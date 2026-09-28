@@ -39,6 +39,15 @@ All notable changes to Sunglasses are documented here.
   data in its query posted so that a chat client previews it. None of the
   three rules carries an exclusion read from the scanned text. Measured on
   0.6.3 before the change 1 of 14 attack scans was caught.
+- **Retrieved text that redirects the agent.** Two rules flag orders that do
+  not come from the user. GLS-EX-030 blocks text that asks the agent to
+  retrieve the user's records or account details and send them to a named
+  email address, URL or phone number. GLS-IP-006 quarantines text that gives
+  orders about the agent's own reply. Examples are encoding it in base64,
+  reversing it, turning it into emoji, translating it and adding a sentence,
+  link or claim to it. Neither needs an override phrase to fire, and ordinary
+  mail that says where to send questions or asks for an order number in your
+  reply stays clean.
 
 ### Documentation
 

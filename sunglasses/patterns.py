@@ -29332,4 +29332,36 @@ PATTERNS = [
         ],
         "description": "Text that tells the agent to post a link whose query string carries record data, such as a phone number or an opportunity amount, so that a chat client like Slack previews it. The preview fetch sends the data to the link's host with no click."
     },
+    # --- retrieved text that redirects the agent: data sent to a named address, and orders for the reply itself ---
+    {
+        "id": "GLS-EX-030",
+        "name": "Tool result asks to send the user's data to an address",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["tool_output", "api_response", "web_content"],
+        "regex": [
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:retrie?ve|get|fetch|list|download|find|access|search|check|collect|gather|pull|export|look\s+up|provide|obtain|extract|dump|copy)\b[^\n]{0,240}?\b(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:it|them|this|these|that|those|(?:the|a|an|all|this|these|those|my)\s+(?:[\w'-]+\s+){0,3}?(?:details|data|information|info|list|file|files|results?|records?|summary|copy|history|report|contents?|email|passwords?|credentials?))\b[^\n]{0,80}?\b(?:to|with|at)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:all\s+(?:of\s+)?)?my\s+(?:[\w'-]+\s+){0,4}?(?:details|data|information|info|records?|history|files?|passwords?|credentials?|addresses|accounts?|contacts?|messages|emails|documents?|photos?|location|keys?)\b[^\n]{0,80}?\b(?:to|with)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+        ],
+        "description": "Text inside a tool result or fetched page that tells the agent to retrieve the user's records, files or account details and then send them to a named email address, URL or phone number. A tool result reports data. It has no business asking the agent to move the user's data somewhere."
+    },
+    {
+        "id": "GLS-IP-006",
+        "name": "Retrieved text gives orders about the agent's reply",
+        "category": "indirect_prompt_injection",
+        "severity": "medium",
+        "channel": ["tool_output", "web_content", "file"],
+        "regex": [
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:encode|encrypt|provide|write|express|render|give|put|reverse|format|convert|present|return|display|replace|translate|reply|respond|answer)\b[^\n.!?]{0,40}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b(?:[^\n.!?]|\.(?=\S)){0,60}?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:(?:use|apply|substitute|swap|replace|encrypt|encode)\b[^\n.!?]{0,60}?)?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b(?:[^\n.!?]|\.(?=\S)){0,60}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:reply|respond|answer)\s+(?:only\s+)?(?:in|using|with)\s+(?:a\s+)?(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:translate|render|provide|write|give|put)\s+your\s+(?:response|answer|reply|output|message)\s+(?:in|into|to)\s+(?:spanish|french|german|italian|portuguese|chinese|japanese|korean|russian|arabic|hindi|dutch|turkish|polish|swedish|greek|hebrew|vietnamese|indonesian|thai)\b""",
+            r"""(?i)\b(?:add|integrate|insert|include|incorporate|append|embed|put|write)\s+(?:a|an|the|this|that|one)\s+(?:[\w'-]+\s+){0,4}?(?:sentence|line|statement|fact|teaser|link|claim|statistic|note|paragraph|remark|reference|announcement|rumou?r|story|joke|promotion|slogan|phrase|quote|mention|disclaimer|signature|footer)\b(?:[^\n]){0,120}?\b(?:in|into|to|within)\s+your\s+(?:response|answer|reply|output|message)\b""",
+            r"""(?i)\b(?:add|insert|include|append|put|write)\s+["\u201c'][^"\u201d\n]{3,200}["\u201d']\s+(?:to|in|into|at\s+the\s+end\s+of)\s+your\s+(?:response|answer|reply|output|message)\b""",
+            r"""(?i)\b(?:add|include|insert|incorporate|integrate)\s+in(?:to)?\s+your\s+(?:response|answer|reply|output|message)\s+(?:a|an|the|that)\b""",
+            r"""(?i)\b(?:in|within)\s+your\s+(?:response|answer|reply|output|message),?\s+(?:please\s+)?(?:add|include|insert|mention|suggest|say|state|hint|promote|reference|note|write|tell|claim)\s+(?:a|an|the|that|how|users?|readers?|people)\b""",
+            r"""(?i)\b(?:modify|enhance|augment|alter|rewrite|end|begin|start|conclude|finish)\s+your\s+(?:response|answer|reply|output|message)\s+(?:to|by|with)\s+(?:\w+ing\b|mention|include|add|promote|recommend|advertise|endorse|praise|push|highlight|spread|hint|suggest|say|state|reference|allude|a\b|an\b|the\b)""",
+        ],
+        "description": "Text inside a retrieved document that addresses the answering model's own reply. It asks for the reply to be encoded, reversed, turned into emoji or translated, or for a sentence, link or claim to be added to it. A document the agent reads is data, and an order about how the agent should answer is an injection."
+    },
 ]
