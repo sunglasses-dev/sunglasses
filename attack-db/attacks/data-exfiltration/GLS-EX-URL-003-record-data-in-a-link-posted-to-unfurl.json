@@ -1,0 +1,26 @@
+{
+  "id": "GLS-EX-URL-003",
+  "name": "Record data in a link posted to unfurl",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Text that tells the agent to post a link whose query string carries record data, such as a phone number or an opportunity amount, so that a chat client like Slack previews it. The preview fetch sends the data to the link's host with no click.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\bso\\s+(?:that\\s+)?(?:it|the\\s+link|the\\s+url|the\\s+preview)\\s+(?:previews|unfurls|expands)\\b.{0,40}?https?://[^\\s\"'<>]{1,200}?[?&][\\w-]{1,20}=.{0,80}?\\b(?:contacts?|e-?mail\\s+addresses|e-?mails?|phone\\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\\s+dates?)\\b",
+    "(?i)https?://[^\\s\"'<>]{1,200}?[?&][\\w-]{1,20}=.{0,80}?\\b(?:contacts?|e-?mail\\s+addresses|e-?mails?|phone\\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\\s+dates?)\\b.{0,80}?\\bso\\s+(?:that\\s+)?(?:it|the\\s+link|the\\s+url|the\\s+preview)\\s+(?:previews|unfurls|expands)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-EX-URL-003"
+}

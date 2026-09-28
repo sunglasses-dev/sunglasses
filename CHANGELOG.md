@@ -31,6 +31,14 @@ All notable changes to Sunglasses are documented here.
   tool's own output is already verified. Neither rule carries an exclusion
   read from the scanned text. Measured on 0.6.3 before the change 0 of 5
   attack scans were caught.
+- Record data put into a URL that a client fetches is now blocked.
+  GLS-EX-URL-001 is an image whose query string holds CRM merge fields such as
+  `{{Lead.Email}}`. GLS-EX-URL-002 is text telling the agent to put contacts
+  or email addresses or opportunity amounts into an image or link, now or when
+  someone later asks about the record. GLS-EX-URL-003 is a link with record
+  data in its query posted so that a chat client previews it. None of the
+  three rules carries an exclusion read from the scanned text. Measured on
+  0.6.3 before the change 1 of 14 attack scans was caught.
 
 ### Documentation
 

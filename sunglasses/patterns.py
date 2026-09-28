@@ -29295,4 +29295,41 @@ PATTERNS = [
         ],
         "description": "A tool name or description that vouches for itself, stacking words like official, verified, certified, trusted and safe, denying it is phishing or malware, or telling the agent its output is already verified. Tool metadata is written by whoever ships the tool, so a self-claim of trust is not evidence of it and can steer which tool an agent picks."
     },
+    # --- GLS-EX-URL: record data leaving through a URL the client fetches (SalesBleed, Zenity 2026-09-24) ---
+    {
+        "id": "GLS-EX-URL-001",
+        "name": "Record merge fields in an image URL",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)(?:!\[[^\]\n]{0,200}\]\(\s*<?|<img\b[^>]{0,200}?\bsrc\s*=\s*["']?)https?://[^\s"'<>()]{1,300}?(?:\{\{\s*[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\s*\}\}|\{![a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}(?:%20){0,3}%7D)""",
+            r"""(?i)(?:^|\n)[ \t]{0,3}\[[^\]\n]{1,100}\]:[ \t]*<?https?://[^\s"'<>]{1,300}?(?:\{\{\s*[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\s*\}\}|\{![a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}(?:%20){0,3}%7D)""",
+        ],
+        "description": "A Markdown or HTML image, or a Markdown reference link, whose URL carries CRM merge fields such as {{Lead.Email}} or {!Account.AnnualRevenue}, plain or percent encoded. When an agent renders its answer the client fetches the image, and the record values in the query string go to the image host."
+    },
+    {
+        "id": "GLS-EX-URL-002",
+        "name": "Record data put into a rendered URL",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)\b(?:append|add|attach|put|insert|include|encode|embed|place|list|look\s+up|collect|gather|pull)\b.{0,60}?\b(?:contacts?|contact\s+list|e-?mail\s+addresses|e-?mails|phone\s+numbers?|opportunit(?:y|ies)|annual\s+revenue|revenue|deal\s+amounts?)\b.{0,120}?\b(?:after|to\s+the\s+end\s+of|into|inside|in|within)\s+(?:the\s+|a\s+|an\s+|this\s+|that\s+)?(?:image|img\b|url\b|query\s+string|[a-z]{1,10}=)""",
+            r"""(?i)\b(?:when|if|whenever|once)\s+(?:someone|anyone|a\s+user|the\s+user|a\s+(?:sales\s+)?rep|an?\s+agent|they)\b.{0,40}?\b(?:later\s+|ever\s+|next\s+)?asks?\b.{0,200}?\b(?:contacts?|e-?mail\s+addresses|phone\s+numbers?|opportunit(?:y|ies)|annual\s+revenue|deal\s+amounts?)\b.{0,160}?\b(?:image|img|link|url)\b""",
+        ],
+        "description": "Text addressed to the agent that tells it to place record data such as contacts, email addresses, phone numbers or opportunity amounts into an image, link or URL query, either now or when someone later asks about the record. A rendered image or link then carries the data to the host that serves it."
+    },
+    {
+        "id": "GLS-EX-URL-003",
+        "name": "Record data in a link posted to unfurl",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)\bso\s+(?:that\s+)?(?:it|the\s+link|the\s+url|the\s+preview)\s+(?:previews|unfurls|expands)\b.{0,40}?https?://[^\s"'<>]{1,200}?[?&][\w-]{1,20}=.{0,80}?\b(?:contacts?|e-?mail\s+addresses|e-?mails?|phone\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\s+dates?)\b""",
+            r"""(?i)https?://[^\s"'<>]{1,200}?[?&][\w-]{1,20}=.{0,80}?\b(?:contacts?|e-?mail\s+addresses|e-?mails?|phone\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\s+dates?)\b.{0,80}?\bso\s+(?:that\s+)?(?:it|the\s+link|the\s+url|the\s+preview)\s+(?:previews|unfurls|expands)\b""",
+        ],
+        "description": "Text that tells the agent to post a link whose query string carries record data, such as a phone number or an opportunity amount, so that a chat client like Slack previews it. The preview fetch sends the data to the link's host with no click."
+    },
 ]
