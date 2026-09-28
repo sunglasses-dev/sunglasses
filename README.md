@@ -33,7 +33,7 @@ a child process and mediates the stdio session between it and your client.
 **What it does depends entirely on whether that server has been approved, and
 the two states are very different.**
 
-### Before approval, none of your client's calls reach the server
+### Before approval, your client's tool requests are refused
 
 Out of the box, every `tools/list` and `tools/call` from your client is
 refused. The client receives a typed JSON-RPC error like this one.
