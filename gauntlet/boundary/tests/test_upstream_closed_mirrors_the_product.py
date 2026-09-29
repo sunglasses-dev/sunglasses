@@ -8,14 +8,18 @@ T8 measured the product on main `1e4e526` and the answer decided this row:
     DESCRIPTOR_CHANGED    an envelope reason_code in proxy/approvals.py, retired
                           through `_retire()`. Never written as a record
     APPROVAL_INVALIDATED  changes state in proxy/pump.py and emits NOTHING
+                          (true on 1e4e526; #263 made it a durable record,
+                          written by `Route._invalidated` when the upstream's
+                          tools/list_changed arrives, so it is mirrored too)
 
 Verified here by importing `sunglasses.proxy.receipts.EVENTS` rather than by
 reading the report, because a citation is a claim until the set says so.
 
-So exactly one of the four gets mirrored. Inventing the other three in
+So two of the four are mirrored now. Inventing the other two in
 `SUPPORTED_EVENTS` would make the adapter the author of the scenario's meaning,
 which is the sentence the whole refusal is built on.
 """
+import io
 import json
 import pathlib
 import shutil
@@ -53,13 +57,13 @@ def _receipt_kinds(run_root):
     return kinds
 
 
-def test_the_product_emits_upstream_closed_and_not_the_other_three():
+def test_the_product_records_two_of_the_four_and_not_the_other_two():
     """The premise of this whole row, asserted rather than cited."""
     from sunglasses.proxy import receipts
 
     assert "UPSTREAM_CLOSED" in receipts.EVENTS
-    for absent in ("REQUEST_RECEIVED", "DESCRIPTOR_CHANGED",
-                   "APPROVAL_INVALIDATED"):
+    assert "APPROVAL_INVALIDATED" in receipts.EVENTS
+    for absent in ("REQUEST_RECEIVED", "DESCRIPTOR_CHANGED"):
         assert absent not in receipts.EVENTS, (
             f"{absent} IS a product record now; this harness refuses it by name "
             "on the grounds that it is not, and that reason has expired")
@@ -96,3 +100,84 @@ def test_the_harness_emits_upstream_closed_when_it_supervised_the_upstream(run_r
 
     # THE CLAIM IS ABOUT A PROCESS, so it carries what the process did.
     assert closed[0].get("status") is not None, closed[0]
+
+
+# ── APPROVAL_INVALIDATED, mirrored after #263 ────────────────────────────────
+#
+# No delivered variant can drive a relist through this adapter yet (G2-19's
+# two list_changed variants need `answer_relist`, which it refuses whole), so
+# the control drives `passthrough.serve` directly with an upstream that says
+# exactly one thing. The record has to appear on the upstream's list_changed
+# and on nothing else, or the mirror is either missing or inventing.
+
+from proxy import passthrough                                  # noqa: E402
+
+LIST_CHANGED = {"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}
+OTHER_NOTE = {"jsonrpc": "2.0", "method": "notifications/message",
+              "params": {"level": "info", "data": "hello"}}
+
+
+def _serve_once(tmp_path, *, upstream_says=None, client_says=None):
+    """One run: the upstream writes its line(s) (if any), then waits for EOF."""
+    says = ([] if not upstream_says else
+            upstream_says if isinstance(upstream_says, list) else [upstream_says])
+    lines = "".join(json.dumps(m) + "\n" for m in says)
+    upstream = [sys.executable, "-c",
+                "import sys\n"
+                f"lines = {lines!r}\n"
+                "if lines:\n"
+                "    sys.stdout.write(lines); sys.stdout.flush()\n"
+                "sys.stdin.read()\n"]
+    client = (json.dumps(client_says) + "\n").encode() if client_says else b""
+    out = io.BytesIO()
+    receipts = tmp_path / "receipts.jsonl"
+    passthrough.serve(upstream, [sys.executable, "-c", "pass"],
+                      receipts=receipts, stdin=io.BytesIO(client), stdout=out)
+    events = [json.loads(l) for l in receipts.read_text().splitlines()
+              if l.strip()]
+    return events, out.getvalue()
+
+
+def test_the_upstreams_list_changed_is_recorded_as_the_product_records_it(tmp_path):
+    events, delivered = _serve_once(tmp_path, upstream_says=LIST_CHANGED)
+    revoked = [e for e in events if e["kind"] == "APPROVAL_INVALIDATED"]
+    assert len(revoked) == 1, [e["kind"] for e in events]
+    # The product's reason, not a harness word for it.
+    assert revoked[0]["reason_code"] == "DESCRIPTOR_CHANGED", revoked[0]
+    # The notification itself still reaches the client: the record is added,
+    # nothing is taken away.
+    assert json.loads(delivered.decode().splitlines()[0]) == LIST_CHANGED
+    # It crossed the boundary first, so the record follows real ingress.
+    ingress = [e["seq"] for e in events if e["kind"] == "RPC_INGRESS"
+               and "list_changed" in e.get("raw", "")]
+    assert ingress and ingress[0] < revoked[0]["seq"], events
+    # ONCE PER SESSION. Measured on the product (real Route.pump_upstream,
+    # signed chain read from disk): 1, 2 and 3 list_changed each leave exactly
+    # 1 durable APPROVAL_INVALIDATED, because an invalidated session drops later
+    # notifications before they reach the setter. A mirror that records every
+    # repeat says something the product never wrote.
+    again = tmp_path / "twice"
+    again.mkdir()
+    events, _ = _serve_once(again, upstream_says=[LIST_CHANGED, LIST_CHANGED])
+    kinds = [e["kind"] for e in events]
+    assert kinds.count("APPROVAL_INVALIDATED") == 1, kinds
+    # And the once is spent by list_changed only: another notification first
+    # must not use it up.
+    later = tmp_path / "other_first"
+    later.mkdir()
+    events, _ = _serve_once(later, upstream_says=[OTHER_NOTE, LIST_CHANGED])
+    kinds = [e["kind"] for e in events]
+    assert kinds.count("APPROVAL_INVALIDATED") == 1, kinds
+
+
+def test_no_revoke_record_without_the_upstreams_list_changed(tmp_path):
+    """The other half, so the mirror cannot quietly fire on every note."""
+    for kwargs in ({"upstream_says": OTHER_NOTE},
+                   {"client_says": LIST_CHANGED},
+                   {}):
+        run = tmp_path / str(len(list(tmp_path.iterdir())))
+        run.mkdir()
+        events, _ = _serve_once(run, **kwargs)
+        assert not [e for e in events if e["kind"] == "APPROVAL_INVALIDATED"], (
+            kwargs, [e["kind"] for e in events])
+

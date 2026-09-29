@@ -38,14 +38,14 @@ def test_an_emitted_event_plans(event):
         == ["await_event"]
 
 
-@pytest.mark.parametrize("event", ["REQUEST_RECEIVED", "APPROVAL_INVALIDATED",
-                                   "DESCRIPTOR_CHANGED"])
+@pytest.mark.parametrize("event", ["REQUEST_RECEIVED", "DESCRIPTOR_CHANGED"])
 def test_an_event_the_product_does_not_record_is_refused_by_name(event):
-    """THREE now, not four, and the bar moved from the harness to the PRODUCT.
+    """TWO now, not four, and the bar moved from the harness to the PRODUCT.
 
     UPSTREAM_CLOSED left this list on 2026-09-22 because
     `sunglasses.proxy.receipts.EVENTS` carries it and the harness now emits it
-    with the same discipline `session.py` uses. These three stay because the
+    with the same discipline `session.py` uses. APPROVAL_INVALIDATED left it
+    after #263 made it a product record. These two stay because the
     product does not record them either — mirroring one would let the harness
     observe something the shipped route cannot.
     """
