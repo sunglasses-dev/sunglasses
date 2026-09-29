@@ -427,7 +427,7 @@ result = scanner.scan_auto("any_file.ext")
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Internal recall (attack-db fixture set) | 64/64, 100% recall |
 | pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
-| False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 76 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
+| False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 77 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
 | Platforms | Mac, Windows, Linux (anywhere Python runs) |
 
@@ -442,9 +442,9 @@ git clone https://github.com/sunglasses-dev/sunglasses && cd sunglasses
 python3 tests/benchmark/precision_recall.py
 ```
 
-Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 76 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
+Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 77 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
 
-| Metric (v0.5.9) | Value |
+| Metric (v0.6.4) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
@@ -452,7 +452,7 @@ Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 
 | Known-shape attacks | 30/30 caught |
 | Novel-semantic attacks (paraphrases the pattern DB has never seen) | 7/8 caught |
 
-**The known gap, stated out loud:** the one miss is `curl … | bash`. Seven of the 76 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line, no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
+**The known gap, stated out loud:** the one miss is `curl … | bash`. Seven of the 77 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line, no text-level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false-positive rate on real READMEs is.
 
 ## Language coverage (measured)
 

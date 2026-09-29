@@ -3,7 +3,7 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [0.6.4] — UNRELEASED
+## [0.6.4] — 2026-09-29
 
 ### Added
 
@@ -12,17 +12,16 @@ All notable changes to Sunglasses are documented here.
   ~/.sunglasses/proxy, to run proxy approve in place of the human or to start
   a server outside the proxy. Our own README and docs name the same paths and
   the same command and stay allowed. Measured on 0.6.3 before the change 1 of
-  13 attack scans was caught, by GLS-CI-001 on a plain rm -rf.
+  13 attack scans was caught, by GLS-CI-001 on a plain rm -rf. (#281)
+
 - Text that sets git to run a program is now flagged. GLS-CI-027 reads
   core.fsmonitor set to a path. GLS-CI-028 reads core.hooksPath set to a path
   on one channel only, since a project README honestly tells a human to set
   it. A boolean or a bare directory name is not a path and does not match. Two
   honest texts are still refused and are listed as known false positives in
   the rule's test. Measured on 0.6.3 before the change 0 of 11 attack scans
-  were caught.
-- `python -m sunglasses.mcp --help`, `-h` and `--version` now print and exit 0 instead of starting the server and reading the terminal as JSON-RPC. Every other argument is still ignored, and the server now names the ignored ones on stderr. (#276)
-- setup.py carries six keywords and four classifiers so the package can be found on PyPI by topic. The classifiers name where it runs today, macOS and Linux, since receipts and the installer use fcntl. (#277)
-- A Claude plugin manifest in `claude-plugin/` lists the shipped MCP server so it can be installed as a plugin. The plugin runs `python3 -m sunglasses.mcp` from the installed package and adds no code of its own. (#278)
+  were caught. (#282)
+
 - A tool that vouches for itself in its own metadata is now flagged.
   GLS-TP-CLAIM-001 blocks a tool description that tells the agent it need not
   ask the user for confirmation. GLS-TP-CLAIM-002 quarantines a name or
@@ -30,7 +29,8 @@ All notable changes to Sunglasses are documented here.
   quarantines a denial of being phishing or malware and a statement that the
   tool's own output is already verified. Neither rule carries an exclusion
   read from the scanned text. Measured on 0.6.3 before the change 0 of 5
-  attack scans were caught.
+  attack scans were caught. (#285)
+
 - Record data put into a URL that a client fetches is now blocked.
   GLS-EX-URL-001 is an image whose query string holds CRM merge fields such as
   `{{Lead.Email}}`. GLS-EX-URL-002 is text telling the agent to put contacts
@@ -38,16 +38,42 @@ All notable changes to Sunglasses are documented here.
   someone later asks about the record. GLS-EX-URL-003 is a link with record
   data in its query posted so that a chat client previews it. None of the
   three rules carries an exclusion read from the scanned text. Measured on
-  0.6.3 before the change 1 of 14 attack scans was caught.
+  0.6.3 before the change 1 of 14 attack scans was caught. (#285)
+
 - **Retrieved text that redirects the agent.** Two rules flag orders that do
   not come from the user. GLS-EX-030 blocks text that asks the agent to
   retrieve the user's records or account details and send them to a named
   email address, URL or phone number. GLS-IP-006 quarantines text that gives
   orders about the agent's own reply. Examples are encoding it in base64,
   reversing it, turning it into emoji, translating it and adding a sentence,
-  link or claim to it. Neither needs an override phrase to fire, and ordinary
-  mail that says where to send questions or asks for an order number in your
-  reply stays clean.
+  link or claim to it. Neither needs an override phrase to fire. Ordinary mail
+  that says where to send questions or asks for an order number in your reply
+  stays clean. (#285)
+
+### Fixed
+
+- `python -m sunglasses.mcp --help` and `--version` now print and exit. Before
+  this they started the server, which then read the terminal as protocol
+  input. Any other argument is still ignored and is now named on stderr.
+  (#276)
+
+### Packaging
+
+- The package now carries keywords and classifiers, so an index search for
+  MCP or prompt injection can find it. The classifiers name Linux and macOS,
+  where it runs today. (#277)
+- A Claude plugin folder lists the MCP server for the Claude plugin
+  directory. It holds config and docs only, no scanner code. (#278)
+
+### Continuous integration
+
+- The release workflow asks PyPI for the version before it uploads. When the
+  version is already there the upload step is skipped. (#283)
+
+### Tests
+
+- Each normalize() stage that had no test of its own now has one, on
+  ordinary text. (#284)
 
 ### Documentation
 
@@ -57,6 +83,10 @@ All notable changes to Sunglasses are documented here.
   Approval needs an interactive terminal and a yes. A published example key is
   blocked as critical. The Threat Registry section is gone because that
   workflow never existed. (#275)
+
+- The README benchmark table said 76 clean READMEs. The corpus has held 77
+  since 0.6.0 (#219), so the table says 77 and its label names the measured
+  version.
 
 
 ## [0.6.3] — 2026-09-28
