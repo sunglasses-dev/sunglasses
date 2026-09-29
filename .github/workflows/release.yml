@@ -174,13 +174,15 @@ jobs:
         with:
           name: dist
           path: dist/
-      # /ship uploads the release to PyPI before it pushes the tag, so this job
-      # normally finds the version already there. PyPI has no trusted publisher
-      # for this workflow yet, so the upload step failed at the token exchange
-      # on every release since 0.6.0 (invalid-publisher) and the run went red
-      # although nothing was wrong. So this job asks PyPI first. A version it
-      # already holds skips the upload and stays green. Any other answer, even no answer,
-      # runs the upload as before, so a version missing from PyPI still fails red.
+      # Up to 0.6.3 the laptop uploaded the release too, sometimes before this
+      # job and sometimes after it, and this upload step failed at the token
+      # exchange on every release since 0.6.0 (invalid-publisher), so the run
+      # went red. From 0.6.4 this job is the only uploader and /ship waits on
+      # it. So this job asks PyPI first. A version PyPI already holds (a laptop
+      # upload, or a re-run after a green upload) skips the upload, and /ship's
+      # release postcondition counts that skip as NOT complete, because the
+      # files on PyPI were not built here. Any other answer, even no answer,
+      # runs the upload, so a version missing from PyPI still fails red.
       - name: Is this version already on PyPI
         id: onpypi
         run: |
