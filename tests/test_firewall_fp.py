@@ -99,7 +99,7 @@ NORMAL_TOOL_CALLS = [
     ("mcp__memory__store", {"key": "api_key_location", "value": "stored in 1Password vault 'prod'"}),
 
     # --- non-egress tools that DO see secret-shaped text: must never block ---
-    ("Read", {"file_path": "/Users/az/.aws/credentials"}),
+    ("Read", {"file_path": "/Users/dev/.aws/credentials"}),
     ("Grep", {"pattern": "AKIA[0-9A-Z]{16}", "path": "."}),
     ("Edit", {"file_path": ".env.example", "old_string": "KEY=", "new_string": "KEY=sk-ant-REPLACE"}),
 ]
@@ -274,7 +274,7 @@ def test_no_fuzzy_in_deterministic_lane():
 
 def test_non_egress_tools_are_not_scanned():
     """Reading a credentials file is not egress. Scanning it there = pure FP surface."""
-    assert not is_egress_tool("Read", {"file_path": "/Users/az/.aws/credentials"})
+    assert not is_egress_tool("Read", {"file_path": "/Users/dev/.aws/credentials"})
     assert not is_egress_tool("Grep", {"pattern": "AKIA[0-9A-Z]{16}"})
     assert is_egress_tool("WebFetch", {"url": "https://example.com"})
     assert is_egress_tool("Bash", {"command": "curl https://example.com"})

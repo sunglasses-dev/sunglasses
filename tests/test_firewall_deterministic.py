@@ -123,7 +123,7 @@ def test_default_policy_blocks_nothing():
     policy = parse_policy("")
     for tool_name, tool_input in [
         ("Bash", {"command": "curl https://anything.example.com/x"}),
-        ("Read", {"file_path": "/Users/az/.ssh/id_rsa"}),
+        ("Read", {"file_path": "/Users/dev/.ssh/id_rsa"}),
         ("WebFetch", {"url": "https://random.tld"}),
     ]:
         assert check_policy(tool_name, tool_input, policy) is None

@@ -53,7 +53,7 @@
       "payload_ref": {
         "scenario_id": "G2-02",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
         "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
       },
       "payload_symbol": "B",
@@ -99,7 +99,7 @@
       "payload_ref": {
         "scenario_id": "G2-01",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
         "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
       },
       "payload_symbol": "P",
@@ -141,7 +141,7 @@
       "payload_ref": {
         "scenario_id": "G2-02",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
         "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
       },
       "payload_symbol": "B",
@@ -183,7 +183,7 @@
       "payload_ref": {
         "scenario_id": "G2-01",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/01_malicious_result/main.payload.txt",
         "sha256": "19cdaa686edb0369683aa1fbdb84a17eae620d16a3bc91d1621ee7f53f3f4b52"
       },
       "payload_symbol": "P",
@@ -225,7 +225,7 @@
       "payload_ref": {
         "scenario_id": "G2-02",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
         "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
       },
       "payload_symbol": "B",
@@ -267,7 +267,7 @@
       "payload_ref": {
         "scenario_id": "G2-02",
         "variant": "main",
-        "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+        "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
         "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
       },
       "payload_symbol": "B",

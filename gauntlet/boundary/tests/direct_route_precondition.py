@@ -4,7 +4,7 @@ Three tests drive a NATIVE upstream from a config frozen into the delivery at
 `ARCHIVE/evidence/GATE2_RUN_2026-09-13/live4/G2-04.main.control/mcp.control.json`.
 That config names an absolute entrypoint inside ANOTHER SESSION'S scratchpad:
 
-    /private/tmp/claude-501/-Users-azrollin/78494234-.../scratchpad/g2batch1/
+    <FIXTURE_ROOT>/scratchpad/g2batch1/
         upstream/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js
 
 The session ended weeks ago and the tree was reaped. The node child dies with

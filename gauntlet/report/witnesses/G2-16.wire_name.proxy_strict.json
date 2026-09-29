@@ -3,7 +3,7 @@
  "route": "proxy_strict",
  "driven_against": "gauntlet/boundary/proxy/passthrough.py",
  "driven_against_note": "ADAPTER AGAINST HARNESS. The mediator here is the gauntlet's own passthrough, not the shipped route. This is evidence that the adapter drives the step and that the step now measures egress; it is NOT proof about the product's real route.",
- "engine_root": "/private/tmp/claude-501/-Users-azrollin/1dbfe431-2791-4551-a3cd-4bc546953918/scratchpad/wt-gaunt",
+ "engine_root": "<FIXTURE_ROOT>/scratchpad/wt-gaunt",
  "executor": "gauntlet/boundary/gen2/execute.py run()",
  "steps": [
   "send_file",

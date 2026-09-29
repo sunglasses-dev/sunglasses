@@ -4,7 +4,7 @@
   "payload_source": {
     "scenario_id": "G2-02",
     "variant": "main",
-    "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
+    "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/02_benign_twin/main.payload.txt",
     "sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e"
   },
   "payload_materialized_sha256": "8164e327e52a8acaf9a153f4832cd081627aeef62e87d13ce0ff949960ca268e",
