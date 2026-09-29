@@ -174,7 +174,29 @@ jobs:
         with:
           name: dist
           path: dist/
+      # Up to 0.6.3 the laptop uploaded the release too, sometimes before this
+      # job and sometimes after it, and this upload step failed at the token
+      # exchange on every release since 0.6.0 (invalid-publisher), so the run
+      # went red. From 0.6.4 this job is the only uploader and /ship waits on
+      # it. So this job asks PyPI first. A version PyPI already holds (a laptop
+      # upload, or a re-run after a green upload) skips the upload, and /ship's
+      # release postcondition counts that skip as NOT complete, because the
+      # files on PyPI were not built here. Any other answer, even no answer,
+      # runs the upload, so a version missing from PyPI still fails red.
+      - name: Is this version already on PyPI
+        id: onpypi
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CODE="$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/sunglasses/$VERSION/json" || true)"
+          echo "PyPI answered $CODE for sunglasses $VERSION"
+          if [ "$CODE" = "200" ]; then
+            echo "sunglasses $VERSION is already on PyPI, the upload is skipped"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        if: steps.onpypi.outputs.exists != 'true'
         with:
           attestations: true
           print-hash: true
