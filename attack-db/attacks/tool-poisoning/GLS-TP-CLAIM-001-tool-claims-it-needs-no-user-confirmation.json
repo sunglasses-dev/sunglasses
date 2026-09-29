@@ -1,0 +1,25 @@
+{
+  "id": "GLS-TP-CLAIM-001",
+  "name": "Tool claims it needs no user confirmation",
+  "version": "1.0",
+  "category": "tool_poisoning",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "tool_output"
+  ],
+  "description": "Tool metadata that tells the agent it does not need to ask the user before running the tool. Whether a call needs confirmation is the client's decision, and a tool that argues it away is claiming authority it does not have.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\b(?:no\\s+need|(?:do|does|will)\\s+not\\s+need|(?:don't|doesn't|won't)\\s+need)\\s+to\\s+(?:ask|prompt|check\\s+with|confirm\\s+with|consult)\\s+(?:the\\s+)?user\\b",
+    "(?i)\\b(?:do\\s+not|don't|never)\\s+(?:ask|prompt)\\s+the\\s+user\\s+(?:for\\s+)?(?:confirmation|approval|permission)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-TP-CLAIM-001"
+}

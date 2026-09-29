@@ -29268,4 +29268,100 @@ PATTERNS = [
         ],
         "description": "A low-trust agent input reaches a privileged helper interpreter that can overwrite the policy or security-state configuration used to enforce authorization."
     },
+    # --- GLS-TP-CLAIM: a tool vouching for itself in its own metadata (ClaimMirage, arXiv 2609.29130) ---
+    {
+        "id": "GLS-TP-CLAIM-001",
+        "name": "Tool claims it needs no user confirmation",
+        "category": "tool_poisoning",
+        "severity": "high",
+        "channel": ["api_response", "tool_output"],
+        "regex": [
+            r"""(?i)\b(?:no\s+need|(?:do|does|will)\s+not\s+need|(?:don't|doesn't|won't)\s+need)\s+to\s+(?:ask|prompt|check\s+with|confirm\s+with|consult)\s+(?:the\s+)?user\b""",
+            r"""(?i)\b(?:do\s+not|don't|never)\s+(?:ask|prompt)\s+the\s+user\s+(?:for\s+)?(?:confirmation|approval|permission)\b""",
+        ],
+        "description": "Tool metadata that tells the agent it does not need to ask the user before running the tool. Whether a call needs confirmation is the client's decision, and a tool that argues it away is claiming authority it does not have."
+    },
+    {
+        "id": "GLS-TP-CLAIM-002",
+        "name": "Tool asserts its own safety or endorsement",
+        "category": "tool_poisoning",
+        "severity": "medium",
+        "channel": ["api_response", "tool_output"],
+        "regex": [
+            r"""(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])(?:(?:\s*[,/&]\s*(?:and\s+)?|\s+and\s+|\s+|_)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])){2}""",
+            r"""(?i)\bnot\s+(?:phishing|malware|malicious|a\s+scam|a\s+virus)\b.{0,120}?(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-])""",
+            r"""(?i)(?<![a-z-])(?:official|verified|certified|trusted|endorsed|safe)(?![a-z-]).{0,120}?\bnot\s+(?:phishing|malware|malicious|a\s+scam|a\s+virus)\b""",
+            r"""(?i)\b(?:its\s+|the\s+|this\s+tool's\s+)?(?:output|results?|responses?)\s+(?:can|may|should)\s+be\s+(?:treated|trusted|accepted|considered)\s+as\s+(?:verified|trusted|safe|authoritative)\b""",
+        ],
+        "description": "A tool name or description that vouches for itself, stacking words like official, verified, certified, trusted and safe, denying it is phishing or malware, or telling the agent its output is already verified. Tool metadata is written by whoever ships the tool, so a self-claim of trust is not evidence of it and can steer which tool an agent picks."
+    },
+    # --- GLS-EX-URL: record data leaving through a URL the client fetches (SalesBleed, Zenity 2026-09-24) ---
+    {
+        "id": "GLS-EX-URL-001",
+        "name": "Record merge fields in an image URL",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)(?:!\[[^\]\n]{0,200}\]\(\s*<?|<img\b[^>]{0,200}?\bsrc\s*=\s*["']?)https?://[^\s"'<>()]{1,300}?(?:\{\{\s*[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\s*\}\}|\{![a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}(?:%20){0,3}%7D)""",
+            r"""(?i)(?:^|\n)[ \t]{0,3}\[[^\]\n]{1,100}\]:[ \t]*<?https?://[^\s"'<>]{1,300}?(?:\{\{\s*[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\s*\}\}|\{![a-z_]\w{0,40}\.[a-z_][\w.]{0,60}\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\w{0,40}\.[a-z_][\w.]{0,60}(?:%20){0,3}%7D)""",
+        ],
+        "description": "A Markdown or HTML image, or a Markdown reference link, whose URL carries CRM merge fields such as {{Lead.Email}} or {!Account.AnnualRevenue}, plain or percent encoded. When an agent renders its answer the client fetches the image, and the record values in the query string go to the image host."
+    },
+    {
+        "id": "GLS-EX-URL-002",
+        "name": "Record data put into a rendered URL",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)\b(?:append|add|attach|put|insert|include|encode|embed|place|list|look\s+up|collect|gather|pull)\b.{0,60}?\b(?:contacts?|contact\s+list|e-?mail\s+addresses|e-?mails|phone\s+numbers?|opportunit(?:y|ies)|annual\s+revenue|revenue|deal\s+amounts?)\b.{0,120}?\b(?:after|to\s+the\s+end\s+of|into|inside|in|within)\s+(?:the\s+|a\s+|an\s+|this\s+|that\s+)?(?:image|img\b|url\b|query\s+string|[a-z]{1,10}=)""",
+            r"""(?i)\b(?:when|if|whenever|once)\s+(?:someone|anyone|a\s+user|the\s+user|a\s+(?:sales\s+)?rep|an?\s+agent|they)\b.{0,40}?\b(?:later\s+|ever\s+|next\s+)?asks?\b.{0,200}?\b(?:contacts?|e-?mail\s+addresses|phone\s+numbers?|opportunit(?:y|ies)|annual\s+revenue|deal\s+amounts?)\b.{0,160}?\b(?:image|img|link|url)\b""",
+        ],
+        "description": "Text addressed to the agent that tells it to place record data such as contacts, email addresses, phone numbers or opportunity amounts into an image, link or URL query, either now or when someone later asks about the record. A rendered image or link then carries the data to the host that serves it."
+    },
+    {
+        "id": "GLS-EX-URL-003",
+        "name": "Record data in a link posted to unfurl",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["api_response", "tool_output", "web_content"],
+        "regex": [
+            r"""(?i)\bso\s+(?:that\s+)?(?:it|the\s+link|the\s+url|the\s+preview)\s+(?:previews|unfurls|expands)\b.{0,40}?https?://[^\s"'<>]{1,200}?[?&][\w-]{1,20}=.{0,80}?\b(?:contacts?|e-?mail\s+addresses|e-?mails?|phone\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\s+dates?)\b""",
+            r"""(?i)https?://[^\s"'<>]{1,200}?[?&][\w-]{1,20}=.{0,80}?\b(?:contacts?|e-?mail\s+addresses|e-?mails?|phone\s+numbers?|opportunit(?:y|ies)|revenue|amounts?|close\s+dates?)\b.{0,80}?\bso\s+(?:that\s+)?(?:it|the\s+link|the\s+url|the\s+preview)\s+(?:previews|unfurls|expands)\b""",
+        ],
+        "description": "Text that tells the agent to post a link whose query string carries record data, such as a phone number or an opportunity amount, so that a chat client like Slack previews it. The preview fetch sends the data to the link's host with no click."
+    },
+    # --- retrieved text that redirects the agent: data sent to a named address, and orders for the reply itself ---
+    {
+        "id": "GLS-EX-030",
+        "name": "Tool result asks to send the user's data to an address",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["tool_output", "api_response", "web_content"],
+        "regex": [
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:retrie?ve|get|fetch|list|download|find|access|search|check|collect|gather|pull|export|look\s+up|provide|obtain|extract|dump|copy)\b[^\n]{0,240}?\b(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:it|them|this|these|that|those|(?:the|a|an|all|this|these|those|my)\s+(?:[\w'-]+\s+){0,3}?(?:details|data|information|info|list|file|files|results?|records?|summary|copy|history|report|contents?|email|passwords?|credentials?))\b[^\n]{0,80}?\b(?:to|with|at)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:all\s+(?:of\s+)?)?my\s+(?:[\w'-]+\s+){0,4}?(?:details|data|information|info|records?|history|files?|passwords?|credentials?|addresses|accounts?|contacts?|messages|emails|documents?|photos?|location|keys?)\b[^\n]{0,80}?\b(?:to|with)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+        ],
+        "description": "Text inside a tool result or fetched page that tells the agent to retrieve the user's records, files or account details and then send them to a named email address, URL or phone number. A tool result reports data. It has no business asking the agent to move the user's data somewhere."
+    },
+    {
+        "id": "GLS-IP-006",
+        "name": "Retrieved text gives orders about the agent's reply",
+        "category": "indirect_prompt_injection",
+        "severity": "medium",
+        "channel": ["tool_output", "web_content", "file"],
+        "regex": [
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:encode|encrypt|provide|write|express|render|give|put|reverse|format|convert|present|return|display|replace|translate|reply|respond|answer)\b[^\n.!?]{0,40}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b(?:[^\n.!?]|\.(?=\S)){0,60}?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:(?:use|apply|substitute|swap|replace|encrypt|encode)\b[^\n.!?]{0,60}?)?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b(?:[^\n.!?]|\.(?=\S)){0,60}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:reply|respond|answer)\s+(?:only\s+)?(?:in|using|with)\s+(?:a\s+)?(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:translate|render|provide|write|give|put)\s+your\s+(?:response|answer|reply|output|message)\s+(?:in|into|to)\s+(?:spanish|french|german|italian|portuguese|chinese|japanese|korean|russian|arabic|hindi|dutch|turkish|polish|swedish|greek|hebrew|vietnamese|indonesian|thai)\b""",
+            r"""(?i)\b(?:add|integrate|insert|include|incorporate|append|embed|put|write)\s+(?:a|an|the|this|that|one)\s+(?:[\w'-]+\s+){0,4}?(?:sentence|line|statement|fact|teaser|link|claim|statistic|note|paragraph|remark|reference|announcement|rumou?r|story|joke|promotion|slogan|phrase|quote|mention|disclaimer|signature|footer)\b(?:[^\n]){0,120}?\b(?:in|into|to|within)\s+your\s+(?:response|answer|reply|output|message)\b""",
+            r"""(?i)\b(?:add|insert|include|append|put|write)\s+["\u201c'][^"\u201d\n]{3,200}["\u201d']\s+(?:to|in|into|at\s+the\s+end\s+of)\s+your\s+(?:response|answer|reply|output|message)\b""",
+            r"""(?i)\b(?:add|include|insert|incorporate|integrate)\s+in(?:to)?\s+your\s+(?:response|answer|reply|output|message)\s+(?:a|an|the|that)\b""",
+            r"""(?i)\b(?:in|within)\s+your\s+(?:response|answer|reply|output|message),?\s+(?:please\s+)?(?:add|include|insert|mention|suggest|say|state|hint|promote|reference|note|write|tell|claim)\s+(?:a|an|the|that|how|users?|readers?|people)\b""",
+            r"""(?i)\b(?:modify|enhance|augment|alter|rewrite|end|begin|start|conclude|finish)\s+your\s+(?:response|answer|reply|output|message)\s+(?:to|by|with)\s+(?:\w+ing\b|mention|include|add|promote|recommend|advertise|endorse|praise|push|highlight|spread|hint|suggest|say|state|reference|allude|a\b|an\b|the\b)""",
+        ],
+        "description": "Text inside a retrieved document that addresses the answering model's own reply. It asks for the reply to be encoded, reversed, turned into emoji or translated, or for a sentence, link or claim to be added to it. A document the agent reads is data, and an order about how the agent should answer is an injection."
+    },
 ]

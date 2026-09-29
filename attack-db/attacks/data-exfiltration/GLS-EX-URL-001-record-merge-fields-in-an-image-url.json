@@ -1,0 +1,26 @@
+{
+  "id": "GLS-EX-URL-001",
+  "name": "Record merge fields in an image URL",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "A Markdown or HTML image, or a Markdown reference link, whose URL carries CRM merge fields such as {{Lead.Email}} or {!Account.AnnualRevenue}, plain or percent encoded. When an agent renders its answer the client fetches the image, and the record values in the query string go to the image host.",
+  "keywords": [],
+  "regex": [
+    "(?i)(?:!\\[[^\\]\\n]{0,200}\\]\\(\\s*<?|<img\\b[^>]{0,200}?\\bsrc\\s*=\\s*[\"']?)https?://[^\\s\"'<>()]{1,300}?(?:\\{\\{\\s*[a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}\\s*\\}\\}|\\{![a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}\\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}(?:%20){0,3}%7D)",
+    "(?i)(?:^|\\n)[ \\t]{0,3}\\[[^\\]\\n]{1,100}\\]:[ \\t]*<?https?://[^\\s\"'<>]{1,300}?(?:\\{\\{\\s*[a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}\\s*\\}\\}|\\{![a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}\\}|%7B(?:%7B|!|%21)(?:%20){0,3}[a-z_]\\w{0,40}\\.[a-z_][\\w.]{0,60}(?:%20){0,3}%7D)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-EX-URL-001"
+}

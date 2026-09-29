@@ -1,0 +1,26 @@
+{
+  "id": "GLS-EX-URL-002",
+  "name": "Record data put into a rendered URL",
+  "version": "1.0",
+  "category": "exfiltration",
+  "severity": "high",
+  "channels": [
+    "api_response",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "Text addressed to the agent that tells it to place record data such as contacts, email addresses, phone numbers or opportunity amounts into an image, link or URL query, either now or when someone later asks about the record. A rendered image or link then carries the data to the host that serves it.",
+  "keywords": [],
+  "regex": [
+    "(?i)\\b(?:append|add|attach|put|insert|include|encode|embed|place|list|look\\s+up|collect|gather|pull)\\b.{0,60}?\\b(?:contacts?|contact\\s+list|e-?mail\\s+addresses|e-?mails|phone\\s+numbers?|opportunit(?:y|ies)|annual\\s+revenue|revenue|deal\\s+amounts?)\\b.{0,120}?\\b(?:after|to\\s+the\\s+end\\s+of|into|inside|in|within)\\s+(?:the\\s+|a\\s+|an\\s+|this\\s+|that\\s+)?(?:image|img\\b|url\\b|query\\s+string|[a-z]{1,10}=)",
+    "(?i)\\b(?:when|if|whenever|once)\\s+(?:someone|anyone|a\\s+user|the\\s+user|a\\s+(?:sales\\s+)?rep|an?\\s+agent|they)\\b.{0,40}?\\b(?:later\\s+|ever\\s+|next\\s+)?asks?\\b.{0,200}?\\b(?:contacts?|e-?mail\\s+addresses|phone\\s+numbers?|opportunit(?:y|ies)|annual\\s+revenue|deal\\s+amounts?)\\b.{0,160}?\\b(?:image|img|link|url)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-EX-URL-002"
+}
