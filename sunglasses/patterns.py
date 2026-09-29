@@ -27716,6 +27716,29 @@ PATTERNS = [
         ],
         "description": "An authorization policy that inventories only direct tool permissions authorizes an unresolved indirect tool-output/resource-handle edge that transitively reaches a privileged or external sink."
     },
+    # ── the proxy's own state ───────────────────────────────────────────────
+    # Text that tells an agent to switch off the proxy guarding it. It writes or
+    # removes files under ~/.sunglasses/proxy (approvals, captures, installs,
+    # locks, receipts), runs `sunglasses proxy approve` or `sunglasses uninstall`
+    # itself to spare the human the prompt, pipes an answer into approve, or starts
+    # the server outside the proxy. Every branch names our
+    # own state or command. A generic rm -rf is left to GLS-CI-001.
+    {
+        "id": "GLS-PE-111",
+        "name": "Agent told to tamper with the proxy's own state",
+        "category": "privilege_escalation",
+        "severity": "high",
+        "channel": ["message", "file", "api_response", "web_content"],
+        "regex": [
+            r"""\b(?:cp|mv|rm|tee|ln|touch|rsync|truncate|shred|unlink|write|overwrite|edit|modify|delete|remove|replace|wipe)\b[^\n]{0,120}?(?:~|\$HOME|\$\{HOME\}|%USERPROFILE%|/(?:Users|home)/[^/\s]+|/root)[/\\]\.sunglasses[/\\]proxy(?:[/\\](?:approvals|captures|installs|locks|receipts)\b|(?![\w/\\-]))""",
+            r"""(?<![-=])>{1,2}\s*(?:~|\$HOME|\$\{HOME\}|%USERPROFILE%|/(?:Users|home)/[^/\s]+|/root)[/\\]\.sunglasses[/\\]proxy(?:[/\\](?:approvals|captures|installs|locks|receipts)\b|(?![\w/\\-]))""",
+            r"""(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b[^\n]{0,160}?\b(?:yourself|on\s+(?:the\s+|their\s+)?users?'?s?\s+behalf|for\s+the\s+user|without\s+(?:asking|prompting|confirmation|the\s+user|a\s+human|them)|so\s+(?:that\s+)?(?:the\s+user|they|nobody|no\s+one)\s+(?:is|are|isn'?t|aren'?t|won'?t|does|doesn'?t|do\s+not|does\s+not|never)|automatically|silently|non-?interactively)\b""",
+            r"""\b(?:skip|avoid|bypass|suppress)\s+(?:the\s+|a\s+|any\s+)?(?:approval|confirmation)\b[^\n]{0,160}?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
+            r"""(?:\|\s*|\bscript\s+-q\S*\s+\S+\s+|\bexpect\b[^\n]{0,60}?)(?:python3?\s+-m\s+)?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
+            r"""\b(?:runs?|running|launch(?:es)?|starts?|calls?|invoke|points?)\b[^\n]{0,80}?\bdirectly\b[^\n]{0,40}?\b(?:instead\s+of|rather\s+than|without)\b[^\n]{0,30}?\b(?:(?:going|passing|routing)\s+)?(?:through|via)\s+(?:the\s+)?sunglasses\b""",
+        ],
+        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, or to start the server outside the proxy. Each one removes the human check the proxy exists to keep."
+    },
     {
         "id": "GLS-DKS-002",
         "name": "Duplicate Policy Key Collision",
