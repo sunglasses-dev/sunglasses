@@ -13,6 +13,16 @@ All notable changes to Sunglasses are documented here.
   a server outside the proxy. Our own README and docs name the same paths and
   the same command and stay allowed. Measured on 0.6.3 before the change 1 of
   13 attack scans was caught, by GLS-CI-001 on a plain rm -rf.
+- Text that sets git to run a program is now flagged. GLS-CI-027 reads
+  core.fsmonitor set to a path. GLS-CI-028 reads core.hooksPath set to a path
+  on one channel only, since a project README honestly tells a human to set
+  it. A boolean or a bare directory name is not a path and does not match. Two
+  honest texts are still refused and are listed as known false positives in
+  the rule's test. Measured on 0.6.3 before the change 0 of 11 attack scans
+  were caught.
+- `python -m sunglasses.mcp --help`, `-h` and `--version` now print and exit 0 instead of starting the server and reading the terminal as JSON-RPC. Every other argument is still ignored, and the server now names the ignored ones on stderr. (#276)
+- setup.py carries six keywords and four classifiers so the package can be found on PyPI by topic. The classifiers name where it runs today, macOS and Linux, since receipts and the installer use fcntl. (#277)
+- A Claude plugin manifest in `claude-plugin/` lists the shipped MCP server so it can be installed as a plugin. The plugin runs `python3 -m sunglasses.mcp` from the installed package and adds no code of its own. (#278)
 
 ### Documentation
 
