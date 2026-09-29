@@ -83,9 +83,22 @@ ENCLOSED_ALPHA = re.compile(r'[\u24b6-\u24e9\u2460-\u2473\u24ea-\u24ff]')
 # (0.4.3). Stripped from raw input first so an attacker cannot plant it.
 VIEW_SEP = "\x1e"
 
+# The ROT13 / reversed / shape views are built only when the folded plain text
+# is at most this long. The engine's step 3.5 reads the same number through
+# normalize_with_length(), so the two gates measure one string, not two.
+ENRICH_MAX_LEN = 2000
+
 
 def normalize(text: str) -> str:
     """Full normalization pipeline. Returns cleaned text for pattern matching."""
+    return normalize_with_length(text)[0]
+
+
+def normalize_with_length(text: str) -> tuple:
+    """normalize(), plus the length of the folded plain text that the
+    enrichment gate measured. That length is taken after every fold and before
+    any view is appended, so a caller gating on it agrees with this function
+    about what counts as a short input."""
     text = text.replace(VIEW_SEP, " ")
     # Read before strip_invisible removes them, so the plain view still loses
     # them (a split phrase keeps matching) and the shadow view sees the text.
@@ -124,8 +137,8 @@ def normalize(text: str) -> str:
     #   3. it added a few extra false positives on the scrambled text.
     # So enrich ONLY short inputs, where these evasions actually occur; larger
     # inputs (files, web pages, tool outputs) skip enrichment entirely.
-    ENRICH_MAX_LEN = 2000
-    if len(text) <= ENRICH_MAX_LEN:
+    folded_length = len(text)
+    if folded_length <= ENRICH_MAX_LEN:
         # ROT13 enrichment so "Vtaber cerivbhf vafgehpgvbaf" also sees
         # "ignore previous instructions"
         rot = decode_rot13(text)
@@ -154,7 +167,7 @@ def normalize(text: str) -> str:
         # Its own views, behind the separator, so an excerpt never joins it
         # to the plain text.
         text = text + " " + VIEW_SEP + " " + normalize(shadow)
-    return text
+    return text, folded_length
 
 
 # Invisible code points that shadow printable ASCII one for one.
