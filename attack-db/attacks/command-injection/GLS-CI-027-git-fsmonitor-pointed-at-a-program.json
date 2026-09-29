@@ -1,0 +1,27 @@
+{
+  "id": "GLS-CI-027",
+  "name": "Git fsmonitor pointed at a program",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "api_response",
+    "web_content"
+  ],
+  "description": "core.fsmonitor set to a path. Git runs that program on every status, so pointing it at a script in the checkout or a temp directory is code execution without a visible run step.",
+  "keywords": [],
+  "regex": [
+    "\\bgit\\b[^\\n]{0,80}?\\bcore\\.fsmonitor(?:\\s*=\\s*|\\s+)[\"']?(?:(?:\\.{1,2}[/\\\\]|\\.[\\w-]+[/\\\\]|[/~$%]|[A-Za-z]:\\\\)[^\\s\"'`;|&<>]+|[\\w.-]+(?:[/\\\\][\\w.-]+)*\\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\\b)",
+    "(?:\\bcore\\.|(?<![\\w.]))fsmonitor\\s*=\\s*[\"']?(?:(?:\\.{1,2}[/\\\\]|\\.[\\w-]+[/\\\\]|[/~$%]|[A-Za-z]:\\\\)[^\\s\"'`;|&<>]+|[\\w.-]+(?:[/\\\\][\\w.-]+)*\\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-CI-027"
+}

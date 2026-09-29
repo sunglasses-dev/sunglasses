@@ -1,0 +1,24 @@
+{
+  "id": "GLS-CI-028",
+  "name": "Git hooksPath repointed at a path",
+  "version": "1.0",
+  "category": "command_injection",
+  "severity": "high",
+  "channels": [
+    "api_response"
+  ],
+  "description": "core.hooksPath set to a path. Every later commit runs whatever that directory holds. Read on one channel only because project READMEs legitimately tell a human to set it.",
+  "keywords": [],
+  "regex": [
+    "\\bgit\\b[^\\n]{0,80}?\\bcore\\.hookspath(?:\\s*=\\s*|\\s+)[\"']?(?:(?:\\.{1,2}[/\\\\]|\\.[\\w-]+[/\\\\]|[/~$%]|[A-Za-z]:\\\\)[^\\s\"'`;|&<>]+|[\\w.-]+(?:[/\\\\][\\w.-]+)*\\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\\b)",
+    "(?:\\bcore\\.|(?<![\\w.]))hookspath\\s*=\\s*[\"']?(?:(?:\\.{1,2}[/\\\\]|\\.[\\w-]+[/\\\\]|[/~$%]|[A-Za-z]:\\\\)[^\\s\"'`;|&<>]+|[\\w.-]+(?:[/\\\\][\\w.-]+)*\\.(?:sh|bash|zsh|py|pl|rb|js|ps1|bat|cmd|exe)\\b)"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-09-28",
+  "source": "patterns.py:GLS-CI-028"
+}
