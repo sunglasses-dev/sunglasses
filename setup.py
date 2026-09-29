@@ -15,6 +15,10 @@ setup(
         "Issues": "https://github.com/sunglasses-dev/sunglasses/issues",
     },
     license="MIT",
+    # Search terms for package indexes. Each one names something the package
+    # does today: the MCP server, the Claude Code firewall hook, the scanner.
+    keywords=["prompt-injection", "mcp", "ai-agent-security", "llm-firewall",
+              "claude-code", "tool-poisoning"],
     # tests/ carries no __init__.py today, so this changes nothing yet; it keeps
     # a future one from shipping the suite as a package (T9 ruling 47).
     packages=find_packages(exclude=["tests", "tests.*"]),
@@ -62,8 +66,15 @@ setup(
         # every package index reader; Beta is the honest rung, and Production/Stable
         # would overstate it while the API can still move in a minor.
         "Development Status :: 4 - Beta",
+        "Environment :: Console",
         "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
         "License :: OSI Approved :: MIT License",
+        # Not "OS Independent": receipts and the installer import fcntl, which
+        # Windows does not have, and CI runs on Linux only. These two name
+        # where it runs today: Linux in CI, macOS where it is built.
+        "Operating System :: MacOS",
+        "Operating System :: POSIX :: Linux",
         # One classifier per version the CI matrix actually runs
         # (.github/workflows/pattern-integrity.yml). Without these, package indexes
         # and the shields.io pyversions badge can only report "3", which tells a
