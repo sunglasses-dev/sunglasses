@@ -328,6 +328,11 @@
     "repo": "sunglasses-dev/sunglasses",
     "source": "authored in-repo; see tests/fp_real_world_corpus/sunglasses-dev__env-var-docs-shapes.md"
   },
+  "sunglasses-dev__sunglasses.md": {
+    "fetched": "2026-07-12",
+    "repo": "sunglasses-dev/sunglasses",
+    "source": "https://github.com/sunglasses-dev/sunglasses"
+  },
   "supabase__supabase.md": {
     "fetched": "2026-07-10",
     "repo": "supabase/supabase",
