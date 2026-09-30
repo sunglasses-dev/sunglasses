@@ -2,7 +2,7 @@
   "version": "0.6.4",
   "patterns": 1564,
   "keywords": 6675,
-  "categories": 118,
+  "categories": 117,
   "normalization_techniques": 17,
   "scan_speed_display": "~0.7ms short input, ~4ms typical attack string",
   "license": "MIT",

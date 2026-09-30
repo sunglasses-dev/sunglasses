@@ -2,7 +2,7 @@
   "id": "GLS-PT-010",
   "name": "Sensitive absolute-path value in agent file-upload/read parameter",
   "version": "1.0",
-  "category": "path-traversal",
+  "category": "path_traversal",
   "severity": "high",
   "channels": [
     "message",
