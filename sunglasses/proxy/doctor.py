@@ -86,6 +86,10 @@ SELF_TEST_UNAVAILABLE = "SELF_TEST_UNAVAILABLE"
 # NOT_RUN can describe away a failure it just produced. This value is only ever
 # synthesised in `render`, from a class this module decided.
 NOT_RUN = "NOT_RUN"
+# A route's verdict is ONE field with three values, written once (`_route_result`)
+# and read by every renderer. PASS and FAIL are what a launcher reported; NOT_RUN
+# is "nothing launched it", which is not a failure and must never be spelled as one.
+ROUTE_RESULTS = ("PASS", "FAIL", NOT_RUN)
 
 # The only details this report will ever print. An allowlist rather than a
 # string, because `detail` is the field a future caller reaches for when it has
@@ -118,6 +122,9 @@ class Entry:
     state: str
     passed: bool = False
     detail: str = ""
+    # CU-M8. `passed` alone cannot say "never launched": False meant both that
+    # and "launched and failed", and the JSON rendered the first as FAIL.
+    result: str = NOT_RUN
 
 
 @dataclass
@@ -245,8 +252,22 @@ def default_self_test():
 
 
 def default_launcher(entry):
-    """The seam R2's per-route launch lands in. Same reason, same direction."""
-    return False, {}
+    """The seam R2's per-route launch lands in. Same reason, same direction.
+
+    `None`, not `False`. CU-M8 (2026-09-30): this returned `False`, which every
+    reader takes to mean "launched and failed", so a build with no launcher
+    reported every wrapped route as FAIL in `--json` while the text said nothing
+    was marked failed. Nothing was launched, and the verdict says so.
+    """
+    return None, {}
+
+
+def _route_result(passed) -> str:
+    """The one place a launcher's answer becomes a verdict: True is PASS, False
+    is FAIL, and `None` (no launch happened) is NOT_RUN."""
+    if passed is None:
+        return NOT_RUN
+    return "PASS" if passed else "FAIL"
 
 
 # ── T10.R2 · classification, path AND hash ─────────────────────────────────
@@ -356,7 +377,7 @@ def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
     unreadable = list(unreadable or [])
 
     per_wrapper = [{"name": e.name, "source": e.source,
-                    "result": "PASS" if e.passed else "FAIL"}
+                    "result": e.result}
                    for e in entries if e.state == WRAPPED]
     inventory = [{"name": e.name, "source": e.source, "state": e.state}
                  for e in entries]
@@ -467,7 +488,8 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
         # evidence named the wrong thing, which is worse than a wrong exit
         # because it is the part an operator reads.
         passed, route_result = launch(entry)
-        entry.passed = bool(passed)
+        entry.result = _route_result(passed)
+        entry.passed = entry.result == "PASS"
         route_checks[f"{entry.source}:{entry.name}"] = _safe_checks(route_result)
 
     outcome = aggregate(sources_readable=not unreadable, entries=entries,
