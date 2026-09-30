@@ -16,6 +16,7 @@ is aimed at in `--item-file`. Match: exec the delivered worker in `barrier`
 mode. Anything else, including an item the mediator did not name: `scan`.
 The delivered `fault_worker.py` is not modified.
 """
+from __future__ import annotations
 import argparse
 import json
 import os
