@@ -3,6 +3,57 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.5] — YYYY-MM-DD
+
+### Changed
+
+- A repo scan now sends a file to review when GLS-PT-010 and a second path
+  traversal rule of high or critical severity both fire on it at different
+  places in the text. GLS-PT-010 was filed under
+  path-traversal with a hyphen while the other 10 path traversal rules use
+  path_traversal, so the repo rollup did not count the two findings as one
+  category. Such a file used to get the clean_notes verdict and now gets
+  review_before_agent_ingestion with path_traversal listed for review. The
+  scan decision on each input does not change. (#290)
+
+- The category field in the public pattern list at
+  sunglasses.dev/patterns.json changes for two rules. GLS-PT-010 goes from
+  path-traversal to path_traversal and GLS-SQLFS-001 goes from sql-injection
+  to sql_injection. A tool that matches on the old spellings needs the new
+  ones. (#290)
+
+### Fixed
+
+- GLS-PT-010 now uses the path_traversal category like the other 10 path
+  traversal rules. The two spellings were counted as two categories, so the
+  category count read 118 for 117 distinct categories. README.md and
+  attack-db/README.md and stats/current.json now say 117. A new test fails if
+  two category spellings ever fold into one. Measured on 1669 inputs across
+  the attack database and the benchmark attacks and the 77 clean READMEs, the
+  change moves 0 scan decisions and 0 finding ids or severities. The repo
+  rollup sends the same 280 files to review. (#290)
+
+- GLS-SQLFS-001 now uses the sql_injection category instead of sql-injection
+  with a hyphen, so no category name in the rule set has a hyphen now. No
+  other rule is in that category, so the category count stays 117 and what
+  the rule detects does not change. (#290)
+
+### Documentation
+
+- stats/current.json now records benchmark_negatives, the number of clean
+  READMEs the benchmark scans (77). A new test counts them with the
+  benchmark's own loader, so adding or removing a README fails the test until
+  the truth file follows. (#290)
+
+- The corpus manifest tests/fp_real_world_corpus/MANIFEST.json now lists
+  sunglasses-dev__sunglasses.md, our own README, in the corpus since 0.3.1
+  (#74) without a manifest row. The manifest had 76 rows for 77 files. A
+  new test fails when a corpus file has no row or a row has no file. (#290)
+
+- README now leads with the 6,675 indexed keywords and names the 6,964
+  declared beside them, the same figure version.json publishes. (#290)
+
+
 ## [0.6.4] — 2026-09-29
 
 ### Added
