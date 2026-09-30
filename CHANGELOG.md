@@ -53,7 +53,6 @@ All notable changes to Sunglasses are documented here.
 - README now leads with the 6,675 indexed keywords and names the 6,964
   declared beside them, the same figure version.json publishes. (#290)
 
-
 - stats/current.json carries the 0.6.4 numbers, 1,564 patterns and 6,675
   keywords. (#287)
 
