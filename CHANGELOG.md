@@ -54,6 +54,9 @@ All notable changes to Sunglasses are documented here.
   declared beside them, the same figure version.json publishes. (#290)
 
 
+- stats/current.json carries the 0.6.4 numbers, 1,564 patterns and 6,675
+  keywords. (#287)
+
 ## [0.6.4] — 2026-09-29
 
 ### Added
