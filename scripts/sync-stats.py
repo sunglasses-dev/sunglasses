@@ -56,8 +56,9 @@ def get_real_stats():
         "patterns": total,
         "categories": len(categories),
         "keywords": keyword_count,
-        # README's "unique keywords" is the DECLARED count; `keywords` is the smaller
-        # pre-screen index. Writing the index there would state a different number.
+        # The README states both: the DECLARED count (table row, and in brackets on the
+        # Text scanning line) and `keywords`, the smaller pre-screen index. Each goes
+        # only in its own slot.
         "keywords_declared": info["keywords_declared"],
         "keyword_entries": info["keyword_entries"],
         "regex": regex_count,
@@ -112,11 +113,13 @@ def sync_readme(stats):
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
         # What Works Today line. It must match the README as written (thousands
-        # separators, "unique keywords", no language count), or the replacement is a
-        # silent no-op, which it was from #147 until this pattern was fixed.
-        (r'Text scanning: [\d,]+ patterns, [\d,]+ unique keywords, [\d,]+ attack categories',
-         f'Text scanning: {stats["patterns"]:,} patterns, {stats["keywords_declared"]:,} unique keywords, '
-         f'{stats["categories"]:,} attack categories'),
+        # separators, no language count), or the replacement is a silent no-op, which
+        # it was from #147 until this pattern was fixed. It leads with the index count,
+        # the number version.json and `sunglasses info` publish, and names the declared
+        # count beside it, so the line never reads as a second "keywords" figure.
+        (r'Text scanning: [\d,]+ patterns, [\d,]+ indexed keywords \([\d,]+ declared\), [\d,]+ attack categories',
+         f'Text scanning: {stats["patterns"]:,} patterns, {stats["keywords"]:,} indexed keywords '
+         f'({stats["keywords_declared"]:,} declared), {stats["categories"]:,} attack categories'),
     ]
     return update_file(readme, replacements, "README.md")
 

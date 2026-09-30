@@ -29,19 +29,19 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} unique keywords, {} attack categories (English-first, see [Language coverage](#language-coverage-measured))"
+TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} indexed keywords ({} declared), {} attack categories (English-first, see [Language coverage](#language-coverage-measured))"
 
 
 def _expected_line(stats):
-    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["keywords_declared"]:,}',
-                            f'{stats["categories"]:,}')
+    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["keywords"]:,}',
+                            f'{stats["keywords_declared"]:,}', f'{stats["categories"]:,}')
 
 
 def test_sync_readme_rewrites_the_text_scanning_line(tmp_path, monkeypatch):
     """The line must be REWRITTEN, counted, not merely survive the run."""
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_readme")
     stats = sync.get_real_stats()
-    stale = TEXT_LINE.format("1", "2", "3")
+    stale = TEXT_LINE.format("1", "2", "3", "4")
     (tmp_path / "README.md").write_text(f"x\n{stale}\ny\n")
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
     assert sync.sync_readme(stats) is True
@@ -52,7 +52,7 @@ def test_sync_readme_rewrites_the_text_scanning_line(tmp_path, monkeypatch):
 
 def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkeypatch):
     """Against the real README the pattern must hit exactly one line, and a current
-    README must come out byte-identical (the declared keyword count, not the index's)."""
+    README must come out byte-identical (the index count first, the declared count in brackets)."""
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_real")
     stats = sync.get_real_stats()
     real = (ROOT / "README.md").read_text()
