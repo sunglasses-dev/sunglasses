@@ -26,6 +26,7 @@ COVERAGE LOSS, stated so it is not discovered later as a silence: G2-12 has no
 executed native direct-route evidence while this holds, and
 `capability_map.json` records it.
 """
+from __future__ import annotations
 import json
 import pathlib
 

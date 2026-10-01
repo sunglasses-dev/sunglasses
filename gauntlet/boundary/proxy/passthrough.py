@@ -1053,6 +1053,12 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         target = params.get("requestId")
         return target if target is not None else params.get("request_id")
 
+    # ONCE PER SESSION, like the product. `Route` checks `_invalidated_as`
+    # before it inspects a notification (pump.py, the notification branch), so
+    # after the first revoke a later list_changed never reaches the setter and
+    # writes no second record. Only the upstream reader sets this.
+    invalidated = threading.Event()
+
     def pump(source, sink, direction, label):
         for raw in bounded_lines(source, proxy.wire_frame_limit):
             line = raw.decode("utf-8", "surrogatepass").rstrip("\n")
@@ -1106,6 +1112,22 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
                     # no window in which the upstream has been told to stop
                     # while this side still believes a release is coming.
                     proxy.cancel(target)
+                if (direction == "result" and not invalidated.is_set()
+                        and message.get("method")
+                        == "notifications/tools/list_changed"):
+                    # MIRRORED FROM `Route._invalidated` (#263). The product
+                    # reads this notification from the upstream as a revoke of
+                    # authority and writes APPROVAL_INVALIDATED with
+                    # reason_code DESCRIPTOR_CHANGED, activated or not, before
+                    # the notification is handed on, and it does so ONCE per
+                    # session (see `invalidated` above). So the harness says
+                    # the same at the same moment, once. It mirrors the RECORD
+                    # only: this mediator holds no approval, so it withholds
+                    # nothing because of it, and a schedule that needs those
+                    # consequences is still out of reach here.
+                    invalidated.set()
+                    proxy._emit("APPROVAL_INVALIDATED", None,
+                                reason_code="DESCRIPTOR_CHANGED")
                 with write_lock:
                     _write(sink, raw)
                 continue
@@ -1242,7 +1264,8 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
         # Added because T8 measured the product on 1e4e526: UPSTREAM_CLOSED is
         # in `receipts.EVENTS`, and REQUEST_RECEIVED, DESCRIPTOR_CHANGED and
         # APPROVAL_INVALIDATED are not. Only what the product records is
-        # mirrored here.
+        # mirrored here. APPROVAL_INVALIDATED became a product record with #263
+        # and is mirrored in `pump`, where the upstream's list_changed arrives.
         status = upstream.poll()
         if status is not None:
             proxy._emit("UPSTREAM_CLOSED", None, status=status,

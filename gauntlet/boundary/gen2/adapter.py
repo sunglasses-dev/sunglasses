@@ -88,12 +88,17 @@ SUPPORTED_EVENTS = frozenset({"SCAN_STARTED", "HOLD_ENTERED", "CANCEL_ACCEPTED",
                               # `sunglasses.proxy.receipts.EVENTS` and the
                               # harness now emits it with the same discipline,
                               # only after supervising the child.
-                              "UPSTREAM_CLOSED"})
+                              "UPSTREAM_CLOSED",
+                              # Mirrored after #263 made it a product record:
+                              # `Route._invalidated` writes it when the
+                              # upstream's list_changed arrives, and the
+                              # harness now writes it at the same frame.
+                              "APPROVAL_INVALIDATED"})
 
 # WHY EACH REMAINING EVENT IS REFUSED, in the product's own terms.
 #
 # "this mediator does not emit X" was true and useless: it invited the reading
-# that the harness is behind and should catch up. Three of these are refused
+# that the harness is behind and should catch up. The two left are refused
 # because THE PRODUCT DOES NOT RECORD THEM EITHER, and mirroring one would mean
 # the harness could observe something the shipped route cannot. That is not a
 # gap to close; it is the answer.
@@ -110,9 +115,6 @@ EVENT_REFUSAL_REASONS = {
         "sunglasses/proxy/approvals.py, retired through `_retire()`. It is a "
         "reason attached to a refusal, not a record of a moment, so awaiting it "
         "would be awaiting the wrong surface"),
-    "APPROVAL_INVALIDATED": (
-        "the product changes this state in sunglasses/proxy/pump.py and emits "
-        "NOTHING for it. There is no record to mirror"),
 }
 
 # Every await_event step naming a supported event carries actor `proxy` or

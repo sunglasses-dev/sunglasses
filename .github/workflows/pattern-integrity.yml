@@ -241,6 +241,28 @@ jobs:
             echo "ROUND-8 GATE INVALID: a skip/error/failure is present"; exit 1; fi
           exit "$CODE"
 
+      # The boundary harness tripwire, as a blocking step in both lanes so the
+      # fast lane still mirrors the matrix step for step. The harness mirrors
+      # the records the proxy writes, and this file fails when the two drift
+      # apart. It went red when revoking became a durable record and nothing
+      # ran it for three days. Only the three tests that need no local review
+      # material run here. The rest of the boundary suite reads scenario and
+      # review files that live outside the repository and runs nightly on the
+      # machine that holds them. Exactly 3 must pass and nothing may skip.
+      - name: Boundary harness tripwire, 3 passed and zero skips
+        run: |
+          pytest -q -p no:cacheprovider \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_the_product_records_two_of_the_four_and_not_the_other_two" \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_the_upstreams_list_changed_is_recorded_as_the_product_records_it" \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_no_revoke_record_without_the_upstreams_list_changed" \
+            | tee /tmp/boundary_tripwire.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^3 passed" /tmp/boundary_tripwire.log || {
+            echo "TRIPWIRE GATE INVALID: expected exactly '3 passed'"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed|deselected)" /tmp/boundary_tripwire.log; then
+            echo "TRIPWIRE GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
+
       # The fast suite: everything except the two v0.5.6 acceptance modules
       # (tests/test_v056_matrix.py — the media matrix, 398 cases — and
       # tests/test_repair_v056.py — 114 cases spanning media, consent, CLI output
@@ -416,6 +438,28 @@ jobs:
             echo "ROUND-8 GATE INVALID: expected exactly '19 passed'"; exit 1; }
           if grep -qE "[0-9]+ (skipped|error|failed)" /tmp/round8.log; then
             echo "ROUND-8 GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
+
+      # The boundary harness tripwire, as a blocking step in both lanes so the
+      # fast lane still mirrors the matrix step for step. The harness mirrors
+      # the records the proxy writes, and this file fails when the two drift
+      # apart. It went red when revoking became a durable record and nothing
+      # ran it for three days. Only the three tests that need no local review
+      # material run here. The rest of the boundary suite reads scenario and
+      # review files that live outside the repository and runs nightly on the
+      # machine that holds them. Exactly 3 must pass and nothing may skip.
+      - name: Boundary harness tripwire, 3 passed and zero skips
+        run: |
+          pytest -q -p no:cacheprovider \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_the_product_records_two_of_the_four_and_not_the_other_two" \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_the_upstreams_list_changed_is_recorded_as_the_product_records_it" \
+            "gauntlet/boundary/tests/test_upstream_closed_mirrors_the_product.py::test_no_revoke_record_without_the_upstreams_list_changed" \
+            | tee /tmp/boundary_tripwire.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^3 passed" /tmp/boundary_tripwire.log || {
+            echo "TRIPWIRE GATE INVALID: expected exactly '3 passed'"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed|deselected)" /tmp/boundary_tripwire.log; then
+            echo "TRIPWIRE GATE INVALID: a skip/error/failure is present"; exit 1; fi
           exit "$CODE"
 
       # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above

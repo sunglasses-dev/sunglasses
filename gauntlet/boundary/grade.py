@@ -6,6 +6,7 @@ It means this batch did not measure that layer at all, and saying so is the poin
 batch 1 ran no destination sink, so every destination cell is OBSERVED-ONLY and
 calling those PASS would manufacture four clean layers out of nothing.
 """
+from __future__ import annotations
 import json, pathlib, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
