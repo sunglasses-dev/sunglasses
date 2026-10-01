@@ -13,7 +13,7 @@
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
 - An MCP server your agent calls, and a GitHub Action that scans every pull request
-- A Claude Code hook that blocks credential paths and policy violations before a tool runs
+- A Claude Code hook that blocks the credential paths and policy violations your policy lists, before a tool runs
 - A local MCP proxy that refuses every `tools/list` and `tools/call` until a person
   approves the server at an interactive terminal. **Once approved, it withholds a
   credential in a tool call or in a tool result, which is the credential lane and not
