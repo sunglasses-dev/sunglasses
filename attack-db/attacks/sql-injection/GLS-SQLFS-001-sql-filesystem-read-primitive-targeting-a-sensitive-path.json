@@ -2,7 +2,7 @@
   "id": "GLS-SQLFS-001",
   "name": "SQL filesystem-read primitive targeting a sensitive path",
   "version": "1.0",
-  "category": "sql-injection",
+  "category": "sql_injection",
   "severity": "high",
   "channels": [
     "message",

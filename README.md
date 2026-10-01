@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sunglasses-dev/sunglasses/badge)](https://scorecard.dev/viewer/?uri=github.com/sunglasses-dev/sunglasses)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,564 patterns across 118 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run, best effort under its 10 second timeout.
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,564 patterns across 117 categories and reports findings and incomplete scans. A Claude Code hook blocks credential leaks and policy violations before tools run, best effort under its 10 second timeout.
 
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
@@ -422,10 +422,10 @@ result = scanner.scan_auto("any_file.ext")
 | Patterns | 1,564 |
 | Keywords | 6,964 unique declared (7,786 entries across all patterns); the pre-screen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
 | Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
-| Attack categories | 118 |
+| Attack categories | 117 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
-| Internal recall (attack-db fixture set) | 64/64, 100% recall |
+| Recall and precision on the shipped benchmark | recall 97.4% (37/38), precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py` (details in the Benchmark section below) |
 | pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
 | False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 77 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
@@ -477,7 +477,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 ## What Works Today
 
-- ✅ Text scanning: 1,564 patterns, 6,964 unique keywords, 118 attack categories (English-first, see [Language coverage](#language-coverage-measured))
+- ✅ Text scanning: 1,564 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
@@ -492,7 +492,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ LangChain + CrewAI integrations
 - ✅ MCP scanning server. Run `python -m sunglasses.mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
 - ✅ SARIF 2.1.0 output for CI integration
-- ✅ 64/64 internal recall on shipped attack fixture set, 100% recall
+- ✅ Measured on a shipped dataset, recall 97.4% (37/38) and precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py`
 - ✅ Local scanning with zero telemetry. Only audio and video need a download, the Whisper model on first use
 - ✅ Daily protection report (local HTML), covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
 - ✅ MIT License

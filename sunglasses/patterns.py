@@ -25462,7 +25462,7 @@ PATTERNS = [
     {
         "id": "GLS-SQLFS-001",
         "name": "SQL filesystem-read primitive targeting a sensitive path",
-        "category": "sql-injection",
+        "category": "sql_injection",
         "severity": "high",
         "channel": ["message", "file", "api_response"],
         "keywords": [
@@ -25483,7 +25483,7 @@ PATTERNS = [
     {
         "id": "GLS-PT-010",
         "name": "Sensitive absolute-path value in agent file-upload/read parameter",
-        "category": "path-traversal",
+        "category": "path_traversal",
         "severity": "high",
         "channel": ["message", "file", "api_response"],
         "keywords": [
