@@ -142,6 +142,88 @@ one is where agents get hurt. Exit `0` is not a guarantee that a file is safe, o
 supported scope was covered and no pattern fired. In JSON the same split is explicit:
 `is_clean` is `not threat_found and inspection_complete`.
 
+## Try the proxy in two minutes
+
+You do not need an MCP client for this. The package ships a tiny server,
+`sunglasses/proxy/echo_server.py`, bundled for the proxy self test; it works as a sample server, it is not a supported surface.
+It has one tool, `echo`. Run all
+of it from one empty folder, with the `python3` that has SUNGLASSES installed.
+Nothing outside that folder and `~/.sunglasses/` is touched.
+
+**1. Wrap it.** `install` needs an existing `.mcp.json` to edit, so write one first.
+
+```bash
+cat > .mcp.json <<'EOF'
+{
+  "mcpServers": {
+    "echo": {
+      "command": "python3",
+      "args": ["-m", "sunglasses.proxy.echo_server"]
+    }
+  }
+}
+EOF
+sunglasses install echo
+```
+
+**2. Be the client.** A client speaks newline delimited JSON-RPC on stdin. Put
+five lines in a file, an initialize, its notification, a tool list, a harmless
+call and a call that carries an AWS example key.
+
+```bash
+cat > calls.jsonl <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"try","version":"1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"text":"hello from the two minute try"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"echo","arguments":{"text":"my key is AKIAIOSFODNN7EXAMPLE"}}}
+EOF
+python3 -m sunglasses.proxy -- python3 -m sunglasses.proxy.echo_server < calls.jsonl
+```
+
+The proxy answers the initialize, then refuses ids 2, 3 and 4 with code
+`-32070`, `SUNGLASSES_WITHHELD` and reason `APPROVAL_REQUIRED`. That is the
+gate working, and it is the expected first result. Each refusal carries two
+values in its `data` object, `server_id` and `snapshot_sha256`. Read them from
+your own output. The `server_id` is computed from the command, its arguments and
+the folder you ran it in, so yours will differ from anyone else's, and a
+different folder gives a different one. Approval is stored against that id, so
+stay in the same folder for the rest of this page.
+
+**3. Approve it as a person.** This has to run at a real terminal. It is
+refused when its input is a pipe.
+
+```bash
+sunglasses proxy approve <server_id> --snapshot <snapshot_sha256>
+# the same command, spelled as the module
+python3 -m sunglasses.proxy approve <server_id> --snapshot <snapshot_sha256>
+```
+
+Both spellings run the same code. `proxy` does not appear in
+`sunglasses --help` yet, so do not go looking for it there.
+
+**4. Run the same file again.**
+
+```bash
+python3 -m sunglasses.proxy -- python3 -m sunglasses.proxy.echo_server < calls.jsonl
+```
+
+The tool list comes back and the harmless call returns its echo. The call
+carrying the key is withheld with `PROHIBITED_SECRET` and never reaches the
+server. A credential in a result is withheld the same way with
+`PROHIBITED_CONTENT`. The checks behind this are the credential lane described
+under [What the proxy enforces](#what-the-proxy-enforces), and this run is not
+evidence beyond that lane.
+
+**5. Put it back.** `sunglasses uninstall echo` restores your `.mcp.json`
+byte for byte. The approval is kept on purpose, so it applies again if you wrap
+the same command from the same folder. To revoke every approval on this machine,
+remove the approvals folder.
+
+```bash
+sunglasses uninstall echo
+rm -r ~/.sunglasses/proxy/approvals
+```
 
 ![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
 
