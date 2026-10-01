@@ -69,8 +69,8 @@ DECISION_REVIEW = "review"
 # killed and the item faults -- it is never handed a scan.
 STARTUP_MS = 10_000
 # The pipe is named on the spare's command line, `--ready-fd N`, never in its
-# environment: the package reads exactly three environment variables and sets
-# none. `_proxy_worker` imports this name, so there is one spelling.
+# environment: the package reads exactly four named environment variables and
+# sets none. `_proxy_worker` imports this name, so there is one spelling.
 READY_FLAG = "--ready-fd"
 
 

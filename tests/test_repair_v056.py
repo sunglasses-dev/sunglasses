@@ -638,7 +638,14 @@ def _environment_audit(pkg):
     _MatchStar = getattr(ast, "MatchStar", ())
     _MatchMapping = getattr(ast, "MatchMapping", ())
 
-    allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT"}
+    # The invariant is that EVERY environment read is named and accounted for, not
+    # that there are three of them. NO_COLOR is the fourth (0.6.5, CU-M6, R284): a
+    # public convention (no-color.org), read once in `cli._color_wanted`, and it
+    # changes presentation bytes only, never a verdict. Anything else is still
+    # refused, and `test_an_environment_read_outside_the_four_is_still_refused`
+    # holds that line.
+    allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT",
+               "NO_COLOR"}
 
     # Names that LOOK like env vars and are not. `SUNGLASSES_WITHHELD` is the
     # JSON-RPC error message T4.R7 freezes for the proxy's client envelope, so
@@ -1179,7 +1186,7 @@ def _environment_audit(pkg):
 
 
 def test_package_reads_no_undeclared_environment_variables():
-    """The wheel may read exactly three env vars, and each is accounted for."""
+    """The wheel may read exactly four env vars, and each is accounted for."""
     found, read_names, refusals, allowed, wire_constants = _environment_audit(
         os.path.dirname(_package_location()))
 
@@ -1234,6 +1241,29 @@ _R52_PROBES = {
                               'HOME = os.environ.get("SUNGLASSES_HOME")\n'
                               'def size(stat):\n    return operator.attrgetter("st_size.real")(stat)\n', False),
 }
+
+
+def test_the_allowed_environment_reads_are_exactly_the_four_named(tmp_path):
+    """The set is pinned, so widening it again shows up as a failure of its own."""
+    (tmp_path / "probe.py").write_text("import os\nHOME = os.environ.get(\"SUNGLASSES_HOME\")\n")
+    _found, _read, _refusals, allowed, _wire = _environment_audit(str(tmp_path))
+    assert allowed == {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS",
+                       "SUNGLASSES_PIN_CONSENT", "NO_COLOR"}
+
+
+def test_an_environment_read_outside_the_four_is_still_refused(tmp_path):
+    """Control for the fourth name: NO_COLOR passes, an unlisted variable in the
+    SAME canonical form does not, so the allowlist was not simply emptied of
+    meaning when NO_COLOR was added."""
+    (tmp_path / "ok.py").write_text("import os\nX = os.environ.get(\"NO_COLOR\")\n")
+    _found, read_names, refusals, allowed, _wire = _environment_audit(str(tmp_path))
+    assert read_names == {"NO_COLOR"} and refusals == [] and not (read_names - allowed)
+
+    (tmp_path / "ok.py").unlink()
+    (tmp_path / "bad.py").write_text("import os\nX = os.environ.get(\"SOME_OTHER_VARIABLE\")\n")
+    _found, read_names, refusals, allowed, _wire = _environment_audit(str(tmp_path))
+    assert read_names == {"SOME_OTHER_VARIABLE"}
+    assert read_names - allowed == {"SOME_OTHER_VARIABLE"}, "an unlisted read was accepted"
 
 
 @pytest.mark.parametrize("name", sorted(_R52_PROBES))

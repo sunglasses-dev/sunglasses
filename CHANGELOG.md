@@ -22,6 +22,12 @@ All notable changes to Sunglasses are documented here.
   to sql_injection. A tool that matches on the old spellings needs the new
   ones. (#290)
 
+- Colour in command output now appears only on a terminal and never when
+  NO_COLOR is set to a non-empty value. Piped output and files carry no escape
+  bytes. This applies to every command and not only to doctor. NO_COLOR is the
+  fourth environment variable the package reads, and it changes presentation
+  bytes only, never a verdict. (#291)
+
 ### Fixed
 
 - GLS-PT-010 now uses the path_traversal category like the other 10 path
@@ -37,6 +43,11 @@ All notable changes to Sunglasses are documented here.
   with a hyphen, so no category name in the rule set has a hyphen now. No
   other rule is in that category, so the category count stays 117 and what
   the rule detects does not change. (#290)
+
+- sunglasses doctor now reads one verdict for each wrapped route in both its
+  text report and its --json output. A route that nothing launched is reported
+  as NOT_RUN. It used to read FAIL in the JSON while the text said no check had
+  failed. A route that a launcher watched fail is still FAIL and still exits 1. (#291)
 
 ### Documentation
 

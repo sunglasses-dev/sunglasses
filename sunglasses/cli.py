@@ -39,6 +39,31 @@ DIM = "\033[2m"
 RESET = "\033[0m"
 
 
+def _color_wanted(stream=None) -> bool:
+    """CU-M6. Colour only on a terminal, and never when NO_COLOR is set.
+
+    no-color.org: the variable counts when present and NON-EMPTY. A pipe or a
+    file is not a terminal, and escape bytes in it are noise to the next reader
+    (a log, `grep`, a screen reader, a CI page).
+    """
+    if os.environ.get("NO_COLOR"):
+        return False
+    stream = sys.stdout if stream is None else stream
+    try:
+        return bool(stream.isatty())
+    except (AttributeError, ValueError):
+        return False
+
+
+def _apply_color_policy():
+    """Blank the palette for this process when colour is not wanted. The
+    constants are read at print time, so one call before dispatch covers every
+    command."""
+    global GREEN, RED, YELLOW, CYAN, BOLD, DIM, RESET
+    if not _color_wanted():
+        GREEN = RED = YELLOW = CYAN = BOLD = DIM = RESET = ""
+
+
 def print_result(result, verbose=False):
     """Pretty-print a scan result."""
     if result.is_clean:
@@ -2389,6 +2414,7 @@ class _MachineAwareParser(argparse.ArgumentParser):
 
 
 def main():
+    _apply_color_policy()
     parser = _MachineAwareParser(
         prog="sunglasses",
         description="SUNGLASSES — The input firewall for AI agents.",
@@ -2827,6 +2853,10 @@ def cmd_doctor(args, _run=None):
         sys.exit(rendered["exit_code"])
 
     st = rendered["self_test"]
+    # CU-M8. A route's verdict is read from `per_wrapper`, the SAME field the
+    # JSON prints, and never recomputed here.
+    route_verdict = {(w["name"], w["source"]): w["result"]
+                     for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
         # The whole point of R-DOCTOR-R3c, in the one place an operator reads.
@@ -2851,6 +2881,10 @@ def cmd_doctor(args, _run=None):
             detail = row.get("detail")
             colour = GREEN if row["state"] == _doc.WRAPPED else DIM
             line = f"    {colour}{row['state']:<10}{RESET} {name}  {DIM}({row['source']}){RESET}"
+            verdict = route_verdict.get((row["name"], row["source"]))
+            if verdict:
+                vcolour = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
+                line += f"  route {vcolour}{verdict}{RESET}"
             # An unreadable source is NAMED, never omitted: a file we could not
             # open must not become, in a reader's head, a file with nothing in it.
             print(line + (f"  {YELLOW}{detail}{RESET}" if detail else ""))
