@@ -53,6 +53,15 @@ All notable changes to Sunglasses are documented here.
 - README now leads with the 6,675 indexed keywords and names the 6,964
   declared beside them, the same figure version.json publishes. (#290)
 
+- README and stats/current.json no longer say "64/64 internal recall, 100%
+  recall". That figure came from a private 64 attack corpus measured in April
+  2026 (v0.2.10) that is not in the repository and gives 60 of 64 on 0.6.4.
+  They now quote the shipped benchmark, recall 97.4% (37/38) and precision
+  86.1%, with the command that reproduces them. stats/current.json drops
+  internal_recall and internal_recall_pct for benchmark_positives,
+  benchmark_recall, benchmark_recall_pct and benchmark_precision_pct, and a
+  new test fails when they stop matching a live run. (#290)
+
 - stats/current.json carries the 0.6.4 numbers, 1,564 patterns and 6,675
   keywords. (#287)
 

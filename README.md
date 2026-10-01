@@ -425,7 +425,7 @@ result = scanner.scan_auto("any_file.ext")
 | Attack categories | 117 |
 | Normalization techniques | 17 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
-| Internal recall (attack-db fixture set) | 64/64, 100% recall |
+| Recall and precision on the shipped benchmark | recall 97.4% (37/38), precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py` (details in the Benchmark section below) |
 | pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
 | False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 77 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
@@ -492,7 +492,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ LangChain + CrewAI integrations
 - ✅ MCP scanning server. Run `python -m sunglasses.mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
 - ✅ SARIF 2.1.0 output for CI integration
-- ✅ 64/64 internal recall on shipped attack fixture set, 100% recall
+- ✅ Measured on a shipped dataset, recall 97.4% (37/38) and precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py`
 - ✅ Local scanning with zero telemetry. Only audio and video need a download, the Whisper model on first use
 - ✅ Daily protection report (local HTML), covers scans made through the Python API's `ProtectedEngine`; CLI scans are not recorded
 - ✅ MIT License
