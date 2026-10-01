@@ -94,6 +94,22 @@ def test_uninstall_with_no_approval_does_not_talk_about_approvals(wrapped):
     assert "rm -r" not in out.stdout
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root can list any directory")
+def test_an_unlistable_approvals_folder_does_not_break_uninstall(wrapped):
+    home, proj = wrapped
+    folder = _approvals_dir(home)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / ("d" * 32 + ".json")).write_text("{}")
+    folder.chmod(0o000)
+    try:
+        out = _run(["uninstall", "echo"], home=home, cwd=proj)
+    finally:
+        folder.chmod(0o700)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "Restored 'echo'" in out.stdout
+    assert "Traceback" not in out.stderr
+
+
 def test_a_refused_uninstall_does_not_print_the_approval_note(wrapped):
     home, proj = wrapped
     folder = _approvals_dir(home)
