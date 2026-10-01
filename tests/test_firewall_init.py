@@ -39,11 +39,11 @@ EXISTING = {
     "hooks": {
         "PreToolUse": [
             {"matcher": "Bash", "hooks": [
-                {"type": "command", "command": "/Users/az/.claude/hooks/skill-router-block.sh"}]}
+                {"type": "command", "command": "/Users/dev/.claude/hooks/existing-user-hook.sh"}]}
         ],
         "SessionStart": [
             {"matcher": "startup", "hooks": [
-                {"type": "command", "command": "~/.claude/hooks/boot-inject.sh"}]}
+                {"type": "command", "command": "~/.claude/hooks/session-start-hook.sh"}]}
         ],
     },
     "permissions": {"allow": ["Bash(git status)"]},
@@ -136,7 +136,7 @@ def test_install_merges_and_does_not_clobber_other_pretooluse_hooks(settings):
     install_hook(settings)
     entries = _read(settings)["hooks"]["PreToolUse"]
     commands = json.dumps(entries)
-    assert "skill-router-block.sh" in commands, "clobbered the user's existing hook"
+    assert "existing-user-hook.sh" in commands, "clobbered the user's existing hook"
     assert HOOK_MARKER in commands
 
 
@@ -204,7 +204,7 @@ def test_uninstall_removes_only_our_entry(settings):
     uninstall_hook(settings)
     data = _read(settings)
     assert HOOK_MARKER not in json.dumps(data)
-    assert "skill-router-block.sh" in json.dumps(data["hooks"]["PreToolUse"])
+    assert "existing-user-hook.sh" in json.dumps(data["hooks"]["PreToolUse"])
     assert data["hooks"]["SessionStart"] == EXISTING["hooks"]["SessionStart"]
 
 

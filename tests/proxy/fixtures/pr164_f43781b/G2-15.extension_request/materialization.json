@@ -4,7 +4,7 @@
   "payload_source": {
     "scenario_id": "G2-04",
     "variant": "main",
-    "path": "/Users/azrollin/.claude/state/warroom/GATE2_SCENARIOS/04_outbound_synthetic_secret/main.payload.txt",
+    "path": "<FIXTURE_ROOT>/GATE2_SCENARIOS/04_outbound_synthetic_secret/main.payload.txt",
     "sha256": "d323fe25715ce49f8e2bf0d5945b9f53ab1fb70c4a0fa077d0f37883930d10ab"
   },
   "payload_materialized_sha256": "d323fe25715ce49f8e2bf0d5945b9f53ab1fb70c4a0fa077d0f37883930d10ab",

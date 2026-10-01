@@ -3,10 +3,10 @@ test_pattern_name_hygiene.py — PATTERN NAMES ARE PUBLISHED, SO THEY MUST BE CL
 
 Every pattern `name` is rendered on sunglasses.dev and shipped inside the wheel.
 Sixty-nine of them carried research residue that should never have left the
-farm: the date a work order ran, a run id, an internal `.md` filename, and the
-account names the Jack hands run under (`azrollinaz`, `qaqu`, `claw`).
+farm: the date a work order ran, a timestamped run id with the farm hand's
+suffix, and an internal `.md` filename.
 
-"Citation-presence validation laundering — C20260718T133021_azrollinaz"
+"Citation-presence validation laundering — C20260718T133021_handa"
 
 That is a private build artifact on a public page. Renaming them once fixes the
 sixty-nine that exist; this gate is what stops the seventieth, because the names
@@ -27,8 +27,7 @@ from sunglasses.patterns import PATTERNS
 HYGIENE = re.compile(
     r"(?i)(?<!CVE-)(?<!\d)20\d{2}[-_]\d{2}[-_]\d{2}(?!\d)"
     r"|(?<!AGENTS)(?<!CLAUDE)\.md\b"
-    r"|C20\d{6}T\d{6}"
-    r"|\b(?:azrollinaz|qaqu|claw)\b"
+    r"|C20\d{6}T\d{6}(?:_\w+)?"
     r"|(?<![-\w])boss(?!-blocker\b)"
 )
 
@@ -87,9 +86,9 @@ def test_pattern_names_are_unique():
 # ── negative controls: every shape the rename removed must still be caught ────
 
 @pytest.mark.parametrize("leaked", [
-    "Citation-presence validation laundering — C20260718T133021_azrollinaz",
-    "MCP stdio startup environment-variable injection — C20260725T180137_claw",
-    "Case-folding mismatch in Custom MCP environment denylist — C20260723T134055_qaqu",
+    "Citation-presence validation laundering — C20260718T133021_handa",
+    "MCP stdio startup environment-variable injection — C20260725T180137_handb",
+    "Case-folding mismatch in Custom MCP environment denylist — C20260723T134055_handc",
     "2026-06-30_ansi_sgr_conceal_encoding_smuggling_hardening",
     "Finding lifted from WO-P1B-NOTES.md",
     "Boss review queue bypass",
@@ -113,7 +112,7 @@ def test_control_clean_names_are_not_flagged(clean):
 def test_control_a_newly_leaked_name_fails_the_gate():
     """The seventieth. Simulated in-memory, since the point is the farm adds one later."""
     injected = [dict(p) for p in PATTERNS]
-    injected[0] = dict(injected[0], name="Some new finding — C20260930T101112_azrollinaz")
+    injected[0] = dict(injected[0], name="Some new finding — C20260930T101112_handa")
     leaked = [(p["id"], p["name"]) for p in injected
               if p["id"] not in ALLOWED and HYGIENE.search(p["name"])]
     assert leaked, "a newly added leaked name must fail this gate"
