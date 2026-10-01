@@ -16,10 +16,21 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import run_alone  # noqa: E402
+
+# A `git archive` of a release has no .git. These three rows ask git for the shared git directory or the
+# worktree list (run_alone.py: `git rev-parse --git-common-dir`, `git worktree list --porcelain`), so
+# without one they fail for the environment, not for the code. They SKIP with that reason instead of
+# failing. In a real checkout or worktree .git exists, nothing skips, and they run in full.
+needs_git = pytest.mark.skipif(
+    not (ROOT / ".git").exists(),
+    reason="needs a .git checkout: this row asks git for the shared git directory or the worktree "
+           "list, and a `git archive` of the tree carries no .git")
 
 
 def test_a_live_pid_is_reported_alive():
@@ -60,6 +71,7 @@ def test_our_own_pid_in_the_lock_is_not_a_holder(tmp_path):
     assert run_alone.current_holder(lock) is None
 
 
+@needs_git
 def test_the_lock_is_keyed_on_the_shared_git_directory_not_the_worktree():
     """Every worktree of one repository must take the SAME lock.
 
@@ -135,6 +147,7 @@ def test_the_scan_excludes_our_own_process_group_and_not_merely_our_pid():
     assert found is None or found[0] not in mine
 
 
+@needs_git
 def test_a_real_foreign_pytest_is_seen(tmp_path):
     """THE POSITIVE. Without it, every other answer here is unfalsifiable.
 
@@ -215,6 +228,7 @@ def test_the_process_listing_is_not_clipped_to_the_terminal_width():
         "path that started it, so it has been truncated")
 
 
+@needs_git
 def test_the_plural_finds_a_child_the_singular_hides(tmp_path):
     """T8's finding, reproduced: two live pytests, and the singular shows one.
 
