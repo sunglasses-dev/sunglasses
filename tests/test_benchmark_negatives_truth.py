@@ -32,8 +32,8 @@ def test_benchmark_negatives_matches_the_live_corpus():
 
 def test_benchmark_recall_and_precision_match_a_live_run():
     """The README and the site quoted "64/64 internal recall, 100% recall" from
-    April 2026 for five months. The corpus behind it was never in the repo and
-    the same script gives 60 of 64 on 0.6.4. The published figure is the shipped
+    April 2026 for five months. The corpus behind it was never in the repo, so
+    nobody outside could reproduce it. The published figure is the shipped
     benchmark, so the truth file must equal what the benchmark prints now."""
     bench = _load(ROOT / "tests" / "benchmark" / "precision_recall.py", "precision_recall_recall_truth")
     m = bench.run()["metrics"]
