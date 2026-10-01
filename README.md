@@ -199,8 +199,7 @@ sunglasses proxy approve <server_id> --snapshot <snapshot_sha256>
 python3 -m sunglasses.proxy approve <server_id> --snapshot <snapshot_sha256>
 ```
 
-Both spellings run the same code. `proxy` does not appear in
-`sunglasses --help` yet, so do not go looking for it there.
+Both spellings run the same code. `sunglasses --help` lists `proxy`.
 
 **4. Run the same file again.**
 
