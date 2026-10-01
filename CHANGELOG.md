@@ -28,6 +28,17 @@ All notable changes to Sunglasses are documented here.
   fourth environment variable the package reads, and it changes presentation
   bytes only, never a verdict. (#291)
 
+- sunglasses uninstall now says that approvals are kept on purpose and how to
+  revoke them. An approval is keyed on the server's identity, so wrapping the
+  same server again from the same folder needs no new one. When the approvals
+  folder holds at least one approval, uninstall names the folder and the one
+  command that removes them all. When the folder holds none, uninstall says
+  nothing about approvals. (#294)
+
+- sunglasses proxy now appears in the sunglasses --help listing, and the proxy
+  usage text shows the sunglasses proxy spelling first. python -m
+  sunglasses.proxy takes the same arguments and runs the same program. (#294)
+
 ### Fixed
 
 - GLS-PT-010 now uses the path_traversal category like the other 10 path
@@ -76,6 +87,10 @@ All notable changes to Sunglasses are documented here.
 
 - stats/current.json carries the 0.6.4 numbers, 1,564 patterns and 6,675
   keywords. (#287)
+
+- The README now says the Claude Code hook blocks the credential paths and
+  policy violations that your policy lists. A new test fails when that
+  sentence stops matching the measured behaviour of the hook. (#294)
 
 ## [0.6.4] — 2026-09-29
 
