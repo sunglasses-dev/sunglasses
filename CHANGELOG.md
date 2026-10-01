@@ -24,7 +24,9 @@ All notable changes to Sunglasses are documented here.
 
 - Colour in command output now appears only on a terminal and never when
   NO_COLOR is set to a non-empty value. Piped output and files carry no escape
-  bytes. This applies to every command and not only to doctor. (#291)
+  bytes. This applies to every command and not only to doctor. NO_COLOR is the
+  fourth environment variable the package reads, and it changes presentation
+  bytes only, never a verdict. (#291)
 
 ### Fixed
 

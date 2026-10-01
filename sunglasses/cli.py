@@ -39,15 +39,14 @@ DIM = "\033[2m"
 RESET = "\033[0m"
 
 
-def _color_wanted(stream=None, environ=None) -> bool:
+def _color_wanted(stream=None) -> bool:
     """CU-M6. Colour only on a terminal, and never when NO_COLOR is set.
 
     no-color.org: the variable counts when present and NON-EMPTY. A pipe or a
     file is not a terminal, and escape bytes in it are noise to the next reader
     (a log, `grep`, a screen reader, a CI page).
     """
-    env = os.environ if environ is None else environ
-    if env.get("NO_COLOR"):
+    if os.environ.get("NO_COLOR"):
         return False
     stream = sys.stdout if stream is None else stream
     try:

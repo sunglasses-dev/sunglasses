@@ -136,6 +136,42 @@ class TestRenderPath:
             capture_output=True, text=True, cwd=REPO, env=env,
         )
 
+    def _render_on_pty(self, tmp_path, raw_line):
+        """The same render with stdout on a real pseudo-terminal, returned as BYTES.
+
+        0.6.5 CU-M6: colour is only emitted to a terminal (and never under
+        NO_COLOR), so a piped render carries none of OUR escapes. The positive
+        control below needs a terminal to see them. Bytes, not text, so a raw
+        0x9B cannot be hidden by a lossy decode."""
+        import pty
+        directory = tmp_path / ".sunglasses" / "receipts"
+        directory.mkdir(parents=True)
+        (directory / "2026-08-30.jsonl").write_text(raw_line + "\n")
+        env = dict(os.environ, HOME=str(tmp_path))
+        for k in ("SUNGLASSES_HOME", "NO_COLOR", "FORCE_COLOR", "CLICOLOR_FORCE"):
+            env.pop(k, None)
+        master, slave = pty.openpty()
+        try:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "sunglasses.cli", "receipts"],
+                stdout=slave, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                cwd=REPO, env=env,
+            )
+            os.close(slave)
+            chunks = []
+            while True:
+                try:
+                    data = os.read(master, 65536)
+                except OSError:
+                    break
+                if not data:
+                    break
+                chunks.append(data)
+            proc.wait(timeout=60)
+        finally:
+            os.close(master)
+        return b"".join(chunks)
+
     def test_render_defuses_a_pre_existing_poisoned_line(self, tmp_path):
         """A jsonl written by an older build must not paint the terminal today."""
         line = json.dumps({
@@ -156,8 +192,17 @@ class TestRenderPath:
 
         # Our OWN colour codes are still emitted — proving the render was not simply
         # stripped of all escapes, which would have passed the checks above for the
-        # wrong reason.
-        assert ESC + "[2m" in proc.stdout
+        # wrong reason. Colour is only written to a terminal (CU-M6), so this
+        # control renders the SAME poisoned line on a real pty, and the forbidden
+        # sequences are checked again there, where escapes are actually being
+        # written and the check can fail.
+        tty_out = self._render_on_pty(tmp_path / "tty", line)
+        assert (ESC + "[2m").encode() in tty_out, (
+            "no colour code of ours on a terminal: the control is blind, so the "
+            f"zero-counts above prove nothing: {tty_out!r}")
+        for seq in (ESC + "[2J", ESC + "[H", ESC + "[92m"):
+            assert seq.encode() not in tty_out, f"{seq!r} survived rendering on a tty"
+        assert b"\x9b" not in tty_out and "\x9b".encode("utf-8") not in tty_out
 
     def test_render_truncates_a_layout_breaking_name(self, tmp_path):
         line = json.dumps({
