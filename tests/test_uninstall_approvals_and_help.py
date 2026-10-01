@@ -94,6 +94,19 @@ def test_uninstall_with_no_approval_does_not_talk_about_approvals(wrapped):
     assert "rm -r" not in out.stdout
 
 
+def test_an_existing_folder_with_no_approval_in_it_does_not_talk_about_approvals(wrapped):
+    """The folder is created by the proxy on first use, so it can exist and be
+    empty, or hold something that is not an approval record."""
+    home, proj = wrapped
+    folder = _approvals_dir(home)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "README.txt").write_text("not an approval")
+    out = _run(["uninstall", "echo"], home=home, cwd=proj)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert APPROVALS_NOTE not in out.stdout
+    assert "rm -r" not in out.stdout
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root can list any directory")
 def test_an_unlistable_approvals_folder_does_not_break_uninstall(wrapped):
     home, proj = wrapped
