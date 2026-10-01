@@ -2776,8 +2776,10 @@ def _say_approvals_outlive_uninstall():
     from .proxy.serve import state_root
 
     folder = state_root() / "approvals"
+    # listdir, not glob: glob answers an unlistable folder with an empty list,
+    # which would read here as "nothing to revoke" (tests/test_receipts_verify_dir_unlistable.py).
     try:
-        kept = len(list(folder.glob("*.json")))
+        kept = sum(1 for name in os.listdir(folder) if name.endswith(".json"))
     except OSError:
         return
     if not kept:
