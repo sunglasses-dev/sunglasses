@@ -1104,6 +1104,27 @@ def serve(upstream_argv, scanner_argv, *, deadline_ms=2000, watchdog_ms=3000,
             message = verdict.message
             request_id = message.get("id")
             if request_id is None:            # notifications
+                if direction == "result" and invalidated.is_set():
+                    # MIRRORED FROM `Route.pump_upstream` (pump.py, the
+                    # notification branch). AN INVALIDATED SESSION FORWARDS
+                    # NOTHING, and a notification is not an exception: it has
+                    # no id, so the record gate that covers responses never
+                    # reaches it. The product drops every later upstream
+                    # notification whatever its method, forwards none, and says
+                    # so with an in-session NOTIFICATION_DROPPED that names the
+                    # invalidation (supported=True, reason_code=
+                    # DESCRIPTOR_CHANGED). Measured with 1, 2 and 3 list_changed
+                    # (1/1/1 delivered) and with other methods after the first.
+                    # The record of the revoke without this would say "revoked"
+                    # and then carry on delivering.
+                    #
+                    # UPSTREAM SIDE ONLY, like the product: the client's own
+                    # notifications, a cancellation above all, still cross.
+                    # Dropped BEFORE the cancellation branch, so a cancelled
+                    # from the upstream does not retire anything either.
+                    proxy._emit("NOTIFICATION_DROPPED", None, supported=True,
+                                reason_code="DESCRIPTOR_CHANGED")
+                    continue
                 target = cancellation_target(message)
                 if target is not None:
                     # RETIRE BEFORE RELEASE. `cancel` records CANCEL_ACCEPTED,

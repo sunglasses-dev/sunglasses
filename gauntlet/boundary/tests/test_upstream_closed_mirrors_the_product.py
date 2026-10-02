@@ -181,3 +181,118 @@ def test_no_revoke_record_without_the_upstreams_list_changed(tmp_path):
         assert not [e for e in events if e["kind"] == "APPROVAL_INVALIDATED"], (
             kwargs, [e["kind"] for e in events])
 
+
+
+# ── the other half of the revoke: an invalidated session forwards nothing ───
+#
+# MEASURED on the product (real Route.pump_upstream, `T10_MIRROR_DROPS` receipt,
+# measure_drops.py): after the first upstream list_changed every LATER upstream
+# notification is dropped, whatever its method, and exactly 1 frame is ever
+# delivered (1/1/1 for 1, 2 and 3 list_changed). The drop is an in-session
+# NOTIFICATION_DROPPED (supported=True, reason_code=DESCRIPTOR_CHANGED), which is
+# in `receipts.EVENTS`. Notifications BEFORE the list_changed are delivered, and
+# only the upstream's side is gated: nothing here touches the client's own
+# notifications (a cancellation still has to reach the upstream).
+#
+# A mirror that records the revoke and keeps forwarding says "this session is
+# revoked" and then behaves as if it were not, which is worse than saying nothing.
+
+PROGRESS = {"jsonrpc": "2.0", "method": "notifications/progress",
+            "params": {"progressToken": "t", "progress": 1}}
+CANCELLED = {"jsonrpc": "2.0", "method": "notifications/cancelled",
+             "params": {"requestId": 7}}
+
+
+def _methods(delivered):
+    return [json.loads(line)["method"]
+            for line in delivered.decode().splitlines() if line.strip()]
+
+
+def test_the_product_premise_for_the_drop_is_asserted_not_cited():
+    from sunglasses.proxy import receipts
+
+    assert "NOTIFICATION_DROPPED" in receipts.EVENTS
+
+
+@pytest.mark.parametrize("later", [[LIST_CHANGED], [LIST_CHANGED, LIST_CHANGED],
+                                   [OTHER_NOTE], [PROGRESS], [CANCELLED],
+                                   [OTHER_NOTE, PROGRESS, LIST_CHANGED]],
+                         ids=["lc", "lc-lc", "message", "progress", "cancelled",
+                              "message-progress-lc"])
+def test_after_the_revoke_no_later_upstream_notification_is_forwarded(tmp_path, later):
+    """The control that fails when forwarding returns. 1/1/1 on the product."""
+    events, delivered = _serve_once(tmp_path, upstream_says=[LIST_CHANGED, *later])
+    assert _methods(delivered) == ["notifications/tools/list_changed"], (
+        f"{len(_methods(delivered))} frames crossed an invalidated session: "
+        f"{_methods(delivered)}")
+    # Not silently: each one is on the record, with the product's reason.
+    dropped = [e for e in events if e["kind"] == "NOTIFICATION_DROPPED"]
+    assert len(dropped) == len(later), [e["kind"] for e in events]
+    assert all(e["reason_code"] == "DESCRIPTOR_CHANGED" and e["supported"] is True
+               for e in dropped), dropped
+    # After the revoke record, never before it.
+    revoked = next(e for e in events if e["kind"] == "APPROVAL_INVALIDATED")
+    assert all(e["seq"] > revoked["seq"] for e in dropped), events
+
+
+def test_nothing_is_dropped_before_the_revoke(tmp_path):
+    """So the drop cannot be a mirror that swallows notifications from the start."""
+    events, delivered = _serve_once(tmp_path,
+                                    upstream_says=[OTHER_NOTE, PROGRESS, LIST_CHANGED])
+    assert _methods(delivered) == ["notifications/message",
+                                   "notifications/progress",
+                                   "notifications/tools/list_changed"]
+    assert not [e for e in events if e["kind"] == "NOTIFICATION_DROPPED"], events
+    alone = tmp_path / "alone"
+    alone.mkdir()
+    events, delivered = _serve_once(alone, upstream_says=[OTHER_NOTE])
+    assert _methods(delivered) == ["notifications/message"]
+    assert not [e for e in events if e["kind"] == "NOTIFICATION_DROPPED"], events
+
+
+class _After:
+    """A client stdin that says nothing until the harness has written the revoke,
+    then sends one notification, then hangs up. The only way to put a CLIENT frame
+    strictly after the invalidation without racing the pump."""
+
+    def __init__(self, receipts, line):
+        self._receipts, self._line, self._sent = receipts, line, False
+
+    def read(self, _n):
+        import time
+        if self._sent:
+            return b""
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if self._receipts.exists() and "APPROVAL_INVALIDATED" in \
+                    self._receipts.read_text():
+                self._sent = True
+                return self._line
+            time.sleep(0.02)
+        # HANG UP, never raise. An exception here dies inside the pump thread,
+        # the upstream's stdin is then never closed, and `serve` blocks forever:
+        # a broken mirror would hang the suite instead of failing it (measured on
+        # the drop-from-start mutant, which ate the 30 minutes it was given).
+        # Hanging up lets the test fail on its own assertion, in 10 s.
+        self._sent = True
+        return b""
+
+
+def test_the_drop_is_the_upstreams_direction_only(tmp_path):
+    """A client notification sent after the revoke still reaches the upstream.
+    The product's gate is on `pump_upstream`; dropping this side too would eat a
+    cancellation, which is the frame that has to get through."""
+    seen = tmp_path / "upstream_stdin.txt"
+    client_note = {"jsonrpc": "2.0", "method": "notifications/initialized"}
+    upstream = [sys.executable, "-c",
+                "import sys, time\n"
+                f"sys.stdout.write({json.dumps(LIST_CHANGED) + chr(10)!r}); sys.stdout.flush()\n"
+                f"open({str(seen)!r}, 'w').write(sys.stdin.read())\n"]
+    receipts = tmp_path / "receipts.jsonl"
+    out = io.BytesIO()
+    passthrough.serve(upstream, [sys.executable, "-c", "pass"], receipts=receipts,
+                      stdin=_After(receipts, (json.dumps(client_note) + "\n").encode()),
+                      stdout=out)
+    events = [json.loads(l) for l in receipts.read_text().splitlines() if l.strip()]
+    assert json.loads(seen.read_text().splitlines()[0]) == client_note, seen.read_text()
+    assert not [e for e in events if e["kind"] == "NOTIFICATION_DROPPED"], events
