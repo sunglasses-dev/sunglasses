@@ -26,7 +26,7 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import VIEW_SEP, decode_shadow_ascii, normalize
+from .preprocessor import ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_with_length
 
 
 # Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
@@ -725,9 +725,11 @@ class SunglassesEngine:
     COOCCUR_WINDOW = 1200
     COOCCUR_STRIDE = 600
 
-    # Step 3.5 length gate — mirrors the preprocessor's ENRICH_MAX_LEN and its
-    # rationale (see scan step 3.5). Raw-input length, in chars.
-    CORROBORATE_NORM_MAX = 2000
+    # Step 3.5 length gate. It is the preprocessor's ENRICH_MAX_LEN and it is
+    # compared with the same quantity, the folded plain text length that
+    # normalize_with_length() returns (see scan step 3.5). The raw length is not
+    # used: whitespace collapse shrinks the text and NFKC can grow it.
+    CORROBORATE_NORM_MAX = ENRICH_MAX_LEN
 
     def _eval_regex(self, mode: str, rx, guards, text: str):
         """Evaluate one compiled pattern regex against `text` per its mode
@@ -1055,7 +1057,7 @@ class SunglassesEngine:
             text = text[: self.max_scan_bytes]
 
         # Step 1: Normalize (strip tricks, decode evasion)
-        normalized = normalize(text)
+        normalized, folded_length = normalize_with_length(text)
 
         # Step 2: Multi-pattern match
         findings = []
@@ -1218,7 +1220,7 @@ class SunglassesEngine:
         # window exists to prevent (measured Jul-16: claude-seo README pulled
         # 9 extra findings through this pass before the gate). Long inputs
         # keep raw-view regex (step 3) as their corroboration lane.
-        if len(text) > self.CORROBORATE_NORM_MAX:
+        if folded_length > self.CORROBORATE_NORM_MAX:
             candidates = {}
         for pid, pattern in candidates.items():
             if pid in seen_ids:
