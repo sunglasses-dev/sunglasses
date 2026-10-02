@@ -226,6 +226,57 @@ jobs:
           attestations: true
           print-hash: true
 
+  postcondition:
+    name: PyPI holds what this tag builds, compared by content
+    # After the upload, rebuild the tag in a fresh clone and compare it with what PyPI
+    # serves: unpack both wheels and both sdists and diff the trees. The archive sha of the
+    # wheel is not compared, it moves with build time and says nothing about the content
+    # (0.6.5 has a different wheel sha and equal content). The sdist sha is compared too, but
+    # only once this tag carries scripts/repack_sdist.sh.
+    #
+    # A failure turns this run red and does nothing else. It never uploads again, yanks,
+    # deletes or rolls back. It is not a dependency of any other job, so the SBOM and the
+    # checksums on the Release do not wait for it. Guarded by tests/test_release_workflow.py.
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: The release on PyPI matches the tag
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}.git
+        run: |
+          # PyPI can take a minute or two to serve a file it just accepted. Exit 2 from the
+          # script means it could not measure (nothing served yet), so that is retried for up
+          # to five minutes. Exit 1 means PyPI holds content that differs from the tag, which
+          # is not a delay, so it fails at once.
+          VERSION="${GITHUB_REF_NAME#v}"
+          WAIT="${POSTCONDITION_WAIT:-300}"
+          PAUSE="${POSTCONDITION_PAUSE:-20}"
+          attempt=0
+          while :; do
+            attempt=$((attempt + 1))
+            rc=0
+            bash scripts/release_postcondition.sh "$VERSION" || rc=$?
+            case "$rc" in
+              0) echo "postcondition met on attempt $attempt"; exit 0 ;;
+              1) echo "FAILED: PyPI holds content that differs from the tag (attempt $attempt), not a propagation delay"; exit 1 ;;
+            esac
+            if [ "$SECONDS" -ge "$WAIT" ]; then
+              echo "FAILED: no comparable release on PyPI within ${WAIT}s (last exit $rc, $attempt attempts)"
+              exit 1
+            fi
+            echo "attempt $attempt could not measure (exit $rc), PyPI may still be propagating, retrying in ${PAUSE}s"
+            sleep "$PAUSE"
+          done
+
   release-assets:
     name: attach the SBOM and SHA256SUMS to the GitHub Release
     # NOT `needs: [pypi, ...]`. These files describe the BUILT artifacts and
