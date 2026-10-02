@@ -64,6 +64,22 @@ def check_release(doc):
             uses = (step or {}).get("uses")
             if uses and not PINNED.match(uses):
                 problems.append(f"{name} uses an unpinned action: {uses}")
+
+    # The wheel must be reproducible from the tagged commit: the Build step
+    # exports SOURCE_DATE_EPOCH, taken from that commit, before it builds.
+    build = jobs.get("build") or {}
+    run = next((s.get("run", "") for s in build.get("steps") or []
+                if (s or {}).get("name") == "Build"), None)
+    if run is None:
+        problems.append("build job has no step named Build")
+    else:
+        export = re.search(r"^\s*export SOURCE_DATE_EPOCH\b", run, re.M)
+        assign = re.search(r"SOURCE_DATE_EPOCH=.*git log -1 --format=%ct", run)
+        built = re.search(r"-m build\b", run)
+        if not (export and assign):
+            problems.append("Build does not export SOURCE_DATE_EPOCH from the tagged commit time")
+        elif not built or built.start() < export.start():
+            problems.append("Build runs the build before it exports SOURCE_DATE_EPOCH")
     return problems
 
 
@@ -120,3 +136,38 @@ def test_the_unmutated_document_is_the_control_for_all_of_them():
     """Without this, every negative control above passes against a checker
     that reports a problem for any input at all."""
     assert check_release(copy.deepcopy(load())) == []
+
+
+# ── reproducible wheel: SOURCE_DATE_EPOCH ────────────────────────────────
+
+def _build_run(doc):
+    return next(s for s in doc["jobs"]["build"]["steps"] if s.get("name") == "Build")
+
+
+def test_the_build_step_pins_the_wheel_timestamp_to_the_tagged_commit():
+    run = _build_run(load())["run"]
+    assert "SOURCE_DATE_EPOCH=\"$(git log -1 --format=%ct)\"" in run
+    assert run.index("export SOURCE_DATE_EPOCH") < run.index("-m build")
+
+
+def test_the_checker_catches_a_build_without_source_date_epoch():
+    doc = load()
+    step = _build_run(doc)
+    step["run"] = "\n".join(l for l in step["run"].splitlines() if "SOURCE_DATE_EPOCH" not in l)
+    assert any("SOURCE_DATE_EPOCH" in p for p in check_release(doc))
+
+
+def test_the_checker_catches_the_export_after_the_build():
+    doc = load()
+    step = _build_run(doc)
+    lines = step["run"].splitlines()
+    kept = [l for l in lines if "export SOURCE_DATE_EPOCH" not in l]
+    step["run"] = "\n".join(kept + ["export SOURCE_DATE_EPOCH"])
+    assert any("before it exports" in p for p in check_release(doc))
+
+
+def test_the_checker_catches_a_missing_build_step():
+    doc = load()
+    _build_run(doc)["name"] = "Compile"
+    assert any("no step named Build" in p for p in check_release(doc))
+
