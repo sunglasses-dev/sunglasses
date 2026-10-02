@@ -1941,6 +1941,14 @@ def evaluate(payload: dict, home=None) -> "tuple":
     except PolicyError as exc:
         errors.append(exc)
     else:
+        # The policy loaded. Say what it was, so a call nothing objected to is not
+        # recorded the same way whether a policy checked it or none exists.
+        # The decision does not change: with no policy the hook has no opinion
+        # about a path (tests/test_hook_policy_states.py pins that table).
+        if not (home / "policy.yaml").exists():
+            extras["policy_state"] = "none_configured"
+        elif not any(policy.get(k) for k in _POLICY_LIST_KEYS):
+            extras["policy_state"] = "inert"
         decision = check_policy(tool_name, tool_input, policy)
         if decision is not None:
             return decision, confession(), extras
@@ -2373,8 +2381,9 @@ STARTER_POLICY_PATHS: tuple = (
 
 _POLICY_HEADER = """\
 # SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
-# Written by `sunglasses init`. Edit or delete freely: an empty file (or no
-# file at all) enforces nothing.
+# Written by `sunglasses init`. Edit it freely. No file at all enforces
+# nothing, and a file with only comments enforces nothing. An empty file is
+# treated as a broken policy and asks before each tool call.
 #
 # blocked_paths — any tool call that touches one of these paths is denied.
 #   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,
