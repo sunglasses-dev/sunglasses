@@ -3,7 +3,7 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [0.6.5] — YYYY-MM-DD
+## [0.6.5] — 2026-10-02
 
 ### Changed
 
@@ -60,6 +60,51 @@ All notable changes to Sunglasses are documented here.
   as NOT_RUN. It used to read FAIL in the JSON while the text said no check had
   failed. A route that a launcher watched fail is still FAIL and still exits 1. (#291)
 
+- The engine and the preprocessor each carried a short input limit of 2000 and
+  measured two different strings, the text as typed and the text after
+  processing, so they could disagree about what counts as a short input. Both
+  now read one number, the length the preprocessor measured. A document is
+  gated by its processed length and not its typed length, so one that is long
+  as typed but short once processed gets the second pass and one that is short
+  as typed but long once processed no longer does. No pattern, category or
+  count changes. (#297)
+
+### Continuous integration
+
+- The release workflow now refuses a tag whose commit is not on main. A step
+  at the start of the gate job fetches main and fails when the tagged commit
+  is not an ancestor of it, so nothing is built or uploaded for such a tag. (#289)
+
+- The gauntlet boundary tests now run in CI as one blocking step in both the
+  fast lane and the matrix. No workflow ran them before, so a failing
+  tripwire test went unseen. (#288)
+
+### Tests
+
+- The gauntlet boundary harness now records the APPROVAL_INVALIDATED event
+  that the proxy writes when an upstream server sends a tool list change
+  notification, once per session. Only the harness changes and no
+  product file does. (#288)
+
+- The gauntlet boundary mirror now drops every upstream notification after an
+  invalidation the way the proxy does, and records NOTIFICATION_DROPPED naming
+  the invalidation. It used to record the revoke and then keep forwarding them.
+  Only the harness changes and no product file does. (#295)
+
+- Committed test files no longer carry an account handle or paths from the
+  machine that produced them. 25 fixtures and witness records now read
+  <FIXTURE_ROOT> or <REPO_ROOT> and three firewall test files use a neutral
+  home directory as sample input. The argv hashes in the witness receipts are
+  kept as recorded, so they will not match the placeholder text now shown, and
+  a README beside the witness files says so. Nothing the scanner detects
+  changes. (#293)
+
+- Five tests that need a git checkout now skip with a stated reason when the
+  suite runs from a source archive, which carries no .git directory, and still
+  run in a normal checkout. They used to fail there for a reason that has
+  nothing to do with the code under test. Only tests change and no product
+  file does. (#296)
+
 ### Documentation
 
 - stats/current.json now records benchmark_negatives, the number of clean
@@ -91,6 +136,15 @@ All notable changes to Sunglasses are documented here.
 - The README now says the Claude Code hook blocks the credential paths and
   policy violations that your policy lists. A new test fails when that
   sentence stops matching the measured behaviour of the hook. (#294)
+
+- README gains a two minute walk through of the proxy that needs no MCP
+  client. It uses the sample server the package already ships for the proxy
+  self test, which is a sample and not a supported surface. It shows a wrapped
+  server refusing every tool request until a person approves, then the tool
+  list and a harmless call passing, a call carrying an example AWS key
+  withheld before it reaches the server and uninstall restoring the file byte
+  for byte. Every code block was run as written on the released 0.6.4
+  package. (#292)
 
 ## [0.6.4] — 2026-09-29
 
