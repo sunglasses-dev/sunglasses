@@ -29,6 +29,15 @@ _root_conftest = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_root_conftest)
 _run_is_the_whole_tree = _root_conftest._run_is_the_whole_tree
 
+# A `git archive` of a release has no .git, and the detector finds foreign pytests through
+# `git worktree list` (run_alone.worktree_roots), so with no .git it names nothing and this row fails
+# for the environment. It SKIPS with that reason; in a real checkout or worktree it runs in full.
+# The skip is decided before the fixture, so no foreign pytest is spawned for a row that will not run.
+needs_git = pytest.mark.skipif(
+    not (ROOT / ".git").exists(),
+    reason="needs a .git checkout: the detector finds foreign pytests through `git worktree list`, "
+           "and a `git archive` of the tree carries no .git")
+
 
 class _Config:
     """The two fields the decision reads, and nothing else."""
@@ -70,6 +79,7 @@ def a_real_foreign_pytest(tmp_path):
         proc.wait(timeout=30)
 
 
+@needs_git
 def test_the_detector_names_a_real_foreign_pytest(a_real_foreign_pytest):
     """The positive. A detector that always returns None must fail here."""
     # WHAT THIS CAN AND CANNOT ASSERT, stated rather than papered over.

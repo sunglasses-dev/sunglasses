@@ -317,6 +317,13 @@ def test_a_dirty_tree_says_so(tmp_path, monkeypatch):
     assert gauntlet._git_dirty() is True
 
 
+# A `git archive` of a release has no .git, and gauntlet._git_branch() answers "unknown" without one
+# (`git rev-parse --abbrev-ref HEAD`), so this row fails for the environment, not for the code. It SKIPS
+# with that reason; in a real checkout or worktree it runs in full.
+@pytest.mark.skipif(
+    not os.path.exists(os.path.join(REPO, ".git")),
+    reason="needs a .git checkout: the run records the branch it measured via git, and a `git archive` "
+           "of the tree carries no .git")
 def test_a_real_run_records_the_tree_it_measured(tmp_path):
     out = tmp_path / "run.json"
     assert _cli(["run", "--out", str(out)]).returncode == 0
