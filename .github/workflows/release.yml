@@ -93,6 +93,12 @@ jobs:
           python-version: '3.12'
       - name: Build
         run: |
+          # The wheel's zip entries carry a timestamp. Pinned to the tagged
+          # commit's time, two builds of one commit give one wheel, so the
+          # sha256 is a fact about the commit and not about when CI ran.
+          SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          export SOURCE_DATE_EPOCH
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH (tag commit time)"
           python3 -m pip install --upgrade pip build==1.6.1
           python3 -m build --sdist --wheel --outdir dist/
           ls -la dist/
