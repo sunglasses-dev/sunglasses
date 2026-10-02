@@ -25,8 +25,9 @@ from __future__ import annotations
 import sys
 
 USAGE = """usage:
-  python -m sunglasses.proxy -- <server command> [args...]   run the mediator
-  python -m sunglasses.proxy approve <server-id> --snapshot SHA [--state-root PATH]
+  sunglasses proxy -- <server command> [args...]   run the mediator
+  sunglasses proxy approve <server-id> --snapshot SHA [--state-root PATH]
+(`python -m sunglasses.proxy` takes the same arguments and is the same program.)
 """
 
 EXIT_OK = 0

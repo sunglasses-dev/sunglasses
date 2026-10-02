@@ -13,7 +13,7 @@
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
 - An MCP server your agent calls, and a GitHub Action that scans every pull request
-- A Claude Code hook that blocks credential paths and policy violations before a tool runs
+- A Claude Code hook that blocks the credential paths and policy violations your policy lists, before a tool runs
 - A local MCP proxy that refuses every `tools/list` and `tools/call` until a person
   approves the server at an interactive terminal. **Once approved, it withholds a
   credential in a tool call or in a tool result, which is the credential lane and not
@@ -199,8 +199,7 @@ sunglasses proxy approve <server_id> --snapshot <snapshot_sha256>
 python3 -m sunglasses.proxy approve <server_id> --snapshot <snapshot_sha256>
 ```
 
-Both spellings run the same code. `proxy` does not appear in
-`sunglasses --help` yet, so do not go looking for it there.
+Both spellings run the same code. `sunglasses --help` lists `proxy`.
 
 **4. Run the same file again.**
 

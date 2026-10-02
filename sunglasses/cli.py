@@ -2606,6 +2606,14 @@ def main():
     config_parser.add_argument("--email", "-e", help="Set email for daily reports")
     config_parser.set_defaults(func=cmd_config)
 
+    # Listed so `sunglasses --help` shows it. The word never reaches this
+    # parser: it is intercepted below, before parse_args.
+    subparsers.add_parser(
+        "proxy",
+        help="Run an MCP server behind the approval gate, or approve its tool "
+             "snapshot (sunglasses proxy approve <server_id> --snapshot <sha>)",
+        add_help=False)
+
     # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
     # 0.6.0 beta's product surface is this command, and everything it does
     # lives in sunglasses.proxy.commands. It is intercepted rather than made a
@@ -2752,7 +2760,35 @@ def cmd_uninstall(args):
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "
               f"after the install{RESET}\n")
+    _say_approvals_outlive_uninstall()
     sys.exit(0)
+
+
+def _say_approvals_outlive_uninstall():
+    """CU-M7. Uninstall puts the file back and leaves the approval where it is.
+    That is by design: an approval is keyed on the server's identity, so wrapping
+    the same command from the same folder again needs no new one. Nothing said so,
+    and there is no other command that revokes one. So when there is something to
+    revoke, name the folder and the exact command, and stay quiet when there is
+    not, because "your approvals are kept" is false about a folder that is empty.
+    """
+    import shlex
+    from .proxy.serve import state_root
+
+    folder = state_root() / "approvals"
+    # listdir, not glob: glob answers an unlistable folder with an empty list,
+    # which would read here as "nothing to revoke" (tests/test_receipts_verify_dir_unlistable.py).
+    try:
+        kept = sum(1 for name in os.listdir(folder) if name.endswith(".json"))
+    except OSError:
+        return
+    if not kept:
+        return
+    print(f"  Approvals are kept on purpose, so wrapping the same server again "
+          f"from the same folder needs no new approval.")
+    print(f"  {DIM}{kept} kept in {folder}{RESET}")
+    print(f"  To revoke every one of them, run")
+    print(f"      rm -r {shlex.quote(str(folder))}\n")
 
 
 DOCTOR_HELP = """Report whether your MCP traffic actually runs through the proxy.
