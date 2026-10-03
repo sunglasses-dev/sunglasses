@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- Two encoding rules, GLS-ENC-ALT-210 and GLS-CF-252, no longer block three ordinary kinds of
+  sentence: a data step that says to ignore empty, blank or duplicate rows, or to ignore messages
+  older than, newer than or marked in some way, and a status line that says a security update
+  was applied successfully. The status line still blocks when an override follows it in the
+  same paragraph, such as approvals pre-granted, safeguards disabled or an order to execute
+  commands. Every other wording of the two rules is unchanged, and so is how they read the text.
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed

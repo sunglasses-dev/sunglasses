@@ -4699,7 +4699,7 @@ PATTERNS = [
             "confusable script jailbreak",
         ],
         "regex": [
-            r'(?is)(\b(decode|decrypt|transliterate|normalize|apply\s*(rot13|cipher|substitution)|convert\s*(braille|dots?)\s*to\s*text)\b.{0,220}\b(ignore\s+(all|previous)|reveal\s+(system\s*prompt|tool\s*schema)|export\s+(token|secret|key)|send\s+to\s+https?://)\b)|([\u2800-\u28FF]{8,})|((?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)',
+            r'(?is)(\b(decode|decrypt|transliterate|normalize|apply\s*(rot13|cipher|substitution)|convert\s*(braille|dots?)\s*to\s*text)\b.{0,220}\b(ignore\s+(all|previous)(?!(?:\s+(?:of|the|my|these|those|any))*\s+(?:(?:empty|blank|null|duplicate|unused|hidden)\b|(?:messages?|checks?|rows?|files?|lines?|entries|items?|records?|emails?|tickets?|logs?|tests?|warnings?|errors?|comments?)\s+(?:older|newer|marked|tagged|matching|containing|prefixed|dated|named)\b))|reveal\s+(system\s*prompt|tool\s*schema)|export\s+(token|secret|key)|send\s+to\s+https?://)\b)|([\u2800-\u28FF]{8,})|((?<![A-Za-z0-9+/])(?:[A-Za-z0-9+/]{40,}={0,2}).{0,120}\b(decode|base64)\b)',
         ],
         "description": "Detects prompt injection payloads concealed in alternate encodings (Braille, ROT13, base64, confusable scripts, dot-patterns) that become harmful after normalization or decoding.",
     },
@@ -16629,7 +16629,7 @@ PATTERNS = [
             "tool-result authority spoof",
         ],
         "regex": [
-            r"""(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\s+(?:all\s+)?(?:prior|previous|earlier|original)\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\s+baseline|start\s+(?:over|fresh)|policy\s+(?:superseded|v\d)|earlier\s+constraints?\s+(?:are\s+)?outdated)\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:\[?\s*(?:system|security)\s+(?:patch|update|override)\s+applied\]?|approvals?\s+pre[- ]granted|unrestricted\s+troubleshooting\s+mode)\b)""",
+            r"""(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\s+(?:all\s+)?(?:prior|previous|earlier|original)\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\s+baseline|start\s+(?:over|fresh)|policy\s+(?:superseded|v\d)|earlier\s+constraints?\s+(?:are\s+)?outdated)\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:\[?\s*(?:system|security)\s+(?:patch|update|override)\s+applied(?!\s+successfully\b(?!(?:(?!\n\s*\n)[\s\S]){0,80}?(?:approvals?\s+pre[- ]granted|unrestricted\s+(?:execution|mode|access|operation)\s+(?:is\s+|are\s+|now\s+)?(?:enabled|granted|active|allowed|on)|ignore\s+(?:all\s+)?(?:prior|previous|earlier)|(?:obey|follow|execute|run)\s+(?:the\s+)?next\s+(?:command|instruction|request)|(?:safeguards?|safety|restrictions?|guardrails?|checks?)\s+(?:are\s+|is\s+)?(?:disabled|off|removed|lifted)|execute\s+(?:my|all|any|the)\s+commands?)))\]?|approvals?\s+pre[- ]granted|unrestricted\s+troubleshooting\s+mode)\b)""",
         ],
         "description": "Attacker uses untrusted tool output or retrieval text to force the agent to discard earlier safety, approval, and scope context, then continues execution under attacker-controlled new-baseline instructions while spoofing system-level authority headers."
     },
