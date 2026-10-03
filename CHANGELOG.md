@@ -3,6 +3,21 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- The WARN lane now stops its own pattern scan after 7 seconds, below the 10
+  second hook timeout, and asks you instead of being killed by the host with no
+  answer. Two limits remain. On Python 3.9 and 3.10 (and 3.11 before 3.11.6,
+  3.12.0) a single regex call made of many short match attempts cannot be
+  interrupted, so the WARN lane can still run past its budget on that input
+  shape, while Python 3.11.6, 3.12.1 and newer stop it close to the 7 seconds.
+  And on tool outputs of about 200 KB and up the WARN lane can use up its 7
+  seconds on any Python and ask you without a pattern check, because the time
+  adds up over hundreds of checks plus the first pattern database build. Hard
+  blocks do not use this budget. (#307)
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed

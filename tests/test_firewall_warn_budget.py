@@ -144,6 +144,27 @@ def test_run_within_budget_is_not_swallowed_by_a_broad_except():
     assert time.perf_counter() - t0 < 1.5
 
 
+def _sre_polls_across_attempts(version):
+    """CPython gh-109631 (first in 3.11.6, 3.12.1 and 3.13.0): the regex engine keeps its
+    signal-check counter across match attempts. Before it the counter restarted at 0 on
+    every attempt and is checked once per 4096 opcodes, so a search made of many short
+    attempts never checks for a signal and no timer can stop it until the C call returns.
+    3.9 and 3.10 never got the fix, and neither did 3.11.0 to 3.11.5 or 3.12.0."""
+    return version >= (3, 12, 1) or (3, 11, 6) <= version < (3, 12)
+
+
+_SRE_POLLS_ACROSS_ATTEMPTS = _sre_polls_across_attempts(tuple(sys.version_info[:3]))
+
+
+def test_the_regex_interrupt_gate_cuts_at_the_first_fixed_releases():
+    """The cut is the release that carries gh-109631, not a minor version."""
+    gate = _sre_polls_across_attempts
+    assert [gate(v) for v in [(3, 9, 6), (3, 10, 19), (3, 11, 5), (3, 12, 0)]] == [False] * 4
+    assert [gate(v) for v in [(3, 11, 6), (3, 11, 14), (3, 12, 1), (3, 13, 0), (3, 14, 7)]] == [True] * 5
+
+
+@pytest.mark.skipif(not _SRE_POLLS_ACROSS_ATTEMPTS,
+                    reason="CPython before gh-109631 cannot interrupt this regex shape")
 def test_run_within_budget_stops_one_long_regex_call():
     """A single C-level regex call is the real shape of the problem."""
     import re
@@ -153,6 +174,21 @@ def test_run_within_budget_stops_one_long_regex_call():
     done, _ = firewall._run_within_budget(lambda: pat.search(text), 0.3)
     assert done is False
     assert time.perf_counter() - t0 < 2
+
+
+@pytest.mark.skipif(_SRE_POLLS_ACROSS_ATTEMPTS,
+                    reason="only interpreters without gh-109631")
+def test_run_within_budget_one_long_regex_call_is_late_but_right_before_gh_109631():
+    """THE KNOWN LIMIT on interpreters without gh-109631. The same search cannot be
+    stopped, so the budget fires only when the C call returns. The answer is still
+    'not done' and nothing is left armed. There is no timing assertion on purpose: how
+    long the call takes is the speed of the machine, not a property of the budget."""
+    import re
+    text = "a" * 100000
+    pat = re.compile(r"a*b")
+    done, _ = firewall._run_within_budget(lambda: pat.search(text), 0.3)
+    assert done is False
+    assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
 
 
 def test_run_within_budget_cleans_up_timer_and_handler():
