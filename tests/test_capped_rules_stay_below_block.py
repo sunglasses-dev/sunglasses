@@ -3,7 +3,9 @@
 Each of them has matched short lines found in project documentation files, such as a
 command line with an angle bracket placeholder, a pinned preload variable or a
 bullet under a known issues heading. At high or critical severity one such line was enough
-for the scan to block a whole file. At medium the scan quarantines it.
+for the scan to block a whole file. At medium a finding of one of these rules on its
+own decides quarantine, and a finding of high or critical severity elsewhere in the
+same text still decides block.
 
 Each row below pairs two texts for one rule. The first is a short documentation
 line that makes the rule fire, and the scan must not block it. The second adds a
