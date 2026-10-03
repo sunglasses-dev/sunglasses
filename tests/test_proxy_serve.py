@@ -204,6 +204,9 @@ def test_a_poisoned_result_never_reaches_the_model(tmp_path):
     assert INJECTION not in json.dumps(replies), \
         "the server's injection was handed to the model"
     assert replies[0]["error"]["message"] == "SUNGLASSES_WITHHELD"
+    # The message alone is also what a torn-down session says. Only this reason
+    # code means the poisoned RESULT was scanned and refused.
+    assert replies[0]["error"]["data"]["reason_code"] == "PROHIBITED_CONTENT"
 
 
 def test_the_client_gets_exactly_one_answer_whatever_withheld_it(tmp_path):
