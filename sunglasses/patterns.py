@@ -25771,7 +25771,7 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|security\s+training|blocked\s+payload|do\s+not\s+obey|must\s+not|requires\s+explicit\s+review)\b)(?=.*"turns"\s*:\s*\[)(?=.*"role"\s*:\s*"assistant").*(?=.*"approval"\s*:\s*"(?:final|execute)")(?=.*"review"\s*:\s*"(?:skipped|stale)")(?=.*"next_turn"\s*:\s*"too_late").*$""",
+            r"""(?is)^(?!.*\b(?:defensive|unit\s+test|security\s+training|blocked\s+payload|do\s+not\s+obey|must\s+not|requires\s+explicit\s+review)\b)(?=.*"turns"\s*:\s*\[)(?=.*"role"\s*:\s*"assistant")(?=.*"approval"\s*:\s*"(?:final|execute)")(?=.*"review"\s*:\s*"(?:skipped|stale)")(?=.*"next_turn"\s*:\s*"too_late").*$""",
         ],
         "description": "A structured assistant tool-call record can itself be the first harm-enabling closure point, so a monitor that inherits benign state from prior turns authorizes the response before any later user turn can intervene."
     },
@@ -27522,7 +27522,7 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|reject|quarantine|fail[- ]closed|benign|safe\s+example)\b)(?=.*(?:schema[- ]valid|valid[- ]schema|valid\s+schema|structured\s+threat|json)).*(?=.*(?:cross[- ]bound|cross[- ]bind|mis[- ]bind|rebind|wrong\s+(?:actor|entity|location)|relation\s+mismatch|field\s+binding)).*(?=.*(?:accept|allow|authoriz|rank|verif|trust)).*$""",
+            r"""(?is)^(?!.*\b(?:documentation|security\s+guide|unit\s+test|fixture|incident\s+report|postmortem|defensive|must\s+not|do\s+not|reject|quarantine|fail[- ]closed|benign|safe\s+example)\b)(?=.*(?:schema[- ]valid|valid[- ]schema|valid\s+schema|structured\s+threat|json))(?=.*(?:cross[- ]bound|cross[- ]bind|mis[- ]bind|rebind|wrong\s+(?:actor|entity|location)|relation\s+mismatch|field\s+binding))(?=.*(?:accept|allow|authoriz|rank|verif|trust)).*$""",
         ],
         "description": "An LLM extractor emits a schema-valid structured record whose threat/actor/location relations are cross-bound to the wrong entity, so a downstream risk consumer accepts a genuine threat under a false actor or location."
     },
