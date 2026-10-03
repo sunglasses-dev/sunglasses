@@ -2593,17 +2593,22 @@ def _run_within_budget(fn, budget_s):
     matches, so this interrupts one long C-level match as well as a Python loop.
 
     The timer is taken only when it is free: a POSIX process, the main thread,
-    no ITIMER_REAL already running and SIGALRM at its default. Anything else
-    belongs to the host (an embedding library caller), so it is left exactly as
-    found and the answer is "unavailable", never an unbudgeted run.
+    SIGALRM not blocked, no ITIMER_REAL already running and SIGALRM at its
+    default. Anything else belongs to the host (an embedding library caller),
+    so it is left exactly as found and the answer is "unavailable", never an
+    unbudgeted run.
     An exception from `fn` propagates.
     """
     import signal
     import threading
-    if not all(hasattr(signal, n) for n in ("setitimer", "getitimer", "SIGALRM")):
+    if not all(hasattr(signal, n) for n in (
+            "setitimer", "getitimer", "SIGALRM", "pthread_sigmask", "sigpending",
+            "sigwait")):
         return None, None
     if threading.current_thread() is not threading.main_thread():
         return None, None
+    if signal.SIGALRM in signal.pthread_sigmask(signal.SIG_BLOCK, ()):
+        return None, None          # blocked by the host: the alarm could never fire
     if any(signal.getitimer(signal.ITIMER_REAL)):
         return None, None          # a host timer is running: not ours to cancel
     previous = signal.getsignal(signal.SIGALRM)
@@ -2624,16 +2629,24 @@ def _run_within_budget(fn, budget_s):
         return None, None
     finished, value = False, None
     try:
+        # The restore is the OUTER finally, entered before the timer is armed, so
+        # an alarm raised anywhere inside (even at the first line of the inner
+        # cleanup) still puts the host's handler back. The catch is outside both.
         try:
-            signal.setitimer(signal.ITIMER_REAL, budget_s)
-            value = fn()
-            finished = True
-        finally:
             try:
+                signal.setitimer(signal.ITIMER_REAL, budget_s)
+                value = fn()
+                finished = True
+            finally:
                 armed[0] = False
                 signal.setitimer(signal.ITIMER_REAL, 0)
-            finally:
-                signal.signal(signal.SIGALRM, previous)
+                if signal.SIGALRM in signal.sigpending():
+                    # Our own alarm, held pending by a mask set during the call.
+                    # Consume it here: after the default handler is back, it
+                    # would kill the process the moment the mask is lifted.
+                    signal.sigwait([signal.SIGALRM])
+        finally:
+            signal.signal(signal.SIGALRM, previous)
     except _WarnBudgetExceeded:
         finished, value = False, None
     return finished, value

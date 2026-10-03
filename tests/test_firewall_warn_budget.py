@@ -240,52 +240,132 @@ def test_a_running_host_timer_is_left_running_and_the_call_does_not_run():
         signal.setitimer(signal.ITIMER_REAL, 0)
 
 
-# ── teardown: an alarm already pending when the call finished cannot escape ──
+# ── teardown and signal faults: each runs in its own child process, so a fault
+#    that kills the process fails the test instead of the test runner, and every
+#    child also proves it SURVIVES once SIGALRM is unblocked after the call ──
 
-def _pending_alarm_during(monkeypatch, name, when):
-    """Wrap `signal.<name>` so a real SIGALRM is sent to this process at the
-    point `when(args)` picks: the signal is pending when teardown runs."""
-    import os
-    real = getattr(signal, name)
-
-    def wrapped(*args):
-        if when(args):
-            os.kill(os.getpid(), signal.SIGALRM)
-        return real(*args)
-    monkeypatch.setattr(signal, name, wrapped)
-
-
-def test_an_alarm_pending_at_cancel_does_not_escape(monkeypatch):
-    _pending_alarm_during(monkeypatch, "setitimer", lambda a: a[1] == 0)
-    assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
-    monkeypatch.undo()
-    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
-    assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
+_CHILD = """
+import inspect, os, signal, sys, time
+sys.path.insert(0, {root!r})
+from sunglasses import firewall
+{body}
+assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL, "handler not restored"
+assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0), "timer left running"
+assert signal.SIGALRM not in signal.sigpending(), "an alarm is still pending"
+signal.pthread_sigmask(signal.SIG_UNBLOCK, {{signal.SIGALRM}})
+time.sleep(0.3)
+print("SURVIVED")
+"""
 
 
-def test_an_alarm_pending_at_handler_restore_does_not_escape(monkeypatch):
-    _pending_alarm_during(monkeypatch, "signal", lambda a: a[1] == signal.SIG_DFL)
-    assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
-    monkeypatch.undo()
-    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+def _child(body):
+    import textwrap
+    root = str(__import__("pathlib").Path(__file__).parent.parent)
+    proc = subprocess.run(
+        [sys.executable, "-B", "-c",
+         _CHILD.format(root=root, body=textwrap.dedent(body))],
+        capture_output=True, text=True, timeout=30, env={"PATH": "/usr/bin:/bin"})
+    assert proc.returncode == 0 and proc.stdout.strip().endswith("SURVIVED"), (
+        proc.returncode, proc.stdout, proc.stderr[-800:])
 
 
-def test_a_cancel_that_fails_still_puts_the_handler_back(monkeypatch):
-    """The handler restore sits in its own finally: if cancelling the timer
-    raises, our handler must still not be left installed."""
-    real = signal.setitimer
+def test_a_blocked_sigalrm_is_left_blocked_and_the_call_does_not_run():
+    """A host that blocked SIGALRM would never see the alarm fire, so a budget
+    armed there is no budget at all. Refuse before touching anything."""
+    _child("""
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
+        def must_not_run():
+            raise AssertionError("the call ran under a blocked SIGALRM")
+        assert firewall._run_within_budget(must_not_run, 0.05) == (None, None)
+        assert signal.SIGALRM in signal.pthread_sigmask(signal.SIG_BLOCK, ())
+    """)
 
-    def failing_cancel(which, seconds, *rest):
-        if seconds == 0:
-            raise signal.ItimerError("cancel failed")
-        return real(which, seconds, *rest)
-    monkeypatch.setattr(signal, "setitimer", failing_cancel)
-    try:
-        with pytest.raises(signal.ItimerError):
+
+def test_an_alarm_held_pending_by_a_mask_set_during_the_call_is_consumed():
+    """If the SIGALRM mask goes up while the call runs, our alarm is left pending
+    at the OS level. Restoring the default handler and then lifting the mask
+    would kill the process, so teardown consumes it first."""
+    _child("""
+        def masks_then_waits():
+            signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
+            time.sleep(0.3)               # the 0.05 s alarm fires here, held pending
+            return 42
+        assert firewall._run_within_budget(masks_then_waits, 0.05) == (True, 42)
+    """)
+
+
+def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
+    """Under a line tracer the alarm can be delivered at the first line of the
+    cleanup, before any of it runs. The restore is the outer finally, so the
+    handler still goes back and the stop is still caught."""
+    _child("""
+        lines, start = inspect.getsourcelines(firewall._run_within_budget)
+        done = start + next(i for i, l in enumerate(lines) if "finished = True" in l)
+        code = firewall._run_within_budget.__code__
+
+        def local(frame, event, arg):
+            if event == "line" and frame.f_lineno > done:
+                end = time.perf_counter() + 2
+                while time.perf_counter() < end:   # the real alarm expires here
+                    sum(range(100))
+                raise SystemExit("the alarm never fired at teardown entry")
+            return local
+
+        sys.settrace(lambda frame, event, arg: local if frame.f_code is code else None)
+        result = firewall._run_within_budget(lambda: 42, 0.05)
+        sys.settrace(None)
+        assert result == (False, None), result
+    """)
+
+
+def test_an_alarm_pending_at_cancel_does_not_escape():
+    _child("""
+        real = signal.setitimer
+        def wrapped(*a):
+            if a[1] == 0:
+                os.kill(os.getpid(), signal.SIGALRM)
+            return real(*a)
+        signal.setitimer = wrapped
+        assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
+        signal.setitimer = real
+    """)
+
+
+def test_an_alarm_pending_at_handler_restore_does_not_escape():
+    _child("""
+        real = signal.signal
+        def wrapped(*a):
+            if a[1] == signal.SIG_DFL:
+                os.kill(os.getpid(), signal.SIGALRM)
+            return real(*a)
+        signal.signal = wrapped
+        assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
+        signal.signal = real
+    """)
+
+
+def test_a_cancel_that_fails_still_puts_the_handler_back():
+    """The handler restore is the outer finally: if cancelling the timer raises,
+    our handler must not be left installed, and the failure is raised, not
+    hidden. A cancel that really failed would leave the timer running and
+    nothing here could stop it, so the child cancels it itself to exit."""
+    _child("""
+        real = signal.setitimer
+        def failing_cancel(which, seconds, *rest):
+            if seconds == 0:
+                raise signal.ItimerError("cancel failed")
+            return real(which, seconds, *rest)
+        signal.setitimer = failing_cancel
+        try:
             firewall._run_within_budget(lambda: 42, 5)
+        except signal.ItimerError:
+            pass
+        else:
+            raise AssertionError("the failed cancel was hidden")
+        signal.setitimer = real
         assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
-    finally:
         real(signal.ITIMER_REAL, 0)
+    """)
 
 
 def test_an_exception_from_the_call_propagates_and_cleans_up():
@@ -579,6 +659,24 @@ def test_injected_slow_scan_through_the_real_hook_is_stopped_at_the_real_constan
 
 @pytest.mark.slow
 @pytest.mark.interpreter_dependent
+def test_a_blocked_sigalrm_through_the_real_hook_asks_unavailable_at_once(tmp_path):
+    """The real `main()` under a blocked SIGALRM (what a host's inherited mask
+    gives it): one terminal unavailable ask in well under the harness timeout,
+    the scan never started, the receipt paired."""
+    proc, took = _run_injected(
+        tmp_path, "import signal\nsignal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})",
+        limit=20)
+    assert took < 5, f"took {took:.1f}s"
+    assert proc.returncode == 0, proc.stderr
+    hso = json.loads(proc.stdout)["hookSpecificOutput"]
+    assert hso["permissionDecision"] == "ask"
+    assert "warn-lane budget unavailable," in hso["permissionDecisionReason"]
+    recs = _receipts(tmp_path)
+    assert [r["kind"] for r in recs] == ["in_flight", "decision"]
+    assert recs[-1]["rule_id"] == "GLS-FW-FUZZY-BUDGET"
+    assert _orphans(recs) == []
+
+
 def test_real_hook_one_mebibyte_answers_inside_the_harness_timeout(tmp_path):
     """INTERPRETER-DEPENDENT: on a faster Python the 1 MiB scan can finish inside the
     budget (py3.14.7: base64 and jwt do) and this then proves nothing about the
