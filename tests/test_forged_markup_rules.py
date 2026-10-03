@@ -1,9 +1,10 @@
 """Three rules for markup that dresses text as an instruction channel.
 
 GLS-TMS-255 reads a command fence marker (a double angle bracket, EXEC, a colon)
-inside tool supplied text. GLS-TOP-651 reads a bracketed role label that is
-followed by a statement that a decision was already made. GLS-TOP-652 reads a
-made up priority tag followed by text that opens with an order word.
+on the message, file, tool output and API response channels. GLS-TOP-651 reads a
+bracketed role label that is followed by a statement that a decision was already
+made. GLS-TOP-652 reads a made up priority tag followed by text that opens with an
+order word.
 
 Each one keys on literal markup, so the pins here are in pairs. Each forged shape
 below is found on a channel its rule declares, and each of the nearest ordinary
@@ -46,6 +47,14 @@ def test_each_rule_is_filed_under_its_category_with_a_regex_and_channels(rule_id
     rule = _rule(rule_id)
     assert rule["category"] == category
     assert rule["regex"] and rule["channel"]
+
+
+def test_the_exec_fence_rule_names_each_channel_it_declares_and_no_narrower_scope():
+    rule = _rule("GLS-TMS-255")
+    assert set(rule["channel"]) == {"message", "file", "tool_output", "api_response"}
+    for word in ("message", "file", "tool result", "API response"):
+        assert word in rule["description"]
+    assert "metadata" not in rule["name"].lower()
 
 
 FORGED = [

@@ -8,7 +8,7 @@ All notable changes to Sunglasses are documented here.
 ### Added
 
 - Three rules for text that dresses itself as an instruction channel. GLS-TMS-255 reads a command
-  fence marker inside tool supplied text, GLS-TOP-651 reads a bracketed role label followed by a
+  fence marker in a message, file, tool result or API response, GLS-TOP-651 reads a bracketed role label followed by a
   claim that a decision was already made and GLS-TOP-652 reads an invented priority tag followed
   by text that opens with an order word. Each one keys on literal markup. A shell here document, a page that only
   names a role label and one well known README are pinned as not matching.
