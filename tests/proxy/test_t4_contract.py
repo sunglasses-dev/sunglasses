@@ -181,7 +181,8 @@ def test_AT27_the_detector_gap_disposition_is_message_only():
 def _invoke(request_id):
     settlements = []
     session = types.SimpleNamespace(closed_with=lambda: None,
-                                    admit_request=lambda *a, **k: True)
+                                    admit_request=lambda *a, **k: True,
+                                    descriptor_revision=lambda: 0)
 
     def scan(params, **kw):
         return result(binding=kw["binding"],
