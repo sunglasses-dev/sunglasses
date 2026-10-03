@@ -523,6 +523,15 @@ git clone https://github.com/sunglasses-dev/sunglasses && cd sunglasses
 python3 tests/benchmark/precision_recall.py
 ```
 
+That command measures the source tree you just cloned. To measure the package a user gets from PyPI, install it and add one flag. The dataset still comes from the clone:
+
+```bash
+pip install sunglasses
+python3 tests/benchmark/precision_recall.py --installed
+```
+
+Both runs print which engine they measured. `--installed` refuses to run when the importable package is the checkout itself, for example an editable install, so a source tree run cannot be reported as an installed one.
+
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 77 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
 
 | Metric (v0.6.5) | Value |

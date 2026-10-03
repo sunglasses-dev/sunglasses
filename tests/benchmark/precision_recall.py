@@ -8,6 +8,12 @@ byte-identical results, verified by the SHA-256 of the metrics block.
 
     python3 tests/benchmark/precision_recall.py            # human-readable
     python3 tests/benchmark/precision_recall.py --json     # machine-readable
+    python3 tests/benchmark/precision_recall.py --installed  # the pip installed package
+
+By default the engine comes from this checkout. --installed measures the
+package on the normal import path (what `pip install sunglasses` put there)
+against the same dataset, and refuses when that package turns out to be the
+checkout (an editable install, or PYTHONPATH pointing at the repo).
 
 Dataset
 -------
@@ -16,10 +22,11 @@ POSITIVES  tests/benchmark/attacks.json  — labeled agent-input attacks
 NEGATIVES  tests/fp_real_world_corpus/*.md — real famous-repo READMEs that
            MUST stay clean (a flag on one is a false positive).
 
-No randomness, no network, no LLM judge. Draws the engine from the local
-package so it measures exactly what ships.
+No randomness, no network, no LLM judge. The report says which engine it
+measured, so a source tree run and a wheel run cannot be told apart by hand.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -27,12 +34,42 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-sys.path.insert(0, REPO)
-
-from sunglasses.engine import SunglassesEngine  # noqa: E402
 
 CAUGHT = {"block", "quarantine"}          # a real detection
 CORPUS = os.path.join(REPO, "tests", "fp_real_world_corpus")
+
+
+def _inside_checkout(path):
+    real = os.path.realpath(path)
+    root = os.path.realpath(REPO)
+    return real == root or real.startswith(root + os.sep)
+
+
+def _refuse(msg):
+    print(f"error: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def load_engine(installed=False):
+    """Return (engine class, "checkout" or "installed", path of the engine module).
+
+    Default: the checkout goes first on sys.path, so the source tree is measured.
+    installed=True leaves sys.path alone and takes whatever the interpreter
+    finds, then refuses if that is the checkout, because calling a source tree
+    "installed" is the one mistake this flag exists to prevent."""
+    if not installed and (not sys.path or sys.path[0] != REPO):
+        sys.path.insert(0, REPO)
+    try:
+        from sunglasses.engine import SunglassesEngine
+    except ImportError as exc:
+        if not installed:
+            raise
+        _refuse(f"no installed sunglasses package to measure ({exc}). pip install sunglasses, then run again.")
+    where = os.path.realpath(sys.modules["sunglasses.engine"].__file__)
+    if installed and _inside_checkout(where):
+        _refuse(f"the importable sunglasses package is the checkout ({where}), not an installed one. "
+                "Run from an environment where the wheel is installed and the repo is not on the import path.")
+    return SunglassesEngine, ("installed" if installed else "checkout"), where
 
 
 def load_positives():
@@ -50,8 +87,9 @@ def load_negatives():
     return out
 
 
-def run():
-    engine = SunglassesEngine()
+def run(installed=False):
+    engine_cls, source, engine_path = load_engine(installed)
+    engine = engine_cls()
     positives = load_positives()
     negatives = load_negatives()
 
@@ -115,16 +153,25 @@ def run():
         json.dumps(metrics, sort_keys=True).encode()
     ).hexdigest()
 
-    return {"metrics": metrics, "misses": misses, "false_positives": sorted(false_positives)}
+    # "engine" sits beside the metrics, not inside, so the sealed block (and
+    # every published hash of it) means exactly what it did before.
+    return {"engine": {"source": source, "path": engine_path},
+            "metrics": metrics, "misses": misses, "false_positives": sorted(false_positives)}
 
 
 def main():
-    result = run()
-    if "--json" in sys.argv:
+    ap = argparse.ArgumentParser(description="Sunglasses precision / recall benchmark.", allow_abbrev=False)
+    ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--installed", action="store_true",
+                    help="measure the installed package instead of this checkout")
+    args = ap.parse_args()
+    result = run(installed=args.installed)
+    if args.json:
         print(json.dumps(result, indent=2))
         return
     m = result["metrics"]
     print(f"\n  Sunglasses benchmark — engine v{m['engine_version']}")
+    print(f"  engine    : {result['engine']['source']}  ({result['engine']['path']})")
     print(f"  {'-' * 46}")
     print(f"  positives (attacks) : {m['positives']:>4}   caught {m['true_positives']}  missed {m['false_negatives']}")
     print(f"  negatives (readmes) : {m['negatives']:>4}   clean  {m['true_negatives']}  flagged {m['false_positives']}")
