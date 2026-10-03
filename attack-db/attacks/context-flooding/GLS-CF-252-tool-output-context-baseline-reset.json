@@ -27,7 +27,7 @@
     "tool-result authority spoof"
   ],
   "regex": [
-    "(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\\s+(?:all\\s+)?(?:prior|previous|earlier|original)\\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\\s+baseline|start\\s+(?:over|fresh)|policy\\s+(?:superseded|v\\d)|earlier\\s+constraints?\\s+(?:are\\s+)?outdated)\\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:\\[?\\s*(?:system|security)\\s+(?:patch|update|override)\\s+applied\\]?|approvals?\\s+pre[- ]granted|unrestricted\\s+troubleshooting\\s+mode)\\b)"
+    "(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\\s+(?:all\\s+)?(?:prior|previous|earlier|original)\\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\\s+baseline|start\\s+(?:over|fresh)|policy\\s+(?:superseded|v\\d)|earlier\\s+constraints?\\s+(?:are\\s+)?outdated)\\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:(?:\\[\\s*)?(?:system|security)\\s+(?:patch|update|override)\\s+applied\\]?|approvals?\\s+pre[- ]granted|unrestricted\\s+troubleshooting\\s+mode)\\b)"
   ],
   "examples": {
     "malicious": [],

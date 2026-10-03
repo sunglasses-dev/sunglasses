@@ -3,6 +3,18 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Fixed
+
+- GLS-CF-252 no longer slows down on a long run of whitespace. The status alternative began
+  with an optional bracket and optional whitespace, so a search retried the whole run at every
+  whitespace position and the time grew with the square of the length. A text with the word
+  applied in it followed by 32,000 spaces took about four seconds to scan. The whitespace is
+  now part of the optional bracket, so a run of spaces is skipped once. The words of the rule
+  are not changed.
+
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed
