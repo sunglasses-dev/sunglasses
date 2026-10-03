@@ -101,6 +101,12 @@ jobs:
           echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH (tag commit time)"
           python3 -m pip install --upgrade pip build==1.6.1
           python3 -m build --sdist --wheel --outdir dist/
+          # setuptools ignores SOURCE_DATE_EPOCH for the sdist, so its member
+          # times, gzip time and owner ids still follow the runner. Repack it
+          # to the tagged commit's time, and prove the wheel did not move.
+          sha256sum dist/*.whl > "$RUNNER_TEMP/wheel.sha256"
+          bash scripts/repack_sdist.sh dist/*.tar.gz
+          sha256sum -c "$RUNNER_TEMP/wheel.sha256"
           ls -la dist/
       - name: The wheel's description is the repo README (the 0.5.0 lesson)
         run: |

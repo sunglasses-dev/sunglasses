@@ -80,6 +80,20 @@ def check_release(doc):
             problems.append("Build does not export SOURCE_DATE_EPOCH from the tagged commit time")
         elif not built or built.start() < export.start():
             problems.append("Build runs the build before it exports SOURCE_DATE_EPOCH")
+        # The sdist ignores SOURCE_DATE_EPOCH, so it is repacked after the build, and the
+        # wheel's sha256 is taken before and checked after to prove the repack left it alone.
+        repack = re.search(r"scripts/repack_sdist\.sh", run)
+        if not repack:
+            problems.append("Build does not repack the sdist with scripts/repack_sdist.sh")
+        elif built and repack.start() < built.start():
+            problems.append("Build repacks the sdist before it builds it")
+        else:
+            record = re.search(r"sha256sum (?!-c)", run)
+            verify = re.search(r"sha256sum -c", run)
+            if not (record and record.start() < repack.start()):
+                problems.append("Build does not record the wheel sha256 before the repack")
+            if not (verify and verify.start() > repack.start()):
+                problems.append("Build does not check the wheel sha256 after the repack")
     return problems
 
 
@@ -171,3 +185,53 @@ def test_the_checker_catches_a_missing_build_step():
     _build_run(doc)["name"] = "Compile"
     assert any("no step named Build" in p for p in check_release(doc))
 
+
+
+# ── reproducible sdist: the repack after the build ───────────────────────
+# setuptools ignores SOURCE_DATE_EPOCH for the sdist, so the Build step repacks it
+# with scripts/repack_sdist.sh, and proves the wheel did not move while doing it.
+
+def test_the_build_step_repacks_the_sdist_after_the_build():
+    run = _build_run(load())["run"]
+    assert "scripts/repack_sdist.sh" in run
+    assert run.index("-m build") < run.index("scripts/repack_sdist.sh")
+
+
+def test_the_build_step_proves_the_wheel_is_unchanged_by_the_repack():
+    run = _build_run(load())["run"]
+    assert run.index("sha256sum") < run.index("scripts/repack_sdist.sh") < run.index("sha256sum -c")
+
+
+def test_the_checker_catches_a_build_without_the_repack():
+    doc = load()
+    step = _build_run(doc)
+    step["run"] = "\n".join(l for l in step["run"].splitlines() if "repack_sdist" not in l)
+    assert any("repack" in p for p in check_release(doc))
+
+
+def test_the_checker_catches_the_repack_before_the_build():
+    doc = load()
+    step = _build_run(doc)
+    lines = step["run"].splitlines()
+    rep = [l for l in lines if "repack_sdist" in l]
+    rest = [l for l in lines if "repack_sdist" not in l]
+    step["run"] = "\n".join(rep + rest)
+    assert any("repack" in p and "before" in p for p in check_release(doc))
+
+
+def test_the_checker_catches_a_repack_with_no_wheel_check():
+    doc = load()
+    step = _build_run(doc)
+    step["run"] = "\n".join(l for l in step["run"].splitlines() if "sha256sum" not in l)
+    assert any("wheel" in p and "sha256" in p for p in check_release(doc))
+
+
+def test_the_checker_catches_a_wheel_check_that_runs_before_the_repack():
+    doc = load()
+    step = _build_run(doc)
+    lines = step["run"].splitlines()
+    kept = [l for l in lines if "sha256sum -c" not in l]
+    chk = [l for l in lines if "sha256sum -c" in l]
+    i = next(i for i, l in enumerate(kept) if "repack_sdist" in l)
+    step["run"] = "\n".join(kept[:i] + chk + kept[i:])
+    assert any("wheel" in p and "after" in p for p in check_release(doc))
