@@ -197,6 +197,18 @@ def test_an_active_policy_line_does_not_promise_the_policy_is_read_on_every_call
     assert "unless the secret check has already denied it" in line, line
 
 
+def test_a_no_policy_line_does_not_say_every_secret_in_a_call_is_blocked(tmp_path):
+    """The secret check only looks at a call that could send bytes out, so the line says that."""
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    for make in (_none, _disabled_starter):
+        make(sh)
+        line = _policy_state_line(sh)
+        assert "could send secret material out" in line, line
+        assert "secret material in a tool call is still blocked" not in line, line
+
+
 def _init(tmp_path, *flags):
     """Run the real `sunglasses init` in a scratch project, the way a person does."""
     home = tmp_path / "home"

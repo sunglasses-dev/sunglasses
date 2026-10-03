@@ -1767,7 +1767,7 @@ def _policy_state_line(home=None) -> str:
                            load_policy, sunglasses_home)
 
     path = (home or sunglasses_home()) / "policy.yaml"
-    off = "secret material in a tool call is still blocked"
+    off = "a call that could send secret material out is still denied"
     try:
         policy = load_policy(path)
     except PolicyDown as down:
