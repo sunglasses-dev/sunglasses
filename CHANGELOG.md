@@ -13,7 +13,7 @@ All notable changes to Sunglasses are documented here.
   was missing the engine retried the checks over and over. The checks now sit
   side by side and the rules run in linear time. What each rule matches does not
   change. A new test reads every shipped regex and fails if any rule chains
-  lookaheads this way again. (#NNN)
+  lookaheads this way again. (#312)
 
 
 ## [0.6.5] — 2026-10-02
