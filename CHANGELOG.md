@@ -3,6 +3,14 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- Two encoding rules, GLS-ENC-ALT-210 and GLS-CF-252, now also read the decoded text, so an
+  instruction hidden in base64 is caught instead of passing as noise. A similar third rule stays
+  on the raw text, because reading it on decoded text blocked a well known README.
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed

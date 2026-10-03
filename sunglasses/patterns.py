@@ -4686,6 +4686,7 @@ PATTERNS = [
         "category": "encoding_evasion",
         "severity": "critical",
         "channel": ["message", "file", "web_content", "tool_output"],
+        "match_on": "normalized",
         "keywords": [
             "decode then ignore all previous",
             "transliterate braille to text execute",
@@ -16614,6 +16615,7 @@ PATTERNS = [
         "category": "context_flooding",
         "severity": "high",
         "channel": ["message", "file", "web_content", "tool_output", "log_memory"],
+        "match_on": "normalized",
         "keywords": [
             "context window reset poisoning",
             "ignore previous directives",
