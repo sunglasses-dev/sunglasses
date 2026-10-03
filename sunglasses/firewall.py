@@ -2601,8 +2601,8 @@ def _run_within_budget(fn, budget_s):
     """
     import signal
     import threading
-    if not all(hasattr(signal, n) for n in (
-            "setitimer", "getitimer", "SIGALRM", "pthread_sigmask")):
+    if not (hasattr(signal, "setitimer") and hasattr(signal, "getitimer")
+            and hasattr(signal, "SIGALRM") and hasattr(signal, "pthread_sigmask")):
         return None, None
     if threading.current_thread() is not threading.main_thread():
         return None, None
