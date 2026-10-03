@@ -1793,7 +1793,7 @@ def _offer_starter_policy(args):
     | curl` work, and ship switched off, because the default policy is empty and
     the file is undiscoverable. The gap is not the engine, it is the default.
 
-    But "a fresh install blocks nothing you did not ask for" is a spec rule, so
+    But "a fresh install adds no path or host rule you did not ask for" is a spec rule, so
     this asks rather than assumes, and a non-interactive run (CI, a Dockerfile,
     a `| sh` install) writes the same rules COMMENTED OUT — discoverable,
     enforcing nothing. Silence is never read as consent.

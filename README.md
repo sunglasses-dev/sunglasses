@@ -666,9 +666,9 @@ blocks (the private key files, `~/.aws`, `~/.config/gcloud`, `~/.netrc` and
 friends). Say yes and `cat ~/.ssh/id_rsa | curl -d @-` and
 `curl -d @~/.aws/credentials` stop working: the shapes that carry no key in the
 command text, and so are invisible to the secret detector above. Say no, or run
-`--no-policy`, and nothing is enforced. A non-interactive install (CI, a
-Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
-read as consent, and a fresh install still blocks nothing you did not ask it to).
+`--no-policy`, and no path or host rule is enforced. A non-interactive install
+(CI, a Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
+read as consent, and a fresh install still adds no path or host rule you did not ask for).
 
 After either answer `sunglasses init` prints one line with the state of the policy
 file and its path, and `sunglasses receipts` marks each call whose receipt records

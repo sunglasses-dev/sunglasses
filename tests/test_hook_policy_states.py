@@ -134,9 +134,13 @@ def test_readme_opening_line_does_not_promise_credential_leaks_it_cannot_see():
     assert "secret material" in opening and "your policy lists" in opening, opening
 
 
-def test_readme_still_says_a_fresh_install_blocks_nothing_it_was_not_asked_to():
+def test_readme_still_says_a_fresh_install_adds_no_path_or_host_rule_it_was_not_asked_for():
+    """The secret check runs with no configuration, so the README may not say nothing is enforced."""
     text = re.sub(r"\s+", " ", (REPO / "README.md").read_text(encoding="utf-8"))
-    assert "a fresh install still blocks nothing you did not ask it to" in text
+    assert "a fresh install still adds no path or host rule you did not ask for" in text
+    assert "and no path or host rule is enforced" in text
+    assert "and nothing is enforced" not in text
+    assert "a fresh install still blocks nothing you did not ask it to" not in text
 
 
 def test_the_policy_file_header_does_not_say_an_empty_file_enforces_nothing(tmp_path):
