@@ -2808,8 +2808,36 @@ class _ExitAwareSource:
         self._source, self._fd = source, fd
         self._wake, self._session = wake, session
 
+    def _held(self, n):
+        """Whatever the source already holds, without waiting for more.
+
+        A caller's BufferedReader may have read ahead (`peek`), which leaves
+        the answer in Python's memory and the kernel pipe empty, so the
+        descriptor says nothing about it. The descriptor is made nonblocking
+        for the length of one read, so an empty source returns at once instead
+        of waiting; b"" here means nothing is held, not end of file.
+        """
+        try:
+            was_blocking = os.get_blocking(self._fd)
+            os.set_blocking(self._fd, False)
+        except (OSError, ValueError):
+            return b""
+        try:
+            read = getattr(self._source, "read1", None) or self._source.read
+            return read(n) or b""
+        except (BlockingIOError, InterruptedError):
+            return b""
+        finally:
+            try:
+                os.set_blocking(self._fd, was_blocking)
+            except (OSError, ValueError):
+                pass
+
     def read1(self, n):
         while True:
+            held = self._held(n)
+            if held:
+                return held             # data first, before any waiting or judging
             try:
                 ready = select.select([self._fd, self._wake.r], [], [])[0]
             except (OSError, ValueError):
