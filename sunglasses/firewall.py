@@ -2214,6 +2214,28 @@ HOOK_MARKER = "sunglasses.firewall"
 
 _HOOK_TIMEOUT = 10
 
+# The warn lane's OWN wall-clock budget, in seconds. The harness kills a hook at
+# `_HOOK_TIMEOUT` and the kill gives the host no verdict (and leaves an in_flight
+# receipt with no terminal partner), so an advisory lane must stop itself first.
+# Measured (Oct 2026 bench, 1 MiB call): with the lane on, a ~1 MiB call takes 11-13 s. It
+# is a clock, not a size cap: scan cost depends on the SHAPE of the input as much
+# as its size. 3 s of headroom covers interpreter start, the deterministic lanes
+# and the receipts.
+_WARN_LANE_BUDGET_S = 7
+
+
+def _check_warn_budget(budget, timeout):
+    """The budget must sit strictly below the harness timeout, and above zero:
+    `setitimer(0)` CANCELS the timer, so a zero budget would be no budget.
+    An explicit raise, not `assert`, so `python -O` cannot strip it."""
+    if not (0 < budget < timeout):
+        raise AssertionError(
+            f"warn-lane budget {budget!r} must satisfy 0 < budget < hook "
+            f"timeout {timeout!r}")
+
+
+_check_warn_budget(_WARN_LANE_BUDGET_S, _HOOK_TIMEOUT)
+
 
 def build_hook_entry(interpreter: str = None) -> dict:
     """The PreToolUse entry we write into settings.json.
@@ -2554,20 +2576,81 @@ def fuzzy_enabled(home=None) -> bool:
     return (home / "warn-lane").exists()
 
 
+class _WarnBudgetExceeded(BaseException):
+    """Raised by the budget timer. A BaseException on purpose: the engine has
+    `except Exception` blocks, and a stop that one of them could swallow is not
+    a stop."""
+
+
+def _run_within_budget(fn, budget_s):
+    """Run `fn()` and stop it after `budget_s` wall-clock seconds.
+
+    Returns `(True, value)`, or `(False, None)` when the budget ran out. Uses
+    SIGALRM: CPython's regex engine checks for signals while it matches, so this
+    interrupts one long C-level match as well as a Python loop. Where that is
+    unavailable (no `setitimer`, or not the main thread) `fn` runs unbudgeted,
+    exactly as before this existed. An exception from `fn` propagates.
+    """
+    import signal
+    if not (hasattr(signal, "setitimer") and hasattr(signal, "SIGALRM")):
+        return True, fn()
+
+    def _expired(signum, frame):
+        raise _WarnBudgetExceeded()
+
+    try:
+        previous = signal.signal(signal.SIGALRM, _expired)
+    except ValueError:  # not the main thread
+        return True, fn()
+    try:
+        signal.setitimer(signal.ITIMER_REAL, budget_s)
+        try:
+            value = fn()
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+        return True, value
+    except _WarnBudgetExceeded:
+        return False, None
+    finally:
+        signal.signal(signal.SIGALRM,
+                      previous if previous is not None else signal.SIG_DFL)
+
+
 def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
     """Pattern-engine pass. Escalates to the human; never decides for them."""
-    global _FUZZY_ENGINE
     text = egress_surface_text(tool_name, tool_input)
     if not text:
         return None
 
-    # Imported here, not at module scope: the deterministic path must never pay
-    # for the pattern DB, and the hot-path import test enforces that.
-    if _FUZZY_ENGINE is None:
-        from .engine import SunglassesEngine
-        _FUZZY_ENGINE = SunglassesEngine()
+    def _scan():
+        global _FUZZY_ENGINE
+        # Imported here, not at module scope: the deterministic path must never
+        # pay for the pattern DB, and the hot-path import test enforces that.
+        if _FUZZY_ENGINE is None:
+            from .engine import SunglassesEngine
+            _FUZZY_ENGINE = SunglassesEngine()
+        return _FUZZY_ENGINE.scan(text, channel="message")
 
-    result = _FUZZY_ENGINE.scan(text, channel="message")
+    # Building the engine and scanning both count against the budget: that is
+    # the lane's whole wall-clock cost, and the harness's clock covers all of it.
+    finished, result = _run_within_budget(_scan, _WARN_LANE_BUDGET_S)
+    if not finished:
+        # TERMINAL, and an ask: the lane never denies, and it must never leave the
+        # host waiting on a verdict that is not coming. The caller writes the
+        # decision receipt as for any other answer, so no in_flight is orphaned.
+        return Decision(
+            action="ask",
+            lane="fuzzy",
+            rule_id="GLS-FW-FUZZY-BUDGET",
+            reason=(
+                f"SUNGLASSES firewall: warn-lane budget exceeded, "
+                f"{len(text.encode('utf-8', 'replace'))} bytes. The pattern scan "
+                f"was stopped after {_WARN_LANE_BUDGET_S:g} s, so this call was "
+                f"NOT pattern-checked. Approve only if you would have approved "
+                f"it unchecked. Turn this lane off by deleting "
+                f"~/.sunglasses/warn-lane."
+            ),
+        )
     # `threat_found`, NOT `is_clean` (v0.5.6). `is_clean` is now False for an
     # oversized command that merely got truncated, and this lane reads `findings[0]`
     # two lines down — on `is_clean` that is an IndexError on a benign long command,
