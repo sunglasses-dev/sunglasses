@@ -29377,14 +29377,14 @@ PATTERNS = [
     },
     {
         "id": "GLS-TOP-651",
-        "name": 'Forged Role Label Carrying A Decision',
+        "name": 'Forged Role Label Followed By Decision Wording',
         "category": "tool_output_poisoning",
         "severity": "high",
         "channel": ["message", "file", "web_content", "tool_output"],
         "regex": [
             r"""(?i)\[(?:assistant|system|developer)\][ \t]{0,2}:[ \t]{0,3}.{0,60}?\b(?:I(?:'ve|[ \t]+have)[ \t]+decided|decided[ \t]+to|I[ \t]+(?:approve|allow|authori[sz]e|confirm)|(?:approved|allowed|authori[sz]ed|confirmed|granted)\b)""",
         ],
-        "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. Such a label imitates a transcript turn to make an approval look settled.",
+        "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. A label like this imitates a transcript turn.",
     },
     {
         "id": "GLS-TOP-652",
@@ -29395,6 +29395,6 @@ PATTERNS = [
         "regex": [
             r"""(?i)<[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>[ \t\r\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)\b[\w \t_-]{0,30}<[ \t]{0,2}/[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>""",
         ],
-        "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, followed by text that opens with an order word such as execute, run, ignore, override, disable, delete or send, as in execute immediately, and then closed by a closing tag from the same list. A tag like this reads as an attempt to raise the rank of the instruction inside it.",
+        "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, followed by text that opens with an order word such as execute, run, ignore, override, disable, delete or send, as in execute immediately, and then closed by a closing tag from the same list. A tag like this imitates a priority marker.",
     },
 ]

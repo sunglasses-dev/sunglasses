@@ -1,6 +1,6 @@
 {
   "id": "GLS-TOP-651",
-  "name": "Forged Role Label Carrying A Decision",
+  "name": "Forged Role Label Followed By Decision Wording",
   "version": "1.0",
   "category": "tool_output_poisoning",
   "severity": "high",
@@ -10,7 +10,7 @@
     "web_content",
     "tool_output"
   ],
-  "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. Such a label imitates a transcript turn to make an approval look settled.",
+  "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. A label like this imitates a transcript turn.",
   "keywords": [],
   "regex": [
     "(?i)\\[(?:assistant|system|developer)\\][ \\t]{0,2}:[ \\t]{0,3}.{0,60}?\\b(?:I(?:'ve|[ \\t]+have)[ \\t]+decided|decided[ \\t]+to|I[ \\t]+(?:approve|allow|authori[sz]e|confirm)|(?:approved|allowed|authori[sz]ed|confirmed|granted)\\b)"

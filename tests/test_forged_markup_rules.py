@@ -2,9 +2,9 @@
 
 GLS-TMS-255 reads a command fence marker (a double angle bracket, EXEC, a colon)
 on the message, file, tool output and API response channels. GLS-TOP-651 reads a
-bracketed role label that is followed by a statement that a decision was already
-made. GLS-TOP-652 reads a made up priority tag followed by text that opens with an
-order word.
+bracketed role label that is followed within a short span by wording such as
+decided or approved. GLS-TOP-652 reads a made up priority tag followed by text
+that opens with an order word.
 
 Each one keys on literal markup, so the pins here are in pairs. Each forged shape
 below is found on a channel its rule declares, and each of the nearest ordinary
@@ -55,6 +55,15 @@ def test_the_exec_fence_rule_names_each_channel_it_declares_and_no_narrower_scop
     for word in ("message", "file", "tool result", "API response"):
         assert word in rule["description"]
     assert "metadata" not in rule["name"].lower()
+
+
+def test_the_role_label_rule_is_described_as_wording_not_as_a_claim():
+    rule = _rule("GLS-TOP-651")
+    assert "wording" in rule["description"]
+    assert "claim" not in rule["description"].lower()
+    assert "carrying a decision" not in rule["name"].lower()
+    with open(os.path.join(ROOT, "CHANGELOG.md")) as fh:
+        assert "claim that a decision" not in fh.read()
 
 
 FORGED = [
