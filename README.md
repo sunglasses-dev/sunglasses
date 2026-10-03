@@ -722,6 +722,19 @@ private key files are named individually and matching is boundary-aware, so
   as a dangerous shell command), and it costs ~902ms per call because the
   pattern database is rebuilt in every hook subprocess. Enable with
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
+- **On older Pythons one regex can outrun the WARN lane clock.** The 7 second
+  budget is a timer signal, and before Python 3.11.6 and 3.12.1 the regex engine
+  only notices a signal inside one long match attempt. A single search that makes
+  many short attempts over a long input therefore runs to its end first. The fix
+  lives in CPython itself (issue 109631). If you turn the WARN lane
+  on, use Python 3.11.6, 3.12.1 or newer. macOS ships 3.9 as /usr/bin/python3.
+- **Large content passed as tool input can use up the WARN lane clock on any
+  Python.** On content of about 200 KB and up (a big file written in one call or
+  a large pasted payload) the 7 seconds add up over hundreds of pattern checks
+  plus building the pattern database on the first call, with no single slow
+  pattern to blame. When the clock runs out the lane stops and asks you, and
+  that call reaches you without a completed pattern check. Hard blocks do not
+  use this clock and are unaffected.
 - **It fails open, and says so.** A crash falls through to Claude Code's own
   permission flow rather than wedging your agent. A *dead control* is different:
   if the policy file is missing, empty, unreadable or unparseable, or if the audit
