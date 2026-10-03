@@ -18,8 +18,11 @@ the next newline, so reading stops rather than resumes.
 """
 from __future__ import annotations
 
+import os
+import select
 import threading
 import time
+import weakref
 
 from . import bounds, envelope, framing, handshake, selector, supervisor
 from .session import Cause, Session as CoreSession, Settled
@@ -356,6 +359,10 @@ class Session:
         self._pgid = pgid
         self._strict = strict
         self._watcher = None
+        # The exit-vs-answer wake (see `_exit_aware`); None until a reader that
+        # can wait on a real pipe asks for it.
+        self._exit_wake = None
+        self._exit_judged = threading.Event()
         self._core = CoreSession()
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
@@ -1534,6 +1541,18 @@ class Session:
         # a client still waiting, which is the whole reason the record exists.
         if self._closed or not (self._pending or self._settling):
             return
+        # THE EXIT IS A FACT, THE VERDICT IS TAKEN AT THE PIPE. A server that
+        # answers and then exits (an echo server on stdin EOF, any one-shot
+        # tool) has its answer in the pipe, or in the reader's hands being
+        # scanned, at the moment this thread wakes. Closing here replaced a
+        # clean, fully scanned answer with MALFORMED_UPSTREAM, on a window of
+        # about a millisecond. The reader is told instead, and judges the exit
+        # at the one point where the question has an exact answer: it has
+        # nothing left to read and is about to wait.
+        if self._wake_reader_for_exit():
+            return
+        # No reader that can be told (a stream without a descriptor): the old
+        # behaviour, unchanged.
         # T7.R1, then T8.R12. The fault is recorded first so the cause is the
         # exit rather than whatever the kill produces, and the group is then
         # stopped, which closes the descendant's copy of the write end and is
@@ -1541,9 +1560,59 @@ class Session:
         # _close supervises now, so the group is stopped as part of the
         # teardown rather than beside it. Doing it twice was how the close
         # could be claimed before anything had actually been stopped.
+        self._judge_upstream_exit()
+
+    def _judge_upstream_exit(self):
+        """The upstream has exited and nothing it wrote is left unread.
+
+        T7.R1: whatever is STILL owed now will never be answered, so the close
+        names the exit. Nothing owed is an ordinary shutdown and closes
+        nothing.
+        """
+        if self._closed or not (self._pending or self._settling):
+            return
         self._close("MALFORMED_UPSTREAM",
                     "the upstream process exited with calls still pending",
                     kind="UPSTREAM_EXIT_WITH_PENDING")
+
+    def _wake_reader_for_exit(self):
+        """Tell the reader the process is gone and wait, briefly, for its verdict.
+
+        True means the reader judged the exit (or the session closed meanwhile).
+        False means nobody can judge it for us in time -- no reader to tell, or
+        a reader that is not coming back to the pipe, which is a consumer that
+        stopped taking frames -- and the watcher takes the verdict itself, as it
+        always did. The grace is what keeps a stalled consumer from holding the
+        fault hostage; it is long next to a scan (about a millisecond) and short
+        next to every wait the existing gates make.
+        """
+        wake = self._exit_wake
+        if wake is None or not wake.signal():
+            return False
+        deadline = time.monotonic() + _EXIT_GRACE_S
+        while time.monotonic() < deadline:
+            if self._exit_judged.wait(0.02) or self._closed:
+                return True
+        return False
+
+    def _exit_aware(self, source):
+        """Wrap a pipe so the reader can be told the upstream has exited.
+
+        The reader waits on the pipe AND on a one-byte wake the watcher writes
+        when the process is gone. Data always wins: while the pipe has bytes
+        the reader reads them, which is how an answer written just before an
+        exit is delivered, and only when the pipe is empty does the exit get
+        judged. A source with no descriptor is returned as it came.
+        """
+        if self._upstream is None:
+            return source
+        try:
+            fd = source.fileno()
+        except (AttributeError, OSError, ValueError):
+            return source
+        if self._exit_wake is None:
+            self._exit_wake = _ExitWake()
+        return _ExitAwareSource(source, fd, self._exit_wake, self)
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream, inspect=None, gate=None):
@@ -1585,6 +1654,9 @@ class Session:
                 "strict mode needs the upstream handle: pass it to Session() or "
                 "attach_upstream() before reading, because an exit cannot be "
                 "observed on the pipe")
+        # Before the watcher starts, so an exit that has already happened is
+        # signalled to a reader that is listening for it.
+        stream = self._exit_aware(_as_reader(stream))
         if self._upstream is not None and self._watcher is None:
             self._watcher = threading.Thread(target=self._watch_upstream,
                                              daemon=True)
@@ -2689,6 +2761,72 @@ class Session:
     @property
     def events(self):
         return self._core.events
+
+
+# How long the watcher lets the reader judge an upstream exit before it does.
+_EXIT_GRACE_S = 1.0
+
+
+class _ExitWake:
+    """A one-byte pipe the watcher writes to and only the reader reads.
+
+    The descriptors close when the object is collected, not with a generator
+    that may never be finished. The watcher holds the session and the session
+    holds this, so nothing can write to a descriptor after it has closed.
+    """
+
+    def __init__(self):
+        self.r, self._w = os.pipe()
+        weakref.finalize(self, _close_fds, self.r, self._w)
+
+    def signal(self):
+        try:
+            os.write(self._w, b"x")
+        except OSError:
+            return False
+        return True
+
+    def consume(self):
+        try:
+            os.read(self.r, 1)
+        except OSError:
+            pass
+
+
+def _close_fds(*fds):
+    for fd in fds:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+class _ExitAwareSource:
+    """`read1` that returns data before it returns the news of an exit."""
+
+    def __init__(self, source, fd, wake, session):
+        self._source, self._fd = source, fd
+        self._wake, self._session = wake, session
+
+    def read1(self, n):
+        while True:
+            try:
+                ready = select.select([self._fd, self._wake.r], [], [])[0]
+            except (OSError, ValueError):
+                break               # let the read itself report a dead pipe
+            if self._fd in ready:
+                break               # bytes, or EOF: what the server wrote first
+            # Only the wake: the pipe is empty and the process is gone. The
+            # exit is judged now, once.
+            self._wake.consume()
+            self._session._judge_upstream_exit()
+            self._session._exit_judged.set()
+            if self._session._closed:
+                return b""
+        read = getattr(self._source, "read1", None) or self._source.read
+        return read(n)
+
+    read = read1
 
 
 def _as_reader(stream):
