@@ -1347,8 +1347,9 @@ def _describe_node(mode) -> str:
 def load_policy(path) -> dict:
     """Read policy.yaml, or raise PolicyDown naming the state it is in.
 
-    Returns `{}` only for the one honest empty case: no home directory, meaning
-    nothing was ever installed.
+    Returns `{}` only for the one honest empty case: there is no policy file and
+    nothing positively says one was installed, meaning no install marker. A
+    missing file WITH the marker is a dead control and raises PolicyDown("missing").
     """
     import pathlib
     p = pathlib.Path(path)
@@ -2383,7 +2384,8 @@ _POLICY_HEADER = """\
 # SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
 # Written by `sunglasses init`. Edit it freely. No file at all enforces
 # nothing, and a file with only comments enforces nothing. An empty file is
-# treated as a broken policy and asks before each tool call.
+# treated as a broken policy, and a tool call that nothing else settles asks
+# until the file is repaired.
 #
 # blocked_paths — any tool call that touches one of these paths is denied.
 #   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,

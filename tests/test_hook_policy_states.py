@@ -134,9 +134,13 @@ def test_readme_opening_line_does_not_promise_credential_leaks_it_cannot_see():
     assert "secret material" in opening and "your policy lists" in opening, opening
 
 
-def test_readme_still_says_a_fresh_install_blocks_nothing_it_was_not_asked_to():
+def test_readme_still_says_a_fresh_install_adds_no_path_or_host_rule_it_was_not_asked_for():
+    """The secret check runs with no configuration, so the README may not say nothing is enforced."""
     text = re.sub(r"\s+", " ", (REPO / "README.md").read_text(encoding="utf-8"))
-    assert "a fresh install still blocks nothing you did not ask it to" in text
+    assert "a fresh install still adds no path or host rule you did not ask for" in text
+    assert "and no path or host rule is enforced" in text
+    assert "and nothing is enforced" not in text
+    assert "a fresh install still blocks nothing you did not ask it to" not in text
 
 
 def test_the_policy_file_header_does_not_say_an_empty_file_enforces_nothing(tmp_path):
@@ -146,4 +150,144 @@ def test_the_policy_file_header_does_not_say_an_empty_file_enforces_nothing(tmp_
         text = starter_policy_text(enabled=enabled)
         flat = re.sub(r"\s*\n#\s*", " ", text)  # comment wrapping must not hide the sentence
         assert OLD_HEADER not in flat
-        assert "An empty file is treated as a broken policy and asks before each tool call" in flat
+        assert "An empty file is treated as a broken policy, and a tool call that nothing else settles asks until the file is repaired" in flat
+
+
+# ── what init says and what receipts show ───────────────────────────────────
+# The decision table above is unchanged on purpose: nothing here moves a verdict.
+# These pin the two places a person reads the state, so "no policy" cannot read
+# like "a policy checked this call", on screen as well as on the receipt.
+
+# setup, the word init prints. `active` has no receipt state, init needs a word for it.
+INIT_WORDS = [
+    ("no policy", _none, "none_configured"),
+    ("no policy file but the install marker", _marker_only, "missing"),
+    ("empty policy file", _empty, "empty"),
+    ("disabled starter", _disabled_starter, "inert"),
+    ("a key with no entries", _key_with_no_entries, "inert"),
+    ("enabled starter", _enabled_starter, "active"),
+    ("active policy that lists something else", _active_but_unrelated, "active"),
+]
+
+
+@pytest.mark.parametrize("name,setup,word", INIT_WORDS, ids=[s[0] for s in INIT_WORDS])
+def test_the_init_line_names_the_state_and_the_file(tmp_path, name, setup, word):
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    setup(sh)
+    line = _policy_state_line(sh)
+    assert "\n" not in line, line
+    assert f"Policy state {word} for " in line, line
+    assert str(sh / "policy.yaml") in line, line
+
+
+def test_a_dead_policy_control_says_the_firewall_asks(tmp_path):
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    _empty(sh)
+    assert "asks on any tool call that no other check settles" in _policy_state_line(sh)
+
+
+def test_an_active_policy_line_does_not_promise_the_policy_is_read_on_every_call(tmp_path):
+    """A secret in a call is denied before the policy is loaded, so the line says so."""
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    _enabled_starter(sh)
+    line = _policy_state_line(sh)
+    assert "on every tool call" not in line, line
+    assert "unless the secret check has already denied it" in line, line
+
+
+def test_a_no_policy_line_says_the_secret_check_runs_and_does_not_promise_a_deny(tmp_path):
+    """The secret check denies only recognised secret text in an outbound call, so the line says it runs."""
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    for make in (_none, _disabled_starter):
+        make(sh)
+        line = _policy_state_line(sh)
+        assert "the secret check on outbound calls runs as before" in line, line
+        for promise in ("still denied", "is denied", "could send", "blocked"):
+            assert promise not in line, line
+
+
+def _init(tmp_path, *flags):
+    """Run the real `sunglasses init` in a scratch project, the way a person does."""
+    home = tmp_path / "home"
+    home.mkdir()
+    sh = home / ".sunglasses"
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(sh), PYTHONPATH=str(REPO))
+    out = subprocess.run([sys.executable, "-m", "sunglasses.cli", "init", *flags],
+                         capture_output=True, text=True, env=env, cwd=str(proj),
+                         stdin=subprocess.DEVNULL, timeout=180)
+    assert out.returncode == 0, out.stdout + out.stderr
+    return out.stdout, sh
+
+
+@pytest.mark.parametrize("flags,word", [
+    (("--no-policy",), "none_configured"),
+    ((), "inert"),                      # not a terminal: the starter is written commented out
+    (("--policy",), "active"),
+], ids=["no-policy", "not-a-terminal", "policy"])
+def test_init_prints_the_state_line_on_every_road(tmp_path, flags, word):
+    """READ THE CALL SITE. The helper is correct and a test of it alone would pass
+    with `init` never calling it."""
+    stdout, sh = _init(tmp_path, *flags)
+    lines = [l for l in stdout.splitlines() if "Policy state" in l]
+    assert len(lines) == 1, stdout
+    assert f"Policy state {word} for " in lines[0], lines[0]
+    assert str(sh / "policy.yaml") in lines[0], lines[0]
+
+
+def test_init_no_longer_says_deleting_the_policy_enforces_nothing(tmp_path):
+    """With the install marker in place a deleted policy asks on every call."""
+    stdout, _ = _init(tmp_path, "--policy")
+    assert "enforces nothing" not in stdout, stdout
+    flat = re.sub(r"\s+", " ", stdout)
+    assert "If you delete it, the firewall asks on any tool call that no other check settles, until you restore it" in flat
+
+
+def test_load_policy_docstring_names_the_marker_not_the_home_directory():
+    from sunglasses.firewall import load_policy
+    doc = re.sub(r"\s+", " ", load_policy.__doc__)
+    assert "no home directory" not in doc, doc
+    assert "install marker" in doc, doc
+
+
+def _receipts(tmp_path, setup):
+    _call(tmp_path, setup)
+    home = tmp_path / "home"
+    env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home / ".sunglasses"), PYTHONPATH=str(REPO))
+    out = subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts"], capture_output=True,
+                         text=True, env=env, cwd=str(home), timeout=120)
+    assert out.returncode == 0, out.stdout + out.stderr
+    return out.stdout
+
+
+def test_the_receipt_view_marks_a_call_that_ran_without_a_policy(tmp_path):
+    shown = _receipts(tmp_path, _none)
+    assert "none_configured" in shown, shown
+    assert "ran with no path or host rules loaded" in shown, shown
+
+
+def test_the_receipt_view_marks_an_inert_policy_the_same_way(tmp_path):
+    shown = _receipts(tmp_path, _disabled_starter)
+    assert "inert" in shown, shown
+    assert "ran with no path or host rules loaded" in shown, shown
+
+
+def test_the_receipt_view_stays_quiet_for_a_call_a_policy_checked(tmp_path):
+    shown = _receipts(tmp_path, _active_but_unrelated)
+    assert "none_configured" not in shown and "inert" not in shown, shown
+    assert "ran with no path or host rules loaded" not in shown, shown
+
+
+def test_readme_says_init_and_receipts_name_the_policy_state():
+    text = re.sub(r"\s+", " ", (REPO / "README.md").read_text(encoding="utf-8"))
+    assert "sunglasses init` prints one line with the state of the policy file and its path" in text
+    assert "`sunglasses receipts` marks each call whose receipt records that it ran with no policy" in text
