@@ -5,10 +5,11 @@ inside tool supplied text. GLS-TOP-651 reads a bracketed role label that is
 followed by a statement that a decision was already made. GLS-TOP-652 reads a
 made up priority tag followed by text that opens with an order word.
 
-Each one keys on literal markup, so the pins here are in pairs. A forged shape
-must be found on the channels the rule declares, and the nearest ordinary text
-must stay quiet: a shell here document, a page that only names the role label,
-an urgent tag with no order inside it, and a well known README.
+Each one keys on literal markup, so the pins here are in pairs. Each forged shape
+below is found on a channel its rule declares, and each of the nearest ordinary
+texts below leaves the three new rules silent: a shell here document, a page that
+only names the role label, an urgent tag with no order inside it, a longer word
+that only starts with an order word, and a well known README.
 """
 import os
 
