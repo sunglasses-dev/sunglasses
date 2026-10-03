@@ -20,6 +20,7 @@ in the threat model rather than a mock of one.
 """
 import json
 import os
+import select
 import subprocess
 import sys
 
@@ -36,7 +37,21 @@ SECRET = "AKIAIOSFODNN7EXAMPLE"
 
 
 def _run(frames, tmp_path, poison=None, timeout=60, linger=False):
-    """Drive the real proxy over real pipes and read both sides afterwards."""
+    """Drive the real proxy over real pipes and read both sides afterwards.
+
+    stdin stays open until the FIRST reply line has been read, and only then
+    closes. Closing it with the request (what `subprocess.run(input=...)` does)
+    makes the client EOF race the answer: the echo server exits on that EOF,
+    and a proxy whose server exits while its answer is still being scanned
+    settles the call as MALFORMED_UPSTREAM instead of delivering it. That race
+    is real product behaviour, tracked on its own; this harness is not the
+    place to lose to it. A reader who sends one frame and wants its answer is
+    a client that waits for the answer, so that is what is modelled here.
+
+    Only the first reply is awaited. If none comes (the proxy exits, or
+    `timeout` runs out) stdin closes anyway, so a proxy that never answers
+    still ends the way it did before.
+    """
     ingress = tmp_path / "ingress.log"
     server = [sys.executable, "-m", "sunglasses.proxy.echo_server",
               "--ingress", str(ingress), "--proc", str(tmp_path / "proc.json")]
@@ -44,15 +59,43 @@ def _run(frames, tmp_path, poison=None, timeout=60, linger=False):
         server += ["--inject", poison]
     if linger:
         server += ["--linger"]
-    proc = subprocess.run(
-        [sys.executable, "-m", "sunglasses.proxy",
-         "--state-root", str(tmp_path / "state"), "--"] + server,
-        input=b"".join(frames), capture_output=True, timeout=timeout)
-    replies = [json.loads(line) for line in proc.stdout.splitlines()
+    argv = [sys.executable, "-m", "sunglasses.proxy",
+            "--state-root", str(tmp_path / "state"), "--"] + server
+    proc = subprocess.Popen(argv, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            bufsize=0)
+    try:
+        proc.stdin.write(b"".join(frames))
+    except BrokenPipeError:
+        pass  # the proxy is already gone; there is nothing left to wait for
+    first = b""
+    fd = proc.stdout.fileno()
+    deadline = time.monotonic() + timeout
+    while b"\n" not in first:
+        left = deadline - time.monotonic()
+        if left <= 0 or not select.select([fd], [], [], left)[0]:
+            break
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            break  # EOF: the proxy ended without a (further) reply
+        first += chunk
+    try:
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    proc.stdin = None  # communicate() must not flush a closed handle
+    try:
+        rest, err = proc.communicate(timeout=max(deadline - time.monotonic(), 1))
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise
+    done = subprocess.CompletedProcess(argv, proc.returncode,
+                                       first + rest, err)
+    replies = [json.loads(line) for line in done.stdout.splitlines()
                if line.strip()]
     arrived = ingress.read_bytes() if ingress.exists() else b""
-    return proc, replies, arrived
-
+    return done, replies, arrived
 
 
 def _approve_the_server(tmp_path, poison=None):
