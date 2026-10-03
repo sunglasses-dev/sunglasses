@@ -1783,7 +1783,7 @@ def _policy_state_line(home=None) -> str:
     if not any(policy.get(k) for k in _POLICY_LIST_KEYS):
         return (f"Policy state inert for {path}. The file lists no enabled rules, "
                 f"so path and host rules are off, {off}.")
-    return f"Policy state active for {path}. Its rules are read on every tool call."
+    return f"Policy state active for {path}. Its rules are checked on a tool call before it runs, unless the secret check has already denied it."
 
 
 def _offer_starter_policy(args):

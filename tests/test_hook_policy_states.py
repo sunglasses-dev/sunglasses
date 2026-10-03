@@ -186,6 +186,17 @@ def test_a_dead_policy_control_says_the_firewall_asks(tmp_path):
     assert "asks on any tool call that no other check settles" in _policy_state_line(sh)
 
 
+def test_an_active_policy_line_does_not_promise_the_policy_is_read_on_every_call(tmp_path):
+    """A secret in a call is denied before the policy is loaded, so the line says so."""
+    from sunglasses.cli import _policy_state_line
+    sh = tmp_path / ".sunglasses"
+    sh.mkdir()
+    _enabled_starter(sh)
+    line = _policy_state_line(sh)
+    assert "on every tool call" not in line, line
+    assert "unless the secret check has already denied it" in line, line
+
+
 def _init(tmp_path, *flags):
     """Run the real `sunglasses init` in a scratch project, the way a person does."""
     home = tmp_path / "home"
@@ -262,4 +273,4 @@ def test_the_receipt_view_stays_quiet_for_a_call_a_policy_checked(tmp_path):
 def test_readme_says_init_and_receipts_name_the_policy_state():
     text = re.sub(r"\s+", " ", (REPO / "README.md").read_text(encoding="utf-8"))
     assert "sunglasses init` prints one line with the state of the policy file and its path" in text
-    assert "`sunglasses receipts` marks every call that ran with no policy" in text
+    assert "`sunglasses receipts` marks each call whose receipt records that it ran with no policy" in text

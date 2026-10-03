@@ -671,9 +671,9 @@ Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
 read as consent, and a fresh install still blocks nothing you did not ask it to).
 
 After either answer `sunglasses init` prints one line with the state of the policy
-file and its path, and `sunglasses receipts` marks every call that ran with no
-policy or with one that lists nothing enabled, so a call that nothing checked never
-reads like a call that was checked.
+file and its path, and `sunglasses receipts` marks each call whose receipt records
+that it ran with no policy or with one that lists nothing enabled, so a call that no
+policy checked does not read like one that a policy checked.
 
 `~/.ssh` as a whole directory is deliberately *not* in that list: it would block
 `ssh-copy-id`, `~/.ssh/config` and `known_hosts`, which is ordinary work. The
