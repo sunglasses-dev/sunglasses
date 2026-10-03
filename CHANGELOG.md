@@ -11,7 +11,9 @@ All notable changes to Sunglasses are documented here.
   instruction hidden in base64 is caught instead of passing as noise. A similar third rule stays
   on the raw text, because reading it on decoded text blocked a well known README. The same two
   rules were also narrowed, so an ordinary sentence such as a data step that says to ignore empty
-  rows, or a plain security update status line, is no longer blocked, with or without an HTML space.
+  rows or old messages, or a plain security update status line, is no longer blocked, with or
+  without an HTML space. The narrowing gives up two bare wordings that read the same as ordinary
+  prose, a lone "[security update applied]" marker and a lone "ignore all rules".
 
 ## [0.6.5] — 2026-10-02
 
