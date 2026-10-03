@@ -1773,7 +1773,7 @@ def _policy_state_line(home=None) -> str:
     except PolicyDown as down:
         return (f"Policy state {down.state} for {path}. "
                 f"{POLICY_STATES.get(down.state, down.state).capitalize()}, so the "
-                f"firewall asks before each tool call until you repair it.")
+                f"firewall asks on any tool call that no other check settles, until you repair it.")
     except PolicyError:
         return (f"Policy state invalid for {path}. The file holds a rule the parser "
                 f"does not accept, so path and host rules did not load.")
@@ -1849,7 +1849,7 @@ def _offer_starter_policy(args):
     if enabled:
         print(f"  {GREEN}Enabled{RESET} {DIM}-> {written}{RESET}")
         print(f"  {DIM}Edit that file to change it. If you delete it, the firewall "
-              f"asks before each tool call until you restore it.{RESET}")
+              f"asks on any tool call that no other check settles, until you restore it.{RESET}")
     else:
         print(f"  {DIM}Written commented-out -> {written}{RESET}")
 

@@ -11,8 +11,8 @@ All notable changes to Sunglasses are documented here.
   its path, and `sunglasses receipts` marks each call that ran with no policy or
   with a policy that lists nothing enabled, using the same words the hook already
   writes on its receipt. The hook decides exactly as before. Two sentences that
-  said deleting the policy file enforces nothing now say that the firewall asks
-  until it is restored. (#313)
+  said deleting the policy file enforces nothing now say that the firewall asks on a
+  call nothing else settles until it is restored. (#313)
 
 ## [0.6.5] — 2026-10-02
 

@@ -2384,7 +2384,8 @@ _POLICY_HEADER = """\
 # SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
 # Written by `sunglasses init`. Edit it freely. No file at all enforces
 # nothing, and a file with only comments enforces nothing. An empty file is
-# treated as a broken policy and asks before each tool call.
+# treated as a broken policy, and a tool call that nothing else settles asks
+# until the file is repaired.
 #
 # blocked_paths — any tool call that touches one of these paths is denied.
 #   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,

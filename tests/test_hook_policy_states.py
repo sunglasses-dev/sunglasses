@@ -146,7 +146,7 @@ def test_the_policy_file_header_does_not_say_an_empty_file_enforces_nothing(tmp_
         text = starter_policy_text(enabled=enabled)
         flat = re.sub(r"\s*\n#\s*", " ", text)  # comment wrapping must not hide the sentence
         assert OLD_HEADER not in flat
-        assert "An empty file is treated as a broken policy and asks before each tool call" in flat
+        assert "An empty file is treated as a broken policy, and a tool call that nothing else settles asks until the file is repaired" in flat
 
 
 # ── what init says and what receipts show ───────────────────────────────────
@@ -183,7 +183,7 @@ def test_a_dead_policy_control_says_the_firewall_asks(tmp_path):
     sh = tmp_path / ".sunglasses"
     sh.mkdir()
     _empty(sh)
-    assert "asks before each tool call" in _policy_state_line(sh)
+    assert "asks on any tool call that no other check settles" in _policy_state_line(sh)
 
 
 def _init(tmp_path, *flags):
@@ -221,7 +221,7 @@ def test_init_no_longer_says_deleting_the_policy_enforces_nothing(tmp_path):
     stdout, _ = _init(tmp_path, "--policy")
     assert "enforces nothing" not in stdout, stdout
     flat = re.sub(r"\s+", " ", stdout)
-    assert "If you delete it, the firewall asks before each tool call until you restore it" in flat
+    assert "If you delete it, the firewall asks on any tool call that no other check settles, until you restore it" in flat
 
 
 def test_load_policy_docstring_names_the_marker_not_the_home_directory():
