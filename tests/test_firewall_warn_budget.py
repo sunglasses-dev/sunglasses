@@ -281,10 +281,10 @@ def test_a_blocked_sigalrm_is_left_blocked_and_the_call_does_not_run():
     """)
 
 
-def test_an_alarm_held_pending_by_a_mask_set_during_the_call_is_consumed():
-    """If the SIGALRM mask goes up while the call runs, our alarm is left pending
+def test_an_alarm_held_pending_by_a_mask_set_during_the_call_is_discarded():
+    """If the SIGALRM mask goes up while the call runs, the alarm is left pending
     at the OS level. Restoring the default handler and then lifting the mask
-    would kill the process, so teardown consumes it first."""
+    would kill the process, so teardown discards it first."""
     _child("""
         def masks_then_waits():
             signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGALRM})
@@ -292,6 +292,64 @@ def test_an_alarm_held_pending_by_a_mask_set_during_the_call_is_consumed():
             return 42
         assert firewall._run_within_budget(masks_then_waits, 0.05) == (True, 42)
     """)
+
+
+# The pending alarm can leave between the moment the call returns and the
+# discard: a peer thread can take it with sigwait, or the mask can be lifted
+# and the disarmed handler take it. Teardown must then still return and
+# restore, never wait for an alarm that is gone. A tracer holds the call at the
+# discard line (the line that drops the pending alarm) while that happens, and
+# a watchdog thread ends a child that hangs instead of the 30 s harness limit.
+_HOLD_AT_DISCARD = """
+import faulthandler, threading
+faulthandler.dump_traceback_later(5, exit=True)
+lines, start = inspect.getsourcelines(firewall._run_within_budget)
+done = next(i for i, l in enumerate(lines) if "finished = True" in l)
+discard = {{start + i for i, l in enumerate(lines) if i > done
+           and not l.strip().startswith("#") and ("SIG_IGN" in l or "sigwait" in l)}}
+assert discard, "no discard line found"
+code = firewall._run_within_budget.__code__
+held = []
+
+def local(frame, event, arg):
+    if event == "line" and frame.f_lineno in discard and not held:
+        held.append(frame.f_lineno)
+        assert signal.SIGALRM in signal.sigpending(), "no alarm pending at the discard"
+        {take}
+        assert signal.SIGALRM not in signal.sigpending(), "the alarm was not taken"
+    return local
+
+def masks_until_pending():
+    signal.pthread_sigmask(signal.SIG_BLOCK, {{signal.SIGALRM}})
+    {start_peer}
+    end = time.perf_counter() + 2
+    while signal.SIGALRM not in signal.sigpending() and time.perf_counter() < end:
+        time.sleep(0.01)
+    return 42
+
+sys.settrace(lambda frame, event, arg: local if frame.f_code is code else None)
+result = firewall._run_within_budget(masks_until_pending, 0.05)
+sys.settrace(None)
+assert held, "the tracer never reached the discard line"
+assert result == (True, 42), result
+signal.pthread_sigmask(signal.SIG_BLOCK, {{signal.SIGALRM}})
+"""
+
+
+def test_a_pending_alarm_a_peer_thread_takes_before_the_discard_does_not_hang():
+    _child(_HOLD_AT_DISCARD.format(
+        start_peer="""go = threading.Event()
+    def peer():
+        go.wait(); signal.sigwait([signal.SIGALRM])
+    taker = threading.Thread(target=peer, daemon=True); taker.start()
+    globals().update(go=go, taker=taker)""",
+        take="go.set(); taker.join(2); assert not taker.is_alive(), 'the peer never took it'"))
+
+
+def test_a_pending_alarm_released_by_the_mask_before_the_discard_does_not_hang():
+    _child(_HOLD_AT_DISCARD.format(
+        start_peer="pass",
+        take="signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGALRM}); time.sleep(0.05)"))
 
 
 def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
@@ -303,17 +361,23 @@ def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
         done = start + next(i for i, l in enumerate(lines) if "finished = True" in l)
         code = firewall._run_within_budget.__code__
 
+        entered = []
+
         def local(frame, event, arg):
-            if event == "line" and frame.f_lineno > done:
-                end = time.perf_counter() + 2
+            if event == "line" and frame.f_lineno > done and not entered:
+                # Record the entry with the timer still running, so the alarm
+                # is known to expire HERE and not earlier, then wait for it.
+                entered.append(signal.getitimer(signal.ITIMER_REAL)[0])
+                end = time.perf_counter() + 5
                 while time.perf_counter() < end:   # the real alarm expires here
                     sum(range(100))
                 raise SystemExit("the alarm never fired at teardown entry")
             return local
 
         sys.settrace(lambda frame, event, arg: local if frame.f_code is code else None)
-        result = firewall._run_within_budget(lambda: 42, 0.05)
+        result = firewall._run_within_budget(lambda: 42, 0.5)
         sys.settrace(None)
+        assert entered and entered[0] > 0, ("timer not running at teardown entry", entered)
         assert result == (False, None), result
     """)
 
@@ -657,8 +721,6 @@ def test_injected_slow_scan_through_the_real_hook_is_stopped_at_the_real_constan
 
 # ── the real hook, the real engine, a real 1 MiB call ───────────────────────
 
-@pytest.mark.slow
-@pytest.mark.interpreter_dependent
 def test_a_blocked_sigalrm_through_the_real_hook_asks_unavailable_at_once(tmp_path):
     """The real `main()` under a blocked SIGALRM (what a host's inherited mask
     gives it): one terminal unavailable ask in well under the harness timeout,
@@ -677,6 +739,8 @@ def test_a_blocked_sigalrm_through_the_real_hook_asks_unavailable_at_once(tmp_pa
     assert _orphans(recs) == []
 
 
+@pytest.mark.slow
+@pytest.mark.interpreter_dependent
 def test_real_hook_one_mebibyte_answers_inside_the_harness_timeout(tmp_path):
     """INTERPRETER-DEPENDENT: on a faster Python the 1 MiB scan can finish inside the
     budget (py3.14.7: base64 and jwt do) and this then proves nothing about the

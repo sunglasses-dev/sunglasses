@@ -2602,8 +2602,7 @@ def _run_within_budget(fn, budget_s):
     import signal
     import threading
     if not all(hasattr(signal, n) for n in (
-            "setitimer", "getitimer", "SIGALRM", "pthread_sigmask", "sigpending",
-            "sigwait")):
+            "setitimer", "getitimer", "SIGALRM", "pthread_sigmask")):
         return None, None
     if threading.current_thread() is not threading.main_thread():
         return None, None
@@ -2640,11 +2639,13 @@ def _run_within_budget(fn, budget_s):
             finally:
                 armed[0] = False
                 signal.setitimer(signal.ITIMER_REAL, 0)
-                if signal.SIGALRM in signal.sigpending():
-                    # Our own alarm, held pending by a mask set during the call.
-                    # Consume it here: after the default handler is back, it
-                    # would kill the process the moment the mask is lifted.
-                    signal.sigwait([signal.SIGALRM])
+                # A mask set during the call can hold a SIGALRM pending, and the
+                # default handler restored below would then kill the process when
+                # the mask is lifted. Its source is not checked: this assumes
+                # exclusive use of SIGALRM, nothing else in the process uses it
+                # while the lane runs. Setting SIG_IGN discards a pending signal,
+                # never waits, and does nothing when none is pending.
+                signal.signal(signal.SIGALRM, signal.SIG_IGN)
         finally:
             signal.signal(signal.SIGALRM, previous)
     except _WarnBudgetExceeded:
