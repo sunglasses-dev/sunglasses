@@ -9,7 +9,9 @@ All notable changes to Sunglasses are documented here.
 
 - Two encoding rules, GLS-ENC-ALT-210 and GLS-CF-252, now also read the decoded text, so an
   instruction hidden in base64 is caught instead of passing as noise. A similar third rule stays
-  on the raw text, because reading it on decoded text blocked a well known README.
+  on the raw text, because reading it on decoded text blocked a well known README. The same two
+  rules were also narrowed, so an ordinary sentence such as a data step that says to ignore empty
+  rows, or a plain security update status line, is no longer blocked, with or without an HTML space.
 
 ## [0.6.5] — 2026-10-02
 
