@@ -10,7 +10,7 @@
     "web_content",
     "tool_output"
   ],
-  "description": "A bracketed role label for the assistant, system or developer followed within a short span by wording such as decided, approved, allowed, authorized, confirmed or granted. A tool result or a retrieved page is data and has no such role of its own, so a label like this imitates the transcript to make an approval look settled.",
+  "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. A tool result or a retrieved page is data and has no such role of its own, so a label like this imitates the transcript to make an approval look settled.",
   "keywords": [],
   "regex": [
     "(?i)\\[(?:assistant|system|developer)\\][ \\t]{0,2}:[ \\t]{0,3}.{0,60}?\\b(?:I(?:'ve|[ \\t]+have)[ \\t]+decided|decided[ \\t]+to|I[ \\t]+(?:approve|allow|authori[sz]e|confirm)|(?:approved|allowed|authori[sz]ed|confirmed|granted)\\b)"

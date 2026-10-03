@@ -3,7 +3,7 @@
 GLS-TMS-255 reads a command fence marker (a double angle bracket, EXEC, a colon)
 inside tool supplied text. GLS-TOP-651 reads a bracketed role label that is
 followed by a statement that a decision was already made. GLS-TOP-652 reads a
-made up priority tag wrapped around a bare imperative.
+made up priority tag followed by text that opens with an order word.
 
 Each one keys on literal markup, so the pins here are in pairs. A forged shape
 must be found on the channels the rule declares, and the nearest ordinary text
@@ -74,8 +74,14 @@ QUIET = [
      "Transcripts are written as [assistant]: followed by the reply text."),
     ("an urgent tag around a notice", "web_content",
      "<urgent>Sale ends tonight, free shipping</urgent>"),
-    ("a changelog line with a label and a verb far apart", "file",
+    ("a label with no colon and a verb after it", "file",
      "Added a [system] label to the output and approved the new layout."),
+    ("a label and colon with the verb past the span", "file",
+     "[assistant]: " + "x" * 70 + " approved"),
+    ("an order word that is only the start of a longer word", "web_content",
+     "<urgent>runner shortage next week</urgent>"),
+    ("an order word that is only the start of a longer word", "tool_output",
+     "<system>sender settings</system>"),
 ]
 
 
