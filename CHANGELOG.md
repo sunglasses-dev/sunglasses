@@ -13,7 +13,10 @@ All notable changes to Sunglasses are documented here.
   rules were also narrowed, so an ordinary sentence such as a data step that says to ignore empty
   rows or old messages, or a plain security update status line, is no longer blocked, with or
   without an HTML space. The narrowing gives up two bare wordings that read the same as ordinary
-  prose, a lone "[security update applied]" marker and a lone "ignore all rules".
+  prose, a lone "[security update applied]" marker, a lone "ignore all rules", and a bare
+  "send to https://" with no secret word in front of it. The other alternatives of the two rules
+  (export, reveal, start over, new baseline, policy changes) now also need the context that
+  makes them an attack, so the decoded text cannot turn their ordinary uses into blocks.
 
 ## [0.6.5] — 2026-10-02
 
