@@ -654,6 +654,9 @@ _SITE_RESTORES = {
     "pretty_lane": ("_display(row.get('lane', ''), limit=13)",
                     "str(row.get('lane', ''))"),
     "summary_decision": ("_display(k, 10)", "str(k)"),
+    # The policy_state tag the receipts view appends to a row's note.
+    "pretty_policy_state": ("{_display(row['policy_state'], limit=16)}",
+                            "{str(row['policy_state'])}"),
     # R21. These two print an exception's text, not a receipt field.
     "off_failure": ("_display(f'{type(exc).__name__}: {exc}', limit=200)",
                     "f'{type(exc).__name__}: {exc}'"),
@@ -746,7 +749,8 @@ def _fixture(site, payload):
         return [json.dumps(_clean_decision(lane="error", error=payload + "x"))], False
     field = {"pretty_decision": "decision", "pretty_rule_id": "rule_id",
              "pretty_tool": "tool_name", "pretty_lane": "lane",
-             "summary_decision": "decision"}[site]
+             "summary_decision": "decision",
+             "pretty_policy_state": "policy_state"}[site]
     return [json.dumps(_clean_decision(**{field: payload + "x"}))], False
 
 

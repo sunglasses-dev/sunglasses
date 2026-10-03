@@ -1723,6 +1723,8 @@ def cmd_receipts(args):
             if row.get("lane") == "error":
                 note = _display(row.get("error", "error"), limit=44)
             tool = _display(row.get("tool_name"), limit=24) or "-"
+            if row.get("policy_state"):
+                note = f"{note} {_display(row['policy_state'], limit=16)}"
             print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
                   f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
                   f"{tool:<24} {DIM}{note}{RESET}")
@@ -1734,6 +1736,11 @@ def cmd_receipts(args):
                             for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
         print(f"  {DIM}{'─' * 74}{RESET}")
         print(f"  {summary}")
+        unprotected = sum(1 for r in rows
+                          if r.get("policy_state") in ("none_configured", "inert"))
+        if unprotected:
+            print(f"  {YELLOW}{unprotected} of these calls ran with no path or host "
+                  f"rules loaded{RESET} {DIM}(policy_state none_configured or inert){RESET}")
         # An audit trail that only reports blocks cannot answer "was it even
         # running?", so the quiet calls are counted here on purpose.
         print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
@@ -1746,6 +1753,37 @@ def cmd_receipts(args):
         return 0
     except _fs.Unlistable as unreadable:
         return _path_unreadable(unreadable)
+
+
+def _policy_state_line(home=None) -> str:
+    """One line naming the state the policy file is in and where it lives.
+
+    The words are the ones the hook writes on its receipt (`policy_state`), so
+    what `init` says and what `sunglasses receipts` shows can be matched by eye.
+    A policy that lists something carries no state on the receipt; it is called
+    `active` here because the person reading init needs a word for it.
+    """
+    from .firewall import (POLICY_STATES, PolicyDown, PolicyError, _POLICY_LIST_KEYS,
+                           load_policy, sunglasses_home)
+
+    path = (home or sunglasses_home()) / "policy.yaml"
+    off = "secret material in a tool call is still blocked"
+    try:
+        policy = load_policy(path)
+    except PolicyDown as down:
+        return (f"Policy state {down.state} for {path}. "
+                f"{POLICY_STATES.get(down.state, down.state).capitalize()}, so the "
+                f"firewall asks before each tool call until you repair it.")
+    except PolicyError:
+        return (f"Policy state invalid for {path}. The file holds a rule the parser "
+                f"does not accept, so path and host rules did not load.")
+    if not path.exists():
+        return (f"Policy state none_configured for {path}. There is no policy file, "
+                f"so path and host rules are off, {off}.")
+    if not any(policy.get(k) for k in _POLICY_LIST_KEYS):
+        return (f"Policy state inert for {path}. The file lists no enabled rules, "
+                f"so path and host rules are off, {off}.")
+    return f"Policy state active for {path}. Its rules are read on every tool call."
 
 
 def _offer_starter_policy(args):
@@ -1810,8 +1848,8 @@ def _offer_starter_policy(args):
         return
     if enabled:
         print(f"  {GREEN}Enabled{RESET} {DIM}-> {written}{RESET}")
-        print(f"  {DIM}Edit or delete that file to change it. "
-              f"Deleting it enforces nothing.{RESET}")
+        print(f"  {DIM}Edit that file to change it. If you delete it, the firewall "
+              f"asks before each tool call until you restore it.{RESET}")
     else:
         print(f"  {DIM}Written commented-out -> {written}{RESET}")
 
@@ -1857,6 +1895,7 @@ def cmd_init(args):
     print(f"  {DIM}{command}{RESET}")
 
     _offer_starter_policy(args)
+    print(f"\n  {DIM}{_policy_state_line()}{RESET}")
 
     print(f"\n  {BOLD}What it blocks{RESET} {DIM}(deterministic facts only){RESET}")
     print(f"    - secret material leaving in an outbound tool call")

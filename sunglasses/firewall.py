@@ -1347,8 +1347,9 @@ def _describe_node(mode) -> str:
 def load_policy(path) -> dict:
     """Read policy.yaml, or raise PolicyDown naming the state it is in.
 
-    Returns `{}` only for the one honest empty case: no home directory, meaning
-    nothing was ever installed.
+    Returns `{}` only for the one honest empty case: there is no policy file and
+    nothing positively says one was installed, meaning no install marker. A
+    missing file WITH the marker is a dead control and raises PolicyDown("missing").
     """
     import pathlib
     p = pathlib.Path(path)

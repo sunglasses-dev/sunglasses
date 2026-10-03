@@ -3,6 +3,17 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- `sunglasses init` now prints one line naming the state of the policy file and
+  its path, and `sunglasses receipts` marks each call that ran with no policy or
+  with a policy that lists nothing enabled, using the same words the hook already
+  writes on its receipt. The hook decides exactly as before. Two sentences that
+  said deleting the policy file enforces nothing now say that the firewall asks
+  until it is restored. (#313)
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed
