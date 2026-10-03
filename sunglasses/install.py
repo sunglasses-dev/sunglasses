@@ -285,8 +285,8 @@ except ImportError:                                    # pragma: no cover - posi
     fcntl = None
 
 # Which primitive serialises config transactions on THIS platform, named rather
-# than discovered, so a reader and `doctor` can both see it. README promises Mac,
-# Windows and Linux; `fcntl` is POSIX-only, and an ImportError swallowed in
+# than discovered, so a reader and `doctor` can both see it. README states POSIX
+# only, Windows unsupported; `fcntl` is POSIX-only, and an ImportError swallowed in
 # silence would leave Windows with an unserialised transaction that LOOKS
 # serialised. It is not silent: on a platform without `flock` the compare-and-swap
 # still runs and the narrow race that needs the lock stays open, and that is a
