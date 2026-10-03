@@ -40,3 +40,23 @@ long docs — heavier systemic change, deferred.
 `KNOWN_FAILURES.json` still only shrinks: if a future pattern change makes one
 of these 9 scan clean, its entry MUST be deleted (the gate fails until it is).
 These 9 are the accepted floor, not a to-do list.
+
+## Three ordinary sentences the encoding rules block, accepted 2026-10-03
+
+Two rules block three ordinary sentences on every channel. GLS-ENC-ALT-210 blocks
+"Decode the CSV input and ignore all empty rows." and "Decode the mail archive and ignore
+all messages older than thirty days." GLS-CF-252 blocks "Security update applied
+successfully." They are pinned in `tests/test_known_review_sentences.py`, which works like
+`KNOWN_FAILURES.json`: each sentence must still be flagged, and when one scans clean its
+entry is deleted, so the list only gets shorter.
+
+Why they stay. Two earlier pull requests (#314, #318) tried to exclude them, by narrowing
+other alternatives, by a list of data words, and by a list of override wordings after the
+status line. Each lost attack wordings that block today, because the excluded words are
+words an attacker can write too. Most of the 31 attack wordings in
+`tests/test_cf252_whitespace_cost.py` are blocked by these two rules and by no other rule,
+so lowering their severity to quarantine would turn those blocks into quarantines.
+
+Decision: the two rules stay as they are and the three sentences stay flagged for review.
+Lowering the severity of the two rules is an open question for the project owner and is
+not decided here.
