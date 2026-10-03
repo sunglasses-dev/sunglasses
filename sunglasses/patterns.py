@@ -29364,4 +29364,37 @@ PATTERNS = [
         ],
         "description": "Text inside a retrieved document that addresses the answering model's own reply. It asks for the reply to be encoded, reversed, turned into emoji or translated, or for a sentence, link or claim to be added to it. A document the agent reads is data, and an order about how the agent should answer is an injection."
     },
+    {
+        "id": "GLS-TMS-255",
+        "name": 'Forged Exec Fence Marker',
+        "category": "tool_metadata_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "regex": [
+            r"""(?i)<<[ \t]{0,2}(?:exec|execute)[ \t]{0,2}:[ \t]{0,3}\S""",
+        ],
+        "description": "A command fence marker, an opening double angle bracket then EXEC or EXECUTE and a colon, found in a message, a file, a tool result or an API response, for example one carried inside a tool description or schema attribute. A match is treated as text dressed as an instruction channel.",
+    },
+    {
+        "id": "GLS-TOP-651",
+        "name": 'Forged Role Label Followed By Decision Wording',
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "regex": [
+            r"""(?i)\[(?:assistant|system|developer)\][ \t]{0,2}:[ \t]{0,3}.{0,60}?\b(?:I(?:'ve|[ \t]+have)[ \t]+decided|decided[ \t]+to|I[ \t]+(?:approve|allow|authori[sz]e|confirm)|(?:approved|allowed|authori[sz]ed|confirmed|granted)\b)""",
+        ],
+        "description": "A bracketed role label for the assistant, system or developer, then a colon and, within a short span, wording such as decided, approved, allowed, authorized, confirmed or granted. A label like this imitates a transcript turn.",
+    },
+    {
+        "id": "GLS-TOP-652",
+        "name": 'Forged Priority Tag Around Text Opening With An Order Word',
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "regex": [
+            r"""(?i)<[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>[ \t\r\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)\b[\w \t_-]{0,30}<[ \t]{0,2}/[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>""",
+        ],
+        "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, followed by text that opens with an order word such as execute, run, ignore, override, disable, delete or send, as in execute immediately, and then closed by a closing tag from the same list. A tag like this imitates a priority marker.",
+    },
 ]
