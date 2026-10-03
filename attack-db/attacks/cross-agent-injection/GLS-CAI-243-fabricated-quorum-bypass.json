@@ -3,7 +3,7 @@
   "name": "Fabricated Quorum Bypass",
   "version": "1.0",
   "category": "cross_agent_injection",
-  "severity": "critical",
+  "severity": "medium",
   "channels": [
     "message",
     "tool_output"

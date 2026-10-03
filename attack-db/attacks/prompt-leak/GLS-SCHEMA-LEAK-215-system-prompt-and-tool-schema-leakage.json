@@ -3,7 +3,7 @@
   "name": "System prompt and tool schema leakage",
   "version": "1.0",
   "category": "prompt_leak",
-  "severity": "critical",
+  "severity": "medium",
   "channels": [
     "message",
     "file",

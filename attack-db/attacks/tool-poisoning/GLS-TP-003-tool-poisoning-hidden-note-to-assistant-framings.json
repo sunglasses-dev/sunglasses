@@ -3,7 +3,7 @@
   "name": "Tool poisoning \u2014 hidden note-to-assistant framings",
   "version": "1.0",
   "category": "tool_poisoning",
-  "severity": "high",
+  "severity": "medium",
   "channels": [
     "file",
     "message"
