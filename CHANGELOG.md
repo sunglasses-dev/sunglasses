@@ -3,6 +3,16 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Added
+
+- Three rules for text that dresses itself as an instruction channel. GLS-TMS-255 reads a command
+  fence marker inside tool supplied text, GLS-TOP-651 reads a bracketed role label followed by a
+  claim that a decision was already made and GLS-TOP-652 reads an invented priority tag wrapped
+  around a bare order. Each one keys on literal markup. A shell here document, a page that only
+  names a role label and one well known README are pinned as not matching.
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed

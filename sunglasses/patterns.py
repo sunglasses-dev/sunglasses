@@ -29364,4 +29364,37 @@ PATTERNS = [
         ],
         "description": "Text inside a retrieved document that addresses the answering model's own reply. It asks for the reply to be encoded, reversed, turned into emoji or translated, or for a sentence, link or claim to be added to it. A document the agent reads is data, and an order about how the agent should answer is an injection."
     },
+    {
+        "id": "GLS-TMS-255",
+        "name": 'Forged Exec Fence Marker In Tool Metadata',
+        "category": "tool_metadata_smuggling",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response"],
+        "regex": [
+            r"""(?i)<<[ \t]{0,2}(?:exec|execute)[ \t]{0,2}:[ \t]{0,3}\S""",
+        ],
+        "description": "A command fence marker, an opening double angle bracket then EXEC and a colon, carried inside a tool description, schema attribute or other tool supplied text. Tool supplied text is not expected to use this marker, so finding it there is treated as text dressed as an instruction channel.",
+    },
+    {
+        "id": "GLS-TOP-651",
+        "name": 'Forged Assistant Role Prefix Carrying A Decision',
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "regex": [
+            r"""(?i)\[(?:assistant|system|developer)\][ \t]{0,2}:[ \t]{0,3}.{0,60}?\b(?:I(?:'ve|[ \t]+have)[ \t]+decided|decided[ \t]+to|I[ \t]+(?:approve|allow|authori[sz]e|confirm)|(?:approved|allowed|authori[sz]ed|confirmed|granted)\b)""",
+        ],
+        "description": "A bracketed role label for the assistant, system or developer followed within a short span by wording such as decided, approved, allowed, authorized, confirmed or granted. A tool result or a retrieved page is data and has no such role of its own, so a label like this imitates the transcript to make an approval look settled.",
+    },
+    {
+        "id": "GLS-TOP-652",
+        "name": 'Forged Priority Tag Wrapping An Imperative',
+        "category": "tool_output_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "web_content", "tool_output"],
+        "regex": [
+            r"""(?i)<[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>[ \t\r\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)[\w \t_-]{0,30}<[ \t]{0,2}/[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>""",
+        ],
+        "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, wrapped around a bare imperative such as execute, run, ignore, override, disable, delete or send, as in execute immediately. Tool output and retrieved text have no priority channel, so a tag like this reads as an attempt to raise the rank of the instruction inside it.",
+    },
 ]

@@ -1,0 +1,26 @@
+{
+  "id": "GLS-TOP-652",
+  "name": "Forged Priority Tag Wrapping An Imperative",
+  "version": "1.0",
+  "category": "tool_output_poisoning",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, wrapped around a bare imperative such as execute, run, ignore, override, disable, delete or send, as in execute immediately. Tool output and retrieved text have no priority channel, so a tag like this reads as an attempt to raise the rank of the instruction inside it.",
+  "keywords": [],
+  "regex": [
+    "(?i)<[ \\t]{0,2}(?:critical|urgent|priority|admin|system)[ \\t]{0,2}>[ \\t\\r\\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)[\\w \\t_-]{0,30}<[ \\t]{0,2}/[ \\t]{0,2}(?:critical|urgent|priority|admin|system)[ \\t]{0,2}>"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-03",
+  "source": "patterns.py:GLS-TOP-652"
+}
