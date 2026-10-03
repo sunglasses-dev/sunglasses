@@ -180,54 +180,112 @@ def host_handler():
         signal.signal(signal.SIGALRM, saved)
 
 
-def test_a_host_sigalrm_handler_is_restored_after_the_call_finishes(host_handler):
-    firewall._run_within_budget(lambda: None, 5)
-    assert signal.getsignal(signal.SIGALRM) is host_handler
+def _must_not_run():
+    raise AssertionError("the call ran although no budget could be enforced")
 
 
-def test_a_host_sigalrm_handler_is_restored_after_the_budget_trips(host_handler):
-    finished, _ = firewall._run_within_budget(lambda: time.sleep(3), 0.1)
-    assert finished is False
+def test_our_handler_is_the_one_installed_while_the_call_runs():
+    seen = []
+    firewall._run_within_budget(
+        lambda: seen.append(signal.getsignal(signal.SIGALRM)), 5)
+    assert len(seen) == 1 and callable(seen[0])
+    assert seen[0] not in (signal.SIG_DFL, signal.SIG_IGN)
+    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+
+
+# ── no budget we can own: the call does NOT run, and host state is untouched ──
+
+def test_without_setitimer_the_call_does_not_run(monkeypatch):
+    monkeypatch.delattr(signal, "setitimer")
+    assert firewall._run_within_budget(_must_not_run, 0.1) == (None, None)
+
+
+def test_on_a_worker_thread_the_call_does_not_run():
+    import threading
+    out = []
+    t = threading.Thread(
+        target=lambda: out.append(firewall._run_within_budget(_must_not_run, 0.1)))
+    t.start()
+    t.join(5)
+    assert out == [(None, None)]
+
+
+def test_a_host_sigalrm_handler_is_left_alone_and_the_call_does_not_run(host_handler):
+    assert firewall._run_within_budget(_must_not_run, 5) == (None, None)
     assert signal.getsignal(signal.SIGALRM) is host_handler
     assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
 
 
-def test_a_host_sigalrm_handler_is_restored_after_the_call_raises(host_handler):
-    def boom():
-        raise ValueError("nope")
-    with pytest.raises(ValueError):
-        firewall._run_within_budget(boom, 5)
-    assert signal.getsignal(signal.SIGALRM) is host_handler
-
-
-def test_our_handler_is_the_one_installed_while_the_call_runs(host_handler):
-    seen = []
-    firewall._run_within_budget(
-        lambda: seen.append(signal.getsignal(signal.SIGALRM)), 5)
-    assert len(seen) == 1 and seen[0] is not host_handler
-    assert seen[0] is not signal.SIG_DFL
-
-
-def test_a_handler_the_host_set_from_C_is_put_back_as_the_default(monkeypatch):
-    """`signal.signal` returns None when the previous handler was not installed
-    from Python. None cannot be passed back (TypeError), so the restore falls
-    to SIG_DFL, which is the only honest thing left."""
+def test_a_handler_the_host_set_from_C_is_left_alone(monkeypatch):
+    """`signal.getsignal` returns None when the handler was not installed from
+    Python. It cannot be put back, so the timer is not taken at all."""
     real = signal.signal
-    calls = []
+    installs = []
+    monkeypatch.setattr(signal, "getsignal", lambda signum: None)
+    monkeypatch.setattr(signal, "signal",
+                        lambda signum, h: (installs.append(h), real(signum, h))[1])
+    assert firewall._run_within_budget(_must_not_run, 5) == (None, None)
+    assert installs == []
 
-    def fake(signum, handler):
-        calls.append(handler)
-        real(signum, handler)
-        return None if len(calls) == 1 else _host_handler
 
-    monkeypatch.setattr(signal, "signal", fake)
+def test_a_running_host_timer_is_left_running_and_the_call_does_not_run():
+    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL   # only the timer is the host's
+    signal.setitimer(signal.ITIMER_REAL, 30, 30)
     try:
-        firewall._run_within_budget(lambda: None, 5)
+        assert firewall._run_within_budget(_must_not_run, 5) == (None, None)
+        delay, interval = signal.getitimer(signal.ITIMER_REAL)
+        assert delay > 25 and interval == 30
+        assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
     finally:
-        monkeypatch.undo()
-        real(signal.SIGALRM, signal.SIG_DFL)
-    assert len(calls) == 2
-    assert calls[-1] is signal.SIG_DFL
+        signal.setitimer(signal.ITIMER_REAL, 0)
+
+
+# ── teardown: an alarm already pending when the call finished cannot escape ──
+
+def _pending_alarm_during(monkeypatch, name, when):
+    """Wrap `signal.<name>` so a real SIGALRM is sent to this process at the
+    point `when(args)` picks: the signal is pending when teardown runs."""
+    import os
+    real = getattr(signal, name)
+
+    def wrapped(*args):
+        if when(args):
+            os.kill(os.getpid(), signal.SIGALRM)
+        return real(*args)
+    monkeypatch.setattr(signal, name, wrapped)
+
+
+def test_an_alarm_pending_at_cancel_does_not_escape(monkeypatch):
+    _pending_alarm_during(monkeypatch, "setitimer", lambda a: a[1] == 0)
+    assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
+    monkeypatch.undo()
+    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+    assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
+
+
+def test_an_alarm_pending_at_handler_restore_does_not_escape(monkeypatch):
+    _pending_alarm_during(monkeypatch, "signal", lambda a: a[1] == signal.SIG_DFL)
+    assert firewall._run_within_budget(lambda: 42, 5) == (True, 42)
+    monkeypatch.undo()
+    assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+
+
+def test_a_cancel_that_fails_still_puts_the_handler_back(monkeypatch):
+    """The handler restore sits in its own finally: if cancelling the timer
+    raises, our handler must still not be left installed."""
+    real = signal.setitimer
+
+    def failing_cancel(which, seconds, *rest):
+        if seconds == 0:
+            raise signal.ItimerError("cancel failed")
+        return real(which, seconds, *rest)
+    monkeypatch.setattr(signal, "setitimer", failing_cancel)
+    try:
+        with pytest.raises(signal.ItimerError):
+            firewall._run_within_budget(lambda: 42, 5)
+        assert signal.getsignal(signal.SIGALRM) == signal.SIG_DFL
+    finally:
+        real(signal.ITIMER_REAL, 0)
 
 
 def test_an_exception_from_the_call_propagates_and_cleans_up():
@@ -236,11 +294,6 @@ def test_an_exception_from_the_call_propagates_and_cleans_up():
     with pytest.raises(ValueError):
         firewall._run_within_budget(boom, 5)
     assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
-
-
-def test_without_setitimer_the_call_runs_unbudgeted_not_broken(monkeypatch):
-    monkeypatch.delattr(signal, "setitimer")
-    assert firewall._run_within_budget(lambda: "ran", 0.1) == (True, "ran")
 
 
 # ── budget hit: terminal ask, proper decision record ────────────────────────
@@ -311,6 +364,43 @@ def test_budget_hit_through_run_hook_leaves_a_terminal_receipt(home, monkeypatch
     assert term["rule_id"] == "GLS-FW-FUZZY-BUDGET"
     assert term["fuzzy_lane"] is True
     assert not term.get("degraded")
+    assert _orphans(recs) == []
+
+
+def test_budget_unavailable_is_a_terminal_ask_and_the_scan_never_starts(monkeypatch):
+    engine = _SlowEngine(5)
+    monkeypatch.setattr(firewall, "_FUZZY_ENGINE", engine)
+    monkeypatch.delattr(signal, "setitimer")
+    command = "\u00e9" * 3000                      # 3000 chars, 6000 bytes in UTF-8
+    d = firewall.check_fuzzy("Bash", {"command": command})
+    assert engine.calls == 0
+    assert d is not None and d.action == "ask" and d.lane == "fuzzy"
+    assert d.rule_id == "GLS-FW-FUZZY-BUDGET"
+    n = len(firewall.egress_surface_text("Bash", {"command": command})
+            .encode("utf-8", "replace"))
+    assert f"warn-lane budget unavailable, {n} bytes" in d.reason
+    assert "NOT pattern-checked" in d.reason
+
+
+def test_run_hook_on_a_worker_thread_asks_and_pairs_its_receipt(home, monkeypatch):
+    """An embedding caller on a worker thread cannot get a SIGALRM budget. It
+    gets the unavailable ask at once, never an unbounded scan or an orphan."""
+    import threading
+    (home / "warn-lane").touch()
+    engine = _SlowEngine(5)
+    monkeypatch.setattr(firewall, "_FUZZY_ENGINE", engine)
+    out = []
+    t0 = time.perf_counter()
+    t = threading.Thread(target=lambda: out.append(firewall.run_hook(_call("x" * 5000))))
+    t.start()
+    t.join(10)
+    assert time.perf_counter() - t0 < 3 and engine.calls == 0
+    hso = out[0]["hookSpecificOutput"]
+    assert hso["permissionDecision"] == "ask"
+    assert "warn-lane budget unavailable," in hso["permissionDecisionReason"]
+    recs = _receipts(home)
+    assert [r["kind"] for r in recs] == ["in_flight", "decision"]
+    assert recs[-1]["rule_id"] == "GLS-FW-FUZZY-BUDGET"
     assert _orphans(recs) == []
 
 

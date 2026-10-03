@@ -2219,8 +2219,10 @@ _HOOK_TIMEOUT = 10
 # receipt with no terminal partner), so an advisory lane must stop itself first.
 # Measured (Oct 2026 bench, 1 MiB call): with the lane on, a ~1 MiB call takes 11-13 s. It
 # is a clock, not a size cap: scan cost depends on the SHAPE of the input as much
-# as its size. 3 s of headroom covers interpreter start, the deterministic lanes
-# and the receipts.
+# as its size. The 3 s left under the installed 10 s timeout is the INTENDED
+# reserve for interpreter start, the deterministic lanes and the receipts. It is a
+# reserve, not a guarantee: a stalled disk or a busy machine can still use it up,
+# and a host that shortens its own timeout gets no protection from this number.
 _WARN_LANE_BUDGET_S = 7
 
 
@@ -2585,35 +2587,56 @@ class _WarnBudgetExceeded(BaseException):
 def _run_within_budget(fn, budget_s):
     """Run `fn()` and stop it after `budget_s` wall-clock seconds.
 
-    Returns `(True, value)`, or `(False, None)` when the budget ran out. Uses
-    SIGALRM: CPython's regex engine checks for signals while it matches, so this
-    interrupts one long C-level match as well as a Python loop. Where that is
-    unavailable (no `setitimer`, or not the main thread) `fn` runs unbudgeted,
-    exactly as before this existed. An exception from `fn` propagates.
+    Returns `(True, value)`, `(False, None)` when the budget ran out, or
+    `(None, None)` when no budget can be enforced here, in which case `fn` is
+    NOT run. Uses SIGALRM: CPython's regex engine checks for signals while it
+    matches, so this interrupts one long C-level match as well as a Python loop.
+
+    The timer is taken only when it is free: a POSIX process, the main thread,
+    no ITIMER_REAL already running and SIGALRM at its default. Anything else
+    belongs to the host (an embedding library caller), so it is left exactly as
+    found and the answer is "unavailable", never an unbudgeted run.
+    An exception from `fn` propagates.
     """
     import signal
-    if not (hasattr(signal, "setitimer") and hasattr(signal, "SIGALRM")):
-        return True, fn()
+    import threading
+    if not all(hasattr(signal, n) for n in ("setitimer", "getitimer", "SIGALRM")):
+        return None, None
+    if threading.current_thread() is not threading.main_thread():
+        return None, None
+    if any(signal.getitimer(signal.ITIMER_REAL)):
+        return None, None          # a host timer is running: not ours to cancel
+    previous = signal.getsignal(signal.SIGALRM)
+    if previous != signal.SIG_DFL:
+        return None, None          # a host handler (None = set from C, unrestorable)
+
+    armed = [True]
 
     def _expired(signum, frame):
-        raise _WarnBudgetExceeded()
+        # Disarmed before the timer is cancelled, so an alarm that was already
+        # pending when the call finished is a no-op instead of an escape.
+        if armed[0]:
+            raise _WarnBudgetExceeded()
 
     try:
-        previous = signal.signal(signal.SIGALRM, _expired)
-    except ValueError:  # not the main thread
-        return True, fn()
+        signal.signal(signal.SIGALRM, _expired)
+    except ValueError:  # not the main thread after all
+        return None, None
+    finished, value = False, None
     try:
-        signal.setitimer(signal.ITIMER_REAL, budget_s)
         try:
+            signal.setitimer(signal.ITIMER_REAL, budget_s)
             value = fn()
+            finished = True
         finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
-        return True, value
+            try:
+                armed[0] = False
+                signal.setitimer(signal.ITIMER_REAL, 0)
+            finally:
+                signal.signal(signal.SIGALRM, previous)
     except _WarnBudgetExceeded:
-        return False, None
-    finally:
-        signal.signal(signal.SIGALRM,
-                      previous if previous is not None else signal.SIG_DFL)
+        finished, value = False, None
+    return finished, value
 
 
 def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
@@ -2634,6 +2657,23 @@ def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
     # Building the engine and scanning both count against the budget: that is
     # the lane's whole wall-clock cost, and the harness's clock covers all of it.
     finished, result = _run_within_budget(_scan, _WARN_LANE_BUDGET_S)
+    if finished is None:
+        # No timer this process can own, so the scan never started: running it
+        # unbudgeted could outlive the harness and orphan the in_flight receipt.
+        # Same terminal ask and rule as a budget hit, with its own reason.
+        return Decision(
+            action="ask",
+            lane="fuzzy",
+            rule_id="GLS-FW-FUZZY-BUDGET",
+            reason=(
+                f"SUNGLASSES firewall: warn-lane budget unavailable, "
+                f"{len(text.encode('utf-8', 'replace'))} bytes. This process "
+                f"cannot give the pattern scan its own timer, so the scan did "
+                f"not run and this call was NOT pattern-checked. Approve only if "
+                f"you would have approved it unchecked. Turn this lane off by "
+                f"deleting ~/.sunglasses/warn-lane."
+            ),
+        )
     if not finished:
         # TERMINAL, and an ask: the lane never denies, and it must never leave the
         # host waiting on a verdict that is not coming. The caller writes the
