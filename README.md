@@ -725,10 +725,8 @@ private key files are named individually and matching is boundary-aware, so
 - **On older Pythons one regex can outrun the WARN lane clock.** The 7 second
   budget is a timer signal, and before Python 3.11.6 and 3.12.1 the regex engine
   only notices a signal inside one long match attempt. A single search that makes
-  many short attempts over a long input therefore runs to its end first. In our
-  measurement on one Mac a test pattern on 200,000 characters took 11.4 seconds on
-  Python 3.9 and 3.10 against the 7 second budget, and Python 3.13 stopped it at
-  7.4. The fix lives in CPython itself (issue 109631). If you turn the WARN lane
+  many short attempts over a long input therefore runs to its end first. The fix
+  lives in CPython itself (issue 109631). If you turn the WARN lane
   on, use Python 3.11.6, 3.12.1 or newer. macOS ships 3.9 as /usr/bin/python3.
 - **Large tool outputs can use up the WARN lane clock on any Python.** On an
   output of about 200 KB and up (a long file listing or CI log, a big API reply)
