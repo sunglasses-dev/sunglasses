@@ -11,7 +11,7 @@ All notable changes to Sunglasses are documented here.
   its path, and `sunglasses receipts` marks each call whose receipt records that it
   ran with no policy or with a policy that lists nothing enabled, using the same
   words the hook already writes on its receipt. The hook decides exactly as before.
-  Three sentences about a missing or empty policy file were wrong. Where they speak
+  Sentences about a missing or empty policy file were wrong. Where they speak
   of an ask, they now say that the firewall asks on a call nothing else settles
   until the file is restored. (#313)
 
