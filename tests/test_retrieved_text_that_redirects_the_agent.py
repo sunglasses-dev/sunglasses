@@ -142,14 +142,17 @@ def test_the_rules_cover_their_channels_and_carry_no_text_exclusion():
     assert RULE_CHANNELS["GLS-IP-006"] <= set(CHANNELS) and len(RULE_CHANNELS["GLS-IP-006"]) == 3
     assert not RULE_CHANNELS["GLS-IP-006"] & {"message", "api_response"}
     # The exempted guard holds only whitespace classes, the line break and punctuation bounds and
-    # counts: with escapes and counts removed no letter, digit or underscore is left, so it cannot
-    # be edited into a word list that reads the scanned text.
+    # counts: with escapes and counts removed no letter, digit or underscore is left. This is a
+    # tripwire against a word list being added to the guard. That the guard is safe rests on its
+    # exact text and on the span comparison in tests/test_newline_run_prefix_cost.py, not on this
+    # assertion alone.
     assert not re.search(r"\w", re.sub(r"\\.|\{\d+\}", "", START_GUARD))
     for rid, rule in rules.items():
         for rx in rule["regex"]:
             # The one lookbehind allowed is the start-position guard in the prefix of six regexes
             # (tests/test_newline_run_prefix_cost.py): it skips a line break as a start only when an
             # earlier start reaches the same verb, so it cannot hide a match. It is removed here by
-            # its exact text; any other lookbehind or lookahead still fails.
+            # its exact text; any other negative lookbehind or negative lookahead still fails. Positive
+            # lookarounds are not checked by this test.
             rx = rx.replace(START_GUARD, "")
             assert "(?!" not in rx and "(?<!" not in rx, f"{rid} carries an exclusion the text can trigger"

@@ -10,7 +10,7 @@ a sentence took time that grew with the square of the run: 6,000 line breaks too
 quarter of a second and 1.2 seconds per regex on the test machine, and a scan of the text
 agreed.
 
-The item now reads `(?:[.!?;:"'\[{(]|G\n)\s*`. G is a set of 33 pairs of lookbehinds, one pair
+The item now reads `(?:[.!?;:"'\[{(]|(?=\n)G\n)\s*`. G is a set of 33 pairs of lookbehinds, one pair
 for each m from 0 to 32, that refuse a line break as a start when, m horizontal whitespace
 characters earlier, there is a line break or one of the punctuation characters. Such a start
 would reach the same verb position as the earlier one, so a match starts where it did before:
@@ -19,15 +19,20 @@ characters of the match as the finding's matched_text, and the SPAN tests compar
 old prefix. The old regex is built from the current one by putting the old item back, so the
 comparison cannot drift from the rule. The words of the rules are not changed.
 
+The lookahead `(?=\n)` in front of G makes every position that is not a line break fail at once. Without
+it the 66 lookbehinds ran at every position of ordinary text, which took about 8 times the old
+time on text with no line break at all, and the ordinary-text cost test below pins that.
+
 Known gap. The guard looks back over at most 32 horizontal whitespace characters (spaces, tabs,
 carriage returns and the like, not line breaks). When consecutive line breaks are separated by
-more than 32 of them, the later line breaks start attempts as before and the cost on that
-shape is the cost it was. The rows with 33 and 40 characters in SPAN_RUNS pin that those texts
+more than 32 of them, the later line breaks start attempts as before and that shape keeps its
+quadratic cost, a few percent higher than before because of the guard. The rows with 33 and 40 characters in SPAN_RUNS pin that those texts
 match as before.
 
 On main the prefix-form test, five of the eight regex cost shapes (line breaks, CRLF, line break
 and space, space and line break, line break and tab) and the scan cost tests fail. The other
-three cost shapes, and the span, start and engine tests, pass on main and on this change.
+three cost shapes, and the span, start and engine tests, pass on main and on this change, and so does the ordinary-text cost test, which is relative to
+the old prefix and fails when the lookahead is taken out.
 """
 import copy
 import random
@@ -50,7 +55,7 @@ PUNCT = "[.!?;:\"'\\[{("
 GUARD = "".join(
     f"(?<!\\n[^\\S\\n]{{{m}}})(?<!{PUNCT}][^\\S\\n]{{{m}}})" for m in range(33)
 )
-NEW_ITEM = f"(?:{PUNCT}]|{GUARD}\\n)\\s*"
+NEW_ITEM = f"(?:{PUNCT}]|(?=\\n){GUARD}\\n)\\s*"
 
 
 def _sources():
@@ -243,3 +248,35 @@ def test_scan_of_a_long_run_is_cheap(shape, channel):
     result = engine.scan(text, channel=channel)
     assert time.perf_counter() - start < LIMIT_SECONDS
     assert result.decision == "allow"
+
+
+# Ordinary text: the guard must not make text without long runs slower. A guard that is tried at
+# every position, and not only at line breaks, was about 8 times the old time here. The old prefix
+# is built from the current regex, so this is relative to what the rule did before.
+ORDINARY = " ".join(["the quick brown fox jumps over a lazy dog while reading some ordinary prose"] * 800)
+ORDINARY_SHAPES = {
+    "no line break": ORDINARY,
+    "line break at the end of each sentence": ORDINARY.replace("prose the", "prose\nthe"),
+    "CRLF": ORDINARY.replace("prose the", "prose\r\nthe"),
+}
+
+
+def _best_of(regexes, text, reps=5):
+    best = None
+    for _ in range(reps):
+        start = time.perf_counter()
+        for rx in regexes.values():
+            rx.search(text)
+        elapsed = time.perf_counter() - start
+        best = elapsed if best is None else min(best, elapsed)
+    return best
+
+
+@pytest.mark.parametrize("shape", sorted(ORDINARY_SHAPES))
+def test_ordinary_text_is_not_slower_than_the_old_prefix(shape):
+    text = ORDINARY_SHAPES[shape] + " " + SCAN_TAIL
+    assert len(text) > 50000
+    old_rx, new_rx = _old(), _new()
+    assert len(old_rx) == len(new_rx) == len(POSITIVE)
+    old, new = _best_of(old_rx, text), _best_of(new_rx, text)
+    assert new < 3 * old + 0.005, (new, old)

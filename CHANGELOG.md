@@ -27,8 +27,8 @@ All notable changes to Sunglasses are documented here.
   break or punctuation character stands in front of it, over at most 32 horizontal whitespace
   characters. A match starts and ends where it did before, and the words of the rules are not
   changed. Known gap: where consecutive line breaks are separated by more than 32 spaces or tabs,
-  those texts keep the cost they had (about a quarter of a second for 16,000 characters on the test
-  machine).
+  those texts keep the quadratic cost they had (about a quarter of a second for 16,000 characters on
+  the test machine, a few percent more than before because of the guard).
 
 ## [0.6.5] — 2026-10-02
 
