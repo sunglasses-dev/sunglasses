@@ -848,6 +848,7 @@ def _lane_repo(tmp_path):
                       "cli": "sunglasses/cli.py", "sarif": "sunglasses/sarif.py",
                       "result": "sunglasses/result.py", "main_mod": "sunglasses/__main__.py",
                       "matrix": "tests/test_v056_matrix.py", "ini": "pytest.ini",
+                      "gate": "tests/test_ci_gate.py", "helper": "tests/v056_matrix.py",
                       "workflow": ".github/workflows/pattern-integrity.yml",
                       "engine": "sunglasses/engine.py"}.items():
         r("checkout", "-q", "-b", tag, heads["base"])
@@ -877,6 +878,8 @@ def lane_behaviour_holds(doc, tmp_path) -> list[str]:
         "main_mod":   ("pull_request", "quick=false"),
         "matrix":     ("pull_request", "quick=false"),
         "ini":        ("pull_request", "quick=false"),
+        "gate":       ("pull_request", "quick=false"),
+        "helper":     ("pull_request", "quick=false"),
         "workflow":   ("pull_request", "quick=false"),
     }
     bad = []
@@ -925,6 +928,19 @@ def test_control_quick_lane_guard_narrowed(tmp_path):
         st = _lane_step(d)
         st["run"] = st["run"].replace("|sarif|", "|")
     assert lane_behaviour_holds(_mutate(m), tmp_path), "dropping sarif.py from the guard was not seen"
+
+    def m2(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|test_ci_gate)", ")")
+    assert lane_behaviour_holds(_mutate(m2), tmp_path / "gate"), "dropping test_ci_gate.py from the guard was not seen"
+    def m3(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|\\.github/)", ")")
+    assert lane_behaviour_holds(_mutate(m3), tmp_path / "wf"), "dropping the workflow path from the guard was not seen"
+    def m4(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|pytest\\.ini", "")
+    assert lane_behaviour_holds(_mutate(m4), tmp_path / "ini"), "dropping pytest.ini from the guard was not seen"
 
 
 def test_control_quick_lane_on_for_every_event(tmp_path):
