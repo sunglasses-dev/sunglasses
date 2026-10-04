@@ -425,7 +425,33 @@ class Session:
         # other thread, which is the exclusion the property needs.
         self._authority_lock = threading.RLock()
         self._cancelled_ids: set = set()
+        # R106.3. identity -> the generation that was live when its
+        # cancellation was accepted. `_cancelled_ids` is never cleared, so on
+        # its own it cannot tell a cancel for THIS request from a late one for
+        # an earlier generation of the same id. The request gate withholds
+        # without answering, so it may only act on the live generation's
+        # cancel; `_cancel` has answered that one. A stale mark would drop an
+        # admitted id with no answer at all (R66).
+        self._cancelled_at: dict = {}
+        # R111.2. identity -> the generation whose request is being released
+        # upstream right now. The gate's check and this claim are one step
+        # under `_authority_lock`, and a cancellation is accepted under the
+        # same lock, so every cancel lands either BEFORE the claim (the gate
+        # withholds) or AFTER it (the call is on its way). A cancel after it
+        # is recorded in `_cancel_deferred` and not answered until the write
+        # has returned, so no client is told "cancelled" before the bytes of
+        # that call leave. The claim is not the settlement lock held across
+        # the write: that lock would park the upstream reader behind a write
+        # the upstream may not be reading, and the pair can deadlock.
+        self._releasing: dict = {}
+        self._cancel_deferred: set = set()
         self._invalidated_as = None
+        # R111.3. Moves on every accepted invalidation and on nothing else.
+        # `_invalidated_as` is sticky for the session, so gating on it would
+        # also refuse a call re-approved against the NEW descriptors, and the
+        # authority epoch moves on cancellations too. A request carries the
+        # value it was admitted under and the gate compares that.
+        self._descriptor_revision = 0
         # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
         # Round 4 claimed the decision and the discharge were atomic because
@@ -863,9 +889,21 @@ class Session:
         the thing the reviewer's XB03 requires and the thing a writer under the
         settlement lock cannot do.
         """
+        identity = key(origin, request_id)
         with self._authority_lock:
-            self._cancelled_ids.add(key(origin, request_id))
+            self._cancelled_ids.add(identity)
+            # Read without `_settlement`, and ordered anyway: admission and
+            # cancellation both run on the client reader, so the generation
+            # this sees is the one the reader last admitted.
+            self._cancelled_at[identity] = self._generation.get(identity, 0)
             self._authority_epoch += 1
+            # R111.2. The request of this generation is being written
+            # upstream. Its cancel is recorded and stays authoritative, but
+            # the answer waits for the write (`end_request_release`).
+            if self._releasing.get(identity) == self._cancelled_at[identity]:
+                self._cancel_deferred.add(identity)
+                return True
+            return False
 
     def accept_invalidation(self, reason):
         """T5.R4. The descriptors moved; every undelivered answer of this
@@ -894,6 +932,7 @@ class Session:
         """
         with self._authority_lock:
             self._invalidated_as = reason
+            self._descriptor_revision += 1
             self._authority_epoch += 1
             self._core._emit("APPROVAL_INVALIDATED", None, reason_code=reason)
 
@@ -908,7 +947,30 @@ class Session:
         """
         with self._authority_lock:
             self._observe_authority()
-            return key(origin, request_id) in self._cancelled_ids
+            return self._cancel_is_live(key(origin, request_id))
+
+    def _cancel_is_live(self, identity):
+        """R107. Does an accepted cancel speak for the item being decided now?
+
+        `_cancelled_ids` is never cleared, and both result-side readers used to
+        ask it by identity alone. A late cancel for an id that was already
+        answered then stood for the rest of the session: the client reused the
+        id (RC19b accepts that once the frame is gone), the server executed the
+        call, and the result was answered REQUEST_CANCELLED. The client was
+        told "cancelled" about a call that ran (R106.4, measured red 3/3).
+
+        A cancel speaks for the generation that was live when it was accepted
+        (`_cancelled_at`, R106.3). The item being decided is named the way the
+        settlement names it, by id AND generation: the standing record's key
+        while it settles, otherwise the live core key, the same pair
+        `recorded_terminal` reads. A cancel for a retired generation is inert,
+        which is what the protocol asks of a cancel for a completed request.
+        The set stays as the record. Caller holds `_authority_lock`.
+        """
+        if identity not in self._cancelled_ids:
+            return False
+        record_key = self._settling_key.get(identity) or self._core_key(identity)
+        return self._cancelled_at.get(identity) == record_key[-1]
 
     def authority_state(self):
         """The cancelled ids and the invalidation, read TOGETHER under one lock.
@@ -970,11 +1032,80 @@ class Session:
             recorded = self.recorded_terminal(request_id, origin=origin)
             if recorded is not None and recorded.rule == "S3":
                 return None
-            if identity in self._cancelled_ids:
+            if self._cancel_is_live(identity):
                 return "REQUEST_CANCELLED"
             if self._invalidated_as:
                 return "DESCRIPTOR_CHANGED"
             return None
+
+    def descriptor_revision(self):
+        """R111.3. The value a request is admitted under."""
+        with self._authority_lock:
+            return self._descriptor_revision
+
+    def request_release_decision(self, request_id, *, origin=ORIGIN_CLIENT,
+                                 admitted_under=None):
+        """R106.3. The REQUEST side's handoff gate, inside the settlement owner.
+
+        The result direction asks `release_decision` at the handoff and the
+        request direction asked nobody: a cancel recorded and answered while
+        its request was being scanned still let the call reach the server
+        (R104, measured red 3/3). This is that question for the request side,
+        asked where the result side asks it: under `_settlement`, then
+        `_authority_lock`, the same order `_retire_prepared` takes them.
+
+        THE LINEARISATION POINT IS THIS CALL. A cancellation is accepted under
+        `_authority_lock`, and `_cancel` answers the client only after that
+        acceptance returns, so a cancel the client saw answered before this
+        call is seen here and nothing is forwarded. A cancel accepted after it
+        is a cancel of a forwarded call, which is what it was before this gate.
+
+        It reads the cancelled set directly and does NOT call
+        `release_decision`, because that stamps `_authority_observed`, the
+        epoch the RESULT reader's pending decision was derived from. A second
+        thread stamping it would move the result side's staleness test.
+
+        Only the cancellation withholds. `DESCRIPTOR_CHANGED` passes through
+        (R106.3 ruling A): a withheld request that `_cancel` did not answer has
+        no answer at all. Returns `"REQUEST_CANCELLED"` or None.
+
+        R111.2. A None is a CLAIM, taken in the same step as the check, and the
+        caller must end it with `end_request_release` once the write returns.
+        A cancel accepted while the claim is held is not answered by `_cancel`;
+        `end_request_release` hands it back to the caller, after the write.
+
+        R111.3. `admitted_under` is the descriptor revision a call's approval
+        was read under. If an invalidation was accepted since, the call was
+        approved against descriptors that moved and the answer is
+        `"DESCRIPTOR_CHANGED"`, with no claim taken. The caller owes that
+        answer; unlike a cancel, nobody has sent it. A cancellation is asked
+        first, because its answer is already on the wire.
+        """
+        identity = key(origin, request_id)
+        with self._settlement:
+            with self._authority_lock:
+                if identity in self._cancelled_ids and \
+                        self._cancelled_at.get(identity) == \
+                        self._generation.get(identity, 0):
+                    return "REQUEST_CANCELLED"
+                if admitted_under is not None and \
+                        admitted_under != self._descriptor_revision:
+                    return "DESCRIPTOR_CHANGED"
+                self._releasing[identity] = self._generation.get(identity, 0)
+                self._cancel_deferred.discard(identity)
+                return None
+
+    def end_request_release(self, request_id, *, origin=ORIGIN_CLIENT):
+        """R111.2. End the claim `request_release_decision` took. True means
+        a cancel was accepted while the call was being written, and its answer
+        is now the caller's to finish."""
+        identity = key(origin, request_id)
+        with self._authority_lock:
+            self._releasing.pop(identity, None)
+            if identity in self._cancel_deferred:
+                self._cancel_deferred.discard(identity)
+                return True
+            return False
 
     def _final_decision(self, request_id, decided):
         """The decision that actually reaches the wire, taken UNDER the lock.
