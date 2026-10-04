@@ -3,20 +3,6 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [Unreleased]
-
-### Fixed
-
-- One rule, GLS-SMP-023, could take far longer than the scan budget on inputs
-  of a few kilobytes. A second rule, GLS-AW-613, carried the same shape and is
-  restacked with it. Their signal checks were chained with a wildcard between
-  them, so when the first signals were present and a later one was missing the
-  engine retried the checks over and over. The checks now sit side by side and
-  the rules run in linear time. What each rule matches does not change. A new
-  test reads every shipped regex and fails if any rule chains lookaheads this
-  way again. (#312)
-
-
 ## [0.6.5] — 2026-10-02
 
 ### Changed
