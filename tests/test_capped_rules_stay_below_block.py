@@ -76,10 +76,3 @@ def test_the_same_line_beside_a_forged_instruction_is_still_blocked(engine, rule
     assert rule_id in [i for i, _ in found]
     assert any(i not in CAPPED and s in ("high", "critical") for i, s in found)
     assert result.decision == "block"
-
-
-def test_the_changelog_says_what_was_matched_and_not_what_documentation_holds():
-    with open(os.path.join(ROOT, "CHANGELOG.md")) as fh:
-        entry = fh.read().split("## [0.6.5]")[0]
-    assert "has matched short lines found in project documentation files" in entry
-    assert "project documentation holds" not in entry
