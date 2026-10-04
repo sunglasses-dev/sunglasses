@@ -8,12 +8,13 @@ the lookaheads over the whole text again at each shorter prefix, so the time on 
 long run of whitespace in front grew with n times the length of the text: 16,000 leading
 spaces took a little over a second per rule on the test machine.
 
-Every lookahead of these rules begins with a character that is not whitespace, so what it finds
+In every lookahead of these rules the target after the leading `.*` begins with a character
+that is not whitespace, so what it finds
 is the same for each prefix inside the run, and a match covers the whole text whatever the run
 took. The head is now `^(?:(?=(\s*))\1)`: the lookahead reads the whole run once, and the group
 consumes exactly that run. `re` does not give back what a lookahead matched, so the search never
 tries a shorter prefix. The `(?:` keeps the start of the regex from reading as `^` followed by
-a lookahead, which the engine would move to its windowed mode; the CLASSIFICATION tests pin that
+a lookahead, which the engine would move to its guarded mode; the CLASSIFICATION tests pin that
 the rules stay in the plain mode with the same required words. The group is the first and only
 capture group of each rule and is read by nothing but the backreference.
 
@@ -189,7 +190,7 @@ def test_span_matches_the_old_head(rule_id):
     assert matched > 20
 
 
-# Cost, with each rule's own regex. The text is a run of 16,000 whitespace characters and then a
+# Cost, with each rule's own regex. The text is a run of about 16,000 whitespace characters and then a
 # body the lookaheads cannot satisfy, so the old head tried every prefix of the run. A text
 # that matches returns at once and measures nothing.
 LONG = 16000
