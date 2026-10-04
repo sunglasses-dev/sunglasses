@@ -15,17 +15,6 @@ All notable changes to Sunglasses are documented here.
   of an ask, they now say that the firewall asks on a call nothing else settles
   until the file is restored. (#313)
 
-### Fixed
-
-- Eighteen rules (GLS-SE-010, GLS-MR-003, GLS-MR-004, GLS-MR-015, GLS-MR-035, GLS-MR-036, GLS-MR-039,
-  GLS-MR-040, GLS-MR-041, GLS-MR-047, GLS-MR-049, GLS-MR-056, GLS-AW-671, GLS-AW-676, GLS-AW-679,
-  GLS-AW-683, GLS-AW-685 and GLS-AW-712) no longer re-read the text once for each character of a run
-  of whitespace at its start. Each of them begins with whitespace and then tests the whole text, and
-  when that test failed the search gave back one character of the run at a time and tested the whole
-  text again, so a text that began with 16,000 spaces took a little over a second per rule on the test
-  machine. The run is now consumed once, and the rules keep the mode they ran in and the words they
-  need. A match starts and ends where it did before, and the words of the rules are not changed.
-
 ## [0.6.5] — 2026-10-02
 
 ### Changed
