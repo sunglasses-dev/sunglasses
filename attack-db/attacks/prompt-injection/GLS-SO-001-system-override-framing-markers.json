@@ -3,7 +3,7 @@
   "name": "System override framing markers",
   "version": "1.0",
   "category": "prompt_injection",
-  "severity": "high",
+  "severity": "medium",
   "channels": [
     "message",
     "file",

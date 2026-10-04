@@ -3,7 +3,7 @@
   "name": "Verification Stamp Tamper Override Guardrails",
   "version": "1.0",
   "category": "tool_output_poisoning",
-  "severity": "high",
+  "severity": "medium",
   "channels": [
     "tool_output",
     "file"

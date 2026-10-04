@@ -1769,7 +1769,7 @@ PATTERNS = [
         "id": "GLS-TD-001",
         "name": "Environment variable poisoning",
         "category": "supply_chain",
-        "severity": "critical",
+        "severity": "medium",
         "channel": ["file", "api_response"],
         "keywords": [
             "PIP_INDEX_URL",
@@ -4096,7 +4096,7 @@ PATTERNS = [
         "id": "GLS-SO-001",
         "name": "System override framing markers",
         "category": "prompt_injection",
-        "severity": "high",
+        "severity": "medium",
         "channel": ["message", "file", "web_content"],
         "keywords": [
             "system override", "system_override", "admin override", "admin_override",
@@ -4219,7 +4219,7 @@ PATTERNS = [
         "id": "GLS-PI-INFO",
         "name": "Indirect injection — <INFORMATION> / <IMPORTANT> wrapper",
         "category": "prompt_injection",
-        "severity": "high",
+        "severity": "medium",
         "channel": ["message", "file", "web_content", "tool_output"],
         "keywords": [
             "<information>",
@@ -4243,7 +4243,7 @@ PATTERNS = [
         "id": "GLS-TP-003",
         "name": "Tool poisoning — hidden note-to-assistant framings",
         "category": "tool_poisoning",
-        "severity": "high",
+        "severity": "medium",
         "channel": ["file", "message"],
         "keywords": [
             "note to assistant",
@@ -4810,7 +4810,7 @@ PATTERNS = [
         "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "System prompt and tool schema leakage",
         "category": "prompt_leak",
-        "severity": "critical",
+        "severity": "medium",
         "channel": ["message", "file", "web_content", "tool_output"],
         "keywords": [
             "print full hidden system prompt",
@@ -5870,7 +5870,7 @@ PATTERNS = [
         "id": "GLS-CAI-243",
         "name": "Fabricated Quorum Bypass",
         "category": "cross_agent_injection",
-        "severity": "critical",
+        "severity": "medium",
         "channel": ["message", "tool_output"],
         "keywords": [
             "other agents already",
@@ -6688,7 +6688,7 @@ PATTERNS = [
         "tier": "B",  # Jul-17 2026 curated demotion: stamped famous-repo prose (retune list)
         "name": "Frontmatter Role Priority Smuggle",
         "category": "token_smuggling",
-        "severity": "high",
+        "severity": "medium",
         "channel": ["file", "web_content", "tool_output"],
         "keywords": [
             "inject yaml frontmatter",
@@ -7019,7 +7019,7 @@ PATTERNS = [
         "id": "GLS-TOP-245",
         "name": "Verification Stamp Tamper Override Guardrails",
         "category": "tool_output_poisoning",
-        "severity": "high",
+        "severity": "medium",
         "channel": ["tool_output", "file"],
         "keywords": [
             "tool summary rewritten",

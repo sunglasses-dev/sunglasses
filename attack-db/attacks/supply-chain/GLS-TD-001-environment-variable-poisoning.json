@@ -3,7 +3,7 @@
   "name": "Environment variable poisoning",
   "version": "1.0",
   "category": "supply_chain",
-  "severity": "critical",
+  "severity": "medium",
   "channels": [
     "file",
     "api_response"
