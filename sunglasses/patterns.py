@@ -16629,7 +16629,7 @@ PATTERNS = [
             "tool-result authority spoof",
         ],
         "regex": [
-            r"""(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\s+(?:all\s+)?(?:prior|previous|earlier|original)\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\s+baseline|start\s+(?:over|fresh)|policy\s+(?:superseded|v\d)|earlier\s+constraints?\s+(?:are\s+)?outdated)\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:\[?\s*(?:system|security)\s+(?:patch|update|override)\s+applied\]?|approvals?\s+pre[- ]granted|unrestricted\s+troubleshooting\s+mode)\b)""",
+            r"""(?i)(?:(?:ignore|discard|reset|forget|supersede|override)\s+(?:all\s+)?(?:prior|previous|earlier|original)\s+(?:directives?|instructions?|constraints?|policy|safety|approvals?|baseline)|(?:new\s+baseline|start\s+(?:over|fresh)|policy\s+(?:superseded|v\d)|earlier\s+constraints?\s+(?:are\s+)?outdated)\s+.{0,80}?(?:continue|proceed|execute|unrestricted|pre[- ]granted)|(?:(?:\[\s*|(?<!\s)\s*)(?:system|security)\s+(?:patch|update|override)\s+applied\]?|approvals?\s+pre[- ]granted|unrestricted\s+troubleshooting\s+mode)\b)""",
         ],
         "description": "Attacker uses untrusted tool output or retrieval text to force the agent to discard earlier safety, approval, and scope context, then continues execution under attacker-controlled new-baseline instructions while spoofing system-level authority headers."
     },
