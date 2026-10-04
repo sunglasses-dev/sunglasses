@@ -10,29 +10,31 @@ a sentence took time that grew with the square of the run: 6,000 line breaks too
 quarter of a second and 1.2 seconds per regex on the test machine, and a scan of the text
 agreed.
 
-The item now reads `(?:[.!?;:"'\[{(]|(?=\n)G\n)\s*`. G is a set of 33 pairs of lookbehinds, one pair
-for each m from 0 to 32, that refuse a line break as a start when, m horizontal whitespace
-characters earlier, there is a line break or one of the punctuation characters. Such a start
-would reach the same verb position as the earlier one, so a match starts where it did before:
-the engine reads the 50 characters in front of match.start() for negation words and the first 50
-characters of the match as the finding's matched_text, and the SPAN tests compare both with the
-old prefix. The old regex is built from the current one by putting the old item back, so the
-comparison cannot drift from the rule. The words of the rules are not changed.
+The item now reads `[\n.!?;:"'\[{(]G\s*`: the same start characters, then G, a set of 33 pairs of
+lookbehinds, one pair for each m from 0 to 32. G refuses the start when the character just read
+is a line break and, m horizontal whitespace characters before it, there is a line break or one
+of the punctuation characters. Such a start would reach the same verb position as the earlier
+one, so a match starts where it did before: the engine reads the 50 characters in front of
+match.start() for negation words and the first 50 characters of the match as the finding's
+matched_text, and the SPAN tests compare both with the old prefix. The old regex is built from
+the current one by taking G out, so the comparison cannot drift from the rule. The words of the
+rules are not changed.
 
-The lookahead `(?=\n)` in front of G makes every position that is not a line break fail at once. Without
-it the 66 lookbehinds ran at every position of ordinary text, which took about 8 times the old
-time on text with no line break at all, and the ordinary-text cost test below pins that.
+G is tried after the start character has been read, so a position that is not a start character
+costs what it cost before. A first version tried G at every position and took about 8 times the
+old time on ordinary text with no line break, and a second one with a lookahead for a line
+break in front of it was still about 1.25 times; the ordinary-text cost tests pin this.
 
 Known gap. The guard looks back over at most 32 horizontal whitespace characters (spaces, tabs,
 carriage returns and the like, not line breaks). When consecutive line breaks are separated by
 more than 32 of them, the later line breaks start attempts as before and that shape keeps its
-quadratic cost, a few percent higher than before because of the guard. The rows with 33 and 40 characters in SPAN_RUNS pin that those texts
-match as before.
+quadratic cost, a few percent higher than before because of the guard.
+The rows with 33 and 40 characters in SPAN_RUNS pin that those texts match as before.
 
 On main the prefix-form test, five of the eight regex cost shapes (line breaks, CRLF, line break
 and space, space and line break, line break and tab) and the scan cost tests fail. The other
-three cost shapes, and the span, start and engine tests, pass on main and on this change, and so does the ordinary-text cost test, which is relative to
-the old prefix and fails when the lookahead is taken out.
+three cost shapes, and the span, start and engine tests, pass on main and on this change, and so do the ordinary-text cost tests, which are relative to
+the old prefix and fail when G is tried at every position.
 """
 import copy
 import random
@@ -53,9 +55,9 @@ LONG = 6000
 OLD_ITEM = "[\\n.!?;:\"'\\[{(]\\s*"
 PUNCT = "[.!?;:\"'\\[{("
 GUARD = "".join(
-    f"(?<!\\n[^\\S\\n]{{{m}}})(?<!{PUNCT}][^\\S\\n]{{{m}}})" for m in range(33)
+    f"(?<!\\n[^\\S\\n]{{{m}}}\\n)(?<!{PUNCT}][^\\S\\n]{{{m}}}\\n)" for m in range(33)
 )
-NEW_ITEM = f"(?:{PUNCT}]|(?=\\n){GUARD}\\n)\\s*"
+NEW_ITEM = "[\\n.!?;:\"'\\[{(]" + GUARD + "\\s*"
 
 
 def _sources():
@@ -250,33 +252,54 @@ def test_scan_of_a_long_run_is_cheap(shape, channel):
     assert result.decision == "allow"
 
 
-# Ordinary text: the guard must not make text without long runs slower. A guard that is tried at
-# every position, and not only at line breaks, was about 8 times the old time here. The old prefix
-# is built from the current regex, so this is relative to what the rule did before.
-ORDINARY = " ".join(["the quick brown fox jumps over a lazy dog while reading some ordinary prose"] * 800)
+# Ordinary text: the guard must not make text without long runs slower. The old prefix is built
+# from the current regex, so this is relative to what the rule did before. Tried at every
+# position the guard took about 8 times the old time here, and behind a lookahead for a line
+# break about 1.25 times; G after the start character measures 1.0 to 1.16. The bound is above
+# that and far below 8, so timing noise cannot fail it and the first version cannot pass it.
+_VOCAB = "the quick brown fox jumps over a lazy dog while reading some ordinary prose about gardens and tea".split()
 ORDINARY_SHAPES = {
-    "no line break": ORDINARY,
-    "line break at the end of each sentence": ORDINARY.replace("prose the", "prose\nthe"),
-    "CRLF": ORDINARY.replace("prose the", "prose\r\nthe"),
+    "words only": ([" "], ""),
+    "sentences": ([". ", ", and ", "; ", "! ", "? ", ": "], ""),
+    "sentences with line breaks": ([". ", ", and ", "; ", "! ", "? ", ": "], "\n"),
+    "sentences with CRLF": ([". ", ", and ", "; ", "! ", "? ", ": "], "\r\n"),
 }
+ORDINARY_RATIO = 1.5
 
 
-def _best_of(regexes, text, reps=5):
-    best = None
+def _prose(size, ends, newline):
+    out, total, i = [], 0, 0
+    while total < size:
+        words = [_VOCAB[(i * 7 + k * 3) % len(_VOCAB)] for k in range(6 + i % 9)]
+        sentence = " ".join(words).capitalize() + ends[i % len(ends)] + newline
+        out.append(sentence)
+        total += len(sentence)
+        i += 1
+    return "".join(out)[:size] + " " + SCAN_TAIL
+
+
+def _best_of_pair(a, b, text, reps=5):
+    best_a = best_b = None
     for _ in range(reps):
-        start = time.perf_counter()
-        for rx in regexes.values():
-            rx.search(text)
-        elapsed = time.perf_counter() - start
-        best = elapsed if best is None else min(best, elapsed)
-    return best
+        for regexes, which in ((a, "a"), (b, "b")):
+            start = time.perf_counter()
+            for rx in regexes.values():
+                rx.search(text)
+            elapsed = time.perf_counter() - start
+            if which == "a":
+                best_a = elapsed if best_a is None else min(best_a, elapsed)
+            else:
+                best_b = elapsed if best_b is None else min(best_b, elapsed)
+    return best_a, best_b
 
 
+@pytest.mark.parametrize("size", [16000, 256000])
 @pytest.mark.parametrize("shape", sorted(ORDINARY_SHAPES))
-def test_ordinary_text_is_not_slower_than_the_old_prefix(shape):
-    text = ORDINARY_SHAPES[shape] + " " + SCAN_TAIL
-    assert len(text) > 50000
+def test_ordinary_text_is_not_slower_than_the_old_prefix(shape, size):
+    ends, newline = ORDINARY_SHAPES[shape]
+    text = _prose(size, ends, newline)
+    assert len(text) > size
     old_rx, new_rx = _old(), _new()
     assert len(old_rx) == len(new_rx) == len(POSITIVE)
-    old, new = _best_of(old_rx, text), _best_of(new_rx, text)
-    assert new < 3 * old + 0.005, (new, old)
+    old, new = _best_of_pair(old_rx, new_rx, text)
+    assert new < ORDINARY_RATIO * old + 0.002, (new, old)

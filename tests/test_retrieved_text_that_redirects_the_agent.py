@@ -28,7 +28,7 @@ from sunglasses.patterns import PATTERNS
 
 FAMILY = ("GLS-EX-030", "GLS-IP-006")
 _PUNCT = "[.!?;:\"'\\[{("
-START_GUARD = "".join(f"(?<!\\n[^\\S\\n]{{{m}}})(?<!{_PUNCT}][^\\S\\n]{{{m}}})" for m in range(33))
+START_GUARD = "".join(f"(?<!\\n[^\\S\\n]{{{m}}}\\n)(?<!{_PUNCT}][^\\S\\n]{{{m}}}\\n)" for m in range(33))
 # Every attack row runs on each of these. On its rule's own channels it must fire,
 # and on the others it must stay silent, so the scoping is tested, not assumed.
 CHANNELS = ("message", "file", "api_response", "tool_output", "web_content")
