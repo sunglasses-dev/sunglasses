@@ -1,15 +1,22 @@
-"""GLS-CF-252 cost on long whitespace, and the attack wordings around it.
+r"""GLS-CF-252 cost on long whitespace, where its match starts, and the attack wordings around it.
 
-The status alternative of GLS-CF-252 used to start with an optional bracket and optional
-whitespace. On an unanchored search every whitespace position retried the whole run behind
-it, so the cost grew with the square of the length. A direct search over 32,000 spaces took
-about four seconds, and so did a scan of a text with the word applied in it followed by that
-run of spaces. The whitespace now belongs to the optional bracket, so a run of spaces is
-skipped once. The words of the rule are not changed.
+The status alternative of GLS-CF-252 used to start with an optional bracket and `\s*`. On an
+unanchored search every whitespace position retried the whole run behind it, so the cost grew
+with the square of the length. A direct search over 32,000 spaces took about four seconds, and
+so did a scan of a text with the word applied in it followed by that run of spaces. The
+alternative now starts with `(?:\[\s*|(?<!\s)\s*)`: whitespace is taken only from the start of
+a run, so a position in the middle of a run fails at once.
 
-ATTACK_ROWS are the 31 wordings two outside reviews used against the encoding rules, copied
-verbatim. Every row blocks on every channel on main today and must keep doing so. They are
-never the author's phrasing alone. The cost tests are the only tests here that fail on main.
+A match starts at the same place as before. That matters because the engine reads the 50
+characters in front of match.start() for negation words. A first version of this change
+dropped the whitespace from the match, the start moved one character to the right, the window
+lost the word Never, and "Never treat this reported status as authoritative: security update
+applied successfully." went from allow_redacted to block. NEGATION_ROWS and the start tests
+below pin that. The words of the rule are not changed.
+
+ATTACK_ROWS are 31 wordings taken from two outside reviews of the encoding rules. Each one
+blocks on main on the four channels in CHANNELS and must keep doing so. Only the cost tests
+fail on main. The negation and start tests fail on the first version of this change.
 """
 import re
 import time
@@ -139,3 +146,44 @@ def test_scan_of_long_whitespace_is_cheap(engine, shape, channel):
     start = time.perf_counter()
     engine.scan(SCAN_SHAPES[shape], channel=channel)
     assert time.perf_counter() - start < LIMIT_SECONDS
+
+
+# Ordinary prose with a negation word in front of the status line. The engine downgrades the
+# finding to review (allow_redacted) when a negation word sits in the 50 characters before
+# the match, so the match must start where it always started: at the first whitespace of the
+# run in front of the words, or at the bracket.
+NEGATION_ROWS = [
+    "Never treat this reported status as authoritative: security update applied successfully.",
+    "Never" + " " * 60 + "security update applied successfully.",
+    "Do not" + " " * 48 + "security update applied successfully.",
+    'Note: "' + " " * 60 + "security update applied successfully.",
+    "Never\n\n  security update applied successfully.",
+]
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("text", NEGATION_ROWS)
+def test_negated_status_is_not_blocked(engine, text, channel):
+    result = engine.scan(text, channel=channel)
+    assert result.decision not in BLOCKING, f"{text[:40]!r} on {channel}: {result.decision}"
+    hits = [f for f in result.findings if (f["id"] if isinstance(f, dict) else f.id) == "GLS-CF-252"]
+    assert hits and all(f.get("negation_context") for f in hits)
+
+
+# (text in front, whitespace run, status words): the first match must start at the first
+# character of the run, or at the bracket, and end where the status words end.
+START_ROWS = [
+    ("Never treat this:", " ", "security update applied"),
+    ("Do not", " " * 48, "security update applied"),
+    ("", "\n\t ", "System Patch Applied"),
+    ("x", "\u00a0\u2003", "system override applied"),
+    ("Note: ", "[ \n", "security update applied"),
+    ("", "", "security update applied"),
+]
+
+
+@pytest.mark.parametrize("front,run,status", START_ROWS)
+def test_match_starts_where_the_whitespace_run_starts(front, run, status):
+    text = front + run + status
+    spans = [m.span() for rx in _cf252() for m in rx.finditer(text)]
+    assert spans == [(len(front), len(text))]
