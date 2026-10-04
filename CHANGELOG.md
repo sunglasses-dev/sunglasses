@@ -23,12 +23,12 @@ All notable changes to Sunglasses are documented here.
   such a start and read the rest of the run before trying the verbs, so a text with thousands of
   blank lines in front of a sentence took time that grew with the square of the run (6,000 line
   breaks took between a quarter of a second and 1.2 seconds per regex, and a scan of such a text
-  about 2.5 seconds, on the test machine). A line break now starts an attempt only when no line
-  break or punctuation character stands in front of it, over at most 32 horizontal whitespace
-  characters. A match starts and ends where it did before, and the words of the rules are not
-  changed. Known gap: where consecutive line breaks are separated by more than 32 spaces or tabs,
-  those texts keep the quadratic cost they had (about a quarter of a second for 16,000 characters on
-  the test machine, a few percent more than before because of the guard).
+  about 2.5 seconds, on the test machine). A line break now starts an attempt only when no other
+  line break stands in front of it over at most four horizontal whitespace characters; the
+  punctuation starts are as before. A match starts and ends where it did before, and the words of
+  the rules are not changed. Known gap: a line break followed by more than four spaces or tabs
+  before the next line break or the matched text keeps the cost it had, so indents of five or more
+  are not covered by this fix, and a long run of such lines is as slow as before plus a small cost per line break.
 
 ## [0.6.5] — 2026-10-02
 

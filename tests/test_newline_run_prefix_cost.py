@@ -10,31 +10,37 @@ a sentence took time that grew with the square of the run: 6,000 line breaks too
 quarter of a second and 1.2 seconds per regex on the test machine, and a scan of the text
 agreed.
 
-The item now reads `[\n.!?;:"'\[{(]G\s*`: the same start characters, then G, a set of 33 pairs of
-lookbehinds, one pair for each m from 0 to 32. G refuses the start when the character just read
-is a line break and, m horizontal whitespace characters before it, there is a line break or one
-of the punctuation characters. Such a start would reach the same verb position as the earlier
-one, so a match starts where it did before: the engine reads the 50 characters in front of
-match.start() for negation words and the first 50 characters of the match as the finding's
+The item now reads `(?:[.!?;:"'\[{(]|\nG)\s*`: the punctuation characters are a start as before, with
+nothing added, and only the line break carries G, five lookbehinds, one for each m from 0 to 4.
+G refuses a line break as a start when, m horizontal whitespace characters before it, there is
+another line break. That earlier line break is itself a start (or is refused for an earlier one,
+and so on back to a start that stays) and its `\s*` reads over the later line break to the same
+verb position, so a match starts where it did before: the engine reads the 50 characters in front
+of match.start() for negation words and the first 50 characters of the match as the finding's
 matched_text, and the SPAN tests compare both with the old prefix. The old regex is built from
-the current one by taking G out, so the comparison cannot drift from the rule. The words of the
-rules are not changed.
+the current one by putting the old item back, so the comparison cannot drift from the rule. The
+words of the rules are not changed.
 
-G is tried after the start character has been read, so a position that is not a start character
-costs what it cost before. A first version tried G at every position and took about 8 times the
-old time on ordinary text with no line break, and a second one with a lookahead for a line
-break in front of it was still about 1.25 times; the ordinary-text cost tests pin this.
+Cost on ordinary text. G is tried only at a line break, so a punctuation character costs what it
+cost before. Earlier versions put G after every start character (about 1.3 times the old time on
+sentences, 2 to 4 times on labeled lines, JSON and code), or in front of every position (about 8 times); this one measured at most 1.14
+times on regex time and at most 1.01 times on a full scan for sentences, labeled lines, JSON and code.
+The ordinary-text cost tests below hold those shapes to a ceiling of 1.4 times plus 2 ms, which is
+a regression detector for the earlier versions on these samples and not a promise about every text.
 
-Known gap. The guard looks back over at most 32 horizontal whitespace characters (spaces, tabs,
-carriage returns and the like, not line breaks). When consecutive line breaks are separated by
-more than 32 of them, the later line breaks start attempts as before and that shape keeps its
-quadratic cost, a few percent higher than before because of the guard.
-The rows with 33 and 40 characters in SPAN_RUNS pin that those texts match as before.
+Known gap, in words: a line break followed by MORE than four horizontal whitespace characters
+(spaces, tabs, carriage returns and the like, not line breaks) before the next line break or
+the matched text keeps the cost it had on main. The guard looks back over at most four of them, so an
+indent of five or more is not reached: such texts are not slower than before, the fix just does
+not apply to that shape, and a long run of line breaks each followed by five or more spaces is
+still quadratic. test_the_guard_reaches_exactly_four_horizontal_characters pins the bound.
 
-On main the prefix-form test, five of the eight regex cost shapes (line breaks, CRLF, line break
-and space, space and line break, line break and tab) and the scan cost tests fail. The other
-three cost shapes, and the span, start and engine tests, pass on main and on this change, and so do the ordinary-text cost tests, which are relative to
-the old prefix and fail when G is tried at every position.
+On main the prefix-form test, six of the nine regex cost shapes (line breaks, CRLF, line break
+and space, space and line break, line break and tab, line break and four spaces) and the scan
+cost tests fail. The other three cost shapes, the guard-bound, span, start, engine and scan-tail
+tests pass on main and on this change, and so do the ordinary-text cost tests, which are relative
+to the old prefix: with the guard of the earlier version (after every start character) the
+labeled-line, JSON and code ones fail.
 """
 import copy
 import random
@@ -52,12 +58,11 @@ CHANNELS = ["tool_output", "web_content"]
 LIMIT_SECONDS = 1.0
 LONG = 6000
 
+GAP = 4
 OLD_ITEM = "[\\n.!?;:\"'\\[{(]\\s*"
 PUNCT = "[.!?;:\"'\\[{("
-GUARD = "".join(
-    f"(?<!\\n[^\\S\\n]{{{m}}}\\n)(?<!{PUNCT}][^\\S\\n]{{{m}}}\\n)" for m in range(33)
-)
-NEW_ITEM = "[\\n.!?;:\"'\\[{(]" + GUARD + "\\s*"
+GUARD = "".join(f"(?<!\\n[^\\S\\n]{{{m}}}\\n)" for m in range(GAP + 1))
+NEW_ITEM = "(?:" + PUNCT + "]|\\n" + GUARD + ")\\s*"
 
 
 def _sources():
@@ -136,7 +141,7 @@ PRE = ["", "x", "ok ", "Never ", "do not ", "Example: ", "a.", "b!", "c?", "(", 
        "please ", "and ", "then ", "can you ", "tool to "]
 MID = ["", "\n", ".", " ", "\n\n", ".\n", "\r\n", "\n \n", "\t\n"]
 WHITESPACE = [" ", "\n", "\r", "\t", " ", "\x0b", " "]
-SPAN_RUNS = [0, 1, 2, 3, 5, 8, 20, 31, 32, 33, 34, 40, 70, 150]
+SPAN_RUNS = [0, 1, 2, 3, 4, 5, 6, 8, 20, 31, 32, 33, 34, 40, 70, 150]
 
 
 def _span_strings(positive, count=2500, seed=39):
@@ -153,6 +158,36 @@ def _span_strings(positive, count=2500, seed=39):
         if rnd.random() < 0.5:
             s = rnd.choice(["Earlier text. ", "", "x\n"]) + s + rnd.choice(["", " and more", "\n"])
         yield s
+
+
+# Line breaks with an exact horizontal gap between them: the guard bound (4) and both sides of it,
+# and the old gaps of 32 and 33 and one of 40. SPAN_RUNS above chooses a run length, not the gap
+# between two line breaks, so the gaps are spelled out here.
+GAPS = [0, 1, 2, 3, 4, 5, 6, 8, 32, 33, 40]
+
+
+@pytest.mark.parametrize("key", sorted(POSITIVE))
+def test_span_matches_the_old_prefix_for_exact_gaps(key):
+    old, new = _old()[key], _new()[key]
+    for gap in GAPS:
+        for filler in (" ", "\t", "\r", " \t"[: 1 + gap % 2]):
+            for front in ("Report ready", "Done.", "", "x:"):
+                for lines in (2, 3, 7):
+                    text = front + ("\n" + filler * gap) * lines + POSITIVE[key]
+                    a, b = old.search(text), new.search(text)
+                    assert a is not None and b is not None, (gap, repr(text[:60]))
+                    assert (a.start(), a.end(), a.group(0)[:50]) == (b.start(), b.end(), b.group(0)[:50]), (gap, repr(text[:60]))
+
+
+def test_the_guard_reaches_exactly_four_horizontal_characters():
+    # The line break item alone, with the lookbehinds: the second line break is refused as a start
+    # when at most four horizontal whitespace characters separate it from the first, and is a
+    # start again at five. Five or more is the gap kept from main.
+    item = re.compile("\\n" + GUARD)
+    for gap in range(0, 9):
+        text = "\n" + " " * gap + "\n"
+        starts = [m.start() for m in item.finditer(text)]
+        assert starts == ([0] if gap <= GAP else [0, gap + 1]), (gap, starts)
 
 
 @pytest.mark.parametrize("key", sorted(POSITIVE))
@@ -220,6 +255,7 @@ SHAPES = {
     "CRLF": "Report ready" + "\r\n" * (LONG // 2) + "zzz",
     "line break and space": "Report ready" + "\n " * (LONG // 2) + "zzz",
     "space and line break": "Report ready" + " \n" * (LONG // 2) + "zzz",
+    "line break and 4 spaces": "Report ready" + ("\n" + " " * 4) * (LONG // 5) + "zzz",
     "line break and 8 spaces": "Report ready" + ("\n" + " " * 8) * (LONG // 9) + "zzz",
     "line break and tab": "Report ready" + "\n\t" * (LONG // 2) + "zzz",
     "full stop and line break": "Report ready" + ".\n" * (LONG // 2) + "zzz",
@@ -238,7 +274,31 @@ def test_long_runs_are_cheap_for_the_regexes(shape):
 
 # The scanner skips a regex whose required words are absent from the text, so the tail here
 # carries the verbs and the words of the objects: the regexes run and none of them matches.
-SCAN_TAIL = "get send write reply translate use rot13 email my"
+SCAN_TAIL = "get send write reply translate use rot13 email my your german"
+
+
+def _requirements_present(text):
+    """True when every one of the six regexes has all its required words in the text."""
+    from sunglasses import _prefilter
+
+    words = set(re.findall(r"[a-z0-9]+", text.lower()))
+    return all(
+        all(words & set(group) for group in _prefilter.requirement(source))
+        for _, _, source in _sources()
+    )
+
+
+def test_the_scan_tail_carries_the_words_every_one_of_the_six_regexes_requires():
+    # The scanner skips a regex whose required words are absent. A tail missing "your" or a
+    # language name left three of the six regexes out of every scan cost case.
+    from sunglasses import _prefilter
+
+    words = set(SCAN_TAIL.split())
+    for rid, i, source in _sources():
+        groups = _prefilter.requirement(source)
+        assert groups, (rid, i)
+        for group in groups:
+            assert words & set(group), (rid, i, sorted(group)[:5])
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
@@ -246,6 +306,7 @@ SCAN_TAIL = "get send write reply translate use rot13 email my"
 def test_scan_of_a_long_run_is_cheap(shape, channel):
     engine = SunglassesEngine()
     text = SHAPES[shape].replace("zzz", SCAN_TAIL)
+    assert _requirements_present(text)
     start = time.perf_counter()
     result = engine.scan(text, channel=channel)
     assert time.perf_counter() - start < LIMIT_SECONDS
@@ -253,18 +314,25 @@ def test_scan_of_a_long_run_is_cheap(shape, channel):
 
 
 # Ordinary text: the guard must not make text without long runs slower. The old prefix is built
-# from the current regex, so this is relative to what the rule did before. Tried at every
-# position the guard took about 8 times the old time here, and behind a lookahead for a line
-# break about 1.25 times; G after the start character measures 1.0 to 1.16. The bound is above
-# that and far below 8, so timing noise cannot fail it and the first version cannot pass it.
+# from the current regex, so this is relative to what the rule did before. Measured here the guard
+# costs at most about 1.14 times the old regex time on sentences, labeled lines, JSON and code, and
+# the earlier versions measured 1.3 times on sentences and 2 to 4 times on the structured shapes
+# (and about 8 times with the guard in front of every position), so the ceiling below catches them
+# on these samples. The ceiling is a regression detector for these shapes, not a guarantee about
+# every text, and a timing assertion can still be disturbed by a loaded machine.
 _VOCAB = "the quick brown fox jumps over a lazy dog while reading some ordinary prose about gardens and tea".split()
+STRUCTURED_SHAPES = {
+    "labeled lines": "Name: Ada\nCity: Rome\nSize: 12\n",
+    "JSON records": '{"id": 12, "name": "Ada", "tags": ["green", "small"]}\n',
+    "code": 'items = [{"x": 1}, {"y": 2}]\nprint(items[0])\n',
+}
 ORDINARY_SHAPES = {
     "words only": ([" "], ""),
     "sentences": ([". ", ", and ", "; ", "! ", "? ", ": "], ""),
     "sentences with line breaks": ([". ", ", and ", "; ", "! ", "? ", ": "], "\n"),
     "sentences with CRLF": ([". ", ", and ", "; ", "! ", "? ", ": "], "\r\n"),
 }
-ORDINARY_RATIO = 1.5
+ORDINARY_RATIO = 1.3
 
 
 def _prose(size, ends, newline):
@@ -303,3 +371,30 @@ def test_ordinary_text_is_not_slower_than_the_old_prefix(shape, size):
     assert len(old_rx) == len(new_rx) == len(POSITIVE)
     old, new = _best_of_pair(old_rx, new_rx, text)
     assert new < ORDINARY_RATIO * old + 0.002, (new, old)
+
+
+@pytest.mark.parametrize("size", [16000, 256000])
+@pytest.mark.parametrize("shape", sorted(STRUCTURED_SHAPES))
+def test_structured_text_is_not_slower_than_the_old_prefix(shape, size):
+    unit = STRUCTURED_SHAPES[shape]
+    text = (unit * (size // len(unit) + 1))[:size] + " " + SCAN_TAIL
+    old_rx, new_rx = _old(), _new()
+    old, new = _best_of_pair(old_rx, new_rx, text)
+    assert new < ORDINARY_RATIO * old + 0.002, (new, old)
+
+
+@pytest.mark.parametrize("shape", sorted(STRUCTURED_SHAPES))
+def test_scan_of_structured_text_is_not_slower_than_the_old_prefix(shape):
+    unit = STRUCTURED_SHAPES[shape]
+    text = (unit * (64000 // len(unit) + 1))[:64000] + " " + SCAN_TAIL
+    assert _requirements_present(text)
+    old_engine, new_engine = _old_engine(), SunglassesEngine()
+    best = {}
+    for _ in range(3):
+        for name, engine in (("old", old_engine), ("new", new_engine)):
+            start = time.perf_counter()
+            result = engine.scan(text, channel="tool_output")
+            elapsed = time.perf_counter() - start
+            best[name] = min(best.get(name, elapsed), elapsed)
+            assert result.decision == "allow"
+    assert best["new"] < ORDINARY_RATIO * best["old"] + 0.005, best
