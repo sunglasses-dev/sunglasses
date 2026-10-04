@@ -15,20 +15,6 @@ All notable changes to Sunglasses are documented here.
   of an ask, they now say that the firewall asks on a call nothing else settles
   until the file is restored. (#313)
 
-### Fixed
-
-- GLS-CMP-009 no longer re-reads the gap between its verb and its noun once for each way of
-  splitting a whitespace run. Three alternatives (copy, print, reveal or exfiltrate then secret, token,
-  credential or env; treat then system, developer, trusted or authoritative; mark then clean,
-  safe or passed) joined the two words with leading whitespace, up to 80 characters, and
-  trailing whitespace, and those three parts could take the same spaces, so a text with the
-  anchor words followed by a long run of whitespace took time that grew with the square of the
-  length (2,000 spaces took about three seconds and 4,000 about thirteen on the test machine).
-  The gap now reads a run of two or more whitespace characters, or leading whitespace, a core
-  of 1 to 80 characters that starts and ends with a non-whitespace character, and trailing
-  whitespace. A gap of 100 spaces between the two words still matches as before, a match starts and
-  ends where it did before, and the words of the rule are not changed.
-
 ## [0.6.5] — 2026-10-02
 
 ### Changed
