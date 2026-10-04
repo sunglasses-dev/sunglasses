@@ -24681,7 +24681,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "api_response"],
         "regex": [
-            r"""(?is)(?:GITHUB_STEP_SUMMARY|job summary|workflow summary|step summary).{0,500}(?:system|developer|assistant|agent|claude|codex|copilot).{0,200}(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions|do\s+not\s+(?:report|mention|summarize)|treat\s+.{0,80}\s+as\s+(?:system|developer|trusted|authoritative)|(?:exfiltrate|copy|print|reveal)\s+.{0,80}\s+(?:secret|token|credential|env)|mark\s+.{0,80}\s+(?:clean|safe|passed))""",
+            r"""(?is)(?:GITHUB_STEP_SUMMARY|job summary|workflow summary|step summary).{0,500}(?:system|developer|assistant|agent|claude|codex|copilot).{0,200}(?:ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions|do\s+not\s+(?:report|mention|summarize)|treat(?:\s+\S(?:.{0,78}\S)?\s+|\s{2,})as\s+(?:system|developer|trusted|authoritative)|(?:exfiltrate|copy|print|reveal)(?:\s+\S(?:.{0,78}\S)?\s+|\s{2,})(?:secret|token|credential|env)|mark(?:\s+\S(?:.{0,78}\S)?\s+|\s{2,})(?:clean|safe|passed))""",
         ],
         "description": "Github Actions Step Summary Tool Output Poisoning: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific vector targeting GITHUB_STEP_SUMMARY injection not covered by existing metadata patterns."
     },
