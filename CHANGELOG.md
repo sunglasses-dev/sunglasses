@@ -3,20 +3,6 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [Unreleased]
-
-### Changed
-
-- Eight rules now carry medium severity, GLS-PI-INFO, GLS-TOP-245, GLS-TD-001,
-  GLS-SCHEMA-LEAK-215, GLS-CAI-243, GLS-TS-252, GLS-SO-001 and GLS-TP-003. Each
-  of them has matched short lines found in project documentation files, and at
-  high or critical severity one such line was enough for a scan to block the
-  text it sat in. The scan decides by the worst finding, so a text where one of these
-  rules is the only finding is now quarantined and was blocked before. A text
-  that holds one of these shapes and also trips a rule of high or critical
-  severity is still blocked. This is a design change to those rules and not a
-  bug fix.
-
 ## [0.6.5] — 2026-10-02
 
 ### Changed
