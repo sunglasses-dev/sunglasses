@@ -139,8 +139,9 @@ def test_no_shipped_rule_chains_lookaheads_with_a_wildcard():
             offenders.append(f"{rule_id}: {gaps} wildcard(s) between lookaheads")
     assert parsed > 1000, f"the sweep only parsed {parsed} regexes, so it measured nothing"
     assert offenders == [], (
-        "a consuming `.*` or `[\\s\\S]*` between lookaheads is cubic in the window "
-        "when the later signals are absent. Stack the lookaheads at the start "
+        "a consuming `.*` or `[\\s\\S]*` between lookaheads can be superlinear in the window "
+        "when the later signals are absent: quadratic with one gap, cubic with two. "
+        "Stack the lookaheads at the start "
         "instead, `(?=.*A)(?=.*B)(?=.*C).*$`. Offenders:\n  " + "\n  ".join(offenders))
 
 
@@ -194,7 +195,7 @@ def _engine_for(rule_id, regex):
 def _verdict(rule_id, regex_source, text):
     engine, mode, rx, guards = _engines()[(rule_id, regex_source)]
     match = engine._eval_regex(mode, rx, guards, text)
-    return None if match is None else (match.start(), match.end(), match.group(0)[:50])
+    return None if match is None else (match.start(), match.end(), match.group(0))
 
 
 _BUILT = {}
@@ -301,36 +302,69 @@ def _generated(rng, vocab, keys, count):
     return texts
 
 
-def test_generated_texts_agree_and_some_of_them_match():
+def test_generated_texts_agree_and_some_of_them_match_for_each_rule():
     rng = random.Random(1108)
-    positives = 0
+    positives = {rule_id: 0 for rule_id in RULES}
     for rule_id, vocab, keys in (("GLS-SMP-023", SMP_VOCAB, "ABCG"),
                                  ("GLS-AW-613", AW_VOCAB, "TRPVNG")):
         for text in _generated(rng, vocab, keys, 400):
             old, new = _agree(rule_id, text)
             assert old == new, (rule_id, text)
-            positives += new is not None
-    assert positives >= 40, f"only {positives} generated texts matched, so agreement proves little"
+            positives[rule_id] += new is not None
+    # one total could be met by a single rule, so each rule has its own floor
+    for rule_id, count in positives.items():
+        assert count >= 40, (
+            f"only {count} generated texts matched {rule_id}, so agreement proves little for it")
 
 
-def _corpus_texts():
+def _example_texts(node):
+    """Every example text under an attack-db `examples` value. The shipped files
+    hold a dict of label (malicious, benign) to a list of texts, so the labels
+    are keys and never texts."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for value in node.values():
+            yield from _example_texts(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _example_texts(value)
+
+
+def test_example_texts_come_from_the_lists_and_not_from_the_labels():
+    assert list(_example_texts({"malicious": ["a", "b"], "benign": ["c", {"k": "d"}]})) == [
+        "a", "b", "c", "d"]
+    assert list(_example_texts({"malicious": [], "benign": []})) == []
+    assert list(_example_texts(["x", "y"])) == ["x", "y"]
+    assert list(_example_texts("z")) == ["z"]
+    assert list(_example_texts(None)) == []
+
+
+def _corpus_walk(counts):
     for path in sorted((ROOT / "attack-db" / "attacks").rglob("*.json")):
-        for example in json.loads(path.read_text(encoding="utf-8")).get("examples") or []:
-            yield example if isinstance(example, str) else json.dumps(example)
+        counts["attack_db_files"] += 1
+        for text in _example_texts(json.loads(path.read_text(encoding="utf-8")).get("examples")):
+            counts["example_texts"] += 1
+            yield text
     for folder in ("tests/fp_real_world_corpus", "tests/fixtures", "gauntlet/corpus"):
         for path in sorted((ROOT / folder).rglob("*")):
             if path.is_file() and path.stat().st_size < 3_000_000:
+                counts["corpus_files"] += 1
                 yield path.read_text(encoding="utf-8", errors="replace")[:120_000]
 
 
 def test_the_fixture_corpus_agrees_for_both_rules():
-    count = 0
-    for text in _corpus_texts():
-        count += 1
+    counts = {"attack_db_files": 0, "example_texts": 0, "corpus_files": 0}
+    compared = 0
+    for text in _corpus_walk(counts):
+        compared += 1
         for rule_id in RULES:
             old, new = _agree(rule_id, text)
             assert old == new, rule_id
-    assert count > 1000, f"the corpus walk found {count} texts"
+    # files read and texts compared are counted apart, so one cannot stand in for the other
+    assert counts["attack_db_files"] > 1000, counts
+    assert counts["corpus_files"] > 100, counts
+    assert compared == counts["example_texts"] + counts["corpus_files"], counts
 
 
 # ---------------------------------------------------------------------------
