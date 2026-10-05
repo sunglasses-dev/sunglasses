@@ -67,7 +67,13 @@ CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=tr
 # exists to stop an UNREVIEWED shape change; a reviewed one updates the
 # assertion here, in the same commit, with its reason -- which is what this
 # line is.
-INTEGRITY_SUITE_CMD = "pytest -q --durations=0"
+# 2026-10-04 (row 32b, fix C): a reviewed shape change, with its reason. The CLI
+# matrix runs every cell in human, json and sarif; the human and sarif legs carry
+# the `full_matrix` marker. A pull request that cannot have changed a renderer
+# (classify's `lane` step says quick=true) deselects that marker; every other
+# event keeps the bare command. The expression is the ONLY thing added.
+INTEGRITY_SUITE_CMD = ("pytest -q --durations=0 "
+                       "${{ needs.classify.outputs.quick == 'true' && '-m \"not full_matrix\"' || '' }}")
 
 CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
 COVERAGE_JOB_KEYS = {"needs", "if", "runs-on", "timeout-minutes", "env", "steps"}
@@ -818,3 +824,172 @@ def test_control_a_marker_filter_in_ci_is_caught():
     for run in installs:
         assert not _pytest_marker_filters(run), (
             "the detector fires on an install step that only mentions pytest")
+
+
+# ---------------------------------------------------------------------------
+# The quick lane (2026-10-04, row 32b fix C). The matrix's human and sarif CLI
+# legs may wait for main only when classify's `lane` step says so, and that step
+# must fail closed. Executed for real, like the decide step above, with a control
+# for each way it could quietly turn the full run off.
+# ---------------------------------------------------------------------------
+
+def _lane_step(doc):
+    return [st for st in doc["jobs"]["classify"]["steps"] if st.get("id") == "lane"][0]
+
+
+def _lane_repo(tmp_path):
+    repo = tmp_path / "lanerepo"
+    repo.mkdir(parents=True)
+    r = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True, text=True).stdout.strip()
+    r("init", "-q", "-b", "main"); r("config", "user.email", "t@t"); r("config", "user.name", "t")
+    (repo / "README.md").write_text("a\n"); r("add", "."); r("commit", "-q", "-m", "base")
+    heads = {"base": r("rev-parse", "HEAD")}
+    for tag, path in {"other_test": "tests/test_other.py", "docs": "docs/a.md",
+                      "cli": "sunglasses/cli.py", "sarif": "sunglasses/sarif.py",
+                      "result": "sunglasses/result.py", "main_mod": "sunglasses/__main__.py",
+                      "matrix": "tests/test_v056_matrix.py", "ini": "pytest.ini",
+                      "gate": "tests/test_ci_gate.py", "helper": "tests/v056_matrix.py",
+                      "workflow": ".github/workflows/pattern-integrity.yml",
+                      "engine": "sunglasses/engine.py"}.items():
+        r("checkout", "-q", "-b", tag, heads["base"])
+        (repo / path).parent.mkdir(parents=True, exist_ok=True)
+        (repo / path).write_text("x\n"); r("add", "."); r("commit", "-q", "-m", tag)
+        heads[tag] = r("rev-parse", "HEAD")
+    return repo, heads
+
+
+def _run_lane(body, tmp_path, repo, event, base, head, tag):
+    out = tmp_path / f"lane-out-{tag}"; out.write_text("")
+    env = dict(os.environ, EVENT=event, BASE=base, HEAD=head, GITHUB_OUTPUT=str(out))
+    cp = _run_script_file(body, env, cwd=repo, timeout=30)
+    return cp.returncode, out.read_text().strip().splitlines()
+
+
+def lane_behaviour_holds(doc, tmp_path) -> list[str]:
+    body = _lane_step(doc)["run"]
+    repo, h = _lane_repo(tmp_path)
+    want = {
+        "other_test": ("pull_request", "quick=true"),
+        "docs":       ("pull_request", "quick=true"),
+        "engine":     ("pull_request", "quick=true"),
+        "cli":        ("pull_request", "quick=false"),
+        "sarif":      ("pull_request", "quick=false"),
+        "result":     ("pull_request", "quick=false"),
+        "main_mod":   ("pull_request", "quick=false"),
+        "matrix":     ("pull_request", "quick=false"),
+        "ini":        ("pull_request", "quick=false"),
+        "gate":       ("pull_request", "quick=false"),
+        "helper":     ("pull_request", "quick=false"),
+        "workflow":   ("pull_request", "quick=false"),
+    }
+    bad = []
+    for tag, (event, expect) in want.items():
+        rc, lines = _run_lane(body, tmp_path, repo, event, h["base"], h[tag], tag)
+        if rc != 0 or lines != [expect]:
+            bad.append(f"{tag}: rc={rc} output={lines} (expected {[expect]})")
+    # Every event that is not a pull request runs everything, whatever it changed.
+    for event in ("push", "schedule", "workflow_dispatch"):
+        rc, lines = _run_lane(body, tmp_path, repo, event, h["base"], h["other_test"], event)
+        if rc != 0 or lines != ["quick=false"]:
+            bad.append(f"{event}: rc={rc} output={lines} (expected ['quick=false'])")
+    # An unreadable change list is not a reason to run less.
+    rc, lines = _run_lane(body, tmp_path, repo, "pull_request", "0" * 40, h["other_test"], "badsha")
+    if rc != 0 or lines != ["quick=false"]:
+        bad.append(f"unreadable diff: rc={rc} output={lines} (expected ['quick=false'])")
+    return bad
+
+
+def quick_lane_shape(doc) -> list[str]:
+    p = []
+    classify = doc["jobs"]["classify"]
+    if classify.get("outputs", {}).get("quick") != "${{ steps.lane.outputs.quick }}":
+        p.append("classify output quick is not bound to steps.lane.outputs.quick")
+    if "if" in _lane_step(doc) or "continue-on-error" in _lane_step(doc):
+        p.append("lane step is conditional or failure tolerant")
+    filters = []
+    for name, job in (doc.get("jobs") or {}).items():
+        for st in job.get("steps") or []:
+            run = st.get("run") or ""
+            if "pytest" in run and "full_matrix" in run:
+                filters.append((name, run.strip()))
+    if filters != [("integrity", INTEGRITY_SUITE_CMD)]:
+        p.append(f"full_matrix may be named only by the integrity suite step: {filters}")
+    return p
+
+
+def test_the_quick_lane_is_wired_and_fails_closed(tmp_path):
+    doc = _load()
+    assert quick_lane_shape(doc) == []
+    assert lane_behaviour_holds(doc, tmp_path) == []
+
+
+def test_control_quick_lane_guard_narrowed(tmp_path):
+    def m(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|sarif|", "|")
+    assert lane_behaviour_holds(_mutate(m), tmp_path), "dropping sarif.py from the guard was not seen"
+
+    def m2(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|test_ci_gate)", ")")
+    assert lane_behaviour_holds(_mutate(m2), tmp_path / "gate"), "dropping test_ci_gate.py from the guard was not seen"
+    def m3(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|\\.github/)", ")")
+    assert lane_behaviour_holds(_mutate(m3), tmp_path / "wf"), "dropping the workflow path from the guard was not seen"
+    def m4(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("|pytest\\.ini", "")
+    assert lane_behaviour_holds(_mutate(m4), tmp_path / "ini"), "dropping pytest.ini from the guard was not seen"
+
+
+def test_control_quick_lane_on_for_every_event(tmp_path):
+    def m(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace('[ "$EVENT" = "pull_request" ] && ', "")
+    assert lane_behaviour_holds(_mutate(m), tmp_path), "quick lane on a push was not seen"
+
+
+def test_control_quick_lane_fails_open_on_grep_error(tmp_path):
+    def broken(d):
+        st = _lane_step(d)
+        st["run"] = st["run"].replace("^(sunglasses", "^((sunglasses")  # unbalanced regex, grep exits 2
+    # The shipped step reads only exit 1 as "no match": with a broken guard every
+    # case comes out quick=false, so the only complaints are cases that wanted true.
+    shipped = lane_behaviour_holds(_mutate(broken), tmp_path / "closed")
+    assert shipped and all("(expected ['quick=true'])" in b for b in shipped)
+
+    def opened(d):
+        broken(d)
+        st = _lane_step(d)
+        st["run"] = st["run"].replace('if [ "$rc" = "1" ]', 'if [ "$rc" != "0" ]')
+    wrong = lane_behaviour_holds(_mutate(opened), tmp_path / "open")
+    assert any("(expected ['quick=false'])" in b for b in wrong), \
+        "a grep error must not turn the full run off"
+
+
+def _suite_step(d):
+    return [st for st in d["jobs"]["integrity"]["steps"] if "pytest -q --durations=0" in st.get("run", "")][0]
+
+
+def test_control_main_lane_dropping_a_format_is_still_refused():
+    """The point of the gate after this change: the narrowing is allowed on a pull
+    request that cannot have touched a renderer and nowhere else."""
+    def always(d): _suite_step(d)["run"] = "pytest -q --durations=0 -m \"not full_matrix\""
+    assert check_workflow(_mutate(always)) or quick_lane_shape(_mutate(always))
+    def flipped(d):
+        _suite_step(d)["run"] = _suite_step(d)["run"].replace("== 'true'", "!= 'true'")
+    assert check_workflow(_mutate(flipped))
+    def other_marker(d):
+        _suite_step(d)["run"] = _suite_step(d)["run"].replace("not full_matrix", "not full_matrix and not network")
+    assert check_workflow(_mutate(other_marker))
+    def ignore_file(d):
+        _suite_step(d)["run"] += " --ignore=tests/test_v056_matrix.py"
+    assert check_workflow(_mutate(ignore_file))
+
+
+def test_control_quick_output_unbound_or_marker_named_elsewhere():
+    def m(d): d["jobs"]["classify"]["outputs"]["quick"] = "true"
+    assert quick_lane_shape(_mutate(m))
+    def m2(d): d["jobs"]["fast"]["steps"][-1]["run"] += ' -m "not full_matrix"'
+    assert quick_lane_shape(_mutate(m2))

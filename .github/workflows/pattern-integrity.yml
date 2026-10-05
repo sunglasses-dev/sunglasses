@@ -95,6 +95,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       full: ${{ steps.decide.outputs.full }}
+      quick: ${{ steps.lane.outputs.quick }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,6 +123,31 @@ jobs:
             exit 0
           fi
           python "$RUNNER_TEMP/ci_classify.py" --base "$BASE" --head "$HEAD"
+
+      # Which legs of the CLI matrix a pull request must run itself. The human and
+      # sarif legs of every cell re-run what the json leg already runs through
+      # another renderer (tests/test_v056_matrix.py, marker full_matrix), so a PR
+      # that cannot have changed a renderer runs the json legs only. Every push to
+      # main, every tag, the schedule and a manual run get quick=false and run all
+      # of it, and a PR that touches the CLI, the sarif writer, the shared result
+      # shape, the matrix itself, the marker registration, the gate test or this workflow gets
+      # quick=false too. Fail closed: anything but a clean "no match" is quick=false.
+      - name: Decide whether the human and sarif CLI legs can wait for main (fail-closed)
+        id: lane
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          quick=false
+          GUARD='^(sunglasses/(cli|__main__|sarif|result)\.py|tests/(test_v056_matrix|v056_matrix|test_ci_gate)\.py|pytest\.ini|\.github/)'
+          if [ "$EVENT" = "pull_request" ] && files=$(git diff --name-only "$BASE" "$HEAD"); then
+            rc=0
+            grep -Eq "$GUARD" <<<"$files" || rc=$?
+            if [ "$rc" = "1" ]; then quick=true; fi
+          fi
+          echo "quick=$quick"
+          echo "quick=$quick" >> "$GITHUB_OUTPUT"
 
   fast:
     runs-on: ubuntu-latest
@@ -478,7 +504,7 @@ jobs:
         # full-matrix run says exactly how many tests wait and which ones,
         # which is the difference between a suspicion and a fix. The cost is
         # log lines on a job that already runs for over two hours.
-        run: pytest -q --durations=0
+        run: pytest -q --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
 
   coverage:
     # The single check merge automation may rely on. always() so a skipped or
