@@ -405,7 +405,9 @@ def test_a_pending_alarm_released_by_the_mask_before_the_discard_does_not_hang()
 def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
     """Under a line tracer the alarm can be delivered at the first line of the
     cleanup, before any of it runs. The restore is the outer finally, so the
-    handler still goes back and the stop is still caught."""
+    handler still goes back and the stop is still caught. The budget is long
+    and the real expiry is started from the confirmed entry, so a slow or
+    descheduled process cannot let the timer run out before the tracer arrives."""
     _child("""
         lines, start = inspect.getsourcelines(firewall._run_within_budget)
         done = start + next(i for i, l in enumerate(lines) if "finished = True" in l)
@@ -415,9 +417,11 @@ def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
 
         def local(frame, event, arg):
             if event == "line" and frame.f_lineno > done and not entered:
-                # Record the entry with the timer still running, so the alarm
-                # is known to expire HERE and not earlier, then wait for it.
+                # Record the entry with the long timer still running, so the
+                # alarm is known not to have fired earlier. Then start the real
+                # expiry from here and wait for it, so it lands at this line.
                 entered.append(signal.getitimer(signal.ITIMER_REAL)[0])
+                signal.setitimer(signal.ITIMER_REAL, 0.2)
                 end = time.perf_counter() + 5
                 while time.perf_counter() < end:   # the real alarm expires here
                     sum(range(100))
@@ -425,9 +429,9 @@ def test_an_alarm_at_teardown_entry_under_tracing_still_restores_the_handler():
             return local
 
         sys.settrace(lambda frame, event, arg: local if frame.f_code is code else None)
-        result = firewall._run_within_budget(lambda: 42, 0.5)
+        result = firewall._run_within_budget(lambda: 42, 60)
         sys.settrace(None)
-        assert entered and entered[0] > 0, ("timer not running at teardown entry", entered)
+        assert entered and entered[0] > 30, ("timer not running at teardown entry", entered)
         assert result == (False, None), result
     """)
 
