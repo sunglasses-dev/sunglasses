@@ -32,6 +32,17 @@ def _cli(args, cwd=None):
                           capture_output=True, text=True, cwd=cwd or REPO)
 
 
+@pytest.fixture(scope="module")
+def real_run(tmp_path_factory):
+    """One real `gauntlet.py run`, read by every test that needs a real artifact.
+
+    Each of those tests used to start its own run with the same argv and cwd. The
+    run writes only to --out, so the artifacts were the same document and every
+    extra run was a full gauntlet pass that proved nothing new."""
+    out = tmp_path_factory.mktemp("gauntlet_run") / "run.json"
+    return _cli(["run", "--out", str(out)]), out
+
+
 # ── the publishable-output gate ─────────────────────────────────────────────
 
 def test_a_miss_may_not_carry_its_own_payload():
@@ -51,10 +62,9 @@ def test_a_clean_artifact_passes_the_gate():
     assert gauntlet.assert_publishable(artifact) == []
 
 
-def test_the_real_run_artifact_is_publishable(tmp_path):
+def test_the_real_run_artifact_is_publishable(real_run):
     """The gate is worthless if it only ever sees hand-written fixtures."""
-    out = tmp_path / "run.json"
-    proc = _cli(["run", "--out", str(out)])
+    proc, out = real_run
     assert proc.returncode == 0, proc.stdout + proc.stderr
     artifact = json.loads(out.read_text())
     assert gauntlet.assert_publishable(artifact) == []
@@ -62,12 +72,12 @@ def test_the_real_run_artifact_is_publishable(tmp_path):
 
 # ── the artifact contract the page depends on ───────────────────────────────
 
-def test_every_count_ships_with_its_denominator(tmp_path):
+def test_every_count_ships_with_its_denominator(real_run):
     """A number without its denominator is how "6 false positives" gets read as
     a rate. The page cannot render one without the other if the artifact never
     carries one without the other."""
-    out = tmp_path / "run.json"
-    assert _cli(["run", "--out", str(out)]).returncode == 0
+    proc, out = real_run
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     totals = json.loads(out.read_text())["totals"]
     assert totals["corpus_n"] > 0
     assert totals["fp_corpus_n"] > 0
@@ -324,9 +334,9 @@ def test_a_dirty_tree_says_so(tmp_path, monkeypatch):
     not os.path.exists(os.path.join(REPO, ".git")),
     reason="needs a .git checkout: the run records the branch it measured via git, and a `git archive` "
            "of the tree carries no .git")
-def test_a_real_run_records_the_tree_it_measured(tmp_path):
-    out = tmp_path / "run.json"
-    assert _cli(["run", "--out", str(out)]).returncode == 0
+def test_a_real_run_records_the_tree_it_measured(real_run):
+    proc, out = real_run
+    assert proc.returncode == 0, proc.stdout + proc.stderr
     versions = json.loads(out.read_text())["versions"]
     assert versions["branch"] and versions["branch"] != "unknown"
     assert versions["dirty"] in (True, False)
