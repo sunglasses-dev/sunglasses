@@ -54,6 +54,11 @@ All notable changes to Sunglasses are documented here.
   severity is still blocked. This is a design change to those rules and not a
   bug fix. (#316)
 
+- The stored benchmark receipt `tests/benchmark/results/benchmark_latest.json` is refreshed from a
+  tool run at engine 0.6.5. It was stale at engine 0.5.0 and one negative short. The public numbers
+  match the published ones, and only the engine version, the negatives count, the true negatives
+  count and the metrics hash moved. No code and no README change. (#306)
+
 ### Fixed
 
 - The hook receipt now records whether a policy existed. A call made with no policy file and a
@@ -123,6 +128,72 @@ All notable changes to Sunglasses are documented here.
   rules stay in the plain mode with the same required words. The words of the rules, their severity
   and their channels are not changed. A match starts and ends where it did on the generated texts
   the tests compare. (#322)
+
+### Continuous integration
+
+- The release workflow now sets the build timestamp from the commit time of the tagged commit
+  before it builds. Two builds of one commit then give one wheel, so the wheel hash says something
+  about the commit and not about the moment CI ran. A workflow check fails when that step is
+  missing, is not taken from the commit time or comes after the build. (#300)
+
+- The release workflow now repacks the source distribution with a new script,
+  `scripts/repack_sdist.sh`, so its bytes follow the tagged commit. Two builds of one tag used to
+  give two different files because the archive carried file times, owner names and an order that
+  depended on the machine. The script keeps every member name, mode, size and content hash, and it
+  refuses and leaves its input alone when the commit time is missing or the file is not a tar.gz.
+  The build step also checks that the wheel hash did not move. The wheel is not affected. The
+  source distribution already on PyPI for 0.6.5 stays as published, and the claim holds for
+  releases built after this change. (#304)
+
+- The release workflow has a new postcondition job that runs after the upload and fails the run
+  when PyPI holds something other than what the tag builds. `scripts/release_postcondition.sh`
+  fetches the files PyPI lists for the version, refuses any file whose hash differs from the one
+  PyPI states, builds the same tag in a fresh clone and compares the unpacked wheels and source
+  distributions by content. A file PyPI has not served yet is retried every 20 seconds for up to
+  300 seconds. The job never uploads, yanks or deletes anything, and the SBOM and the checksums
+  do not wait for it. (#305)
+
+- The CLI matrix test now runs one test for each output format, so a failure names the surface,
+  the state and the format. The human and sarif legs carry a `full_matrix` marker. A pull request
+  that touches none of a short list of output and CI files skips those legs in CI, and a push to
+  main, a tag, a schedule and a manual run always run them. A plain `pytest` still runs every
+  leg. (#325)
+
+### Tests
+
+- The proxy serve tests now keep the client's stdin open until the first reply has been read. They
+  closed it together with the request, so an echo server that exits on end of input could race its
+  own answer and the ordinary call test failed with a missing result in some CI runs. The poisoned
+  result test also asserts the reason code `PROHIBITED_CONTENT`, because a session torn down during
+  the scan gave the same withheld message and let that test pass without the result ever being
+  scanned. Only tests change. (#309)
+
+- One firewall test no longer depends on how fast the process runs. It checks that an alarm landing
+  at the first line of the warn lane cleanup still restores the signal handler and still stops the
+  call. Its short budget began before the tracer reached that line, so a stalled process could run
+  the timer out first. The call now gets a long budget and the real expiry starts once the tracer
+  reaches the cleanup. Only the test changes. (#323)
+
+- The gauntlet and installed benchmark tests now share their repeated real runs. Three gauntlet
+  tests that each started the same full run and two benchmark tests that each ran the same default
+  JSON run now read one module scoped run each. Every assertion is unchanged and each test job
+  does four fewer full runs. Only tests change. (#324)
+
+- The stacked lookahead tests now count the matches of each rule, so one rule can no longer pass on
+  the count of the other, and the agreement test compares the whole matched text and not a cut of
+  its start. The corpus reader used to hand the test the label words of the attack db files and now
+  reads the real example texts. A failure message now says quadratic for one gap and cubic for two.
+  Only tests change. (#326)
+
+### Documentation
+
+- The benchmark table in the README is now headed Metric (v0.6.5). The benchmark was run again on
+  the installed 0.6.5 wheel and on a clone at the v0.6.5 tag, every row read the same on both, and
+  no value in the table changed. (#302)
+
+- The README now shows the install command and the demo before the proxy section. The demo image
+  and the Sixty seconds section moved up to sit just ahead of What the proxy enforces, and no word
+  was edited. (#327)
 
 ## [0.6.5] — 2026-10-02
 
