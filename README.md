@@ -26,6 +26,78 @@ it matched **and what it could not read**, so you can decide what to pass onward
 produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
 on that result.
 
+![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
+
+## Sixty seconds
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install --upgrade sunglasses
+curl -fsSL -o sixty-seconds.sh https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.sh && bash sixty-seconds.sh
+```
+
+An activated virtualenv keeps the install and the `sunglasses` your shell resolves in the
+same environment, and `--upgrade` matters if you already have an older version. `curl -fsSL`
+fails on an HTTP error instead of saving the error page, so the script only runs if the
+download actually succeeded.
+
+The script writes three fixture files into a temp directory, and deliberately scans a fourth
+path that does not exist, five scanner invocations in total, because the archive is scanned
+twice (human output and JSON). The script's own commands execute; **scanned content stays
+data** (it is never executed, and the ZIP is not extracted).
+
+Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
+presentation are not shown because they vary:
+
+```
+$ sunglasses scan --file notes.md            # ordinary sprint notes
+  PASS — No threats detected.
+scanner exit code: 0
+
+$ sunglasses scan --file vendor-brief.md     # a vendor brief with an instruction buried in it
+  BLOCK [HIGH] — 6 threat(s) found:
+  1. [HIGH] Ignore previous instructions            GLS-PI-001
+  … findings 2-5 omitted …
+  6. [HIGH] Data exfiltration to sink (mechanism)   GLS-MECH-003
+scanner exit code: 1
+
+$ sunglasses scan --file attachments.zip     # an archive we do not extract
+  INCOMPLETE
+  No findings in the inspected scope. Part of this input was not read, so this is
+  not a clean result.
+scanner exit code: 3
+
+$ sunglasses scan --file missing.md
+  File not found: missing.md — Nothing was scanned. Check the path.
+scanner exit code: 2
+```
+
+And the same archive as JSON. Selected fields from the scan document, not the whole of it:
+
+```json
+{
+  "decision": "allow",
+  "threat_found": false,
+  "inspection_complete": false,
+  "is_clean": false,
+  "extraction_warnings": [
+    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result."
+  ]
+}
+```
+
+`decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
+the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
+result is incomplete.** The document exposes the distinction; acting on it is the caller's
+job.
+
+*Timings and presentation vary. The demo checks the exit statuses and the ZIP coverage
+fields; report a mismatch against your installed version.*
+
+⭐ If this is useful, consider starring the repository.
+
+**🕶 Or try it in your browser, no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) (scan text, GitHub repos, or images). Image OCR runs locally in your browser; the image never leaves your device.
+
 ## What the proxy enforces
 
 `python -m sunglasses.proxy -- <your server command>` runs a real MCP server as
@@ -223,78 +295,6 @@ remove the approvals folder.
 sunglasses uninstall echo
 rm -r ~/.sunglasses/proxy/approvals
 ```
-
-![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
-
-## Sixty seconds
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-python -m pip install --upgrade sunglasses
-curl -fsSL -o sixty-seconds.sh https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.sh && bash sixty-seconds.sh
-```
-
-An activated virtualenv keeps the install and the `sunglasses` your shell resolves in the
-same environment, and `--upgrade` matters if you already have an older version. `curl -fsSL`
-fails on an HTTP error instead of saving the error page, so the script only runs if the
-download actually succeeded.
-
-The script writes three fixture files into a temp directory, and deliberately scans a fourth
-path that does not exist, five scanner invocations in total, because the archive is scanned
-twice (human output and JSON). The script's own commands execute; **scanned content stays
-data** (it is never executed, and the ZIP is not extracted).
-
-Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
-presentation are not shown because they vary:
-
-```
-$ sunglasses scan --file notes.md            # ordinary sprint notes
-  PASS — No threats detected.
-scanner exit code: 0
-
-$ sunglasses scan --file vendor-brief.md     # a vendor brief with an instruction buried in it
-  BLOCK [HIGH] — 6 threat(s) found:
-  1. [HIGH] Ignore previous instructions            GLS-PI-001
-  … findings 2-5 omitted …
-  6. [HIGH] Data exfiltration to sink (mechanism)   GLS-MECH-003
-scanner exit code: 1
-
-$ sunglasses scan --file attachments.zip     # an archive we do not extract
-  INCOMPLETE
-  No findings in the inspected scope. Part of this input was not read, so this is
-  not a clean result.
-scanner exit code: 3
-
-$ sunglasses scan --file missing.md
-  File not found: missing.md — Nothing was scanned. Check the path.
-scanner exit code: 2
-```
-
-And the same archive as JSON. Selected fields from the scan document, not the whole of it:
-
-```json
-{
-  "decision": "allow",
-  "threat_found": false,
-  "inspection_complete": false,
-  "is_clean": false,
-  "extraction_warnings": [
-    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result."
-  ]
-}
-```
-
-`decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
-the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
-result is incomplete.** The document exposes the distinction; acting on it is the caller's
-job.
-
-*Timings and presentation vary. The demo checks the exit statuses and the ZIP coverage
-fields; report a mismatch against your installed version.*
-
-⭐ If this is useful, consider starring the repository.
-
-**🕶 Or try it in your browser, no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) (scan text, GitHub repos, or images). Image OCR runs locally in your browser; the image never leaves your device.
 
 ---
 
