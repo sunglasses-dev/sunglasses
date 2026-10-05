@@ -27,6 +27,7 @@ from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
 
 FAMILY = ("GLS-EX-030", "GLS-IP-006")
+START_GUARD = "".join(f"(?<!\\n[^\\S\\n]{{{m}}}\\n)" for m in range(5))
 # Every attack row runs on each of these. On its rule's own channels it must fire,
 # and on the others it must stay silent, so the scoping is tested, not assumed.
 CHANNELS = ("message", "file", "api_response", "tool_output", "web_content")
@@ -139,6 +140,18 @@ def test_the_rules_cover_their_channels_and_carry_no_text_exclusion():
     # IP-006 reads retrieved documents, never the user's own message or a raw API payload.
     assert RULE_CHANNELS["GLS-IP-006"] <= set(CHANNELS) and len(RULE_CHANNELS["GLS-IP-006"]) == 3
     assert not RULE_CHANNELS["GLS-IP-006"] & {"message", "api_response"}
+    # The exempted guard holds only whitespace classes, the line break and counts: with escapes and
+    # counts removed no letter, digit or underscore is left. This is a
+    # tripwire against a word list being added to the guard. That the guard is safe rests on its
+    # exact text and on the span comparison in tests/test_newline_run_prefix_cost.py, not on this
+    # assertion alone.
+    assert not re.search(r"\w", re.sub(r"\\.|\{\d+\}", "", START_GUARD))
     for rid, rule in rules.items():
         for rx in rule["regex"]:
+            # The one lookbehind allowed is the start-position guard in the prefix of six regexes
+            # (tests/test_newline_run_prefix_cost.py): it skips a line break as a start only when another
+            # line break within four horizontal whitespace characters reaches the same verb, so it cannot hide a match. It is removed here by
+            # its exact text; any other negative lookbehind or negative lookahead still fails. Positive
+            # lookarounds are not checked by this test.
+            rx = rx.replace(START_GUARD, "")
             assert "(?!" not in rx and "(?<!" not in rx, f"{rid} carries an exclusion the text can trigger"
