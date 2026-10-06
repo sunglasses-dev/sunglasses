@@ -105,8 +105,7 @@ All notable changes to Sunglasses are documented here.
 - GLS-CF-252 no longer retries the status alternative at every position of a whitespace run.
   The alternative began with an optional bracket and optional whitespace, so on a text with
   the word applied in it followed by a long run of whitespace the search read the whole run
-  again from each position, and the time grew with the square of the length (32,000 spaces
-  took about four seconds per scan on the test machine). Whitespace is now taken only from the
+  again from each position, and the time grew with the square of the length. Whitespace is now taken only from the
   start of a run. A match starts at the same place as before and the words of the rule are
   not changed. (#319)
 
