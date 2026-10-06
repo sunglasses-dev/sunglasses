@@ -1,9 +1,9 @@
 {
  "map_version": 1,
- "revision": "2026-09-23-h",
+ "revision": "2026-10-05-aa",
  "authored_by": "T10",
  "review_state": "reviewed",
- "review_note": "Authored from source inspection on the heads below. ASTRA has not reviewed these entries and T8 has not answered the two route questions. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The single executed_witness entry IS a driven record, and it is adapter-against-harness: it says the adapter drives the step, not that the product's real route behaves this way.",
+ "review_note": "Authored from source inspection on the heads below. Reviewed by ASTRA in rounds r1 (verdict f2802e1039aa) and r2 (verdict c39a0dc8acb5). The two route questions are resolved as follows. execute_armed_worker_fault is resolved on basis executed_witness. assert_pending_retired is resolved on basis inspected_source under ruling (b). These two resolutions are kept separate from the count of 2 product-route witness entries below. Entries marked basis inspected_source are judgements about where machinery lives, not evidence that a schedule was driven through it. The 7 executed_witness entries ARE driven records. 5 are adapter-against-harness: they say the adapter drives the step, not that the product's real route behaves this way. 2 are product-route (cancel_behind_scan, execute_armed_worker_fault), each driven through the product's own route with the substitution stated in its entry.",
  "bound_to": {
   "adapter_path": "gauntlet/boundary/gen2/adapter.py",
   "mediator_paths": [
@@ -289,20 +289,27 @@
    "evidence": "the mediator emits WORKER_OUTPUT with accepted and discarded_reason (gauntlet/boundary/proxy/passthrough.py:379-381); gen2/adapter.py:50 lists the op in IMPLEMENTED (added 2026-09-22 with its test); gen2/execute.py:727 answers it from those WORKER_OUTPUT receipts, including discard and absence",
    "caveat": "an inspection of the HARNESS mediator, not a run and not the product route: no executed witness exists and release semantics are not certified. All 5 delivered variants naming it stay blocked by event gaps, so reclassifying it moves no count (main stays 29/40/5/0/0)",
    "reconciled": "2026-09-23 (T10), ASTRA capmap-88403e5-r1 NO GO: the entry was stale. It was unclassified with open_question \"discard machinery present (passthrough.py:375) but no evidence a schedule drives it\" (declared 2026-09-14, owner T8) after the op was implemented"
-  }
- },
- "unclassified": {
+  },
   "execute_armed_worker_fault": {
-   "open_question": "fault dispatch machinery exists at proxy/fault_dispatch.py, but a word occurring in the mediator does not establish that a schedule can be driven through it. Needs a route-based answer or an executed witness.",
-   "owner": "T8",
-   "declared_at": "2026-09-14"
+   "bucket": "route_capability",
+   "basis": "executed_witness",
+   "run_id": "7895d5fed636",
+   "step_record": "gauntlet/report/witnesses/worker_kinds.product.runs.json",
+   "driven_against": "PRODUCT: sunglasses/proxy route.Route + worker_process.ProcessScan at afbffbcbc4a5 (serve --worker process), stimulus child substituted",
+   "witness_class": "product-route (real Route + ProcessScan, child substituted)",
+   "ruled_by": "T8 proposal, T9 R757 PASS, ASTRA to rule",
+   "evidence": "The 8 worker profiles (G2-17 x7, G2-25 receipt_worker) were driven through the real route at afbffbcb as 16 rows with 3 repeats per row. There are 9 stimulus rows and 7 controls (honest child, same payload), which makes 6 differing pairs. 3 rows are drive-only and prove only that the drive ran (complete_finding does not differ from its control, and the two worker_redaction rows have no control). Every row repeated identically. --worker process is in main (serve.py lines 40, 70, 138).",
+   "caveat": "Scope of what the 16 rows show. 6 of the 7 stimulus rows that have a control differ from their control. complete_finding does not differ (stimulus and control are both PROHIBITED_CONTENT). The two worker_redaction rows (stderr, extra) have no control row. Those three rows prove only that the drive ran. One substitution: the child binary. Stdio framing and the approval layer are not in the loop. The driver ready-fd fix is ruled (T9 R757) as its own tests-only branch, so this witness reproduces on main only once that branch lands. Client envelope still says status not_run for 4 malformed kinds while disk says exception (finding 6, persists at afbffbcb)."
   },
   "assert_pending_retired": {
-   "open_question": "retirement is emitted at passthrough.py:528 but whether the adapter can assert it is unevidenced",
-   "owner": "T8",
-   "declared_at": "2026-09-14"
+   "bucket": "route_capability",
+   "basis": "inspected_source",
+   "evidence": "The product retires on cancel and tombstones the id (pump.py:1556 Session.cancel; tests/test_proxy_pump.py T6.R6 passes; tests/proxy/test_round4.py::test_F04_G2_20_reused_late_discard_and_health drives the G2-20.reused_id_late fixture on pump.Session and passes: cancel, reuse refused, DISCARDED_LATE recorded). The harness mediator emits PENDING_RETIRED and CANCEL_ACCEPTED retired= (passthrough.py:565-566, 3 tests pass). The PRODUCT emits neither: grep PENDING_RETIRED in sunglasses/proxy is 0 hits and route.py:985 records CANCEL_ACCEPTED with id_type only.",
+   "caveat": "No schedule drove this step, so not executed_witness. T9 R757 ruling (b): the assertion means a black box reuse probe (cancel, then reuse of the id is refused and a late result is DISCARDED_LATE), witnessed by the three passing tests named in evidence, not a product receipt field. A product receipt field (PENDING_RETIRED or retired=) is followups row 52 for 0.6.8. Every variant carrying this step also needs arm_fault kinds outside SELECTABLE (queue_before_worker, writer_before_first_*) or result_worker.",
+   "ruled_by": "T8 proposal, T9 R757 ruling (b) black box reuse probe, ASTRA to rule"
   }
  },
+ "unclassified": {},
  "coverage_losses": {
   "native_direct_route": {
    "scenarios": [
@@ -404,5 +411,5 @@
    }
   }
  },
- "review_receipt": "reviews/2026-09-23-h.receipt.json"
+ "review_receipt": "reviews/2026-10-05-aa.receipt.json"
 }
