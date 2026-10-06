@@ -792,19 +792,10 @@ PATTERNS = [
         "category": "hidden_instruction",
         "severity": "high",
         "channel": ["web_content", "file"],
-        "keywords": [
-            "font-size:0",
-            "font-size: 0",
-            "display:none",
-            "display: none",
-            "visibility:hidden",
-            "visibility: hidden",
-            "color:white;background:white",
-            "color:#fff;background:#fff",
-            "opacity:0",
-            "opacity: 0",
+        "regex": [
+            r"""(?is)<[a-z][a-z0-9]{0,15}\b[^>]{0,300}?\bstyle\s*=\s*["'][^"']{0,200}?(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d])|opacity\s*:\s*0(?![.\d])|color\s*:\s*(?:white|\#fff(?:fff)?)\s*;\s*background(?:-color)?\s*:\s*(?:white|\#fff(?:fff)?))[^"']{0,200}["'][^>]{0,300}>(?:(?=(?:[^<]|<[^>]{0,200}>){0,600}?\b[a-z]+(?:[^a-z<]{1,3}[a-z]+){3,})(?:[^<]|<[^>]{0,200}>){0,600}?\b(?:ignore\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier)|disregard|you\s+(?:must|should|are\s+to)|do\s+not\s+(?:mention|tell|reveal|disclose)|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)|language\s+models?|llms?\b|system\s*(?:prompt|:)|instructions?\b|(?:please\s+)?(?:tell|inform|notify|remind)\s+the\s+(?:user|reader|customer|human)|(?:reply|respond|answer)\s+(?:only|that|with|yes|no|in\s+[a-z]+)\b|recommend\s+only|(?:send|forward|email|upload|transmit)\s+(?:this|the|all|your|their|my)\b|from\s+now\s+on|leave\s+out|omit\s+the|do\s+not\s+(?:ask|warn|confirm|verify|flag|report|alert|notify)|(?:the\s+)?(?:model|assistant|chatbot|bot)\s+(?:must|should|shall|will)\b|assistant\s*:|(?:every|each)\s+(?:answer|reply|response)\b)|(?:[^<]|<[^>]{0,200}>){0,600}?!?\[[^\]]{0,80}\]\(\s*https?://)""",
         ],
-        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents."
+        "description": "Instructions hidden with CSS so that a person does not see them and an agent reads them. The style that hides the element must sit on an element whose text reads as an order to the agent, such as ignore previous, you must, do not mention, an address to AI models, a system prompt, tell the user, reply that, from now on, recommend only, send this to or leave out. A hidden link or image that carries a web address is flagged whatever the words around it say. A hidden element with ordinary interface text or only markup, such as a tag manager noscript frame or a closed cookie dialog, is not flagged.",
     },
 
     # =========================================================================
@@ -4927,7 +4918,7 @@ PATTERNS = [
         ],
         "regex": [
             r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}\b(?:in\s+your\s+(?:reply|response|output|answer))\b",
-            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
+            r"(?i)\b(?:render|embed|include|insert|output|display)\b(?!\s*=).{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
         ],
         "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
     },
@@ -29396,5 +29387,30 @@ PATTERNS = [
             r"""(?i)<[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>[ \t\r\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)\b[\w \t_-]{0,30}<[ \t]{0,2}/[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>""",
         ],
         "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, followed by text that opens with an order word such as execute, run, ignore, override, disable, delete or send, as in execute immediately, and then closed by a closing tag from the same list. A tag like this imitates a priority marker.",
+    },
+    {
+        "id": "GLS-IP-007",
+        "name": 'AI Addressed Directive About The Answer',
+        "category": "indirect_prompt_injection",
+        "severity": "medium",
+        "channel": ["web_content", "file"],
+        "regex": [
+            r"""(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:(?:direct\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\s+(?:for|to)\s+(?:(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity))\b|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)\s*:\s*(?:when|if|always|never|please|you|do|use|add|offer|recommend|mention|ignore|answer|tell))""",
+            r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,60}\b(?:answering|responding|discussing|asked|describing|recommending)\b[^.\n]{0,80}\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|note|state|tell|say|add|offer|direct|refer)\b""",
+            r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llm\s+agents?|llms?)\b[^\n]{0,200}?\b(?:when|if)\s+(?:discussing|asked\s+about|users?\s+ask|answering|recommending)\b[^.\n]{0,100}[:,]\s*(?:offer|direct|send|refer|point|steer|invite|ask)\s+(?:the\s+)?(?:users?|them)\b[^.\n]{0,80}\b(?:to|visit|go\s+to|read|see|check)\b[^\n]{0,120}https?://""",
+        ],
+        "description": "Text on a page or in a file that is written to AI models and tells them how to answer. It is found when a heading or label names AI assistants or models and is followed by an order, when AI assistants answering questions about a subject are told what they should emphasize or recommend, or when text that names AI assistants says that users who ask about a subject should be sent to a link. A page can be honest about this, and it is still an instruction aimed at the answer of an agent that read it. The rule reads web content and files only, because a system prompt is written to a model on purpose.",
+    },
+    {
+        "id": "GLS-IP-008",
+        "name": 'Order To Put A Marker In The Reply',
+        "category": "indirect_prompt_injection",
+        "severity": "low",
+        "channel": ["web_content", "file"],
+        "regex": [
+            r"""(?is)\bif\s+you\s+(?:see|read|find|are\s+reading|have\s+read)\s+this\b(?!\s+(?:error|notice|message|warning|page|email|form|screen|banner|dialog|prompt|alert|popup))[^.\n]{0,120}\b(?:add|append|include|insert|end|finish|close|prepend|put|write|say)\b[^.\n]{0,80}\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\b""",
+            r"""(?is)\b(?:add|append|insert|include|put)\b[^.\n]{0,40}\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\b[^.\n]{0,40}\b(?:to|at)\s+the\s+(?:end|start|beginning)\s+of\s+(?:your|the)\s+(?:response|reply|answer|message|output)\b""",
+        ],
+        "description": "Text that tells a model that reads it to add a marker to its own reply, such as if you see this add an emoji, a word or a phrase to the end of your response. A marker like that proves an agent read the text and obeyed it, which is the mechanism an injection needs. The rule is reported and not blocked, because the text is often benign marketing. It needs the marker to be a token, word, phrase, emoji or similar, so that an order to add a signature or a flag to a message is not found.",
     },
 ]

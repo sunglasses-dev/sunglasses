@@ -8,20 +8,11 @@
     "web_content",
     "file"
   ],
-  "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents.",
-  "keywords": [
-    "font-size:0",
-    "font-size: 0",
-    "display:none",
-    "display: none",
-    "visibility:hidden",
-    "visibility: hidden",
-    "color:white;background:white",
-    "color:#fff;background:#fff",
-    "opacity:0",
-    "opacity: 0"
+  "description": "Instructions hidden with CSS so that a person does not see them and an agent reads them. The style that hides the element must sit on an element whose text reads as an order to the agent, such as ignore previous, you must, do not mention, an address to AI models, a system prompt, tell the user, reply that, from now on, recommend only, send this to or leave out. A hidden link or image that carries a web address is flagged whatever the words around it say. A hidden element with ordinary interface text or only markup, such as a tag manager noscript frame or a closed cookie dialog, is not flagged.",
+  "keywords": [],
+  "regex": [
+    "(?is)<[a-z][a-z0-9]{0,15}\\b[^>]{0,300}?\\bstyle\\s*=\\s*[\"'][^\"']{0,200}?(?:display\\s*:\\s*none|visibility\\s*:\\s*hidden|font-size\\s*:\\s*0(?![.\\d])|opacity\\s*:\\s*0(?![.\\d])|color\\s*:\\s*(?:white|\\#fff(?:fff)?)\\s*;\\s*background(?:-color)?\\s*:\\s*(?:white|\\#fff(?:fff)?))[^\"']{0,200}[\"'][^>]{0,300}>(?:(?=(?:[^<]|<[^>]{0,200}>){0,600}?\\b[a-z]+(?:[^a-z<]{1,3}[a-z]+){3,})(?:[^<]|<[^>]{0,200}>){0,600}?\\b(?:ignore\\s+(?:all\\s+|any\\s+)?(?:previous|prior|above|earlier)|disregard|you\\s+(?:must|should|are\\s+to)|do\\s+not\\s+(?:mention|tell|reveal|disclose)|(?:ai|a\\.i\\.)\\s+(?:assistants?|models?|agents?)|language\\s+models?|llms?\\b|system\\s*(?:prompt|:)|instructions?\\b|(?:please\\s+)?(?:tell|inform|notify|remind)\\s+the\\s+(?:user|reader|customer|human)|(?:reply|respond|answer)\\s+(?:only|that|with|yes|no|in\\s+[a-z]+)\\b|recommend\\s+only|(?:send|forward|email|upload|transmit)\\s+(?:this|the|all|your|their|my)\\b|from\\s+now\\s+on|leave\\s+out|omit\\s+the|do\\s+not\\s+(?:ask|warn|confirm|verify|flag|report|alert|notify)|(?:the\\s+)?(?:model|assistant|chatbot|bot)\\s+(?:must|should|shall|will)\\b|assistant\\s*:|(?:every|each)\\s+(?:answer|reply|response)\\b)|(?:[^<]|<[^>]{0,200}>){0,600}?!?\\[[^\\]]{0,80}\\]\\(\\s*https?://)"
   ],
-  "regex": [],
   "examples": {
     "malicious": [],
     "benign": []

@@ -1,0 +1,26 @@
+{
+  "id": "GLS-IP-007",
+  "name": "AI Addressed Directive About The Answer",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "medium",
+  "channels": [
+    "web_content",
+    "file"
+  ],
+  "description": "Text on a page or in a file that is written to AI models and tells them how to answer. It is found when a heading or label names AI assistants or models and is followed by an order, when AI assistants answering questions about a subject are told what they should emphasize or recommend, or when text that names AI assistants says that users who ask about a subject should be sent to a link. A page can be honest about this, and it is still an instruction aimed at the answer of an agent that read it. The rule reads web content and files only, because a system prompt is written to a model on purpose.",
+  "keywords": [],
+  "regex": [
+    "(?im)^[ \\t]*(?:#{1,6}[ \\t]*)?(?:(?:direct\\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\\s+(?:for|to)\\s+(?:(?:(?:ai|a\\.i\\.)\\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\\s+)?language\\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity))\\b|(?:ai|a\\.i\\.)\\s+(?:assistants?|models?|agents?)\\s*:\\s*(?:when|if|always|never|please|you|do|use|add|offer|recommend|mention|ignore|answer|tell))",
+    "(?is)\\b(?:(?:ai|a\\.i\\.)\\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\\s+)?language\\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\\b[^.\\n]{0,60}\\b(?:answering|responding|discussing|asked|describing|recommending)\\b[^.\\n]{0,80}\\b(?:should|must|shall|are\\s+to|need\\s+to|please)\\s+(?:\\w+\\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|note|state|tell|say|add|offer|direct|refer)\\b",
+    "(?is)\\b(?:(?:ai|a\\.i\\.)\\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\\s+)?language\\s+models?|llm\\s+agents?|llms?)\\b[^\\n]{0,200}?\\b(?:when|if)\\s+(?:discussing|asked\\s+about|users?\\s+ask|answering|recommending)\\b[^.\\n]{0,100}[:,]\\s*(?:offer|direct|send|refer|point|steer|invite|ask)\\s+(?:the\\s+)?(?:users?|them)\\b[^.\\n]{0,80}\\b(?:to|visit|go\\s+to|read|see|check)\\b[^\\n]{0,120}https?://"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-06",
+  "source": "patterns.py:GLS-IP-007"
+}
