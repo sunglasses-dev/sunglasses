@@ -1,7 +1,7 @@
 {
   "version": "0.6.6",
   "patterns": 1569,
-  "keywords": 6665,
+  "keywords": 6675,
   "categories": 117,
   "normalization_techniques": 17,
   "scan_speed_display": "~0.7ms short input, ~4ms typical attack string",

@@ -792,10 +792,23 @@ PATTERNS = [
         "category": "hidden_instruction",
         "severity": "high",
         "channel": ["web_content", "file"],
-        "regex": [
-            r"""(?is)<[a-z][a-z0-9]{0,15}\b[^>]{0,300}?\bstyle\s*=\s*["'][^"']{0,200}?(?:display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d])|opacity\s*:\s*0(?![.\d])|color\s*:\s*(?:white|\#fff(?:fff)?)\s*;\s*background(?:-color)?\s*:\s*(?:white|\#fff(?:fff)?))[^"']{0,200}["'][^>]{0,300}>(?:(?=(?:[^<]|<[^>]{0,200}>){0,600}?\b[a-z]+(?:[^a-z<]{1,3}[a-z]+){3,})(?:[^<]|<[^>]{0,200}>){0,600}?\b(?:ignore\s+(?:all\s+|any\s+)?(?:previous|prior|above|earlier)|disregard|you\s+(?:must|should|are\s+to)|do\s+not\s+(?:mention|tell|reveal|disclose)|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)|language\s+models?|llms?\b|system\s*(?:prompt|:)|instructions?\b|(?:please\s+)?(?:tell|inform|notify|remind)\s+the\s+(?:user|reader|customer|human)|(?:reply|respond|answer)\s+(?:only|that|with|yes|no|in\s+[a-z]+)\b|recommend\s+only|(?:send|forward|email|upload|transmit)\s+(?:this|the|all|your|their|my)\b|from\s+now\s+on|leave\s+out|omit\s+the|do\s+not\s+(?:ask|warn|confirm|verify|flag|report|alert|notify)|(?:the\s+)?(?:model|assistant|chatbot|bot)\s+(?:must|should|shall|will)\b|assistant\s*:|(?:every|each)\s+(?:answer|reply|response)\b)|(?:[^<]|<[^>]{0,200}>){0,600}?!?\[[^\]]{0,80}\]\(\s*https?://)""",
+        "match_on": "normalized",
+        "keywords": [
+            "font-size:0",
+            "font-size: 0",
+            "display:none",
+            "display: none",
+            "visibility:hidden",
+            "visibility: hidden",
+            "color:white;background:white",
+            "color:#fff;background:#fff",
+            "opacity:0",
+            "opacity: 0",
         ],
-        "description": "Instructions hidden with CSS so that a person does not see them and an agent reads them. The style that hides the element must sit on an element whose text reads as an order to the agent, such as ignore previous, you must, do not mention, an address to AI models, a system prompt, tell the user, reply that, from now on, recommend only, send this to or leave out. A hidden link or image that carries a web address is flagged whatever the words around it say. A hidden element with ordinary interface text or only markup, such as a tag manager noscript frame or a closed cookie dialog, is not flagged.",
+        "regex": [
+            r"""(?i)(?:(?<![\s\S])|(?!<(?:(?P<v>area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)|(?P<t>[a-z][a-z0-9]{0,15}))(?![\w:-])(?:\s+(?:style\s*=\s*(?:\"(?:\s*[a-z-]{1,30}\s*:\s*[a-z0-9\#%.()_,/+-]{1,40}(?:\s*!important)?\s*;?){1,8}\s*\"|'(?:\s*[a-z-]{1,30}\s*:\s*[a-z0-9\#%.()_,/+-]{1,40}(?:\s*!important)?\s*;?){1,8}\s*'|[a-z-]{1,30}:[a-z0-9\#%.()_,-]{1,40}(?:;[a-z-]{1,30}:[a-z0-9\#%.()_,-]{1,40}){0,7};?)|[a-z][a-z0-9:_-]{0,30}\s*=\s*(?:\"[^\"\s<>]{0,300}\"|'[^'\s<>]{0,300}'|[^\s\"'<>=`]{1,300})|(?:async|defer|hidden|nomodule|allowfullscreen|disabled|checked|crossorigin|autofocus|inert)(?![\w:-]))){0,12}\s*/?>(?(v)|\s*</(?P=t)\s*>))<)[^<]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\#fff;background:\#fff)(?![^\W_])""",
+        ],
+        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. Any of the hiding styles is flagged wherever it appears, with one structural exception: a start tag that holds no text, such as a frame, a script tag with a source, an empty container or an image, whose attributes carry no words and whose element is closed at once. A hidden element with text in it is flagged, including hidden interface text such as a closed cookie dialog.",
     },
 
     # =========================================================================
@@ -4918,7 +4931,7 @@ PATTERNS = [
         ],
         "regex": [
             r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}\b(?:in\s+your\s+(?:reply|response|output|answer))\b",
-            r"(?i)\b(?:render|embed|include|insert|output|display)\b(?!\s*=).{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
+            r"""(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=(?!\s*(?:"this\.media\s*=\s*'all'\s*;?\s*"|'this\.media\s*=\s*"all"\s*;?\s*'))|javascript:)""",
         ],
         "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
     },
@@ -29395,7 +29408,7 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["web_content", "file"],
         "regex": [
-            r"""(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:(?:direct\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\s+(?:for|to)\s+(?:(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity))\b|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)\s*:\s*(?:when|if|always|never|please|you|do|use|add|offer|recommend|mention|ignore|answer|tell))""",
+            r"""(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:(?:direct\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\s+(?:for|to)\s+(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^\n]{0,60}\n[\s\S]{0,400}?(?:\b(?:you|assistants?|models?|llms?|agents?)\s+(?:should|must|shall|are\s+to|need\s+to)\s+(?:always\s+|never\s+)?(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|\b(?:when|if)\s+(?:discussing|asked|users?|someone|a\s+user|answering|recommending|describing|summari[sz]ing|you)\b[^.\n]{0,100}[,:]?\s*(?:you\s+)?(?:(?:should|must|please)\s+)?(?:offer|direct|send|refer|point|steer|invite|recommend|mention|add|emphasi[sz]e|tell|say|suggest|always|never)\b|\b(?:always|never)\s+(?:mention|recommend|say|add|use|include|suggest|answer|reply|respond|cite|link|refer)\b|\b(?:offer|direct|send|refer|steer)\s+(?:the\s+)?(?:users?|them)\b|\b(?:add|append|end|finish|close)\b[^.\n]{0,60}\b(?:to|at|with)\s+(?:the\s+)?(?:end|start)\s+of\s+(?:your|the)\s+(?:response|reply|answer)\b|\b(?:ignore|disregard)\s+(?:all\s+|any\s+)?(?:previous|prior|above)\b|\bplease\s+(?:tell|inform|mention|recommend|say|add|answer|reply)\b)|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)\s*:\s*(?:\b(?:you|assistants?|models?|llms?|agents?)\s+(?:should|must|shall|are\s+to|need\s+to)\s+(?:always\s+|never\s+)?(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|\b(?:when|if)\s+(?:discussing|asked|users?|someone|a\s+user|answering|recommending|describing|summari[sz]ing|you)\b[^.\n]{0,100}[,:]?\s*(?:you\s+)?(?:(?:should|must|please)\s+)?(?:offer|direct|send|refer|point|steer|invite|recommend|mention|add|emphasi[sz]e|tell|say|suggest|always|never)\b|\b(?:always|never)\s+(?:mention|recommend|say|add|use|include|suggest|answer|reply|respond|cite|link|refer)\b|\b(?:offer|direct|send|refer|steer)\s+(?:the\s+)?(?:users?|them)\b|\b(?:add|append|end|finish|close)\b[^.\n]{0,60}\b(?:to|at|with)\s+(?:the\s+)?(?:end|start)\s+of\s+(?:your|the)\s+(?:response|reply|answer)\b|\b(?:ignore|disregard)\s+(?:all\s+|any\s+)?(?:previous|prior|above)\b|\bplease\s+(?:tell|inform|mention|recommend|say|add|answer|reply)\b))""",
             r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,60}\b(?:answering|responding|discussing|asked|describing|recommending)\b[^.\n]{0,80}\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|note|state|tell|say|add|offer|direct|refer)\b""",
             r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llm\s+agents?|llms?)\b[^\n]{0,200}?\b(?:when|if)\s+(?:discussing|asked\s+about|users?\s+ask|answering|recommending)\b[^.\n]{0,100}[:,]\s*(?:offer|direct|send|refer|point|steer|invite|ask)\s+(?:the\s+)?(?:users?|them)\b[^.\n]{0,80}\b(?:to|visit|go\s+to|read|see|check)\b[^\n]{0,120}https?://""",
         ],
