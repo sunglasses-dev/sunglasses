@@ -107,13 +107,44 @@ def _build(tmp_path_factory, doc=None, ledger=LEDGER, raw=None):
 
 @pytest.fixture(scope="module")
 def world(tmp_path_factory, run_doc):
-    report, code = _build(tmp_path_factory, run_doc)
+    report, code = build_with_open_map(tmp_path_factory, run_doc)
     return types.SimpleNamespace(report=report, code=code)
+
+
+OPEN_MAP = HERE / "fixtures" / "capability_map.open.json"
+
+
+def open_map_path(tmp_path_factory):
+    """A reviewed copy of the COMMITTED open map, made the way conftest makes its copy of the
+    tree map (through `review.record`, never by typing the state).
+
+    The reports that say a run refused over an open map are about a map with unclassified
+    operations in it. The map in the tree is not that map for ever, because the map change closes
+    it, so those fixtures read this file and not the tree. The suite is then green with the tree
+    map open or closed."""
+    import classify
+    import review
+    path = tmp_path_factory.mktemp("capmap-open") / "capability_map.json"
+    path.write_text(OPEN_MAP.read_text())
+    review.record(path, "**GO**: test-suite fixture, not a real review.\n", verdict="GO",
+                  reviewer="TEST-FIXTURE", round_id="suite-open")
+    assert classify.load_map(path)["unclassified"], "the committed copy must be an open map"
+    return path
+
+
+def build_with_open_map(tmp_path_factory, doc=None, **kwargs):
+    import classify
+    patch = pytest.MonkeyPatch()
+    patch.setattr(classify, "MAP_PATH", open_map_path(tmp_path_factory))
+    try:
+        return _build(tmp_path_factory, doc, **kwargs)
+    finally:
+        patch.undo()
 
 
 @pytest.fixture(scope="module")
 def norun(tmp_path_factory):
-    report, code = _build(tmp_path_factory, None, ledger=None)
+    report, code = build_with_open_map(tmp_path_factory, None, ledger=None)
     return types.SimpleNamespace(report=report, code=code)
 
 
