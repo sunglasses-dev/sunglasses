@@ -598,7 +598,7 @@ def test_a_background_line_between_heading_and_body_does_not_hide_the_order(engi
     assert A in ids(engine, text, channel)
 
 
-# ROW BC. The loader exception must read a tag in one pass. A slash between attributes, an unquoted value and a repeated media
+# ROW BC. The loader exception is pinned to finish inside a time budget on the attribute shapes listed below. A slash between attributes, an unquoted value and a repeated media
 # attribute once gave the matcher several ways to read the same text, and a 269 byte tag took seconds on every channel. The
 # exception now reads whitespace separated attributes with quoted values only, and a slash is allowed only as the last character
 # before the closing bracket. Anything else is not the loader and is read as before.
@@ -636,7 +636,7 @@ LOADER_COST_SHAPES = {
 @pytest.mark.skipif(NO_TIMER, reason="needs a POSIX interval timer")
 @pytest.mark.parametrize("size", (4096, 65536, 1048576))
 @pytest.mark.parametrize("shape", sorted(LOADER_COST_SHAPES))
-def test_the_loader_rule_reads_a_tag_in_one_pass_whatever_its_attribute_shape(shape, size):
+def test_the_loader_rule_finishes_inside_the_budget_on_the_attribute_shapes_pinned(shape, size):
     rx = re.compile(by_id(UI)["regex"][1], re.IGNORECASE)
     text = LOADER_COST_SHAPES[shape](size)
     assert bounded(lambda: rx.search(text))
@@ -727,3 +727,84 @@ def test_a_sentence_that_names_the_model_and_orders_it_is_read_after_a_staff_lin
                                   "Human reviewers should recommend the premium plan to customers."])
 def test_a_body_that_does_not_name_the_model_keeps_the_staff_scope(engine, body, line, channel):
     assert A not in ids(engine, "# Notes for AI assistants\n%s\n%s" % (line, body), channel)
+
+
+# A tag like text inside a quoted attribute value is not a tag. A hidden container that carries one in an attribute is still a hidden container.
+HI_CHANNELS = set(by_id("GLS-HI-002")["channel"]) | {"code"}  # the channels the hidden text rule reads (its own list plus code), every other channel is expected to stay quiet
+BOUNDARY_CHANNELS = sorted(SunglassesEngine.DOCUMENTED_CHANNELS)
+BOUNDARY_INNER = ("<img>", "<input>", "<br>", "<iframe></iframe>", "<script></script>")
+
+
+def boundary_cases():
+    for name in ("div", "span", "section"):
+        for quote in ('"', "'"):
+            for inner in BOUNDARY_INNER:
+                yield '<%s data-x=%s%s%s style="display:none">Ordinary child text.</%s>' % (name, quote, inner, quote, name)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", list(boundary_cases()))
+def test_a_hidden_container_is_flagged_when_an_attribute_value_holds_tag_like_text(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", [
+    "<p>It's hidden: display:none</p>",
+    "<p>It's here, and it's display:none</p>",
+    '<div title="x style="display:none">text</div>',
+    "<div title='x style='display:none'>text</div>",
+    '<div data-x="a">it\'s</div><span style="display:none">text</span>',
+])
+def test_a_stray_quote_before_a_hiding_style_does_not_hide_it_from_the_rule(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("snippet", [
+    '<img alt="x" style="display:none">',
+    "<input style='display:none'>",
+    '<iframe style="display:none"></iframe>',
+    '<script style="display:none"></script>',
+])
+def test_an_empty_tag_in_the_fixed_set_is_still_excused_beside_quoted_attributes(engine, snippet, channel):
+    assert not flagged_hi(engine, snippet, channel)
+
+
+# The handler recognizer reads the gaps around its optional semicolon once. A suffix it rejects must not make the scan grow faster than the input.
+HANDLER_OPEN = '<link rel="stylesheet" ' + LOADER_HREF + ' media="print" onload="this.media=\'all\''
+HANDLER_TAILS = {
+    "unclosed": lambda n: HANDLER_OPEN + " " * n + "x>",
+    "closed wrong": lambda n: HANDLER_OPEN + " " * n + 'x">',
+    "semicolon unclosed": lambda n: HANDLER_OPEN + ";" + " " * n + "x>",
+    "semicolon then spaces": lambda n: HANDLER_OPEN + " " * n + ";" + " " * n + "x>",
+    "single quoted form": lambda n: '<link rel="stylesheet" ' + LOADER_HREF + ' media="print" onload=\'this.media="all"' + " " * n + "x>",
+}
+
+
+@pytest.mark.skipif(NO_TIMER, reason="needs a POSIX interval timer")
+@pytest.mark.parametrize("channel", sorted(SunglassesEngine.DOCUMENTED_CHANNELS))
+@pytest.mark.parametrize("tail", ("unclosed", "closed wrong"))
+def test_a_loader_handler_with_a_rejected_tail_is_scanned_quickly_on_every_channel(engine, tail, channel):
+    text = HANDLER_TAILS[tail](32768)
+    assert bounded(lambda: engine.scan(text, channel=channel))
+
+
+def best_of(call, runs=3):
+    best = None
+    for _ in range(runs):
+        start = time.perf_counter()
+        call()
+        took = time.perf_counter() - start
+        best = took if best is None else min(best, took)
+    return best
+
+
+@pytest.mark.skipif(NO_TIMER, reason="needs a POSIX interval timer")
+@pytest.mark.parametrize("tail", sorted(HANDLER_TAILS))
+def test_a_loader_handler_with_a_rejected_tail_grows_in_step_with_the_input(engine, tail):
+    small, big = HANDLER_TAILS[tail](4096), HANDLER_TAILS[tail](16384)
+    assert bounded(lambda: engine.scan(big, channel="web_content"), seconds=8.0)
+    t_small = best_of(lambda: engine.scan(small, channel="web_content"))
+    t_big = best_of(lambda: engine.scan(big, channel="web_content"))
+    assert t_big <= 8 * max(t_small, 0.02), "a fourfold longer input took %.1f times as long" % (t_big / max(t_small, 0.02))
