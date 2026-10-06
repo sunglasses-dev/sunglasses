@@ -10,7 +10,7 @@ own summary is treated as a claim to be checked rather than a source to be read.
 Two separate checks, and a mutation that defeats one must not defeat the other:
 
   validate_report   recomputes every total from the ids beneath it
-  check_transcription  compares the rendered page against the validated JSON
+  check_transcription  the page must equal render(report) byte for byte
 
 Change a number in the JSON alone and transcription catches it. Change the JSON
 and the HTML together and recomputation catches it. Changing the underlying
@@ -21,7 +21,6 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import re
-from html.parser import HTMLParser
 
 import schema
 
@@ -66,7 +65,12 @@ def _guarded(section: str, check, *args) -> list[Finding]:
 
 def validate_report(report: dict) -> list[Finding]:
     """Everything wrong with this artifact. Empty means publishable. Never raises."""
-    return _guarded("report", _validate_report, report)
+    # Every field the page is built from is named in `schema.REPORT_READS` and typed here, so a
+    # report that passes can be rendered and one that does not is a finding and not a crash. It is
+    # read first and apart, because a section that cannot read a wrong typed field takes the rest
+    # of its own findings with it, and this one must survive that.
+    shape = [Finding("REPORT_FIELD_TYPE", path, why) for path, why in schema.render_view(report)[1]]
+    return shape + _guarded("report", _validate_report, report)
 
 
 def _validate_report(report: dict) -> list[Finding]:
@@ -904,206 +908,34 @@ def _validate_rows(rows, path, route) -> list[Finding]:
     return findings
 
 
-# Elements whose text a reader is never shown. These are tags, not styles: whether a tag shows
-# its text is the browser's fixed answer, and no reading of CSS is needed to know it.
-NON_VISIBLE_TAGS = frozenset({"script", "style", "template", "title", "textarea", "noscript",
-                              "head", "iframe", "object"})
-VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
-                       "source", "track", "wbr"})
-
-
-def _attribute_problem(attrs: dict) -> list[tuple[str, str]]:
-    """(attribute, why) for every attribute the renderer does not write. The renderer's own list
-    is `schema.RENDER_ATTRIBUTES`. Nothing here parses CSS, JavaScript or any other language."""
-    bad = []
-    for name, value in attrs.items():
-        allowed = schema.RENDER_ATTRIBUTES.get(name, False)
-        if allowed is False:
-            bad.append((name, "the renderer writes no such attribute"))
-        elif allowed is not None:
-            tokens = (value or "").split() if name == "class" else [value]
-            if not tokens and name == "class":
-                bad.append((name, "an empty class"))
-            elif any(token not in allowed for token in tokens):
-                bad.append((name, f"{value!r} is not a value the renderer writes"))
-    return bad
-
-
-class _Bindings(HTMLParser):
-    """Every `data-bound` element with the text a browser would show for it.
-
-    A parser and not a pattern, because the pattern read only up to the first nested tag, and
-    because entity decoding belongs to the context: text in a script or style element is raw, and
-    text in a visible element is decoded. `convert_charrefs` does exactly that.
-
-    It also reads the markup the renderer would have written. An element that is a bound element,
-    holds one, or sits inside one carries only the attributes in `schema.RENDER_ATTRIBUTES`, and
-    every style element is `schema.RENDER_STYLESHEET`. Whatever else a page does to hide a thing
-    needs an attribute or a sheet, so a page with neither cannot hide anything.
-    """
-
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.stack: list[dict] = []
-        self.found: list[dict] = []
-        self.attribute_findings: list[tuple[str, str, str]] = []
-        self.sheets: list[str] = []
-        self.links = 0
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        hides = ("hidden" in attrs or (attrs.get("aria-hidden") or "").strip().lower() == "true"
-                 or tag in NON_VISIBLE_TAGS)
-        parent_dark = bool(self.stack) and self.stack[-1]["dark"]
-        inside_bound = any(entry["path"] is not None for entry in self.stack)
-        entry = {"tag": tag, "dark": parent_dark or hides, "hides": hides,
-                 "path": attrs.get("data-bound"), "text": [], "raw": [],
-                 "bad": _attribute_problem(attrs), "checked": inside_bound}
-        if tag == "link":
-            self.links += 1
-        if entry["path"] is not None:
-            entry["checked"] = True
-            for outer in self.stack:                  # every ancestor of a bound element
-                outer["checked"] = True
-        if tag in VOID_TAGS:
-            self._report(entry)
-            if entry["path"] is not None:
-                self.found.append(entry)
-            return
-        self.stack.append(entry)
-
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        if tag not in VOID_TAGS and self.stack and self.stack[-1]["tag"] == tag:
-            self._close(len(self.stack) - 1)
-
-    def handle_data(self, data):
-        """Text counts toward a bound element only when nothing between that element and the text
-        hides it. A hidden, aria hidden, script, style or template descendant is the element's own
-        concealed text, not its displayed text, so it is left out of what the element shows."""
-        if self.stack and self.stack[-1]["tag"] == "style":
-            self.stack[-1]["raw"].append(data)
-        for index, entry in enumerate(self.stack):
-            if entry["path"] is not None and not any(
-                    inner["hides"] for inner in self.stack[index + 1:]):
-                entry["text"].append(data)
-
-    def handle_endtag(self, tag):
-        for index in range(len(self.stack) - 1, -1, -1):
-            if self.stack[index]["tag"] == tag:
-                self._close(index)
-                return
-
-    def _report(self, entry):
-        if entry["checked"]:
-            for name, why in entry["bad"]:
-                self.attribute_findings.append((entry["tag"], name, why))
-
-    def _close(self, index):
-        while len(self.stack) > index:
-            entry = self.stack.pop()
-            if entry["tag"] == "style":
-                self.sheets.append("".join(entry["raw"]))
-            self._report(entry)
-            if entry["path"] is not None:
-                self.found.append(entry)
-
-    def close(self):
-        super().close()
-        self._close(0)
-
-
-def resolve(report: dict, path: str):
-    """Follow a dotted path with [index] segments into the report."""
-    node = report
-    for part in path.split("."):
-        if part.endswith("]") and "[" in part:
-            name, index = part[:-1].split("[")
-            node = node[name][int(index)]
-        else:
-            node = node[part]
-    return node
-
-
-def _required_bindings(report: dict) -> list[str]:
-    """Fields the page must show as bound figures or text, derived from the report alone. A page
-    that drops one of them cannot be told from one whose renderer never had it."""
-    need: list[str] = []
-    routes = report.get("routes")
-    for index, route in enumerate(routes if isinstance(routes, list) else []):
-        block = route.get("execution") if isinstance(route, dict) else None
-        if isinstance(block, dict):
-            need.append(f"routes[{index}].execution.fit_scope")
-            need += [f"routes[{index}].execution.counts.{key}"
-                     for key in sorted(block["counts"])] if isinstance(
-                         block.get("counts"), dict) else []
-    ledger = report.get("ledger")
-    if isinstance(ledger, dict) and schema.numeric_readable(ledger) and isinstance(
-            ledger.get("lines"), list):
-        need += [f"ledger.lines[{index}].text" for index, line in enumerate(ledger["lines"])
-                 if isinstance(line, dict) and line.get("text") is not None]
-    coverage = report.get("coverage")
-    if isinstance(coverage, dict) and schema.numeric_readable(coverage) and isinstance(
-            coverage.get("execution_partition"), dict):
-        need += ["coverage.execution_partition.passed", "coverage.execution_partition.not_run"]
-    return need
-
-
 def check_transcription(html: str, report: dict) -> list[Finding]:
-    """Every rendered figure equals the validated artifact it cites.
+    """The page is the render of the report, byte for byte, or it is not.
 
-    This is the weaker of the two checks and is labelled as such, because a
-    coordinated edit to both files passes it. It exists to catch the renderer,
-    not the author. It reads the page as a browser does: the text of a bound
-    element is all of its text after the entities in it are decoded, a binding
-    inside an element nobody sees is refused, and the fields the report says
-    must be on the page must be bound there.
+    One comparison. The page is `render.render(report)` and nothing else, so there is no reading
+    of markup here: no parser, no list of tags, no list of attributes and no reading of a
+    stylesheet. A figure retyped, a sentence reworded, a section dropped, an element wrapped, a
+    sheet added, a script added or an overlay laid on top is a different page, whatever it does
+    in a browser. The check is weaker than recomputation in one way and labelled as such: a
+    report and a page edited together still pass it, which is why `validate_report` recomputes.
     """
-    findings: list[Finding] = []
-    parser = _Bindings()
-    parser.feed(html)
-    parser.close()
-    visible: set[str] = set()
-    for tag, name, why in parser.attribute_findings:
-        findings.append(Finding(
-            "BINDING_ATTRIBUTE_FORBIDDEN", f"html.{tag}.{name}",
-            f"a {tag!r} element that holds or sits in a bound figure carries {name!r}, and {why}. "
-            "The renderer writes no style, no hidden and no aria hidden, so one here can only be "
-            "concealing text a browser would otherwise show"))
-    if parser.links or any(sheet != schema.RENDER_STYLESHEET for sheet in parser.sheets):
-        findings.append(Finding(
-            "STYLESHEET_NOT_RENDERERS", "html.style",
-            "the page holds a style element that is not the renderer's stylesheet byte for byte, "
-            "or a linked sheet. The checker does not read CSS, so a sheet it did not write is "
-            "refused whole"))
-    for entry in parser.found:
-        path = entry["path"]
-        if entry["dark"]:
-            findings.append(Finding(
-                "BINDING_NOT_VISIBLE", path,
-                f"the binding sits in a {entry['tag']!r} element or under one that is hidden. "
-                "Text nobody is shown can say anything, so it proves nothing about the page"))
-            continue
-        visible.add(path)               # shown, so not missing. A wrong text is reported below
-        try:
-            value = resolve(report, path)
-        except (KeyError, IndexError, TypeError, ValueError):
-            findings.append(Finding("BOUND_PATH_MISSING", path,
-                                    "the page cites a field the artifact lacks"))
-            continue
-        shown = "".join(entry["text"]).strip()
-        if str(value) != shown:
-            findings.append(Finding(
-                "TRANSCRIPTION_MISMATCH", path,
-                f"the page shows {shown!r}; the artifact says {value!r}"))
-    if not parser.found:
-        findings.append(Finding(
-            "NOTHING_BOUND", "html",
-            "no rendered figure cites an artifact field. An unbound page is a "
-            "page of hand-typed numbers, which is the defect this exists for."))
-    for path in _required_bindings(report):
-        if path not in visible:
-            findings.append(Finding(
-                "BINDING_MISSING", path,
-                "the report carries this field and the page does not show it bound to it"))
-    return findings
+    import render                                           # render imports this module
+    try:
+        expected = render.render(report)
+    except render.WillNotRender as exc:
+        return [Finding("PAGE_REPORT_NOT_RENDERABLE", "html",
+                        f"there is no page this report would produce, so none can match it: {exc}")]
+    except Exception as exc:                                # noqa: BLE001
+        return [Finding("PAGE_REPORT_NOT_RENDERABLE", "html",
+                        f"the report could not be rendered, {type(exc).__name__}")]
+    if isinstance(html, str) and html == expected:
+        return []
+    if not isinstance(html, str):
+        return [Finding("PAGE_NOT_THE_RENDER", "html", "the page is not text")]
+    shown, wanted = html.split("\n"), expected.split("\n")
+    line = next((n for n in range(max(len(shown), len(wanted)))
+                 if shown[n:n + 1] != wanted[n:n + 1]), 0)
+    return [Finding(
+        "PAGE_NOT_THE_RENDER", "html",
+        f"the page is not what the renderer makes of this report. First difference at line "
+        f"{line + 1}: the page has {(shown[line:line + 1] or ['(nothing)'])[0][:120]!r}, the "
+        f"render has {(wanted[line:line + 1] or ['(nothing)'])[0][:120]!r}")]

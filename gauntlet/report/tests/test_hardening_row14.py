@@ -246,58 +246,6 @@ def passed_span(page, world):
     return span, value
 
 
-def test_r6_a_count_hidden_in_a_script_element_is_refused(world, page):
-    span, value = passed_span(page, world)
-    hidden = ('<script data-bound="coverage.execution_partition.passed">'
-              + "".join(f"&#{ord(c)};" for c in str(value)) + "</script>")
-    found = validate.check_transcription(page.replace(span, hidden), world.report)
-    assert "BINDING_NOT_VISIBLE" in codes(found)
-
-
-@pytest.mark.parametrize("tag", ["style", "template", "title", "textarea"])
-def test_r6_a_binding_on_a_non_visible_element_is_refused(world, page, tag):
-    span, value = passed_span(page, world)
-    swapped = f'<{tag} data-bound="coverage.execution_partition.passed">{value}</{tag}>'
-    found = validate.check_transcription(page.replace(span, swapped), world.report)
-    assert "BINDING_NOT_VISIBLE" in codes(found)
-
-
-def test_r6_a_hidden_bound_element_is_refused(world, page):
-    span, value = passed_span(page, world)
-    swapped = span.replace("<span ", "<span hidden ")
-    found = validate.check_transcription(page.replace(span, swapped), world.report)
-    assert "BINDING_NOT_VISIBLE" in codes(found)
-
-
-def test_r6_the_text_of_a_bound_element_is_all_of_its_text():
-    html = '<span data-bound="a">3<b>4</b></span>'
-    assert "TRANSCRIPTION_MISMATCH" in codes(validate.check_transcription(html, {"a": 3}))
-    assert validate.check_transcription(html, {"a": 34}) == []
-
-
-def test_r6_a_visible_encoded_count_is_still_what_a_browser_shows(world, page):
-    span, value = passed_span(page, world)
-    encoded = span.replace(f">{value}<", f">&#{ord(str(value)[0])};<") if len(str(value)) == 1 else span
-    assert validate.check_transcription(page.replace(span, encoded), world.report) == []
-
-
-def test_r6_a_ledger_line_that_lost_its_binding_is_refused(world, page):
-    text = world.report["ledger"]["lines"][0]["text"]
-    bound = f'<span class="bound-text" data-bound="ledger.lines[0].text">{text}</span>'
-    assert bound in page
-    found = validate.check_transcription(page.replace(bound, f"<span>{text}</span>"), world.report)
-    assert "BINDING_MISSING" in codes(found)
-
-
-def test_r6_a_scope_sentence_that_lost_its_binding_is_refused(world, page):
-    sentence = schema.STANDIN_SCOPE_SENTENCE.replace("'", "&#x27;")
-    bound = f'<span class="bound-text" data-bound="routes[0].execution.fit_scope">{sentence}</span>'
-    assert bound in page
-    found = validate.check_transcription(page.replace(bound, f"<span>{sentence}</span>"),
-                                         world.report)
-    assert "BINDING_MISSING" in codes(found)
-
-
 # ---------------------------------------------------------------------------------------- R7
 def run_with_bad_records(run_doc, bad):
     doc = copy.deepcopy(run_doc)

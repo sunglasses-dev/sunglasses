@@ -234,15 +234,3 @@ def test_an_undated_examination_reads_as_current_and_is_rejected(honest):
 
 
 # --- the page against the artifact -----------------------------------------
-
-def test_a_page_citing_a_field_the_artifact_lacks_is_rejected(honest):
-    page = render.render(honest)
-    broken = page.replace('data-bound="run.id"', 'data-bound="run.no_such_field"')
-    assert broken != page, "the mutation did not apply; the control is vacuous"
-    assert "BOUND_PATH_MISSING" in codes(validate.check_transcription(broken, honest))
-
-
-def test_a_page_that_cites_nothing_is_rejected(honest):
-    """An unbound page is a page of hand typed numbers, which is the whole point."""
-    assert "NOTHING_BOUND" in codes(
-        validate.check_transcription("<p>everything is fine</p>", honest))

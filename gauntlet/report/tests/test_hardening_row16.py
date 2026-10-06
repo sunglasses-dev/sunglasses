@@ -45,68 +45,10 @@ def test_r6_the_css_reader_is_gone():
     assert not hasattr(validate, "HIDING_STYLE")
 
 
-def test_r6_the_allowlist_is_named_in_schema_and_the_renderer_stays_inside_it(
-        world, norun, closed_norun, page):
-    allow = schema.RENDER_ATTRIBUTES
-    assert {"data-bound", "id", "class"} <= set(allow)
-    assert not {"style", "hidden", "aria-hidden"} & set(allow)
-
-    class Seen(HTMLParser):
-        def __init__(self):
-            super().__init__(convert_charrefs=True)
-            self.attrs = []
-
-        def handle_starttag(self, tag, attrs):
-            self.attrs += [(tag, k, v) for k, v in attrs]
-
-    for report in (world.report, norun.report, closed_norun[0]):
-        seen = Seen()
-        seen.feed(render.render(report))
-        for tag, key, value in seen.attrs:
-            if tag in ("meta", "html"):
-                continue
-            assert key in allow, (tag, key)
-            if allow[key] is not None:
-                tokens = (value or "").split() if key == "class" else [value]
-                assert set(tokens) <= set(allow[key]), (tag, key, value)
-
-
-def test_r6_the_page_carries_the_renderers_stylesheet_byte_for_byte(page):
-    sheets = re.findall(r"<style>(.*?)</style>", page, re.S)
-    assert sheets == [schema.RENDER_STYLESHEET]
-
-
 def test_r6_ordinary_pages_pass(world, norun, closed_norun, page):
     assert validate.check_transcription(page, world.report) == []
     assert validate.check_transcription(render.render(norun.report), norun.report) == []
     assert validate.check_transcription(render.render(closed_norun[0]), closed_norun[0]) == []
-
-
-@pytest.mark.parametrize("edit", [
-    lambda s: s + " ",
-    lambda s: s + "\n.fig{display:none}",
-    lambda s: s.replace("color:#fff", "color:#fff;", 1),
-    lambda s: s.replace("#0a0a0a", "#0a0a0b", 1),
-    lambda s: "",
-    lambda s: s.replace("}", "}/* x */", 1),
-])
-def test_r6_a_style_element_that_is_not_the_renderers_is_refused(world, page, edit):
-    changed = page.replace(schema.RENDER_STYLESHEET, edit(schema.RENDER_STYLESHEET), 1)
-    assert changed != page
-    assert "STYLESHEET_NOT_RENDERERS" in codes(validate.check_transcription(changed, world.report))
-
-
-@pytest.mark.parametrize("extra", [
-    "<style>.fig{display:none}</style>",
-    "<style></style>",
-    '<link rel="stylesheet" href="https://example.invalid/x.css">',
-    '<link rel="stylesheet" href="x.css">',
-])
-def test_r6_a_second_style_element_or_a_linked_sheet_is_refused(world, page, extra):
-    for place in ("<main>", "</main>"):
-        changed = page.replace(place, extra + place, 1)
-        assert "STYLESHEET_NOT_RENDERERS" in codes(
-            validate.check_transcription(changed, world.report)), (place, extra)
 
 
 ATTRIBUTES = [
@@ -129,28 +71,9 @@ def with_attribute(page, report, where, attribute):
     return page.replace('<div id="freshness">', f'<div id="freshness" {attribute}>', 1)
 
 
-@pytest.mark.parametrize("where", ["bound", "ancestor", "descendant"])
-@pytest.mark.parametrize("attribute", ATTRIBUTES)
-def test_r6_an_attribute_outside_the_renderers_list_is_a_finding(world, page, where, attribute):
-    changed = with_attribute(page, world.report, where, attribute)
-    assert changed != page
-    found = attr_findings(validate.check_transcription(changed, world.report))
-    assert found, (where, attribute)
-    assert all(f.path.startswith("html.") for f in found)
-
-
 def test_r6_an_unknown_attribute_on_an_unrelated_element_is_not_this_checks_business(world, page):
     changed = page.replace("<title>", '<title data-x="1">', 1)
     assert not attr_findings(validate.check_transcription(changed, world.report))
-
-
-def test_r6_a_hidden_child_of_a_bound_element_is_refused_by_attribute_not_by_css(world, page):
-    span, value = passed_span(page, world)
-    for hider in ('<span style="display:none">{}</span>', '<span style="opacity:0">{}</span>',
-                  '<span style="font-size:0">{}</span>', '<i hidden>{}</i>'):
-        concealed = span.replace(f">{value}</span>", ">" + hider.format(value) + "</span>")
-        found = validate.check_transcription(page.replace(span, concealed), world.report)
-        assert attr_findings(found), hider
 
 
 # ---------------------------------------------------------------------------------------- R7

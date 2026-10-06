@@ -60,6 +60,11 @@ STATE_WORDS = {
 }
 
 
+# The page's own stylesheet. A page is the render of its report or it is not, so nothing else
+# needs to know what is in it.
+STYLESHEET = '\n :root { color-scheme: dark; }\n body { background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;\n        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }\n main { max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }\n h1,h2,h3,h4 { color:#00ccff; line-height:1.25; }\n h1 { font-size:1.7rem; } h2 { font-size:1.25rem; margin-top:2.5rem; }\n h3 { font-size:1rem; margin-top:1.75rem; }\n h4 { font-size:.95rem; margin:.5rem 0; }\n code { background:#151515; padding:.1em .35em; border-radius:3px;\n        font-size:.87em; word-break:break-all; }\n .fig { font-variant-numeric:tabular-nums; font-weight:600; color:#fff;\n        /* Digests are 64 unbroken hex characters. Without this the page is\n           594px wide at a 375px viewport, which the dry run measured rather\n           than guessed. */\n        overflow-wrap:anywhere; word-break:break-word; }\n .bound-text { color:#fff; font-weight:600; }\n .execution { border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }\n .detail { color:#9aa0a6; font-size:.92rem; }\n .state { margin:.4rem 0; }\n .state-unavailable, .state-not_computed, .state-invalid { color:#ffc857; }\n .state-measured, .state-historical { color:#8fe388; }\n .unresolved li { color:#9aa0a6; margin:.3rem 0; }\n #freshness { border:1px solid #333; border-left:3px solid #ffc857;\n              padding:.75rem 1rem; margin:1.5rem 0; }\n @media (max-width:375px) { main { padding:1.25rem .75rem 3rem; } }\n'
+
+
 class WillNotRender(Exception):
     """The artifact did not validate. A page is not built from one that did not."""
 
@@ -134,7 +139,7 @@ def _coverage_section(report: dict) -> str:
     ]
 
     ceiling = coverage["ceiling"]
-    state = ceiling["state"]
+    state = ceiling.get("state")
     template = CEILING_TEMPLATES.get(state, "")
     try:
         sentence = template.format(**{k: v for k, v in ceiling.items()
@@ -241,7 +246,23 @@ def render(report: dict, *, findings: list | None = None) -> str:
     if findings:
         raise WillNotRender(
             f"{len(findings)} validation finding(s); the first is {findings[0]}")
+    # THE PAGE IS BUILT FROM THE TABLE'S VIEW OF THE REPORT AND FROM NOTHING ELSE. Whatever the
+    # table does not name never reaches a line below, and whatever it names is typed, so a report
+    # that validated cannot make this raise. The guard after it is for a bug, and a test would
+    # see it, because a validated report must render.
+    view, problems = schema.render_view(report)
+    if problems:
+        raise WillNotRender(f"{len(problems)} field(s) the page reads are not as the table says; "
+                            f"the first is {problems[0][0]}, {problems[0][1]}")
+    try:
+        return _page(view)
+    except Exception as exc:                                # noqa: BLE001
+        raise WillNotRender(f"the page could not be built, {type(exc).__name__}") from exc
 
+
+def _page(report: dict) -> str:
+    """The page for a view. Deterministic: no clock, no environment, no iteration order that is
+    not sorted, so the same report is the same bytes every time."""
     run, fresh = report["run"], report["freshness"]
 
     # A META DESCRIPTION THE PAGE CAN STAND BEHIND.
@@ -270,7 +291,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
         "measured_at": fresh.get("measured_at"),
         "policy_hours": fresh.get("policy_hours"),
         "outcome": run.get("outcome"),
-    })
+    }, sort_keys=True)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -278,7 +299,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="{description}">
 <title>Nightly gauntlet</title>
-<style>{schema.RENDER_STYLESHEET}</style>
+<style>{STYLESHEET}</style>
 <main>
 <h1>What our own adversarial harness proved last night</h1>
 <p class="detail">This page is a test our own organization runs on its own work, with
@@ -333,12 +354,12 @@ and not provider requests. A deterministic run adds none.</p>
 <section id="inputs">
 <h2>What this was measured against</h2>
 <p class="detail">Corpus digest
-{_bound_or_not("identities.corpus_digest", report["identities"]["corpus_digest"])}.
+{_bound_or_not("identities.corpus_digest", report["identities"].get("corpus_digest"))}.
 Capability map revision
 {_bound_or_not("identities.capability_map_revision",
-         report["identities"]["capability_map_revision"])}, review state
+         report["identities"].get("capability_map_revision"))}, review state
 {_bound_or_not("identities.capability_map_review_state",
-         report["identities"]["capability_map_review_state"])}.</p>
+         report["identities"].get("capability_map_review_state"))}.</p>
 </section>
 </main>
 <script>

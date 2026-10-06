@@ -143,21 +143,14 @@ def test_a_dropped_scope_sentence_does_not_render(world):
 def test_a_line_typed_into_the_page_after_rendering_fails_transcription(world, page):
     typed = page.replace("this nightly, 0 live calls", "this nightly, 1 live calls")
     assert typed != page
-    assert "TRANSCRIPTION_MISMATCH" in codes(validate.check_transcription(typed, world.report))
+    assert "PAGE_NOT_THE_RENDER" in codes(validate.check_transcription(typed, world.report))
 
 
 def test_a_sentence_edited_in_the_page_after_rendering_fails_transcription(world, page):
     typed = page.replace("has not been examined", "has been examined")
     assert typed != page
     found = validate.check_transcription(typed, world.report)
-    assert [f.path for f in found] == ["routes[0].execution.fit_scope"]
-
-
-def test_transcription_compares_what_a_browser_shows_not_the_markup():
-    html = '<span data-bound="a">x &amp; y</span>'
-    assert validate.check_transcription(html, {"a": "x & y"}) == []
-    assert "TRANSCRIPTION_MISMATCH" in codes(
-        validate.check_transcription('<span data-bound="a">x &amp; z</span>', {"a": "x & y"}))
+    assert [f.code for f in found] == ["PAGE_NOT_THE_RENDER"]
 
 
 def test_an_unavailable_line_says_so_and_prints_no_count(tmp_path_factory, run_doc):

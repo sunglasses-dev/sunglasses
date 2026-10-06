@@ -267,17 +267,125 @@ def numeric_readable(panel: dict) -> bool:
     return panel.get("state") in NUMERIC_STATES
 
 
-# WHAT THE PAGE MAY SAY ABOUT ITSELF. The checker does not read CSS. It holds the renderer's own
-# stylesheet and its own attributes, and a page differs from them or it does not.
-RENDER_STYLESHEET = '\n :root { color-scheme: dark; }\n body { background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;\n        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }\n main { max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }\n h1,h2,h3,h4 { color:#00ccff; line-height:1.25; }\n h1 { font-size:1.7rem; } h2 { font-size:1.25rem; margin-top:2.5rem; }\n h3 { font-size:1rem; margin-top:1.75rem; }\n h4 { font-size:.95rem; margin:.5rem 0; }\n code { background:#151515; padding:.1em .35em; border-radius:3px;\n        font-size:.87em; word-break:break-all; }\n .fig { font-variant-numeric:tabular-nums; font-weight:600; color:#fff;\n        /* Digests are 64 unbroken hex characters. Without this the page is\n           594px wide at a 375px viewport, which the dry run measured rather\n           than guessed. */\n        overflow-wrap:anywhere; word-break:break-word; }\n .bound-text { color:#fff; font-weight:600; }\n .execution { border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }\n .detail { color:#9aa0a6; font-size:.92rem; }\n .state { margin:.4rem 0; }\n .state-unavailable, .state-not_computed, .state-invalid { color:#ffc857; }\n .state-measured, .state-historical { color:#8fe388; }\n .unresolved li { color:#9aa0a6; margin:.3rem 0; }\n #freshness { border:1px solid #333; border-left:3px solid #ffc857;\n              padding:.75rem 1rem; margin:1.5rem 0; }\n @media (max-width:375px) { main { padding:1.25rem .75rem 3rem; } }\n'
-RENDER_IDS = frozenset({"coverage", "routes", "run", "harness", "method", "inputs", "freshness",
-                        "freshness-note"})
-RENDER_CLASSES = frozenset(
-    {"fig", "bound-text", "execution", "detail", "state", "unresolved", "counts", "scope",
-     "ledger-lines"}
-    | {f"state-{x}" for x in set(STATES) | set(CEILING_STATES) | set(EXEC_STATES)
-       | set(ROW_STATES) | set(PLAN_STATES)})
-# attribute -> the values the renderer writes, or None for a value that is the point (a path).
-# No `style`, no `hidden`, no `aria-hidden`: nothing the renderer writes needs them.
-RENDER_ATTRIBUTES = {"data-bound": None, "id": RENDER_IDS, "class": RENDER_CLASSES,
-                     "lang": frozenset({"en"})}
+# WHAT RENDER MAY READ. One table for every field the page is built from, and the page is built
+# from the view this table cuts out of a report and from nothing else. The validator types each
+# field here (`REPORT_FIELD_TYPE`), so a report that passes has a view render cannot trip on, and
+# a field the table does not name cannot reach the page. A kind is text, a whole number or a number
+# (a bool is none of them), OBJECT for a thing only its presence is read of, a table for an object,
+# or a wrapped kind: `_opt` null or absent, `_nul` present but null allowed, `_list` of, `_map` of
+# text keys to.
+NUMBER, OBJECT = "number", "object"
+
+
+def _opt(kind): return ("opt", kind)
+def _nul(kind): return ("nul", kind)
+def _list(kind): return ("list", kind)
+def _map(kind): return ("map", kind)
+
+
+_PANEL = {"state": _opt(TEXT), "reason_code": _opt(TEXT), "detail": _opt(TEXT)}
+REPORT_READS = {
+    "run": {"id": TEXT, "attempt": WHOLE, "finished_at": TEXT, "outcome": TEXT,
+            "exit_code": WHOLE, "reason_code": _opt(TEXT)},
+    "freshness": {"measured_at": TEXT, "policy_hours": NUMBER},
+    "identities": {"corpus_digest": _nul(TEXT), "capability_map_revision": _nul(TEXT),
+                   "capability_map_review_state": _nul(TEXT)},
+    "harness": dict(_PANEL),
+    "coverage": dict(_PANEL, plan_partition=_opt({"drivable": _opt(WHOLE)}), total=_opt(WHOLE),
+                     execution_partition=_opt({"passed": _opt(WHOLE), "not_run": _opt(WHOLE)}),
+                     ceiling=_opt({"state": _opt(TEXT), "unclassified_count": _opt(WHOLE),
+                                   "blocked_needing_route": _opt(WHOLE),
+                                   "blocked_by_adapter_work_alone": _opt(WHOLE),
+                                   "unclassified": _opt(_map(TEXT))})),
+    "routes": _opt(_list({
+        "name": _opt(TEXT), "implementation_kind": _opt(TEXT), "head": _opt(TEXT),
+        "head_reachable_on_origin": _opt(TEXT), "rows": _opt(dict(_PANEL)),
+        "execution": _opt({"state": _opt(TEXT), "harness_head": _opt(TEXT),
+                           "records_digest": _opt(TEXT), "counts": _opt(_map(WHOLE)),
+                           "fit_scope": _opt(TEXT)})})),
+    "ledger": dict(_PANEL, lines=_opt(_list({
+        "scope": _opt(TEXT), "state": _opt(TEXT), "reason_code": _opt(TEXT),
+        "text": _opt(TEXT), "updated_at": _opt(TEXT)}))),
+    "execution_run": _opt(OBJECT),
+}
+# A panel whose digits may be shown is read for them, so these must be there when it is.
+_READ_WHEN_NUMERIC = (("plan_partition", "drivable"), ("total",), ("execution_partition", "passed"),
+                      ("execution_partition", "not_run"), ("ceiling",))
+
+
+def _has_kind(value, kind) -> bool:
+    if kind == TEXT:
+        return isinstance(value, str)
+    if kind == WHOLE:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == NUMBER:
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and value == value and value not in (float("inf"), float("-inf")))
+    return isinstance(value, dict)                          # OBJECT
+
+
+def _cut(value, kind, path, problems, present=True):
+    """The part of `value` the table names, appending a (path, why) for every field that is not
+    what the table says. Returns None for a field that is null or absent."""
+    wrap = kind[0] if isinstance(kind, tuple) else None
+    if wrap in ("opt", "nul"):
+        if value is None:
+            if wrap == "nul" and not present:
+                problems.append((path, "absent. The page shows this field, so it must be named"))
+            return None
+        kind, wrap = kind[1], (kind[1][0] if isinstance(kind[1], tuple) else None)
+    elif value is None:
+        problems.append((path, "absent" if not present else "null, and this field is required"))
+        return None
+    if isinstance(kind, dict):
+        if not isinstance(value, dict):
+            problems.append((path, f"not an object, it is {type(value).__name__}"))
+            return None
+        out = {}
+        for key, sub in kind.items():
+            got = _cut(value.get(key), sub, f"{path}.{key}" if path else key, problems,
+                       key in value)
+            if got is not None:
+                out[key] = got
+        return out
+    if wrap == "list":
+        if not isinstance(value, list):
+            problems.append((path, f"not a list, it is {type(value).__name__}"))
+            return None
+        return [_cut(item, kind[1], f"{path}[{index}]", problems) for index, item in enumerate(value)]
+    if wrap == "map":
+        if not isinstance(value, dict):
+            problems.append((path, f"not an object, it is {type(value).__name__}"))
+            return None
+        out = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                problems.append((path, f"a key that is not text, {key!r}"))
+                continue
+            out[key] = _cut(item, kind[1], f"{path}.{key}", problems)
+        return out
+    if not _has_kind(value, kind):
+        problems.append((path, f"not {kind}, it is {type(value).__name__}"))
+        return None
+    return value
+
+
+def render_view(report) -> tuple[dict, list[tuple[str, str]]]:
+    """(view, problems). The view holds only fields `REPORT_READS` names. Never raises."""
+    problems: list[tuple[str, str]] = []
+    try:
+        if not isinstance(report, dict):
+            return {}, [("report", "not an object")]
+        view = _cut(report, REPORT_READS, "", problems) or {}
+        coverage = view.get("coverage")
+        if isinstance(coverage, dict) and numeric_readable(coverage):
+            for chain in _READ_WHEN_NUMERIC:
+                node = coverage
+                for key in chain:
+                    node = node.get(key) if isinstance(node, dict) else None
+                if node is None:
+                    problems.append((".".join(("coverage",) + chain),
+                                     "absent, and this panel is measured so the page shows it"))
+        return view, problems
+    except Exception as exc:                                # noqa: BLE001
+        return {}, problems + [("report", f"could not be read, {type(exc).__name__}")]
