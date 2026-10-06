@@ -23,6 +23,9 @@ validated counts, and a reason code that a test can assert on.
 """
 from __future__ import annotations
 
+import datetime
+import re
+
 SCHEMA_VERSION = 2
 
 # --- how a panel can be ------------------------------------------------------
@@ -61,6 +64,10 @@ REASON_CODES = {
     "EXEC_NOT_RUN": "planned and not executed in this run",
     "EXEC_OBSERVER_ABSENT": "a required independent observation is missing",
     "EXEC_CONTRADICTED": "an independent observation contradicts the candidate",
+    "CEILING_OP_OPEN_QUESTION":
+        "the reviewed capability map lists this operation as an open question",
+    "CEILING_OP_NOT_IN_MAP":
+        "this operation appears in a blocked variant and the capability map does not name it",
     "EXEC_NONE": "the ceiling is computed and no variant was executed, so there is nothing "
                  "behind the number",
     # evidence / identity
@@ -97,6 +104,14 @@ CEILING_STATES = ("true", "false", "not_computed", "not_applicable")
 # Origin reachability is three-valued: a failed network check means unknown,
 # never "gone". E8.
 REACHABILITY_STATES = ("reachable", "unreachable", "unknown")
+
+# The reason codes a ceiling can give for one operation it could not classify. Each has its fixed
+# text in REASON_CODES, so the page prints that text and never a sentence the report carries.
+OP_REASON_CODES = ("CEILING_OP_OPEN_QUESTION", "CEILING_OP_NOT_IN_MAP")
+
+# What a run can end as, and the states a reviewed capability map can be in.
+RUN_OUTCOMES = ("complete", "refused", "failed", "incomplete")
+REVIEW_STATES = ("reviewed", "unreviewed")
 
 # What kind of thing was actually executed. E7: a stand-in is not a candidate,
 # a candidate is not a merged route, and a merged route is not a release.
@@ -280,36 +295,117 @@ NUMBER, OBJECT = "number", "object"
 def _opt(kind): return ("opt", kind)
 def _nul(kind): return ("nul", kind)
 def _list(kind): return ("list", kind)
-def _map(kind): return ("map", kind)
+def _map(kind, keys=None): return ("map", kind) if keys is None else ("map", kind, keys)
+
+
+def parse_when(value) -> datetime.datetime | None:
+    """The one timestamp parse. A value that does not parse is not a time. No zone means UTC."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=datetime.timezone.utc)
+
+
+class Kind:
+    """What one text field is allowed to hold. Every text field the page reads declares exactly
+    one, because a string no check binds is a string anyone can write the page's claim in.
+
+      code     a member of a named table
+      ident    an identifier with a pattern, no space, no markup, bounded
+      when     a timestamp that parses
+      digest   hex of one fixed length
+      derived  a value the validator recomputes from the rest of the report. `bound_by` names where
+    """
+    __slots__ = ("how", "name", "bound_by", "_test")
+
+    def __init__(self, how, name, test, bound_by=None):
+        self.how, self.name, self.bound_by, self._test = how, name, bound_by, test
+
+    def fits(self, value) -> bool:
+        return isinstance(value, str) and bool(self._test(value))
+
+    def why(self, value) -> str:
+        shown = value if len(value) <= 40 else value[:40] + "..."
+        return {"code": f"not a code in {self.name}, it is {shown!r}",
+                "ident": f"not {self.name}, it is {shown!r}",
+                "when": f"not a timestamp, it is {shown!r}",
+                "digest": f"not {self.name}, it is {shown!r}",
+                "derived": f"not {self.name}"}[self.how]
+
+    def __repr__(self):
+        return f"Kind({self.how}, {self.name})"
+
+
+def code_in(name, table) -> Kind:
+    return Kind("code", name, lambda v: v in table)
+
+
+def ident(name, pattern) -> Kind:
+    compiled = re.compile(pattern)
+    return Kind("ident", name, lambda v: compiled.fullmatch(v) is not None)
+
+
+def digest(name, pattern) -> Kind:
+    compiled = re.compile(pattern)
+    return Kind("digest", name, lambda v: compiled.fullmatch(v) is not None)
+
+
+def derived(name, bound_by) -> Kind:
+    return Kind("derived", name, lambda v: True, bound_by)
+
+
+WHEN = Kind("when", "a timestamp", lambda v: parse_when(v) is not None)
+RUN_ID = ident("a run id", r"[0-9A-Za-z][0-9A-Za-z._-]{0,63}")
+ROUTE_NAME = ident("a route name", r"[a-z][a-z0-9_]{0,63}")
+MAP_REVISION = ident("a map revision", r"[0-9A-Za-z][0-9A-Za-z._-]{0,63}")
+OP_KEY = ident("an operation key", r"[a-z][a-z0-9_]*(\[[a-z0-9_]+=[A-Za-z0-9_.-]+\])?")
+DIGEST64 = digest("a sha256 digest", r"[0-9a-f]{64}")
+GIT_HEAD = digest("a git head", r"[0-9a-f]{40}([0-9a-f]{24})?")
+STATE = code_in("STATES", STATES)
+REASON = code_in("REASON_CODES", REASON_CODES)
+LEDGER_TEXT = derived("ledger line text",
+                      "validate._validate_ledger recomputes it with schema.ledger_line_text")
+FIT_SCOPE = derived("the stand in scope sentence",
+                    "validate._validate_route_blocks pins it to schema.STANDIN_SCOPE_SENTENCE")
 
 
 # A panel is a state and a reason code, and the page prints the fixed text for the code. It has no
 # free form sentence of its own: a string nothing can bind is a string anyone can write the page's
 # claim in, so the field is not read and a report that carries one is refused.
 REFUSED_FIELD = ("refused", "unknown field. The page does not read it, so a report may not carry it")
-_PANEL = {"state": _opt(TEXT), "reason_code": _opt(TEXT), "detail": REFUSED_FIELD}
+_PANEL = {"state": _opt(STATE), "reason_code": _opt(REASON), "detail": REFUSED_FIELD}
 REPORT_READS = {
-    "run": {"id": TEXT, "attempt": WHOLE, "finished_at": TEXT, "outcome": TEXT,
-            "exit_code": WHOLE, "reason_code": _opt(TEXT)},
-    "freshness": {"measured_at": TEXT, "policy_hours": NUMBER},
-    "identities": {"corpus_digest": _nul(TEXT), "capability_map_revision": _nul(TEXT),
-                   "capability_map_review_state": _nul(TEXT)},
+    "run": {"id": RUN_ID, "attempt": WHOLE, "finished_at": WHEN,
+            "outcome": code_in("RUN_OUTCOMES", RUN_OUTCOMES),
+            "exit_code": WHOLE, "reason_code": _opt(REASON)},
+    "freshness": {"measured_at": WHEN, "policy_hours": NUMBER},
+    "identities": {"corpus_digest": _nul(DIGEST64), "capability_map_revision": _nul(MAP_REVISION),
+                   "capability_map_review_state": _nul(code_in("REVIEW_STATES", REVIEW_STATES))},
     "harness": dict(_PANEL),
     "coverage": dict(_PANEL, plan_partition=_opt({"drivable": _opt(WHOLE)}), total=_opt(WHOLE),
                      execution_partition=_opt({"passed": _opt(WHOLE), "not_run": _opt(WHOLE)}),
-                     ceiling=_opt({"state": _opt(TEXT), "unclassified_count": _opt(WHOLE),
+                     ceiling=_opt({"state": _opt(code_in("CEILING_STATES", CEILING_STATES)),
+                                   "unclassified_count": _opt(WHOLE),
                                    "blocked_needing_route": _opt(WHOLE),
                                    "blocked_by_adapter_work_alone": _opt(WHOLE),
-                                   "unclassified": _opt(_map(TEXT))})),
+                                   "unclassified": _opt(_map(code_in("OP_REASON_CODES",
+                                                                     OP_REASON_CODES), OP_KEY))})),
     "routes": _opt(_list({
-        "name": _opt(TEXT), "implementation_kind": _opt(TEXT), "head": _opt(TEXT),
-        "head_reachable_on_origin": _opt(TEXT), "rows": _opt(dict(_PANEL)),
-        "execution": _opt({"state": _opt(TEXT), "harness_head": _opt(TEXT),
-                           "records_digest": _opt(TEXT), "counts": _opt(_map(WHOLE)),
-                           "fit_scope": _opt(TEXT)})})),
+        "name": _opt(ROUTE_NAME),
+        "implementation_kind": _opt(code_in("IMPLEMENTATION_KINDS", IMPLEMENTATION_KINDS)),
+        "head": _opt(GIT_HEAD),
+        "head_reachable_on_origin": _opt(code_in("REACHABILITY_STATES", REACHABILITY_STATES)),
+        "rows": _opt(dict(_PANEL)),
+        "execution": _opt({"state": _opt(STATE), "harness_head": _opt(GIT_HEAD),
+                           "records_digest": _opt(DIGEST64),
+                           "counts": _opt(_map(WHOLE, code_in("EXEC_STATES", EXEC_STATES))),
+                           "fit_scope": _opt(FIT_SCOPE)})})),
     "ledger": dict(_PANEL, lines=_opt(_list({
-        "scope": _opt(TEXT), "state": _opt(TEXT), "reason_code": _opt(TEXT),
-        "text": _opt(TEXT), "updated_at": _opt(TEXT)}))),
+        "scope": _opt(code_in("LEDGER_SCOPES", LEDGER_SCOPES)), "state": _opt(STATE),
+        "reason_code": _opt(REASON), "text": _opt(LEDGER_TEXT), "updated_at": _opt(WHEN)}))),
     "execution_run": _opt(OBJECT),
 }
 # A panel whose digits may be shown is read for them, so these must be there when it is.
@@ -318,6 +414,8 @@ _READ_WHEN_NUMERIC = (("plan_partition", "drivable"), ("total",), ("execution_pa
 
 
 def _has_kind(value, kind) -> bool:
+    if isinstance(kind, Kind):
+        return kind.fits(value)
     if kind == TEXT:
         return isinstance(value, str)
     if kind == WHOLE:
@@ -370,10 +468,22 @@ def _cut(value, kind, path, problems, present=True):
             if not isinstance(key, str):
                 problems.append((path, f"a key that is not text, {key!r}"))
                 continue
+            if len(kind) > 2 and not kind[2].fits(key):
+                problems.append((path, "a key " + kind[2].why(key)))
+                continue
             out[key] = _cut(item, kind[1], f"{path}.{key}", problems)
         return out
+    if kind == TEXT:
+        problems.append((path, "a text field that declares no kind. Nothing binds what it says, "
+                               "so the page may not read it"))
+        return None
     if not _has_kind(value, kind):
-        problems.append((path, f"not {kind}, it is {type(value).__name__}"))
+        if isinstance(kind, Kind) and isinstance(value, str):
+            problems.append((path, kind.why(value)))
+        elif isinstance(kind, Kind):
+            problems.append((path, f"not text, it is {type(value).__name__}"))
+        else:
+            problems.append((path, f"not {kind}, it is {type(value).__name__}"))
         return None
     return value
 

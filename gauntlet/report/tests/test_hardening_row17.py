@@ -239,8 +239,10 @@ def test_r7_a_field_the_table_does_not_name_never_reaches_the_page(world, page):
 
 def fits(value, kind):
     """Is `value` what the table says `kind` is. The spec restated, not the code under test."""
+    if isinstance(kind, schema.Kind):
+        return kind.fits(value)
     if isinstance(kind, tuple):
-        wrap, inner = kind
+        wrap, inner = kind[0], kind[1]
         if wrap in ("opt", "nul") and value is None:
             return True
         if wrap in ("opt", "nul"):
@@ -248,7 +250,8 @@ def fits(value, kind):
         if wrap == "list":
             return isinstance(value, list) and all(fits(item, inner) for item in value)
         return isinstance(value, dict) and all(
-            isinstance(key, str) and fits(item, inner) for key, item in value.items())
+            isinstance(key, str) and (len(kind) < 3 or kind[2].fits(key)) and fits(item, inner)
+            for key, item in value.items())
     if isinstance(kind, dict):
         return isinstance(value, dict)
     if kind == schema.TEXT:

@@ -35,6 +35,19 @@ from test_execution_run import (                            # noqa: E402,F401
     codes, corpus_digest, norun, planned, run_doc, world)
 
 UNREADABLE = "FRESHNESS_MEASURED_AT_UNREADABLE"
+
+REAL_VIEW = schema.render_view
+
+
+@pytest.fixture(autouse=True)
+def _encoders_alone(monkeypatch):
+    """Row 24 made the typed view refuse a text field that is not its declared kind, so a hostile
+    string in such a field no longer reaches the renderer at all. This file tests the encoders as
+    their own layer, so it hands the renderer the raw report and skips the typed view as it skips
+    the validator. The validator still runs wherever a test calls render.render without
+    `findings=[]`, so every refusal asserted here is still the validator's."""
+    monkeypatch.setattr(schema, "render_view", lambda report: (copy.deepcopy(report), []))
+
 CLAIM = schema.STANDIN_SCOPE_SENTENCE
 HOSTILE = '"><script>X</script><b id="y" onclick="z">&lt;\'</b><!--  '
 SCRIPT_BODY = re.compile(r"<script>(.*?)</script>", re.S)
@@ -360,5 +373,5 @@ def test_exact_transcription_is_still_one_comparison(norun):
 
 
 def test_the_render_view_table_is_untouched_by_the_encoders(norun):
-    view, problems = schema.render_view(norun.report)
+    view, problems = REAL_VIEW(norun.report)
     assert problems == [] and set(view) <= set(schema.REPORT_READS)

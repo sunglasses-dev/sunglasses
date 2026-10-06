@@ -153,11 +153,7 @@ def _validate_report(report: dict) -> list[Finding]:
 
 
 def _when(value) -> datetime.datetime | None:
-    try:
-        parsed = datetime.datetime.fromisoformat(str(value))
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=datetime.timezone.utc)
+    return schema.parse_when(str(value))
 
 
 def _is_count(value) -> bool:

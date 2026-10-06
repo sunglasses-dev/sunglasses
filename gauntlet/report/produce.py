@@ -292,8 +292,10 @@ def coverage_panel(planned: dict, capmap: dict, run_doc: dict | None = None) -> 
         return panel
 
     if not classification.complete:
-        unresolved = dict(classification.unknown)
-        unresolved.update(classification.uncovered)
+        # A code for each operation, never the map's sentence. The page prints the fixed text for
+        # the code, and the sentence stays in the reviewed map where it can be read and checked.
+        unresolved = {op: "CEILING_OP_OPEN_QUESTION" for op in classification.unknown}
+        unresolved.update({op: "CEILING_OP_NOT_IN_MAP" for op in classification.uncovered})
         panel["ceiling"] = {
             "state": "not_computed",
             "reason_code": "CEILING_UNCLASSIFIED_OPS",

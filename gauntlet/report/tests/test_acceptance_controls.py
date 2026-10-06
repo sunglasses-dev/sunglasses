@@ -584,7 +584,7 @@ def test_the_description_states_todays_real_outcome(honest):
 def test_the_description_moves_when_the_outcome_does(honest):
     """THE CONTROL. A fixed string passes the row above and fails this one."""
     other = copy.deepcopy(honest)
-    other["run"]["outcome"] = "completed"
+    other["run"]["outcome"] = "complete"
     moved = _description(render.render(other, findings=[]))
     assert moved != _description(render.render(honest)), \
         "the description did not change when the outcome did — it is not derived"

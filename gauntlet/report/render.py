@@ -171,8 +171,9 @@ def _coverage_section(report: dict) -> str:
 
     if state == "not_computed":
         parts.append("<ul class='unresolved'>")
-        for op, reason in sorted((ceiling.get("unclassified") or {}).items()):
-            parts.append(f"<li><code>{_text(op)}</code> {_text(reason)}</li>")
+        for op, code in sorted((ceiling.get("unclassified") or {}).items()):
+            parts.append(f"<li><code>{_text(op)}</code> "
+                         f"{_text(schema.REASON_CODES.get(code, ''))}</li>")
         parts.append("</ul>")
     parts.append("</section>")
     return "".join(parts)
