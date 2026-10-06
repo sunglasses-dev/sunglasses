@@ -218,14 +218,13 @@ def usable_run(run_doc, corpus_digest: str | None, started: str) -> tuple[dict |
 
 
 def malformed_record(records) -> str | None:
-    """Why a list of records cannot be counted, or None. A record is an object that names a
-    variant and an outcome as text. One that is not makes the whole document unreadable, because a
+    """Why a list of records cannot be counted, or None. A record is shaped as `schema` says,
+    every nested field included. One that is not makes the whole document unreadable, because a
     count that skips what it cannot read is a count of a different document."""
     for index, record in enumerate(records):
-        if (not isinstance(record, dict) or not isinstance(record.get("variant_id"), str)
-                or not isinstance(record.get("outcome"), str)):
-            return (f"record {index} of the execution run is not an object with a variant id and "
-                    "an outcome")
+        problem = schema.record_shape_problem(record)
+        if problem:
+            return f"record {index} of the execution run cannot be read: {problem}"
     return None
 
 
@@ -516,10 +515,13 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
         or coverage.get("ceiling", {}).get("state") == "not_computed"
         or bool(run_unreadable)
     )
-    if refusing:
+    # V15. A ceiling that is computed over a run that executed nothing is a number with nothing
+    # behind it. Another refusal takes precedence: it is the more basic one.
+    exec_none = (not refusing and schema.ceiling_over_nothing(coverage))
+    if refusing or exec_none:
         report["run"]["outcome"] = "refused"
         report["run"]["exit_code"] = 3
-        report["run"]["reason_code"] = "RUN_REFUSED"
+        report["run"]["reason_code"] = "EXEC_NONE" if exec_none else "RUN_REFUSED"
     report["run"]["finished_at"] = _now()
     return report, report["run"]["exit_code"]
 

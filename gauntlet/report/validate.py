@@ -193,8 +193,17 @@ def _validate_execution(report) -> list[Finding]:
     seen = set()
     for index, record in enumerate(records):
         path = f"execution_run.records[{index}]"
-        if not isinstance(record, dict):
-            findings.append(Finding("EXEC_RECORD_SCHEMA", path, "a record is not an object"))
+        problem = schema.record_shape_problem(record)
+        if problem:
+            findings.append(Finding("EXEC_RECORD_SCHEMA", path,
+                                    f"the record cannot be read, {problem}"))
+            outcome = record.get("outcome") if isinstance(record, dict) else None
+            if not isinstance(outcome, str) or outcome not in schema.EXEC_STATES or (
+                    outcome == "not_run"):
+                findings.append(Finding(
+                    "EXEC_OUTCOME_UNKNOWN", f"{path}.outcome",
+                    f"{outcome!r} is not an executed outcome. `not_run` is the absence of a "
+                    "record"))
             continue
         variant_id = record.get("variant_id")
         if record.get("record_schema") != schema.EXEC_RECORD_SCHEMA:
@@ -312,7 +321,8 @@ def _validate_execution(report) -> list[Finding]:
     counted = {"passed": 0, "failed": 0, "refused": 0, "errored": 0}
     once = set()
     for record in records:
-        if (isinstance(record, dict) and record.get("variant_id") in drivable_set
+        if (isinstance(record, dict) and isinstance(record.get("variant_id"), str)
+                and record.get("variant_id") in drivable_set
                 and record.get("variant_id") not in once and record.get("outcome") in counted):
             once.add(record["variant_id"])
             counted[record["outcome"]] += 1
@@ -871,7 +881,10 @@ NON_VISIBLE_TAGS = frozenset({"script", "style", "template", "title", "textarea"
                               "head", "iframe", "object"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
                        "source", "track", "wbr"})
-HIDING_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+HIDING_STYLE = re.compile(
+    r"display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?![.\d])"
+    r"|font-size\s*:\s*0(?![.\d])|color\s*:\s*transparent"
+    r"|(?:left|top|text-indent)\s*:\s*-\d{3,}|clip-path\s*:\s*inset\(\s*50%", re.I)
 
 
 class _Bindings(HTMLParser):
@@ -886,13 +899,16 @@ class _Bindings(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.stack: list[dict] = []
         self.found: list[dict] = []
+        self.hiding_rules: list[str] = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        hidden = ("hidden" in attrs or bool(HIDING_STYLE.search(attrs.get("style") or "")))
+        hides = ("hidden" in attrs or (attrs.get("aria-hidden") or "").strip().lower() == "true"
+                 or bool(HIDING_STYLE.search(attrs.get("style") or ""))
+                 or tag in NON_VISIBLE_TAGS)
         parent_dark = bool(self.stack) and self.stack[-1]["dark"]
-        dark = parent_dark or hidden or tag in NON_VISIBLE_TAGS
-        entry = {"tag": tag, "dark": dark, "path": attrs.get("data-bound"), "text": []}
+        entry = {"tag": tag, "dark": parent_dark or hides, "hides": hides,
+                 "path": attrs.get("data-bound"), "text": []}
         if tag in VOID_TAGS:
             if entry["path"] is not None:
                 self.found.append(entry)
@@ -905,9 +921,19 @@ class _Bindings(HTMLParser):
             self._close(len(self.stack) - 1)
 
     def handle_data(self, data):
-        for entry in self.stack:
-            if entry["path"] is not None:
+        """Text counts toward a bound element only when nothing between that element and the text
+        hides it. A hidden, aria hidden, script, style or template descendant is the element's own
+        concealed text, not its displayed text, so it is left out of what the element shows."""
+        if self.stack and self.stack[-1]["tag"] == "style":
+            self.handle_style_text(data)
+        for index, entry in enumerate(self.stack):
+            if entry["path"] is not None and not any(
+                    inner["hides"] for inner in self.stack[index + 1:]):
                 entry["text"].append(data)
+
+    def handle_style_text(self, text):
+        if HIDING_STYLE.search(text):
+            self.hiding_rules.append(text)
 
     def handle_endtag(self, tag):
         for index in range(len(self.stack) - 1, -1, -1):
@@ -977,6 +1003,11 @@ def check_transcription(html: str, report: dict) -> list[Finding]:
     parser.feed(html)
     parser.close()
     visible: set[str] = set()
+    if parser.hiding_rules:
+        findings.append(Finding(
+            "BINDING_NOT_VISIBLE", "html.style",
+            "a style sheet on the page hides content. The page the renderer writes has no such "
+            "rule, and one here can conceal any bound text that a browser would otherwise show"))
     for entry in parser.found:
         path = entry["path"]
         if entry["dark"]:

@@ -61,6 +61,8 @@ REASON_CODES = {
     "EXEC_NOT_RUN": "planned and not executed in this run",
     "EXEC_OBSERVER_ABSENT": "a required independent observation is missing",
     "EXEC_CONTRADICTED": "an independent observation contradicts the candidate",
+    "EXEC_NONE": "the ceiling is computed and no variant was executed, so there is nothing "
+                 "behind the number",
     # evidence / identity
     "EVIDENCE_UNBOUND": "no evidence reference for a claim-bearing field",
     "IDENTITY_UNPINNED": "an identity is a name or an abbreviation, not a full digest",
@@ -131,6 +133,59 @@ def ledger_line_text(line: dict) -> str:
 EXEC_RECORD_SCHEMA = 1
 EXEC_RUN_SCHEMA = 1
 
+# The shape of a driver record, read by the producer on import and by the validator on every
+# record. Only the fields either of them reads are listed. A field may be absent or null, and when
+# it is present it has this type. A record of the wrong shape is not a record with a wrong value:
+# it cannot be read at all, so it is refused whole and never counted around.
+_TEXT, _FLAG, _LIST_OF_TEXT, _OBJECT, _WHOLE = "text", "flag", "list of text", "object", "whole"
+RECORD_SHAPE = {
+    "record_schema": _WHOLE, "variant_id": _TEXT, "route": _TEXT, "implementation_kind": _TEXT,
+    "mode": _TEXT, "harness_head": _TEXT, "delivered_digest": _TEXT, "outcome": _TEXT,
+    "reason_code": _TEXT, "started_at": _TEXT, "finished_at": _TEXT, "cause": _TEXT,
+    "graded_on": _LIST_OF_TEXT, "control": _OBJECT, "expectation": _OBJECT, "assertions": _OBJECT,
+}
+RECORD_SUBSHAPE = {
+    "control": {"route": _TEXT, "stimulus_delivered": _FLAG, "refusal": _TEXT},
+    "expectation": {"assert_original_payload_absent": _FLAG, "bytes_outcome": _TEXT},
+    "assertions": {"held": _LIST_OF_TEXT, "not_held": _LIST_OF_TEXT, "no_subject": _LIST_OF_TEXT,
+                   "payload_at_destination": _FLAG, "expect_payload_absent": _FLAG,
+                   "expect_original": _FLAG, "declared_frames_delivered_unchanged": _FLAG},
+}
+
+
+def _has_shape(value, kind) -> bool:
+    if value is None:
+        return True
+    if kind == _TEXT:
+        return isinstance(value, str)
+    if kind == _FLAG:
+        return isinstance(value, bool)
+    if kind == _WHOLE:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == _LIST_OF_TEXT:
+        return isinstance(value, list) and all(isinstance(item, str) for item in value)
+    return isinstance(value, dict)
+
+
+def record_shape_problem(record) -> str | None:
+    """Why this driver record cannot be read, or None. Never raises."""
+    if not isinstance(record, dict):
+        return "a record is not an object"
+    for key in ("variant_id", "outcome"):
+        if not isinstance(record.get(key), str):
+            return f"{key} is not text"
+    for key, kind in RECORD_SHAPE.items():
+        if not _has_shape(record.get(key), kind):
+            return f"{key} is not {kind}"
+    for key, subshape in RECORD_SUBSHAPE.items():
+        inner = record.get(key)
+        if isinstance(inner, dict):
+            for sub, kind in subshape.items():
+                if not _has_shape(inner.get(sub), kind):
+                    return f"{key}.{sub} is not {kind}"
+    return None
+
+
 def canonical_digest(doc) -> str:
     """sha256 over a parsed document with sorted keys, so a digest does not depend on how a file
     happened to be indented. The producer writes it and the validator recomputes it."""
@@ -139,9 +194,22 @@ def canonical_digest(doc) -> str:
     return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()
 
 
+def ceiling_over_nothing(coverage) -> bool:
+    """V15. The ceiling is computed (true or false) and no variant has an executed outcome."""
+    if not isinstance(coverage, dict) or coverage.get("state") != "measured":
+        return False
+    ceiling, part = coverage.get("ceiling"), coverage.get("execution_partition")
+    if not isinstance(ceiling, dict) or ceiling.get("state") not in ("true", "false"):
+        return False
+    if not isinstance(part, dict):
+        return False
+    return not any(part.get(k) for k in ("passed", "failed", "refused", "errored"))
+
+
 def records_digest(records: list) -> str:
     """The digest that binds a run's records: sorted by variant id, serialised with sorted keys."""
-    return canonical_digest(sorted(records, key=lambda r: r.get("variant_id", "")))
+    return canonical_digest(sorted(
+        records, key=lambda r: str(r.get("variant_id", "")) if isinstance(r, dict) else ""))
 
 
 # What the executed variants ran on, in the words the page must carry as data
