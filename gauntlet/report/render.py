@@ -119,14 +119,14 @@ def _bound_or_not(path: str, value) -> str:
 def _state_note(panel: dict) -> str:
     state = panel.get("state")
     code = panel.get("reason_code")
-    detail = panel.get("detail") or schema.REASON_CODES.get(code, "")
+    fixed = schema.REASON_CODES.get(code, "")
     word = STATE_WORDS.get(state, state)
     body = f'<p class="state state-{_attr(state)}">{_text(word)}'
     if code:
         body += f' <code>{_text(code)}</code>'
     body += "</p>"
-    if detail:
-        body += f'<p class="detail">{_text(detail)}</p>'
+    if fixed:
+        body += f'<p class="detail">{_text(fixed)}</p>'
     return body
 
 

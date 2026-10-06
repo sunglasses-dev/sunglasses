@@ -283,7 +283,11 @@ def _list(kind): return ("list", kind)
 def _map(kind): return ("map", kind)
 
 
-_PANEL = {"state": _opt(TEXT), "reason_code": _opt(TEXT), "detail": _opt(TEXT)}
+# A panel is a state and a reason code, and the page prints the fixed text for the code. It has no
+# free form sentence of its own: a string nothing can bind is a string anyone can write the page's
+# claim in, so the field is not read and a report that carries one is refused.
+REFUSED_FIELD = ("refused", "unknown field. The page does not read it, so a report may not carry it")
+_PANEL = {"state": _opt(TEXT), "reason_code": _opt(TEXT), "detail": REFUSED_FIELD}
 REPORT_READS = {
     "run": {"id": TEXT, "attempt": WHOLE, "finished_at": TEXT, "outcome": TEXT,
             "exit_code": WHOLE, "reason_code": _opt(TEXT)},
@@ -343,6 +347,10 @@ def _cut(value, kind, path, problems, present=True):
             return None
         out = {}
         for key, sub in kind.items():
+            if sub == REFUSED_FIELD:
+                if key in value:
+                    problems.append((f"{path}.{key}" if path else key, sub[1]))
+                continue
             got = _cut(value.get(key), sub, f"{path}.{key}" if path else key, problems,
                        key in value)
             if got is not None:

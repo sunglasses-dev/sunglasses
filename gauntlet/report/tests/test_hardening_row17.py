@@ -371,7 +371,9 @@ def test_r7_the_report_mutation_set_gives_no_exception_in_validate_or_render(wor
             else:
                 assert isinstance(render.render(mutated), str), (path, bad)
                 accepted += 1
-    assert cases >= 1681, cases
+    # 1681 on the row 17 head. Row 23 removed the detail keys the honest reports used to carry,
+    # so the same walk is 40 cases shorter.
+    assert cases >= 1641, cases
     assert refused > accepted > 0
 
 

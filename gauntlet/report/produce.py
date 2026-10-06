@@ -106,14 +106,15 @@ def _digest_tree(root: pathlib.Path) -> str | None:
     return h.hexdigest()
 
 
-def _unavailable(reason_code: str, detail: str) -> dict:
+def _unavailable(reason_code: str) -> dict:
     """A panel with no number in it at all.
 
     Deliberately carries no numeric keys. A panel that kept a stale integer
     beside its state invites exactly the transcription a renderer bug would
-    then publish.
+    then publish. It carries no sentence either: the page prints the fixed text for the reason
+    code, and a free form string has nothing in the report to bind it.
     """
-    return {"state": "unavailable", "reason_code": reason_code, "detail": detail}
+    return {"state": "unavailable", "reason_code": reason_code}
 
 
 def _load_optional(path: pathlib.Path) -> tuple[dict | None, str | None]:
@@ -336,10 +337,9 @@ def ledger_panel_of(ledger: dict | None, ledger_digest: str | None, run_doc: dic
     exactly what it was, unavailable.
     """
     if ledger is None and run_doc is None:
-        return _unavailable(
-            "EVIDENCE_UNBOUND",
-            "no ledger record declaring its own scope, cap, updated_at and "
-            "digest. Budget policy is set outside this process, which does not author it.")
+        # No ledger record declaring its own scope, cap, updated_at and digest. Budget policy is set
+        # outside this process, which does not author it.
+        return _unavailable("EVIDENCE_UNBOUND")
 
     lines = []
     if ledger is not None:
@@ -407,11 +407,9 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
         run_set_aside = run_unreadable
 
     if capmap is None:
-        coverage = _unavailable("EVIDENCE_UNBOUND",
-                                f"capability map unusable. {capmap_error}")
+        coverage = _unavailable("EVIDENCE_UNBOUND")          # the capability map is unusable
     elif corpus_digest is None:
-        coverage = _unavailable("EVIDENCE_UNBOUND",
-                                "the pinned corpus is not present on this host")
+        coverage = _unavailable("EVIDENCE_UNBOUND")          # the pinned corpus is not on this host
     else:
         coverage = coverage_panel(planned, capmap, run_doc)
         if run_set_aside:
@@ -429,14 +427,12 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
 
     # E1. FIT is imported or it is absent. It is never minted here.
     if examiner is None:
-        harness = _unavailable(
-            "EVIDENCE_UNBOUND",
-            "no record written by the examiner in a form this run can read. FIT is a finding "
-            "about the instrument made by the examiner on a dated head under a "
-            "named contract. This run may reference such a record and may not "
-            "write one. The delivered mutation plan holds 73 entries over 7 "
-            "requirements and is not the 119-mutation examination manifest, so "
-            "it cannot stand in for one.")
+        # No record written by the examiner in a form this run can read. FIT is a finding about the
+        # instrument made by the examiner on a dated head under a named contract. This run may
+        # reference such a record and may not write one. The delivered mutation plan holds 73 entries
+        # over 7 requirements and is not the 119 mutation examination manifest, so it cannot stand
+        # in for one.
+        harness = _unavailable("EVIDENCE_UNBOUND")
     else:
         harness = {"state": "historical", "record": examiner,
                    "record_digest": examiner_digest}
@@ -486,11 +482,9 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
             "head_state": "unavailable",
             "head_reachable_on_origin": "unknown",
             "reachability_checked_at": None,
-            "rows": {"state": "unavailable",
-                     "reason_code": "EVIDENCE_UNBOUND",
-                     "detail": "no row results are bound to an executed head. "
-                               "Stand-in planning counts are not route "
-                               "conformance and are never relabelled as such."},
+            # No row results are bound to an executed head. Stand in planning counts are not route
+            # conformance and are never relabelled as such.
+            "rows": {"state": "unavailable", "reason_code": "EVIDENCE_UNBOUND"},
         }],
         "ledger": ledger_panel,
     }
