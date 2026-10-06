@@ -19,7 +19,7 @@
     "curl --upload-file"
   ],
   "regex": [
-    "curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)(?:\\b|(?!\\S))[^\\n]{0,160}?@[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)(?:\\b|(?!\\S))|curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:--upload-file|-T)(?:\\b|(?!\\S))\\s+[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)(?:\\b|(?!\\S))"
+    "curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)(?:\\b|(?!\\S))[^\\n]{0,160}?@[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))|curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:--upload-file|-T)(?:\\b|(?!\\S))\\s+[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))"
   ],
   "examples": {
     "malicious": [],
