@@ -464,7 +464,7 @@ def test_v14_the_route_block_equals_the_header_it_summarises(world):
             is not world.report["execution_run"]["header"]["counts"])
     found = validate.validate_report(mutated(
         world, lambda r: r["routes"][0]["execution"]["counts"].update(passed=29), seal=False))
-    assert any(f.code == "AGGREGATE_MISMATCH" and f.path == "routes[proxy_strict].execution" for f in found)
+    assert any(f.code == "AGGREGATE_MISMATCH" and f.path == "routes[0].execution" for f in found)
 
 
 # =========================== LEDGER L1 to L7 ====================================================

@@ -30,7 +30,9 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 import pathlib
+import subprocess
 import sys
 import uuid
 
@@ -65,6 +67,28 @@ def _digest_file(path: pathlib.Path) -> str | None:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError:
         return None
+
+
+ENGINE_HEAD_ENV = "GAUNTLET_ENGINE_HEAD"
+
+
+def engine_head() -> str | None:
+    """The engine commit this report is built against, resolved here and not read from the run.
+
+    A run document names the engine it ran on, and a document cannot vouch for itself. The pin is
+    the environment value a nightly sets from the archive it exported, else the head of the
+    checkout this file sits in. Anything that is not a full 40 character commit is no pin at all,
+    and a run is never bound to no pin.
+    """
+    pinned = (os.environ.get(ENGINE_HEAD_ENV) or "").strip().lower()
+    if not pinned:
+        try:
+            out = subprocess.run(["git", "-C", str(pathlib.Path(__file__).resolve().parents[2]),
+                                  "rev-parse", "HEAD"], capture_output=True, text=True, timeout=20)
+            pinned = out.stdout.strip().lower() if out.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError):
+            pinned = ""
+    return pinned if len(pinned) == 40 and all(c in "0123456789abcdef" for c in pinned) else None
 
 
 def _digest_tree(root: pathlib.Path) -> str | None:
@@ -171,17 +195,38 @@ def usable_run(run_doc, corpus_digest: str | None, started: str) -> tuple[dict |
     records = run_doc.get("records") if isinstance(run_doc, dict) else None
     if not isinstance(header, dict) or not isinstance(records, list):
         return None, "the execution run document is not a header and a list of records"
+    problem = malformed_record(records)
+    if problem:
+        return None, problem
     if header.get("schema") != schema.EXEC_RUN_SCHEMA:
         return None, f"the execution run schema {header.get('schema')!r} is not known"
     if header.get("corpus_digest") != corpus_digest:
         return None, "the execution run was made against a different corpus than this report"
     if header.get("adapter_digest") != _digest_file(pathlib.Path(adapter.__file__)):
         return None, "the execution run was made with different adapter code than this report"
+    pin = engine_head()
+    if pin is None or header.get("engine_head") != pin:
+        return None, ("the execution run was made on a different engine commit than the one this "
+                      "report is pinned to, or no engine commit is pinned")
     finished, measured = _parse_time(header.get("finished_at")), _parse_time(started)
     if (finished is None or measured is None or
             measured - finished > datetime.timedelta(hours=schema.DEFAULT_FRESHNESS_HOURS)):
         return None, ("the execution run is older than the freshness policy, or undated")
+    if finished > measured or finished > datetime.datetime.now(datetime.timezone.utc):
+        return None, "the execution run finished after the measurement that would carry it"
     return run_doc, None
+
+
+def malformed_record(records) -> str | None:
+    """Why a list of records cannot be counted, or None. A record is an object that names a
+    variant and an outcome as text. One that is not makes the whole document unreadable, because a
+    count that skips what it cannot read is a count of a different document."""
+    for index, record in enumerate(records):
+        if (not isinstance(record, dict) or not isinstance(record.get("variant_id"), str)
+                or not isinstance(record.get("outcome"), str)):
+            return (f"record {index} of the execution run is not an object with a variant id and "
+                    "an outcome")
+    return None
 
 
 def execution_partition(planned: dict, run_doc: dict | None) -> tuple[dict, str, str | None]:
@@ -199,6 +244,8 @@ def execution_partition(planned: dict, run_doc: dict | None) -> tuple[dict, str,
     drivable = set(planned["drivable"])
     seen, counts = set(), {"passed": 0, "failed": 0, "refused": 0, "errored": 0}
     for record in run_doc["records"]:
+        if not isinstance(record, dict) or not isinstance(record.get("variant_id"), str):
+            continue                    # the validator and `usable_run` refuse these. Never count
         variant_id = record.get("variant_id")
         if variant_id in drivable and variant_id not in seen and record.get("outcome") in counts:
             seen.add(variant_id)
@@ -306,9 +353,10 @@ def ledger_panel_of(ledger: dict | None, ledger_digest: str | None, run_doc: dic
                       "reason_code": "EVIDENCE_UNBOUND", "source": "ledger_record"})
     if run_doc is not None:
         header = run_doc["header"]
+        header_ledger = header.get("ledger") if isinstance(header.get("ledger"), dict) else {}
         lines.append({
-            "scope": (header.get("ledger") or {}).get("scope"),
-            "charges": (header.get("ledger") or {}).get("charges"),
+            "scope": header_ledger.get("scope"),
+            "charges": header_ledger.get("charges"),
             "updated_at": header.get("finished_at"), "source": "execution_run",
             "run_id": header.get("run_id"), "records_digest": header.get("records_digest")})
     else:
@@ -344,8 +392,19 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     if run_doc is not None and capmap is None:
         run_doc, run_set_aside = None, ("the capability map is unusable, so no coverage panel "
                                         "exists to bind the execution run to")
+    # A run file that cannot be read as records is not a stale run, it is a broken instrument.
+    # It refuses (exit 3) and still writes the report, rather than raising and writing nothing.
+    run_unreadable = None
     if run_file is None and EXECUTION_RUN.is_file():
-        run_set_aside = "the execution run file is not valid JSON"
+        run_unreadable = "the execution run file is not valid JSON"
+    elif isinstance(run_file, dict) and isinstance(run_file.get("records"), list):
+        run_unreadable = malformed_record(run_file["records"]) or (
+            None if isinstance(run_file.get("header"), dict)
+            else "the execution run document is not a header and a list of records")
+    elif run_file is not None:
+        run_unreadable = "the execution run document is not a header and a list of records"
+    if run_unreadable:
+        run_set_aside = run_unreadable
 
     if capmap is None:
         coverage = _unavailable("EVIDENCE_UNBOUND",
@@ -361,7 +420,12 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
             coverage["execution_detail"] = run_set_aside
 
     examiner, examiner_digest = _load_optional(EXAMINER_RECORD)
-    ledger, ledger_digest = _load_optional(LEDGER_RECORD)
+    ledger, _ = _load_optional(LEDGER_RECORD)
+    # The digest is over the PARSED record, so the validator can recompute it from the record
+    # embedded in the report. A digest of file bytes cannot be checked from the report alone.
+    ledger_digest = schema.canonical_digest(ledger) if isinstance(ledger, dict) else None
+    if ledger is not None and not isinstance(ledger, dict):
+        ledger = None
 
     # E1. FIT is imported or it is absent. It is never minted here.
     if examiner is None:
@@ -402,6 +466,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
             "capability_map_revision": (capmap or {}).get("revision"),
             "capability_map_review_state": (capmap or {}).get("review_state"),
             "producer_digest": _digest_file(pathlib.Path(__file__)),
+            "engine_head": engine_head(),
         },
         "freshness": {
             "policy_hours": schema.DEFAULT_FRESHNESS_HOURS,
@@ -441,13 +506,15 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
             "state": "measured",
             "records_digest": run_doc["header"].get("records_digest"),
             "harness_head": run_doc["header"].get("harness_head"),
-            "counts": dict(run_doc["header"].get("counts") or {}),
+            "counts": (dict(run_doc["header"]["counts"])
+                       if isinstance(run_doc["header"].get("counts"), dict) else {}),
             "fit_scope": schema.STANDIN_SCOPE_SENTENCE,
         }
 
     refusing = (
         coverage.get("state") == "unavailable"
         or coverage.get("ceiling", {}).get("state") == "not_computed"
+        or bool(run_unreadable)
     )
     if refusing:
         report["run"]["outcome"] = "refused"

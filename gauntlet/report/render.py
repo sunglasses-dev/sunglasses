@@ -171,7 +171,8 @@ def _routes_section(report: dict) -> str:
                      + f'. Origin reachability: <code>'
                      f'{_esc(route.get("head_reachable_on_origin"))}</code>.</p>')
         parts.append(_state_note(route.get("rows") or {}))
-        if isinstance(route.get("execution"), dict):
+        if isinstance(route.get("execution"), dict) and isinstance(
+                report.get("execution_run"), dict):
             parts.append(_execution_block(index, route["execution"]))
     parts.append("</section>")
     return "".join(parts)
@@ -213,12 +214,12 @@ def _ledger_lines(panel: dict) -> str:
     why, so a reader cannot take one line for both.
     """
     lines = panel.get("lines")
-    if not isinstance(lines, list) or not lines:
+    if (not schema.numeric_readable(panel) or not isinstance(lines, list) or not lines):
         return ""
     parts = ['<ul class="ledger-lines">']
     for index, line in enumerate(lines):
         path = f"ledger.lines[{index}]"
-        if line.get("text") is None:
+        if line.get("state") == "unavailable" or line.get("text") is None:
             code = line.get("reason_code")
             parts.append(f'<li class="state state-unavailable">'
                          f'<code>{_esc(line.get("scope"))}</code> unavailable '

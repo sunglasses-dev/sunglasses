@@ -21,7 +21,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import re
-from html import unescape as html_unescape
+from html.parser import HTMLParser
 
 import schema
 
@@ -163,13 +163,21 @@ def _validate_execution(report) -> list[Finding]:
         findings.append(Finding(
             "EXEC_STATE_UNBACKED", "execution_run",
             "a run document is present and the execution state does not stand on it"))
-    if declared == "not_run":
-        part = coverage.get("execution_partition") or {}
-        if any(part.get(k) for k in ("passed", "failed", "refused", "errored")) or (
-                coverage.get("execution_reason_code") != "EXEC_NOT_RUN"):
-            findings.append(Finding(
-                "EXEC_STATE_UNBACKED", "coverage.execution_partition",
-                "nothing was run, and the partition or its reason says otherwise"))
+    bound = declared == "measured" and valid_shape
+    part = coverage.get("execution_partition") if measured_cov else None
+    if declared == "not_run" and coverage.get("execution_reason_code") != "EXEC_NOT_RUN":
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "coverage.execution_reason_code",
+            "nothing was run, and the reason says otherwise"))
+    # R2. An executed count needs a measured state AND the run beneath it. `not_run` is only one
+    # of the ways to have no run: unavailable, unknown and missing states may not carry a pass.
+    if measured_cov and not bound and isinstance(part, dict) and any(
+            part.get(k) for k in ("passed", "failed", "refused", "errored")):
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "coverage.execution_partition",
+            "an executed count with no measured execution state and no run document beneath it"))
+    # R1. Every route's execution block is checked, and none stands without a run.
+    findings += _validate_route_blocks(report, run if bound else None)
     if not valid_shape or not measured_cov:
         return findings
 
@@ -279,6 +287,12 @@ def _validate_execution(report) -> list[Finding]:
         if not FULL_SHA.match(str(header.get(key) or "")):
             findings.append(Finding("IDENTITY_UNPINNED", f"execution_run.header.{key}",
                                     f"{header.get(key)!r} is not a full commit"))
+    pin = identities.get("engine_head")
+    if not FULL_SHA.match(str(pin or "")) or header.get("engine_head") != pin:
+        findings.append(Finding(
+            "IDENTITY_UNPINNED", "execution_run.header.engine_head",
+            "the run's engine commit is not the engine commit this report is pinned to. A run "
+            "document cannot name the engine it is judged against"))
     if identities.get("execution_harness_head") != header.get("harness_head"):
         findings.append(Finding("IDENTITY_UNPINNED", "identities.execution_harness_head",
                                 "does not equal the run header's harness head"))
@@ -328,33 +342,81 @@ def _validate_execution(report) -> list[Finding]:
     finished, measured = _when(header.get("finished_at")), _when(fresh.get("measured_at"))
     policy = fresh.get("policy_hours")
     if (finished is None or measured is None or not isinstance(policy, (int, float))
-            or measured - finished > datetime.timedelta(hours=policy)):
+            or measured - finished > datetime.timedelta(hours=policy)
+            or finished > measured
+            or finished > datetime.datetime.now(datetime.timezone.utc)):
         findings.append(Finding(
             "EXEC_RUN_STALE", "execution_run.header.finished_at",
-            "the run is older than the freshness policy allows, or its date cannot be read. "
-            "Republishing an old run does not refresh it"))
-    # V14, the route half, and the sentence that says what the examiner's finding covers.
-    block = route_entry.get("execution")
-    if not isinstance(block, dict) or block.get("state") != "measured":
-        findings.append(Finding("EXEC_STATE_UNBACKED", "routes[proxy_strict].execution",
-                                "a run is embedded and the route entry does not say what ran"))
-    else:
+            "the run is older than the freshness policy allows, finished after the measurement "
+            "that carries it or after now, or its date cannot be read. Republishing an old run "
+            "does not refresh it"))
+    return findings
+
+
+def _validate_route_blocks(report, run) -> list[Finding]:
+    """V12 and V14, the route half, for EVERY route that carries an execution block.
+
+    The block says what ran and carries the sentence that states what the examiner's finding
+    covers. It is data the page prints, so it is validated wherever the page can print it: a block
+    with no run beneath it, or on a route the run did not execute, is a claim nothing backs.
+    """
+    findings: list[Finding] = []
+    routes = report.get("routes")
+    if not isinstance(routes, list):
+        return findings
+    header = run["header"] if run is not None else {}
+    for index, route in enumerate(routes):
+        if not isinstance(route, dict) or "execution" not in route:
+            continue
+        path, block = f"routes[{index}].execution", route["execution"]
+        if run is None:
+            findings.append(Finding(
+                "EXEC_STATE_UNBACKED", path,
+                "an execution block with no run document beneath it. Counts and a scope "
+                "sentence that nothing ran are the claim this page exists to refuse"))
+            continue
+        if not isinstance(block, dict) or block.get("state") != "measured":
+            findings.append(Finding("EXEC_STATE_UNBACKED", path,
+                                    "the execution block is not a measured block of the run"))
+            continue
+        if route.get("name") != header.get("route") or route.get(
+                "implementation_kind") != "harness_stand_in":
+            findings.append(Finding(
+                "EXEC_RECORD_KIND", path,
+                "the block sits on a route the run did not execute, or one that is not the "
+                "harness stand in"))
         if ROUTE_ROW_KEYS & set(block):
             findings.append(Finding(
-                "STANDIN_CLAIMED_AS_ROUTE", "routes[proxy_strict].execution",
+                "STANDIN_CLAIMED_AS_ROUTE", path,
                 f"the execution block carries {sorted(ROUTE_ROW_KEYS & set(block))}"))
         if block.get("fit_scope") != schema.STANDIN_SCOPE_SENTENCE:
             findings.append(Finding(
-                "STANDIN_SCOPE_MISSING", "routes[proxy_strict].execution.fit_scope",
+                "STANDIN_SCOPE_MISSING", f"{path}.fit_scope",
                 "the route's execution block does not carry the sentence that states what the "
                 "examiner's finding covers. Executed variants beside a FIT word read as an "
                 "examined executor, and this one was not"))
         if (block.get("records_digest") != header.get("records_digest")
                 or block.get("counts") != header.get("counts")
                 or block.get("harness_head") != header.get("harness_head")):
-            findings.append(Finding("AGGREGATE_MISMATCH", "routes[proxy_strict].execution",
+            findings.append(Finding("AGGREGATE_MISMATCH", path,
                                     "the block does not equal the run header it summarises"))
+    # The route the run executed must say so. This is the old rule, kept: a run is embedded and
+    # the route entry does not say what ran.
+    if run is not None:
+        executed = [r for r in routes if isinstance(r, dict) and r.get("name") == "proxy_strict"]
+        if not executed or not isinstance(executed[0].get("execution"), dict) or executed[
+                0]["execution"].get("state") != "measured":
+            findings.append(Finding(
+                "EXEC_STATE_UNBACKED", "routes[proxy_strict].execution",
+                "a run is embedded and the route entry does not say what ran"))
     return findings
+
+
+def _digest_or_none(doc) -> str | None:
+    try:
+        return schema.canonical_digest(doc)
+    except (TypeError, ValueError):
+        return None
 
 
 def _validate_ledger(report) -> list[Finding]:
@@ -367,7 +429,14 @@ def _validate_ledger(report) -> list[Finding]:
     """
     findings: list[Finding] = []
     panel = report.get("ledger")
-    if not isinstance(panel, dict) or panel.get("state") not in schema.NUMERIC_STATES:
+    if isinstance(panel, dict) and panel.get("state") not in schema.NUMERIC_STATES:
+        if panel.get("lines"):
+            findings.append(Finding(
+                "LEDGER_COUNT_INVALID", "ledger.lines",
+                "labelled lines beneath a panel whose state states no numbers. A state is not a "
+                "number, and lines under it would print one"))
+        return findings
+    if not isinstance(panel, dict):
         return findings
     run = report.get("execution_run") if isinstance(report.get("execution_run"), dict) else None
     header = (run or {}).get("header") if isinstance((run or {}).get("header"), dict) else {}
@@ -404,9 +473,15 @@ def _validate_ledger(report) -> list[Finding]:
             if line.get("reason_code") not in schema.REASON_CODES:
                 findings.append(Finding("REASON_CODE_MISSING", path,
                                         "an unavailable line with no reason code in the closed set"))
-            if any(key in line for key in ("charges", "cap", "unsettled")):
+            carried = sorted(set(line) - {"scope", "state", "reason_code", "source", "text"})
+            if carried:
                 findings.append(Finding("LEDGER_COUNT_INVALID", path,
-                                        "an unavailable line that still carries a count"))
+                                        f"an unavailable line that still carries {carried}"))
+            if line.get("text") is not None:
+                findings.append(Finding(
+                    "LEDGER_LINE_TYPED", f"{path}.text",
+                    "an unavailable line with words on it. A line with no record has no text, "
+                    "and text beside a state is a number nobody can trace"))
             continue
         charges, cap, unsettled = line.get("charges"), line.get("cap"), line.get("unsettled")
         needs_cap = scope in ("cumulative_gate2", "live_driver_batch")
@@ -433,14 +508,18 @@ def _validate_ledger(report) -> list[Finding]:
         if line.get("source") == "ledger_record":
             record = panel.get("record")
             if (not isinstance(record, dict) or not panel.get("record_digest")
+                    or _digest_or_none(record) != panel.get("record_digest")
                     or line.get("record_digest") != panel.get("record_digest")
-                    or any(record.get(k) != line.get(k) for k in ("scope", "cap", "charges"))):
+                    or any(record.get(k) != line.get(k)
+                           for k in ("scope", "cap", "charges", "unsettled", "updated_at"))):
                 findings.append(Finding(
                     "LEDGER_NOT_IMPORTED", path,
                     "the line is not the imported ledger record it cites"))
         elif line.get("source") == "execution_run":
             ledger_header = header.get("ledger") if isinstance(header.get("ledger"), dict) else {}
             if (run is None or line.get("records_digest") != header.get("records_digest")
+                    or line.get("run_id") != header.get("run_id")
+                    or line.get("updated_at") != header.get("finished_at")
                     or ledger_header.get("scope") != scope
                     or ledger_header.get("charges") != charges):
                 findings.append(Finding(
@@ -786,7 +865,65 @@ def _validate_rows(rows, path, route) -> list[Finding]:
     return findings
 
 
-BOUND = re.compile(r'data-bound="([^"]+)"[^>]*>([^<]*)<')
+# Elements whose text a reader is never shown, and the markup that hides one that is. A binding
+# there can hold any text at all, because nobody reads it.
+NON_VISIBLE_TAGS = frozenset({"script", "style", "template", "title", "textarea", "noscript",
+                              "head", "iframe", "object"})
+VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+                       "source", "track", "wbr"})
+HIDING_STYLE = re.compile(r"display\s*:\s*none|visibility\s*:\s*hidden", re.I)
+
+
+class _Bindings(HTMLParser):
+    """Every `data-bound` element with the text a browser would show for it.
+
+    A parser and not a pattern, because the pattern read only up to the first nested tag, and
+    because entity decoding belongs to the context: text in a script or style element is raw, and
+    text in a visible element is decoded. `convert_charrefs` does exactly that.
+    """
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.stack: list[dict] = []
+        self.found: list[dict] = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        hidden = ("hidden" in attrs or bool(HIDING_STYLE.search(attrs.get("style") or "")))
+        parent_dark = bool(self.stack) and self.stack[-1]["dark"]
+        dark = parent_dark or hidden or tag in NON_VISIBLE_TAGS
+        entry = {"tag": tag, "dark": dark, "path": attrs.get("data-bound"), "text": []}
+        if tag in VOID_TAGS:
+            if entry["path"] is not None:
+                self.found.append(entry)
+            return
+        self.stack.append(entry)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag not in VOID_TAGS and self.stack and self.stack[-1]["tag"] == tag:
+            self._close(len(self.stack) - 1)
+
+    def handle_data(self, data):
+        for entry in self.stack:
+            if entry["path"] is not None:
+                entry["text"].append(data)
+
+    def handle_endtag(self, tag):
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index]["tag"] == tag:
+                self._close(index)
+                return
+
+    def _close(self, index):
+        while len(self.stack) > index:
+            entry = self.stack.pop()
+            if entry["path"] is not None:
+                self.found.append(entry)
+
+    def close(self):
+        super().close()
+        self._close(0)
 
 
 def resolve(report: dict, path: str):
@@ -801,30 +938,73 @@ def resolve(report: dict, path: str):
     return node
 
 
+def _required_bindings(report: dict) -> list[str]:
+    """Fields the page must show as bound figures or text, derived from the report alone. A page
+    that drops one of them cannot be told from one whose renderer never had it."""
+    need: list[str] = []
+    routes = report.get("routes")
+    for index, route in enumerate(routes if isinstance(routes, list) else []):
+        block = route.get("execution") if isinstance(route, dict) else None
+        if isinstance(block, dict):
+            need.append(f"routes[{index}].execution.fit_scope")
+            need += [f"routes[{index}].execution.counts.{key}"
+                     for key in sorted(block["counts"])] if isinstance(
+                         block.get("counts"), dict) else []
+    ledger = report.get("ledger")
+    if isinstance(ledger, dict) and schema.numeric_readable(ledger) and isinstance(
+            ledger.get("lines"), list):
+        need += [f"ledger.lines[{index}].text" for index, line in enumerate(ledger["lines"])
+                 if isinstance(line, dict) and line.get("text") is not None]
+    coverage = report.get("coverage")
+    if isinstance(coverage, dict) and schema.numeric_readable(coverage) and isinstance(
+            coverage.get("execution_partition"), dict):
+        need += ["coverage.execution_partition.passed", "coverage.execution_partition.not_run"]
+    return need
+
+
 def check_transcription(html: str, report: dict) -> list[Finding]:
     """Every rendered figure equals the validated artifact it cites.
 
     This is the weaker of the two checks and is labelled as such, because a
     coordinated edit to both files passes it. It exists to catch the renderer,
-    not the author.
+    not the author. It reads the page as a browser does: the text of a bound
+    element is all of its text after the entities in it are decoded, a binding
+    inside an element nobody sees is refused, and the fields the report says
+    must be on the page must be bound there.
     """
     findings: list[Finding] = []
-    seen = 0
-    for path, rendered in BOUND.findall(html):
-        seen += 1
+    parser = _Bindings()
+    parser.feed(html)
+    parser.close()
+    visible: set[str] = set()
+    for entry in parser.found:
+        path = entry["path"]
+        if entry["dark"]:
+            findings.append(Finding(
+                "BINDING_NOT_VISIBLE", path,
+                f"the binding sits in a {entry['tag']!r} element or under one that is hidden. "
+                "Text nobody is shown can say anything, so it proves nothing about the page"))
+            continue
+        visible.add(path)               # shown, so not missing. A wrong text is reported below
         try:
             value = resolve(report, path)
         except (KeyError, IndexError, TypeError, ValueError):
             findings.append(Finding("BOUND_PATH_MISSING", path,
                                     "the page cites a field the artifact lacks"))
             continue
-        if str(value) != html_unescape(rendered).strip():
+        shown = "".join(entry["text"]).strip()
+        if str(value) != shown:
             findings.append(Finding(
                 "TRANSCRIPTION_MISMATCH", path,
-                f"the page shows {rendered.strip()!r}; the artifact says {value!r}"))
-    if not seen:
+                f"the page shows {shown!r}; the artifact says {value!r}"))
+    if not parser.found:
         findings.append(Finding(
             "NOTHING_BOUND", "html",
             "no rendered figure cites an artifact field. An unbound page is a "
             "page of hand-typed numbers, which is the defect this exists for."))
+    for path in _required_bindings(report):
+        if path not in visible:
+            findings.append(Finding(
+                "BINDING_MISSING", path,
+                "the report carries this field and the page does not show it bound to it"))
     return findings
