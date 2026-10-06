@@ -104,6 +104,57 @@ IMPLEMENTATION_KINDS = ("harness_stand_in", "product_candidate",
 # The unit the ledger counts. E9: not dollars, not provider requests.
 LEDGER_UNIT = "charged driver invocations"
 
+# The ledger is two labelled lines and each line says its own scope. A bare
+# zero beside the unit could mean "nothing was spent" or "nothing was counted",
+# so the scope is a closed set and the words of each line are GENERATED from the
+# line's fields by `ledger_line_text`, never typed. The validator recomputes the
+# text and refuses a line whose words were written by hand.
+LEDGER_SCOPES = ("cumulative_gate2", "no_live_calls_standin_run",
+                 "live_driver_batch")
+
+
+def ledger_line_text(line: dict) -> str:
+    """The words of one ledger line, from its own fields and nothing else."""
+    scope = line.get("scope")
+    if scope == "cumulative_gate2":
+        return (f"cumulative Gate 2, {line.get('charges')} of {line.get('cap')} "
+                f"{LEDGER_UNIT}")
+    if scope == "no_live_calls_standin_run":
+        return f"this nightly, {line.get('charges')} live calls"
+    if scope == "live_driver_batch":
+        return (f"live driver batch, {line.get('charges')} of {line.get('cap')} "
+                f"{LEDGER_UNIT}")
+    return ""
+
+
+# The driver's records (report/drive.py) and the run document around them.
+EXEC_RECORD_SCHEMA = 1
+EXEC_RUN_SCHEMA = 1
+
+def canonical_digest(doc) -> str:
+    """sha256 over a parsed document with sorted keys, so a digest does not depend on how a file
+    happened to be indented. The producer writes it and the validator recomputes it."""
+    import hashlib
+    import json
+    return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()
+
+
+def records_digest(records: list) -> str:
+    """The digest that binds a run's records: sorted by variant id, serialised with sorted keys."""
+    return canonical_digest(sorted(records, key=lambda r: r.get("variant_id", "")))
+
+
+# What the executed variants ran on, in the words the page must carry as data
+# beside the route name and the implementation kind. It states the limit of the
+# examiner's finding, which covers an earlier and smaller harness, and that the
+# executor which drove these variants came after it and was not examined. It
+# holds no measured number, so it can sit on a public page without becoming one.
+STANDIN_SCOPE_SENTENCE = (
+    "These variants ran on the harness stand in route, which is the test "
+    "instrument and not the product. The examiner's FIT finding covers an "
+    "earlier and smaller version of the harness, and the executor that ran "
+    "these variants was written after it and has not been examined.")
+
 # E6. The policy lives in the committed artifact, not in the renderer, so a
 # reader can check the number the page enforced against the number it claims.
 DEFAULT_FRESHNESS_HOURS = 36

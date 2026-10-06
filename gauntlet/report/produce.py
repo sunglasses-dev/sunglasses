@@ -49,6 +49,8 @@ REPORT_PATH = REPORT_DIR / "nightly.json"
 # today. Absent is a state the page renders, not a number it invents.
 EXAMINER_RECORD = pathlib.Path(__file__).with_name("examiner_record.json")
 LEDGER_RECORD = pathlib.Path(__file__).with_name("ledger_record.json")
+# Written by drive.py, never by this file. Absent means nothing was executed.
+EXECUTION_RUN = pathlib.Path(__file__).with_name("execution_run.json")
 
 # GAUNTLET_REVIEW_ROOT, read in ONE place (review_root.py); unset = absent = refusal.
 MATERIALISED = review_root.GATE3 / "materialized"
@@ -147,7 +149,66 @@ def plan_corpus(materialised: pathlib.Path = MATERIALISED) -> dict:
     return result
 
 
-def coverage_panel(planned: dict, capmap: dict) -> dict:
+def _parse_time(value) -> datetime.datetime | None:
+    try:
+        parsed = datetime.datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=datetime.timezone.utc)
+
+
+def usable_run(run_doc, corpus_digest: str | None, started: str) -> tuple[dict | None, str | None]:
+    """The run document if this report may count it, else (None, why not).
+
+    A run document is the driver's claim about an earlier moment, so it is checked against
+    TONIGHT's identities before one record in it is counted: the same corpus, the same adapter
+    code, a known schema, and young enough for the freshness policy. A document that fails any
+    of these is not zero executed and not a pass, it is evidence this report cannot bind.
+    """
+    if run_doc is None:
+        return None, None
+    header = run_doc.get("header") if isinstance(run_doc, dict) else None
+    records = run_doc.get("records") if isinstance(run_doc, dict) else None
+    if not isinstance(header, dict) or not isinstance(records, list):
+        return None, "the execution run document is not a header and a list of records"
+    if header.get("schema") != schema.EXEC_RUN_SCHEMA:
+        return None, f"the execution run schema {header.get('schema')!r} is not known"
+    if header.get("corpus_digest") != corpus_digest:
+        return None, "the execution run was made against a different corpus than this report"
+    if header.get("adapter_digest") != _digest_file(pathlib.Path(adapter.__file__)):
+        return None, "the execution run was made with different adapter code than this report"
+    finished, measured = _parse_time(header.get("finished_at")), _parse_time(started)
+    if (finished is None or measured is None or
+            measured - finished > datetime.timedelta(hours=schema.DEFAULT_FRESHNESS_HOURS)):
+        return None, ("the execution run is older than the freshness policy, or undated")
+    return run_doc, None
+
+
+def execution_partition(planned: dict, run_doc: dict | None) -> tuple[dict, str, str | None]:
+    """(partition, state, reason_code), counted from the driver's records and nothing else.
+
+    No run document is exactly the panel this file always produced. A record for a variant that
+    is not drivable tonight is NOT counted here (the validator turns it into a finding), so a
+    stale or edited run file cannot inflate a partition. Variants the planner cannot drive stay
+    `not_run`, as does a drivable variant with no record.
+    """
+    total = len(planned["drivable"]) + len(planned["blocked"]) + len(planned["invalid"])
+    if run_doc is None:
+        return ({"passed": 0, "failed": 0, "refused": 0, "errored": 0, "not_run": total},
+                "not_run", "EXEC_NOT_RUN")
+    drivable = set(planned["drivable"])
+    seen, counts = set(), {"passed": 0, "failed": 0, "refused": 0, "errored": 0}
+    for record in run_doc["records"]:
+        variant_id = record.get("variant_id")
+        if variant_id in drivable and variant_id not in seen and record.get("outcome") in counts:
+            seen.add(variant_id)
+            counts[record["outcome"]] += 1
+    part = dict(counts)
+    part["not_run"] = total - sum(counts.values())
+    return part, "measured", None
+
+
+def coverage_panel(planned: dict, capmap: dict, run_doc: dict | None = None) -> dict:
     """Planning counts, and the ceiling only if it is genuinely computable."""
     drivable, blocked, invalid = planned["drivable"], planned["blocked"], planned["invalid"]
     total = len(drivable) + len(blocked) + len(invalid)
@@ -164,14 +225,10 @@ def coverage_panel(planned: dict, capmap: dict) -> dict:
         "drivable_ids": sorted(drivable),
         "blocked_ids": sorted(blocked),
         "invalid_detail": invalid,
-        # E2: execution is a separate partition and never inherits planning.
-        "execution_partition": {
-            "passed": 0, "failed": 0, "refused": 0, "errored": 0,
-            "not_run": total,
-        },
-        "execution_state": "not_run",
-        "execution_reason_code": "EXEC_NOT_RUN",
     }
+    # E2: execution is a separate partition and never inherits planning.
+    (panel["execution_partition"], panel["execution_state"],
+     panel["execution_reason_code"]) = execution_partition(planned, run_doc)
 
     # CLASSIFY EVERYTHING FIRST. No ceiling, no subtotal and no category count
     # exists before this returns, which is the whole fix for the short circuit.
@@ -221,6 +278,51 @@ def coverage_panel(planned: dict, capmap: dict) -> dict:
     return panel
 
 
+def ledger_panel_of(ledger: dict | None, ledger_digest: str | None, run_doc: dict | None) -> dict:
+    """The ledger as two labelled lines, each built from a record and never typed.
+
+    One line is the cumulative Gate 2 count from the imported ledger record. The other is this
+    nightly run's own count from the driver's header. They are different scopes with different
+    meanings, and a bare number under either label is the 34 versus 36 error the README says was
+    nearly published. A line whose source is absent says so instead of leaving a gap, so the page
+    cannot show one line and let the reader assume the other. Neither record exists: the panel is
+    exactly what it was, unavailable.
+    """
+    if ledger is None and run_doc is None:
+        return _unavailable(
+            "EVIDENCE_UNBOUND",
+            "no ledger record declaring its own scope, cap, updated_at and "
+            "digest. Budget policy is set outside this process, which does not author it.")
+
+    lines = []
+    if ledger is not None:
+        lines.append({
+            "scope": ledger.get("scope"), "cap": ledger.get("cap"),
+            "charges": ledger.get("charges"), "unsettled": ledger.get("unsettled"),
+            "updated_at": ledger.get("updated_at"), "source": "ledger_record",
+            "record_digest": ledger_digest})
+    else:
+        lines.append({"scope": "cumulative_gate2", "state": "unavailable",
+                      "reason_code": "EVIDENCE_UNBOUND", "source": "ledger_record"})
+    if run_doc is not None:
+        header = run_doc["header"]
+        lines.append({
+            "scope": (header.get("ledger") or {}).get("scope"),
+            "charges": (header.get("ledger") or {}).get("charges"),
+            "updated_at": header.get("finished_at"), "source": "execution_run",
+            "run_id": header.get("run_id"), "records_digest": header.get("records_digest")})
+    else:
+        lines.append({"scope": "no_live_calls_standin_run", "state": "unavailable",
+                      "reason_code": "EVIDENCE_UNBOUND", "source": "execution_run"})
+    for line in lines:
+        line["text"] = schema.ledger_line_text(line) if "state" not in line else None
+
+    panel = {"state": "measured", "unit": schema.LEDGER_UNIT, "lines": lines}
+    if ledger is not None:
+        panel["record"], panel["record_digest"] = ledger, ledger_digest
+    return panel
+
+
 def build(run_id: str | None = None) -> tuple[dict, int]:
     """The report and the exit code. Always both, even when it refuses."""
     started = _now()
@@ -235,6 +337,16 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     planned = plan_corpus()
     corpus_digest = _digest_tree(MATERIALISED)
 
+    # The driver's records, imported like the examiner's. A document that does not bind to
+    # tonight's corpus, code and freshness window is set aside with its reason, never counted.
+    run_file, _ = _load_optional(EXECUTION_RUN)
+    run_doc, run_set_aside = usable_run(run_file, corpus_digest, started)
+    if run_doc is not None and capmap is None:
+        run_doc, run_set_aside = None, ("the capability map is unusable, so no coverage panel "
+                                        "exists to bind the execution run to")
+    if run_file is None and EXECUTION_RUN.is_file():
+        run_set_aside = "the execution run file is not valid JSON"
+
     if capmap is None:
         coverage = _unavailable("EVIDENCE_UNBOUND",
                                 f"capability map unusable. {capmap_error}")
@@ -242,7 +354,11 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
         coverage = _unavailable("EVIDENCE_UNBOUND",
                                 "the pinned corpus is not present on this host")
     else:
-        coverage = coverage_panel(planned, capmap)
+        coverage = coverage_panel(planned, capmap, run_doc)
+        if run_set_aside:
+            coverage["execution_state"] = "unavailable"
+            coverage["execution_reason_code"] = "EVIDENCE_UNBOUND"
+            coverage["execution_detail"] = run_set_aside
 
     examiner, examiner_digest = _load_optional(EXAMINER_RECORD)
     ledger, ledger_digest = _load_optional(LEDGER_RECORD)
@@ -264,14 +380,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     # E9. Scope or nothing. The one delivered ledger counts 34 charges for a
     # single run; publishing it under the cumulative cap's label would be a
     # scope error wearing a citation.
-    if ledger is None:
-        ledger_panel = _unavailable(
-            "EVIDENCE_UNBOUND",
-            "no ledger record declaring its own scope, cap, updated_at and "
-            "digest. Budget policy is set outside this process, which does not author it.")
-    else:
-        ledger_panel = {"state": "measured", "unit": schema.LEDGER_UNIT,
-                        "record": ledger, "record_digest": ledger_digest}
+    ledger_panel = ledger_panel_of(ledger, ledger_digest, run_doc)
 
     report = {
         "schema": schema.SCHEMA_VERSION,
@@ -322,6 +431,20 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     }
 
     # The terminal state, decided last and from the report itself.
+    if run_doc is not None:
+        report["identities"]["execution_run_digest"] = schema.canonical_digest(run_doc)
+        report["identities"]["execution_harness_head"] = run_doc["header"].get("harness_head")
+        report["execution_run"] = run_doc
+        # The route stays a stand in with unavailable rows. What ran, and the limit of what the
+        # examiner's finding says about it, sit beside them as data and never inside them.
+        report["routes"][0]["execution"] = {
+            "state": "measured",
+            "records_digest": run_doc["header"].get("records_digest"),
+            "harness_head": run_doc["header"].get("harness_head"),
+            "counts": dict(run_doc["header"].get("counts") or {}),
+            "fit_scope": schema.STANDIN_SCOPE_SENTENCE,
+        }
+
     refusing = (
         coverage.get("state") == "unavailable"
         or coverage.get("ceiling", {}).get("state") == "not_computed"
