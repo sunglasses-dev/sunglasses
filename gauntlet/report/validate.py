@@ -21,6 +21,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import re
+from html import unescape as html_unescape
 
 import schema
 
@@ -817,7 +818,7 @@ def check_transcription(html: str, report: dict) -> list[Finding]:
             findings.append(Finding("BOUND_PATH_MISSING", path,
                                     "the page cites a field the artifact lacks"))
             continue
-        if str(value) != rendered.strip():
+        if str(value) != html_unescape(rendered).strip():
             findings.append(Finding(
                 "TRANSCRIPTION_MISMATCH", path,
                 f"the page shows {rendered.strip()!r}; the artifact says {value!r}"))

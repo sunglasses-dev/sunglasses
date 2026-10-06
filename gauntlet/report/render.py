@@ -73,6 +73,15 @@ def _figure(path: str, value) -> str:
     return f'<span class="fig" data-bound="{_esc(path)}">{_esc(value)}</span>'
 
 
+def _bound_text(path: str, value) -> str:
+    """A sentence or a line that cites the field it was copied from, byte for byte.
+
+    Same contract as `_figure` (escaped once, `data-bound` names the field), but it carries words
+    the validator already pinned, so the page never holds a typed copy of them.
+    """
+    return f'<span class="bound-text" data-bound="{_esc(path)}">{_esc(value)}</span>'
+
+
 def _bound_or_not(path: str, value) -> str:
     """A figure when the field holds one; the words "not bound" when it is null.
 
@@ -162,7 +171,66 @@ def _routes_section(report: dict) -> str:
                      + f'. Origin reachability: <code>'
                      f'{_esc(route.get("head_reachable_on_origin"))}</code>.</p>')
         parts.append(_state_note(route.get("rows") or {}))
+        if isinstance(route.get("execution"), dict):
+            parts.append(_execution_block(index, route["execution"]))
     parts.append("</section>")
+    return "".join(parts)
+
+
+def _execution_block(index: int, block: dict) -> str:
+    """What the driver ran on this route, as data, with the limit of what is known about it.
+
+    Everything here is copied from the validated fields. The sentence that says what the
+    examiner's finding covers is `fit_scope`, which the validator requires to equal
+    `schema.STANDIN_SCOPE_SENTENCE`, so the page can neither drop it nor reword it.
+    """
+    base = f"routes[{index}].execution"
+    parts = ['<div class="execution"><h4>What ran on this route</h4>',
+             '<p class="detail">Executed by the driver on the stand in, beside the rows above. '
+             'Not route rows, and never read as the product. State '
+             + _bound_text(f"{base}.state", block.get("state"))
+             + ". Harness head "
+             + _bound_or_not(f"{base}.harness_head", block.get("harness_head"))
+             + ". Records digest "
+             + _bound_or_not(f"{base}.records_digest", block.get("records_digest"))
+             + ".</p>"]
+    counts = block.get("counts")
+    if isinstance(counts, dict) and counts:
+        parts.append('<ul class="counts">')
+        for key in sorted(counts):
+            parts.append(f"<li><code>{_esc(key)}</code> "
+                         + _figure(f"{base}.counts.{key}", counts[key]) + "</li>")
+        parts.append("</ul>")
+    parts.append('<p class="scope">'
+                 + _bound_text(f"{base}.fit_scope", block.get("fit_scope")) + "</p></div>")
+    return "".join(parts)
+
+
+def _ledger_lines(panel: dict) -> str:
+    """The ledger as the two labelled lines the validator checked, never as one bare count.
+
+    A line with a text prints that text verbatim. A line without one says it is unavailable and
+    why, so a reader cannot take one line for both.
+    """
+    lines = panel.get("lines")
+    if not isinstance(lines, list) or not lines:
+        return ""
+    parts = ['<ul class="ledger-lines">']
+    for index, line in enumerate(lines):
+        path = f"ledger.lines[{index}]"
+        if line.get("text") is None:
+            code = line.get("reason_code")
+            parts.append(f'<li class="state state-unavailable">'
+                         f'<code>{_esc(line.get("scope"))}</code> unavailable '
+                         f'<code>{_esc(code)}</code> '
+                         f'<span class="detail">{_esc(schema.REASON_CODES.get(code, ""))}'
+                         f'</span></li>')
+            continue
+        parts.append("<li>" + _bound_text(f"{path}.text", line["text"])
+                     + ' <span class="detail">as of '
+                     + _bound_or_not(f"{path}.updated_at", line.get("updated_at"))
+                     + "</span></li>")
+    parts.append("</ul>")
     return "".join(parts)
 
 
@@ -214,9 +282,10 @@ def render(report: dict, *, findings: list | None = None) -> str:
  body {{ background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;
         font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }}
  main {{ max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }}
- h1,h2,h3 {{ color:#00ccff; line-height:1.25; }}
+ h1,h2,h3,h4 {{ color:#00ccff; line-height:1.25; }}
  h1 {{ font-size:1.7rem; }} h2 {{ font-size:1.25rem; margin-top:2.5rem; }}
  h3 {{ font-size:1rem; margin-top:1.75rem; }}
+ h4 {{ font-size:.95rem; margin:.5rem 0; }}
  code {{ background:#151515; padding:.1em .35em; border-radius:3px;
         font-size:.87em; word-break:break-all; }}
  .fig {{ font-variant-numeric:tabular-nums; font-weight:600; color:#fff;
@@ -224,6 +293,8 @@ def render(report: dict, *, findings: list | None = None) -> str:
            594px wide at a 375px viewport, which the dry run measured rather
            than guessed. */
         overflow-wrap:anywhere; word-break:break-word; }}
+ .bound-text {{ color:#fff; font-weight:600; }}
+ .execution {{ border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }}
  .detail {{ color:#9aa0a6; font-size:.92rem; }}
  .state {{ margin:.4rem 0; }}
  .state-unavailable, .state-not_computed, .state-invalid {{ color:#ffc857; }}
@@ -279,6 +350,7 @@ from its own passing suite.</p>
 <section id="method">
 <h2>Method accounting</h2>
 {_state_note(report["ledger"])}
+{_ledger_lines(report["ledger"])}
 <p class="detail">Counted in charged driver invocations, which are not dollars
 and not provider requests. A deterministic run adds none.</p>
 </section>
