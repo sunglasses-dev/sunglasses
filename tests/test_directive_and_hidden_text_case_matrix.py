@@ -1,7 +1,7 @@
 """A wide case matrix for the four rules the directive detection change touches.
 
-Every case in the fixture file is scanned on the three channels that matter for these rules, and the set of those four rules
-that fire is compared with the set written down for it. The cases cover hidden text in many markups, tags that look empty,
+Every case in the fixture file is scanned on every channel the engine accepts, and the set of those four rules that fire on each
+channel is compared with the set written down for it, so a channel is never left out by omission. The cases cover hidden text in many markups, tags that look empty,
 tag names that only start like an exception, font loaders with and without a second handler, ordinary documentation that
 names AI models, and orders to put a marker in a reply. Text in the fixture is data only.
 """
@@ -13,13 +13,18 @@ import pytest
 from sunglasses.engine import SunglassesEngine
 
 RULES = {"GLS-IP-007", "GLS-IP-008", "GLS-HI-002", "GLS-SEM-UI-219"}
-CHANNELS = ("web_content", "file", "message")
+CHANNELS = ("message", "file", "api_response", "web_content", "log_memory", "tool_output", "agent_input", "code", "prompt")
 CASES = json.loads((pathlib.Path(__file__).parent / "fixtures" / "directive_and_hidden_text_case_matrix.json").read_text())
 
 
 @pytest.fixture(scope="module")
 def engine():
     return SunglassesEngine()
+
+
+def test_the_matrix_channel_list_is_every_channel_the_engine_accepts():
+    assert set(CHANNELS) == set(SunglassesEngine.DOCUMENTED_CHANNELS)
+    assert all(set(c["expect"]) == set(CHANNELS) for c in CASES)
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
