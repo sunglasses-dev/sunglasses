@@ -91,12 +91,15 @@ def findings_under(report, path):
 
 # ------------------------------------------------------------------ the table declares every text field
 def table_text_leaves(kind, path=()):
-    """Every leaf of the table that is bare text, with no kind. There must be none."""
+    """Every leaf of the table that is bare text, with no kind, and every mapping whose keys declare
+    none. There must be none."""
     if kind == schema.TEXT:
         yield path
     elif isinstance(kind, tuple) and kind[0] in ("opt", "nul", "list"):
         yield from table_text_leaves(kind[1], path)
     elif isinstance(kind, tuple) and kind[0] == "map":
+        if len(kind) < 3 or not isinstance(kind[2], schema.Kind):
+            yield path + ("<keys>",)                        # a key is text too, row 26
         yield from table_text_leaves(kind[1], path + ("*",))
     elif isinstance(kind, dict):
         for key, sub in kind.items():

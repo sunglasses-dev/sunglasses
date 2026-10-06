@@ -288,7 +288,8 @@ def numeric_readable(panel: dict) -> bool:
 # a field the table does not name cannot reach the page. A kind is text, a whole number or a number
 # (a bool is none of them), OBJECT for a thing only its presence is read of, a table for an object,
 # or a wrapped kind: `_opt` null or absent, `_nul` present but null allowed, `_list` of, `_map` of
-# text keys to.
+# text keys to. The keys are text, so a `_map` declares a kind for them as well as for its values, and
+# one that does not is a problem in the view (row 26).
 NUMBER, OBJECT = "number", "object"
 
 
@@ -463,12 +464,16 @@ def _cut(value, kind, path, problems, present=True):
         if not isinstance(value, dict):
             problems.append((path, f"not an object, it is {type(value).__name__}"))
             return None
+        if len(kind) < 3 or not isinstance(kind[2], Kind):
+            problems.append((path, "a mapping that declares no key kind. A key is text, and "
+                                   "nothing binds what it says, so the page may not read it"))
+            return None
         out = {}
         for key, item in value.items():
             if not isinstance(key, str):
                 problems.append((path, f"a key that is not text, {key!r}"))
                 continue
-            if len(kind) > 2 and not kind[2].fits(key):
+            if not kind[2].fits(key):
                 problems.append((path, "a key " + kind[2].why(key)))
                 continue
             out[key] = _cut(item, kind[1], f"{path}.{key}", problems)
