@@ -53,8 +53,23 @@ def _state_of(panel, path, findings) -> str | None:
     return state
 
 
+def _guarded(section: str, check, *args) -> list[Finding]:
+    """A section of the validator that cannot raise. A crash is a finding about the artifact, and
+    it is never an excuse to publish: a report this file cannot read is a report it does not pass."""
+    try:
+        return list(check(*args))
+    except Exception as exc:                                # noqa: BLE001
+        return [Finding("VALIDATOR_CRASHED", section,
+                        f"{type(exc).__name__} while checking this section. An artifact the "
+                        "validator cannot read does not pass it")]
+
+
 def validate_report(report: dict) -> list[Finding]:
-    """Everything wrong with this artifact. Empty means publishable."""
+    """Everything wrong with this artifact. Empty means publishable. Never raises."""
+    return _guarded("report", _validate_report, report)
+
+
+def _validate_report(report: dict) -> list[Finding]:
     findings: list[Finding] = []
 
     if report.get("schema") != schema.SCHEMA_VERSION:
@@ -81,6 +96,14 @@ def validate_report(report: dict) -> list[Finding]:
         findings.append(Finding("COMPLETE_EXITED_NONZERO", "run.exit_code",
                                 f"outcome complete with exit {run.get('exit_code')}"))
 
+    # V16. A run that says complete with nothing executed is a page of planning counts with a
+    # clean exit on it. Whatever the ceiling says, nothing run is a refusal.
+    if run.get("outcome") == "complete" and schema.executed_total(report.get("coverage")) == 0:
+        findings.append(Finding(
+            "EXEC_NONE_NOT_REFUSED", "run.outcome",
+            "the run says complete and no variant has an executed outcome. Nothing run is a "
+            "refusal with EXEC_NONE and exit 3, whatever the ceiling is"))
+
     fresh = report.get("freshness") or {}
     if not isinstance(fresh.get("policy_hours"), (int, float)):
         findings.append(Finding(
@@ -91,12 +114,12 @@ def validate_report(report: dict) -> list[Finding]:
         findings.append(Finding("FRESHNESS_NO_MEASURED_AT", "freshness.measured_at",
                                 "generation time cannot stand in for measurement time"))
 
-    findings += _validate_coverage(report.get("coverage"))
-    findings += _validate_routes(report.get("routes"))
+    findings += _guarded("coverage", _validate_coverage, report.get("coverage"))
+    findings += _guarded("routes", _validate_routes, report.get("routes"))
 
-    findings += _validate_harness(report.get("harness"))
-    findings += _validate_execution(report)
-    findings += _validate_ledger(report)
+    findings += _guarded("harness", _validate_harness, report.get("harness"))
+    findings += _guarded("execution", _validate_execution, report)
+    findings += _guarded("ledger", _validate_ledger, report)
 
     for name in ("harness", "ledger"):
         panel = report.get(name)
@@ -197,6 +220,11 @@ def _validate_execution(report) -> list[Finding]:
         if problem:
             findings.append(Finding("EXEC_RECORD_SCHEMA", path,
                                     f"the record cannot be read, {problem}"))
+            if isinstance(record, dict) and ROUTE_ROW_KEYS & set(record):
+                findings.append(Finding(
+                    "STANDIN_CLAIMED_AS_ROUTE", path,
+                    f"a driver record carries {sorted(ROUTE_ROW_KEYS & set(record))}, which read "
+                    "as route conformance. The stand in is an instrument, not the product"))
             outcome = record.get("outcome") if isinstance(record, dict) else None
             if not isinstance(outcome, str) or outcome not in schema.EXEC_STATES or (
                     outcome == "not_run"):
@@ -323,7 +351,8 @@ def _validate_execution(report) -> list[Finding]:
     for record in records:
         if (isinstance(record, dict) and isinstance(record.get("variant_id"), str)
                 and record.get("variant_id") in drivable_set
-                and record.get("variant_id") not in once and record.get("outcome") in counted):
+                and record.get("variant_id") not in once
+                and isinstance(record.get("outcome"), str) and record.get("outcome") in counted):
             once.add(record["variant_id"])
             counted[record["outcome"]] += 1
     if header.get("counts") != counted:
@@ -875,16 +904,29 @@ def _validate_rows(rows, path, route) -> list[Finding]:
     return findings
 
 
-# Elements whose text a reader is never shown, and the markup that hides one that is. A binding
-# there can hold any text at all, because nobody reads it.
+# Elements whose text a reader is never shown. These are tags, not styles: whether a tag shows
+# its text is the browser's fixed answer, and no reading of CSS is needed to know it.
 NON_VISIBLE_TAGS = frozenset({"script", "style", "template", "title", "textarea", "noscript",
                               "head", "iframe", "object"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
                        "source", "track", "wbr"})
-HIDING_STYLE = re.compile(
-    r"display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse)|opacity\s*:\s*0(?![.\d])"
-    r"|font-size\s*:\s*0(?![.\d])|color\s*:\s*transparent"
-    r"|(?:left|top|text-indent)\s*:\s*-\d{3,}|clip-path\s*:\s*inset\(\s*50%", re.I)
+
+
+def _attribute_problem(attrs: dict) -> list[tuple[str, str]]:
+    """(attribute, why) for every attribute the renderer does not write. The renderer's own list
+    is `schema.RENDER_ATTRIBUTES`. Nothing here parses CSS, JavaScript or any other language."""
+    bad = []
+    for name, value in attrs.items():
+        allowed = schema.RENDER_ATTRIBUTES.get(name, False)
+        if allowed is False:
+            bad.append((name, "the renderer writes no such attribute"))
+        elif allowed is not None:
+            tokens = (value or "").split() if name == "class" else [value]
+            if not tokens and name == "class":
+                bad.append((name, "an empty class"))
+            elif any(token not in allowed for token in tokens):
+                bad.append((name, f"{value!r} is not a value the renderer writes"))
+    return bad
 
 
 class _Bindings(HTMLParser):
@@ -893,23 +935,38 @@ class _Bindings(HTMLParser):
     A parser and not a pattern, because the pattern read only up to the first nested tag, and
     because entity decoding belongs to the context: text in a script or style element is raw, and
     text in a visible element is decoded. `convert_charrefs` does exactly that.
+
+    It also reads the markup the renderer would have written. An element that is a bound element,
+    holds one, or sits inside one carries only the attributes in `schema.RENDER_ATTRIBUTES`, and
+    every style element is `schema.RENDER_STYLESHEET`. Whatever else a page does to hide a thing
+    needs an attribute or a sheet, so a page with neither cannot hide anything.
     """
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.stack: list[dict] = []
         self.found: list[dict] = []
-        self.hiding_rules: list[str] = []
+        self.attribute_findings: list[tuple[str, str, str]] = []
+        self.sheets: list[str] = []
+        self.links = 0
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         hides = ("hidden" in attrs or (attrs.get("aria-hidden") or "").strip().lower() == "true"
-                 or bool(HIDING_STYLE.search(attrs.get("style") or ""))
                  or tag in NON_VISIBLE_TAGS)
         parent_dark = bool(self.stack) and self.stack[-1]["dark"]
+        inside_bound = any(entry["path"] is not None for entry in self.stack)
         entry = {"tag": tag, "dark": parent_dark or hides, "hides": hides,
-                 "path": attrs.get("data-bound"), "text": []}
+                 "path": attrs.get("data-bound"), "text": [], "raw": [],
+                 "bad": _attribute_problem(attrs), "checked": inside_bound}
+        if tag == "link":
+            self.links += 1
+        if entry["path"] is not None:
+            entry["checked"] = True
+            for outer in self.stack:                  # every ancestor of a bound element
+                outer["checked"] = True
         if tag in VOID_TAGS:
+            self._report(entry)
             if entry["path"] is not None:
                 self.found.append(entry)
             return
@@ -925,15 +982,11 @@ class _Bindings(HTMLParser):
         hides it. A hidden, aria hidden, script, style or template descendant is the element's own
         concealed text, not its displayed text, so it is left out of what the element shows."""
         if self.stack and self.stack[-1]["tag"] == "style":
-            self.handle_style_text(data)
+            self.stack[-1]["raw"].append(data)
         for index, entry in enumerate(self.stack):
             if entry["path"] is not None and not any(
                     inner["hides"] for inner in self.stack[index + 1:]):
                 entry["text"].append(data)
-
-    def handle_style_text(self, text):
-        if HIDING_STYLE.search(text):
-            self.hiding_rules.append(text)
 
     def handle_endtag(self, tag):
         for index in range(len(self.stack) - 1, -1, -1):
@@ -941,9 +994,17 @@ class _Bindings(HTMLParser):
                 self._close(index)
                 return
 
+    def _report(self, entry):
+        if entry["checked"]:
+            for name, why in entry["bad"]:
+                self.attribute_findings.append((entry["tag"], name, why))
+
     def _close(self, index):
         while len(self.stack) > index:
             entry = self.stack.pop()
+            if entry["tag"] == "style":
+                self.sheets.append("".join(entry["raw"]))
+            self._report(entry)
             if entry["path"] is not None:
                 self.found.append(entry)
 
@@ -1003,11 +1064,18 @@ def check_transcription(html: str, report: dict) -> list[Finding]:
     parser.feed(html)
     parser.close()
     visible: set[str] = set()
-    if parser.hiding_rules:
+    for tag, name, why in parser.attribute_findings:
         findings.append(Finding(
-            "BINDING_NOT_VISIBLE", "html.style",
-            "a style sheet on the page hides content. The page the renderer writes has no such "
-            "rule, and one here can conceal any bound text that a browser would otherwise show"))
+            "BINDING_ATTRIBUTE_FORBIDDEN", f"html.{tag}.{name}",
+            f"a {tag!r} element that holds or sits in a bound figure carries {name!r}, and {why}. "
+            "The renderer writes no style, no hidden and no aria hidden, so one here can only be "
+            "concealing text a browser would otherwise show"))
+    if parser.links or any(sheet != schema.RENDER_STYLESHEET for sheet in parser.sheets):
+        findings.append(Finding(
+            "STYLESHEET_NOT_RENDERERS", "html.style",
+            "the page holds a style element that is not the renderer's stylesheet byte for byte, "
+            "or a linked sheet. The checker does not read CSS, so a sheet it did not write is "
+            "refused whole"))
     for entry in parser.found:
         path = entry["path"]
         if entry["dark"]:

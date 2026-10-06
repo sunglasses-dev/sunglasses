@@ -506,7 +506,9 @@ def _skeleton():
         "schema": 2,
         "run": {"id": "x", "attempt": 1, "started_at": "2026-09-14T00:00:00+00:00",
                 "finished_at": "2026-09-14T00:00:00+00:00",
-                "outcome": "complete", "exit_code": 0},
+                # Nothing is executed under these panels, so the run is the refusal the law
+                # requires (V16). The panels under test are about the ceiling, not about a run.
+                "outcome": "refused", "exit_code": 3, "reason_code": "EXEC_NONE"},
         "freshness": {"policy_hours": 36,
                       "measured_at": "2026-09-14T00:00:00+00:00"},
         "harness": {"state": "unavailable", "reason_code": "EVIDENCE_UNBOUND"},

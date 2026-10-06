@@ -213,7 +213,21 @@ def stable_record_digest(record: dict) -> str:
 
 
 def _finish(record: dict) -> dict:
+    """The one exit of a record. It leaves only through `schema.RECORD_FIELDS`: a record the table
+    refuses is replaced by an errored one that carries what is certain, because a driver that
+    writes what its own reader cannot read has told nobody anything."""
     record["finished_at"] = _now()
+    problem = schema.record_shape_problem(record)
+    if problem:
+        certain = {k: record[k] for k in ("record_schema", "variant_id", "scenario_id", "variant",
+                                          "route", "implementation_kind", "mode", "control_route",
+                                          "started_at", "finished_at", "harness_head")
+                   if schema.record_shape_problem({"variant_id": "x", "outcome": "x", k: record.get(k)})
+                   is None and k in record}
+        record = dict(certain, variant_id=certain.get("variant_id") if isinstance(
+            certain.get("variant_id"), str) else "unknown", outcome="errored",
+            reason_code="RUN_FAILED",
+            cause=f"the driver wrote a record its own shape table refuses, {problem}"[:240])
     record["stable_record_digest"] = stable_record_digest(record)
     return record
 

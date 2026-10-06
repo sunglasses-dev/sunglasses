@@ -278,33 +278,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="{description}">
 <title>Nightly gauntlet</title>
-<style>
- :root {{ color-scheme: dark; }}
- body {{ background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;
-        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }}
- main {{ max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }}
- h1,h2,h3,h4 {{ color:#00ccff; line-height:1.25; }}
- h1 {{ font-size:1.7rem; }} h2 {{ font-size:1.25rem; margin-top:2.5rem; }}
- h3 {{ font-size:1rem; margin-top:1.75rem; }}
- h4 {{ font-size:.95rem; margin:.5rem 0; }}
- code {{ background:#151515; padding:.1em .35em; border-radius:3px;
-        font-size:.87em; word-break:break-all; }}
- .fig {{ font-variant-numeric:tabular-nums; font-weight:600; color:#fff;
-        /* Digests are 64 unbroken hex characters. Without this the page is
-           594px wide at a 375px viewport, which the dry run measured rather
-           than guessed. */
-        overflow-wrap:anywhere; word-break:break-word; }}
- .bound-text {{ color:#fff; font-weight:600; }}
- .execution {{ border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }}
- .detail {{ color:#9aa0a6; font-size:.92rem; }}
- .state {{ margin:.4rem 0; }}
- .state-unavailable, .state-not_computed, .state-invalid {{ color:#ffc857; }}
- .state-measured, .state-historical {{ color:#8fe388; }}
- .unresolved li {{ color:#9aa0a6; margin:.3rem 0; }}
- #freshness {{ border:1px solid #333; border-left:3px solid #ffc857;
-              padding:.75rem 1rem; margin:1.5rem 0; }}
- @media (max-width:375px) {{ main {{ padding:1.25rem .75rem 3rem; }} }}
-</style>
+<style>{schema.RENDER_STYLESHEET}</style>
 <main>
 <h1>What our own adversarial harness proved last night</h1>
 <p class="detail">This page is a test our own organization runs on its own work, with

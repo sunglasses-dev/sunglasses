@@ -33,13 +33,17 @@ SENTENCE_SPAN = ('<span class="bound-text" data-bound="routes[0].execution.fit_s
 
 HIDERS = {
     "hidden attribute": '<span hidden>{}</span>',
-    "display none": '<span style="display:none">{}</span>',
-    "visibility hidden": '<span style="visibility:hidden">{}</span>',
-    "opacity zero": '<span style="opacity:0">{}</span>',
     "aria hidden": '<span aria-hidden="true">{}</span>',
     "script": "<script>{}</script>",
     "style": "<style>{}</style>",
     "template": "<template>{}</template>",
+}
+# Hidden by a style attribute. Row 16 stopped reading CSS, so the answer is the attribute, not the
+# text, and the check is BINDING_ATTRIBUTE_FORBIDDEN.
+STYLE_HIDERS = {
+    "display none": '<span style="display:none">{}</span>',
+    "visibility hidden": '<span style="visibility:hidden">{}</span>',
+    "opacity zero": '<span style="opacity:0">{}</span>',
 }
 
 
@@ -54,6 +58,14 @@ def test_r6_a_count_moved_into_a_hidden_child_of_its_bound_element_is_refused(
     assert "TRANSCRIPTION_MISMATCH" in codes(found)
 
 
+@pytest.mark.parametrize("hider", sorted(STYLE_HIDERS))
+def test_r6_a_count_moved_into_a_style_hidden_child_is_refused_by_attribute(world, page, hider):
+    span, value = passed_span(page, world)
+    concealed = span.replace(f">{value}</span>", ">" + STYLE_HIDERS[hider].format(value) + "</span>")
+    found = validate.check_transcription(page.replace(span, concealed), world.report)
+    assert "BINDING_ATTRIBUTE_FORBIDDEN" in codes(found)
+
+
 @pytest.mark.parametrize("hider", sorted(HIDERS))
 def test_r6_the_scope_sentence_inside_a_hidden_child_is_refused(world, page, hider):
     assert SENTENCE_SPAN in page
@@ -66,18 +78,24 @@ def test_r6_the_scope_sentence_inside_a_hidden_child_is_refused(world, page, hid
 
 
 def test_r6_the_scope_sentence_under_a_hidden_ancestor_is_refused(world, page):
-    for opener in ('<div hidden>', '<div aria-hidden="true">', '<div style="display:none">'):
+    for opener in ('<div hidden>', '<div aria-hidden="true">'):
         wrapped = page.replace(SENTENCE_SPAN, f"{opener}{SENTENCE_SPAN}</div>")
         found = validate.check_transcription(wrapped, world.report)
         assert "BINDING_NOT_VISIBLE" in codes(found), opener
         assert "BINDING_MISSING" in codes(found), opener
 
 
+def test_r6_a_style_hidden_ancestor_is_refused_by_attribute(world, page):
+    wrapped = page.replace(SENTENCE_SPAN, f'<div style="display:none">{SENTENCE_SPAN}</div>')
+    assert "BINDING_ATTRIBUTE_FORBIDDEN" in codes(validate.check_transcription(wrapped, world.report))
+
+
 def test_r6_visible_nested_text_still_counts_and_hidden_nested_text_does_not(world):
     shown = '<span data-bound="a">3<b>4</b></span>'
     assert validate.check_transcription(shown, {"a": 34}) == []
     mixed = '<span data-bound="a">3<span hidden>9</span></span>'
-    assert validate.check_transcription(mixed, {"a": 3}) == []
+    # the hidden child is its own finding now, and what it holds still does not count as text
+    assert codes(validate.check_transcription(mixed, {"a": 3})) == {"BINDING_ATTRIBUTE_FORBIDDEN"}
     assert "TRANSCRIPTION_MISMATCH" in codes(validate.check_transcription(mixed, {"a": 39}))
 
 
@@ -87,7 +105,7 @@ def test_r6_a_style_sheet_that_hides_content_is_refused(world, page, rule):
     tampered = page.replace("</style>", f"{rule}</style>", 1)
     assert tampered != page
     found = validate.check_transcription(tampered, world.report)
-    assert "BINDING_NOT_VISIBLE" in codes(found)
+    assert "STYLESHEET_NOT_RENDERERS" in codes(found)
 
 
 def test_r6_the_ordinary_page_has_no_hiding_rule_and_still_passes(world, page):

@@ -246,7 +246,8 @@ def execution_partition(planned: dict, run_doc: dict | None) -> tuple[dict, str,
         if not isinstance(record, dict) or not isinstance(record.get("variant_id"), str):
             continue                    # the validator and `usable_run` refuse these. Never count
         variant_id = record.get("variant_id")
-        if variant_id in drivable and variant_id not in seen and record.get("outcome") in counts:
+        if (variant_id in drivable and variant_id not in seen
+                and isinstance(record.get("outcome"), str) and record.get("outcome") in counts):
             seen.add(variant_id)
             counts[record["outcome"]] += 1
     part = dict(counts)
@@ -515,9 +516,9 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
         or coverage.get("ceiling", {}).get("state") == "not_computed"
         or bool(run_unreadable)
     )
-    # V15. A ceiling that is computed over a run that executed nothing is a number with nothing
-    # behind it. Another refusal takes precedence: it is the more basic one.
-    exec_none = (not refusing and schema.ceiling_over_nothing(coverage))
+    # V15. A run that executed nothing is not a result, whatever the ceiling says. Another refusal
+    # takes precedence: it is the more basic one.
+    exec_none = (not refusing and schema.nothing_executed(coverage))
     if refusing or exec_none:
         report["run"]["outcome"] = "refused"
         report["run"]["exit_code"] = 3

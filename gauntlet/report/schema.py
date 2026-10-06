@@ -133,57 +133,82 @@ def ledger_line_text(line: dict) -> str:
 EXEC_RECORD_SCHEMA = 1
 EXEC_RUN_SCHEMA = 1
 
-# The shape of a driver record, read by the producer on import and by the validator on every
-# record. Only the fields either of them reads are listed. A field may be absent or null, and when
-# it is present it has this type. A record of the wrong shape is not a record with a wrong value:
-# it cannot be read at all, so it is refused whole and never counted around.
-_TEXT, _FLAG, _LIST_OF_TEXT, _OBJECT, _WHOLE = "text", "flag", "list of text", "object", "whole"
-RECORD_SHAPE = {
-    "record_schema": _WHOLE, "variant_id": _TEXT, "route": _TEXT, "implementation_kind": _TEXT,
-    "mode": _TEXT, "harness_head": _TEXT, "delivered_digest": _TEXT, "outcome": _TEXT,
-    "reason_code": _TEXT, "started_at": _TEXT, "finished_at": _TEXT, "cause": _TEXT,
-    "graded_on": _LIST_OF_TEXT, "control": _OBJECT, "expectation": _OBJECT, "assertions": _OBJECT,
+# ONE TABLE, FOR WHAT A DRIVER RECORD IS. The driver writes through it (`drive._finish` refuses to
+# emit a record it rejects), the producer reads it on import, and the validator checks it. A field
+# the table does not name is not a field, and a named one is null or of its type. A record of the
+# wrong shape is not a record with a wrong value: it cannot be read at all, so it is refused whole
+# and never counted around.
+TEXT, FLAG, WHOLE, TEXTS, SCALAR = "text", "flag", "whole number", "list of text", "text or whole number"
+_DIGEST_TEXT = TEXT
+RECORD_FIELDS = {
+    "record_schema": WHOLE, "variant_id": TEXT, "scenario_id": TEXT, "variant": TEXT,
+    "route": TEXT, "implementation_kind": TEXT, "mode": TEXT, "control_route": TEXT,
+    "started_at": TEXT, "finished_at": TEXT, "harness_head": TEXT, "delivered_digest": TEXT,
+    "outcome": TEXT, "reason_code": TEXT, "cause": TEXT,
+    "control": {"route": TEXT, "stimulus_delivered": FLAG, "refusal": TEXT,
+                "payload_sent_by_client": FLAG, "payload_visible_at_client": FLAG,
+                "declared_frames_reached_client": FLAG, "terminal_arrived": FLAG,
+                "client_bound_wire_stable_sha256": TEXT, "execution_stable_sha256": TEXT},
+    "expectation": {"source_sha256": TEXT, "policy_decision": TEXT,
+                    "assert_original_payload_absent": FLAG, "bytes_outcome": TEXT,
+                    "unreadable": FLAG},
+    "assertions": {"held": TEXTS, "not_held": TEXTS, "no_subject": TEXTS,
+                   "expect_payload_absent": FLAG, "payload_at_destination": FLAG,
+                   "stimulus_origin": TEXT, "expect_original": FLAG,
+                   "declared_frames_delivered_unchanged": FLAG},
+    "graded_on": TEXTS, "steps": TEXTS, "primary_id": SCALAR, "terminal_expected": FLAG,
+    "terminal_arrived": FLAG, "upstream_as_declared": FLAG, "mediator_disposition": TEXT,
+    "client_bound_wire_stable_sha256": TEXT, "into_mediator_wire_stable_sha256": TEXT,
+    "execution_stable_sha256": TEXT, "receipts_stable_sha256": TEXT,
+    "volatile": {"bytes_to_client": WHOLE, "bytes_into_mediator": WHOLE,
+                 "execution_sha256": TEXT, "receipts_sha256": TEXT},
+    "stable_record_digest": TEXT,
 }
-RECORD_SUBSHAPE = {
-    "control": {"route": _TEXT, "stimulus_delivered": _FLAG, "refusal": _TEXT},
-    "expectation": {"assert_original_payload_absent": _FLAG, "bytes_outcome": _TEXT},
-    "assertions": {"held": _LIST_OF_TEXT, "not_held": _LIST_OF_TEXT, "no_subject": _LIST_OF_TEXT,
-                   "payload_at_destination": _FLAG, "expect_payload_absent": _FLAG,
-                   "expect_original": _FLAG, "declared_frames_delivered_unchanged": _FLAG},
-}
+RECORD_IDENTITY = ("variant_id", "outcome")        # never null: they say which variant, which result
 
 
 def _has_shape(value, kind) -> bool:
     if value is None:
         return True
-    if kind == _TEXT:
+    if isinstance(kind, dict):
+        return isinstance(value, dict)
+    if kind == TEXT:
         return isinstance(value, str)
-    if kind == _FLAG:
+    if kind == FLAG:
         return isinstance(value, bool)
-    if kind == _WHOLE:
+    if kind == WHOLE:
         return isinstance(value, int) and not isinstance(value, bool)
-    if kind == _LIST_OF_TEXT:
-        return isinstance(value, list) and all(isinstance(item, str) for item in value)
-    return isinstance(value, dict)
+    if kind == SCALAR:
+        return isinstance(value, str) or (isinstance(value, int) and not isinstance(value, bool))
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _table_problem(node, table, where="") -> str | None:
+    for key, value in node.items():
+        if not isinstance(key, str) or key not in table:
+            return f"{where}{key!r} is not a field of the record table"
+        kind = table[key]
+        if not _has_shape(value, kind):
+            what = "an object" if isinstance(kind, dict) else kind
+            return f"{where}{key} is not {what}"
+        if isinstance(kind, dict) and isinstance(value, dict):
+            inner = _table_problem(value, kind, f"{where}{key}.")
+            if inner:
+                return inner
+    return None
 
 
 def record_shape_problem(record) -> str | None:
     """Why this driver record cannot be read, or None. Never raises."""
-    if not isinstance(record, dict):
-        return "a record is not an object"
-    for key in ("variant_id", "outcome"):
-        if not isinstance(record.get(key), str):
-            return f"{key} is not text"
-    for key, kind in RECORD_SHAPE.items():
-        if not _has_shape(record.get(key), kind):
-            return f"{key} is not {kind}"
-    for key, subshape in RECORD_SUBSHAPE.items():
-        inner = record.get(key)
-        if isinstance(inner, dict):
-            for sub, kind in subshape.items():
-                if not _has_shape(inner.get(sub), kind):
-                    return f"{key}.{sub} is not {kind}"
-    return None
+    try:
+        if not isinstance(record, dict):
+            return "a record is not an object"
+        for key in RECORD_IDENTITY:
+            if not isinstance(record.get(key), str):
+                return f"{key} is not text"
+        return _table_problem(record, RECORD_FIELDS)
+    except Exception as exc:                                # noqa: BLE001
+        return f"the record could not be read, {type(exc).__name__}"
 
 
 def canonical_digest(doc) -> str:
@@ -194,16 +219,20 @@ def canonical_digest(doc) -> str:
     return hashlib.sha256(json.dumps(doc, sort_keys=True).encode()).hexdigest()
 
 
-def ceiling_over_nothing(coverage) -> bool:
-    """V15. The ceiling is computed (true or false) and no variant has an executed outcome."""
-    if not isinstance(coverage, dict) or coverage.get("state") != "measured":
-        return False
-    ceiling, part = coverage.get("ceiling"), coverage.get("execution_partition")
-    if not isinstance(ceiling, dict) or ceiling.get("state") not in ("true", "false"):
-        return False
+def executed_total(coverage) -> int:
+    """passed + failed + refused + errored, and 0 for anything that does not say."""
+    part = coverage.get("execution_partition") if isinstance(coverage, dict) else None
     if not isinstance(part, dict):
-        return False
-    return not any(part.get(k) for k in ("passed", "failed", "refused", "errored"))
+        return 0
+    return sum(v for k, v in part.items()
+               if k in ("passed", "failed", "refused", "errored")
+               and isinstance(v, int) and not isinstance(v, bool))
+
+
+def nothing_executed(coverage) -> bool:
+    """V15. A measured coverage panel under which no variant has an executed outcome."""
+    return (isinstance(coverage, dict) and coverage.get("state") == "measured"
+            and executed_total(coverage) == 0)
 
 
 def records_digest(records: list) -> str:
@@ -236,3 +265,19 @@ def numeric_readable(panel: dict) -> bool:
     integer.
     """
     return panel.get("state") in NUMERIC_STATES
+
+
+# WHAT THE PAGE MAY SAY ABOUT ITSELF. The checker does not read CSS. It holds the renderer's own
+# stylesheet and its own attributes, and a page differs from them or it does not.
+RENDER_STYLESHEET = '\n :root { color-scheme: dark; }\n body { background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;\n        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }\n main { max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }\n h1,h2,h3,h4 { color:#00ccff; line-height:1.25; }\n h1 { font-size:1.7rem; } h2 { font-size:1.25rem; margin-top:2.5rem; }\n h3 { font-size:1rem; margin-top:1.75rem; }\n h4 { font-size:.95rem; margin:.5rem 0; }\n code { background:#151515; padding:.1em .35em; border-radius:3px;\n        font-size:.87em; word-break:break-all; }\n .fig { font-variant-numeric:tabular-nums; font-weight:600; color:#fff;\n        /* Digests are 64 unbroken hex characters. Without this the page is\n           594px wide at a 375px viewport, which the dry run measured rather\n           than guessed. */\n        overflow-wrap:anywhere; word-break:break-word; }\n .bound-text { color:#fff; font-weight:600; }\n .execution { border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }\n .detail { color:#9aa0a6; font-size:.92rem; }\n .state { margin:.4rem 0; }\n .state-unavailable, .state-not_computed, .state-invalid { color:#ffc857; }\n .state-measured, .state-historical { color:#8fe388; }\n .unresolved li { color:#9aa0a6; margin:.3rem 0; }\n #freshness { border:1px solid #333; border-left:3px solid #ffc857;\n              padding:.75rem 1rem; margin:1.5rem 0; }\n @media (max-width:375px) { main { padding:1.25rem .75rem 3rem; } }\n'
+RENDER_IDS = frozenset({"coverage", "routes", "run", "harness", "method", "inputs", "freshness",
+                        "freshness-note"})
+RENDER_CLASSES = frozenset(
+    {"fig", "bound-text", "execution", "detail", "state", "unresolved", "counts", "scope",
+     "ledger-lines"}
+    | {f"state-{x}" for x in set(STATES) | set(CEILING_STATES) | set(EXEC_STATES)
+       | set(ROW_STATES) | set(PLAN_STATES)})
+# attribute -> the values the renderer writes, or None for a value that is the point (a path).
+# No `style`, no `hidden`, no `aria-hidden`: nothing the renderer writes needs them.
+RENDER_ATTRIBUTES = {"data-bound": None, "id": RENDER_IDS, "class": RENDER_CLASSES,
+                     "lang": frozenset({"en"})}
