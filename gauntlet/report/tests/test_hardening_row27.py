@@ -148,7 +148,7 @@ def test_a_mapping_under_wrappers_below_a_list_member_is_not_passed_through(noru
     report = copy.deepcopy(norun.report)
     report["run"]["added"] = [{UNBOUND: "x"}]
     view, problems = schema.render_view(report)
-    assert any(p.startswith("run.added[0]") for p, _ in problems), problems
+    assert [p for p, _ in problems] == ["run.added[]"], problems       # the audit names the declaration (row 28)
     assert UNBOUND not in str(view)
 
 
@@ -158,7 +158,7 @@ def test_a_mapping_under_wrappers_as_a_mapping_value_is_not_passed_through(norun
     report = copy.deepcopy(norun.report)
     report["run"]["added"] = {"some_op": {UNBOUND: "x"}}
     view, problems = schema.render_view(report)
-    assert any(p.startswith("run.added.some_op") and "key kind" in why for p, why in problems), problems
+    assert [p for p, _ in problems] == ["run.added.*"] and "key kind" in problems[0][1], problems   # row 28
     assert UNBOUND not in str(view)
 
 

@@ -430,12 +430,16 @@ def _has_kind(value, kind) -> bool:
 
 
 _WRAPPERS = ("opt", "nul", "list")
+KEYLESS = ("a mapping that declares no key kind. A key is text, and nothing binds what it says, "
+           "so the page may not read it")
 
 
 def declaration_problems(kind, path=""):
     """(path, why) for every declaration in the table that the view does not recognise. A schema
     defect is a finding like any other and is reported whether or not the report carries the field,
-    so an unknown declaration is never read as an opaque object (row 27)."""
+    so an unknown declaration is never read as an opaque object (row 27). A mapping is audited for
+    its key declaration as well as its value, so a table cannot lose the key kind behind an absent
+    optional parent (row 28)."""
     where = path or "report"
     if isinstance(kind, Kind) or (isinstance(kind, str) and kind in (TEXT, WHOLE, NUMBER, OBJECT)):
         return []
@@ -448,7 +452,8 @@ def declaration_problems(kind, path=""):
     if isinstance(kind, tuple) and len(kind) == 2 and kind[0] in _WRAPPERS:
         return declaration_problems(kind[1], path + ("[]" if kind[0] == "list" else ""))
     if isinstance(kind, tuple) and len(kind) in (2, 3) and kind[0] == "map":
-        return declaration_problems(kind[1], path + ".*")
+        keyless = [] if len(kind) == 3 and isinstance(kind[2], Kind) else [(where, KEYLESS)]
+        return keyless + declaration_problems(kind[1], path + ".*")      # keys and values, row 28
     return [(where, "a declaration the view does not recognise. It is not read, so it can not "
                     "stand for a thing the page shows")]
 
@@ -502,8 +507,8 @@ def _cut(value, kind, path, problems, present=True):
             problems.append((path, f"not an object, it is {type(value).__name__}"))
             return None
         if len(kind) < 3 or not isinstance(kind[2], Kind):
-            problems.append((path, "a mapping that declares no key kind. A key is text, and "
-                                   "nothing binds what it says, so the page may not read it"))
+            if not any(why == KEYLESS for _, why in problems):      # the audit reports it first
+                problems.append((path, KEYLESS))
             return None
         out = {}
         for key, item in value.items():
