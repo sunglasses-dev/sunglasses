@@ -808,3 +808,49 @@ def test_a_loader_handler_with_a_rejected_tail_grows_in_step_with_the_input(engi
     t_small = best_of(lambda: engine.scan(small, channel="web_content"))
     t_big = best_of(lambda: engine.scan(big, channel="web_content"))
     assert t_big <= 8 * max(t_small, 0.02), "a fourfold longer input took %.1f times as long" % (t_big / max(t_small, 0.02))
+
+
+# The exemption reads quoted attribute values whole as well. A greater or less sign inside a quoted value never ends the tag and never fakes a closing tag, and a quoted word is not an attribute name.
+EXEMPT_STYLES = ("display:none", "visibility:hidden", "color:white;background:white", "color:#fff;background:#fff")
+
+
+def quoted_boundary_cases():
+    for tag in ("iframe", "script"):
+        for quote in ('"', "'"):
+            for style in EXEMPT_STYLES:
+                for space in ("", " ", "\n"):
+                    yield '<%s style="%s" title=%s>%s</%s>%s>Example content</%s>' % (tag, style, quote, space, tag, quote, tag)
+
+
+def srcdoc_cases():
+    for quote in ('"', "'"):
+        for style in EXEMPT_STYLES:
+            for space in ("", " ", "\n"):
+                base = '<iframe style="%s" title=%s>%s</iframe>%s></iframe>' % (style, quote, space, quote)
+                yield base.replace("title=", 'srcdoc="Example page" title=', 1)
+                late = base.replace("style=", 'title2="x" style=', 1)
+                cut = late.rfind("></iframe")
+                yield late[:cut] + ' srcdoc="Example page"' + late[cut:]
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", list(quoted_boundary_cases()))
+def test_a_closing_tag_inside_a_quoted_value_does_not_make_a_hidden_element_look_empty(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", list(srcdoc_cases()))
+def test_a_frame_with_a_srcdoc_stays_flagged_when_a_quoted_value_holds_a_tag_boundary(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("snippet", [
+    '<iframe title="a>b" style="display:none"></iframe>',
+    "<script title='a>b' style='display:none'></script>",
+    '<img alt="a>b" style="display:none">',
+    '<iframe title="srcdoc" style="display:none"></iframe>',
+])
+def test_a_greater_than_sign_inside_a_quoted_value_does_not_split_an_empty_tag_that_is_excused(engine, snippet, channel):
+    assert not flagged_hi(engine, snippet, channel)
