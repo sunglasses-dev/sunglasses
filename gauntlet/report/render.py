@@ -69,13 +69,33 @@ class WillNotRender(Exception):
     """The artifact did not validate. A page is not built from one that did not."""
 
 
-def _esc(value) -> str:
+# ONE ENCODER PER EMBEDDING CONTEXT. A value from the report reaches the page in exactly one of
+# three places, and each place has its own encoder and no other. Nothing else in this file puts a
+# report value into markup, and `test_hardening_row20` reads this file's syntax tree to hold it to
+# that. A new place a value can land needs a new encoder here first.
+#   text       an element's content           `_text`
+#   attribute  a double quoted attribute      `_attr`
+#   data       JSON inside the script element `_data`
+def _text(value) -> str:
     return html_mod.escape(str(value), quote=True)
+
+
+def _attr(value) -> str:
+    return html_mod.escape(str(value), quote=True)
+
+
+def _data(value) -> str:
+    """JSON that sits inside a script element. json.dumps alone is not safe there, because a
+    string may hold a closing script tag, an opening comment or an ampersand and the markup parser
+    reads those before the script engine does. The three characters are written as JSON escapes,
+    which decode to the same value, so the script reads exactly what the report held."""
+    return (json.dumps(value, sort_keys=True)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
 
 
 def _figure(path: str, value) -> str:
     """A number that cites the field it came from."""
-    return f'<span class="fig" data-bound="{_esc(path)}">{_esc(value)}</span>'
+    return f'<span class="fig" data-bound="{_attr(path)}">{_text(value)}</span>'
 
 
 def _bound_text(path: str, value) -> str:
@@ -84,7 +104,7 @@ def _bound_text(path: str, value) -> str:
     Same contract as `_figure` (escaped once, `data-bound` names the field), but it carries words
     the validator already pinned, so the page never holds a typed copy of them.
     """
-    return f'<span class="bound-text" data-bound="{_esc(path)}">{_esc(value)}</span>'
+    return f'<span class="bound-text" data-bound="{_attr(path)}">{_text(value)}</span>'
 
 
 def _bound_or_not(path: str, value) -> str:
@@ -101,12 +121,12 @@ def _state_note(panel: dict) -> str:
     code = panel.get("reason_code")
     detail = panel.get("detail") or schema.REASON_CODES.get(code, "")
     word = STATE_WORDS.get(state, state)
-    body = f'<p class="state state-{_esc(state)}">{_esc(word)}'
+    body = f'<p class="state state-{_attr(state)}">{_text(word)}'
     if code:
-        body += f' <code>{_esc(code)}</code>'
+        body += f' <code>{_text(code)}</code>'
     body += "</p>"
     if detail:
-        body += f'<p class="detail">{_esc(detail)}</p>'
+        body += f'<p class="detail">{_text(detail)}</p>'
     return body
 
 
@@ -147,12 +167,12 @@ def _coverage_section(report: dict) -> str:
     except (KeyError, IndexError):
         sentence = ""
     parts.append('<h3>Could adapter work alone unlock the rest</h3>')
-    parts.append(f'<p class="state state-{_esc(state)}">{_esc(sentence)}</p>')
+    parts.append(f'<p class="state state-{_attr(state)}">{_text(sentence)}</p>')
 
     if state == "not_computed":
         parts.append("<ul class='unresolved'>")
         for op, reason in sorted((ceiling.get("unclassified") or {}).items()):
-            parts.append(f"<li><code>{_esc(op)}</code> {_esc(reason)}</li>")
+            parts.append(f"<li><code>{_text(op)}</code> {_text(reason)}</li>")
         parts.append("</ul>")
     parts.append("</section>")
     return "".join(parts)
@@ -162,9 +182,9 @@ def _routes_section(report: dict) -> str:
     parts = ['<section id="routes"><h2>What the product route satisfied</h2>']
     for index, route in enumerate(report.get("routes") or []):
         kind = route.get("implementation_kind")
-        parts.append(f'<h3>{_esc(route.get("name"))}</h3>')
+        parts.append(f'<h3>{_text(route.get("name"))}</h3>')
         parts.append(f'<p class="detail">Implementation kind: '
-                     f'<code>{_esc(kind)}</code>. ')
+                     f'<code>{_text(kind)}</code>. ')
         if kind == "harness_stand_in":
             parts.append("A stand-in is an instrument, not the product. Its "
                          "planning counts are never route conformance.")
@@ -174,7 +194,7 @@ def _routes_section(report: dict) -> str:
                      + (_figure(f"routes[{index}].head", head) if head
                         else "<em>not bound</em>")
                      + f'. Origin reachability: <code>'
-                     f'{_esc(route.get("head_reachable_on_origin"))}</code>.</p>')
+                     f'{_text(route.get("head_reachable_on_origin"))}</code>.</p>')
         parts.append(_state_note(route.get("rows") or {}))
         if isinstance(route.get("execution"), dict) and isinstance(
                 report.get("execution_run"), dict):
@@ -204,7 +224,7 @@ def _execution_block(index: int, block: dict) -> str:
     if isinstance(counts, dict) and counts:
         parts.append('<ul class="counts">')
         for key in sorted(counts):
-            parts.append(f"<li><code>{_esc(key)}</code> "
+            parts.append(f"<li><code>{_text(key)}</code> "
                          + _figure(f"{base}.counts.{key}", counts[key]) + "</li>")
         parts.append("</ul>")
     parts.append('<p class="scope">'
@@ -227,9 +247,9 @@ def _ledger_lines(panel: dict) -> str:
         if line.get("state") == "unavailable" or line.get("text") is None:
             code = line.get("reason_code")
             parts.append(f'<li class="state state-unavailable">'
-                         f'<code>{_esc(line.get("scope"))}</code> unavailable '
-                         f'<code>{_esc(code)}</code> '
-                         f'<span class="detail">{_esc(schema.REASON_CODES.get(code, ""))}'
+                         f'<code>{_text(line.get("scope"))}</code> unavailable '
+                         f'<code>{_text(code)}</code> '
+                         f'<span class="detail">{_text(schema.REASON_CODES.get(code, ""))}'
                          f'</span></li>')
             continue
         parts.append("<li>" + _bound_text(f"{path}.text", line["text"])
@@ -285,13 +305,13 @@ def _page(report: dict) -> str:
                    f"{run.get('reason_code') or 'no reason code'}).")
     else:
         summary = f"Nightly gauntlet report: {outcome}."
-    description = html_mod.escape(summary, quote=True)
+    description = _attr(summary)
 
-    embedded = json.dumps({
+    embedded = _data({
         "measured_at": fresh.get("measured_at"),
         "policy_hours": fresh.get("policy_hours"),
         "outcome": run.get("outcome"),
-    }, sort_keys=True)
+    })
 
     return f"""<!doctype html>
 <html lang="en">

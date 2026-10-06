@@ -117,6 +117,12 @@ def _validate_report(report: dict) -> list[Finding]:
     if not fresh.get("measured_at"):
         findings.append(Finding("FRESHNESS_NO_MEASURED_AT", "freshness.measured_at",
                                 "generation time cannot stand in for measurement time"))
+    elif not isinstance(fresh["measured_at"], str) or _when(fresh["measured_at"]) is None:
+        # The same parse rule the executed run is held to (`_when`), applied to every report. A
+        # refusal report has no run to compare it with, and a value that is not a date was
+        # being printed and embedded as if it were one.
+        findings.append(Finding("FRESHNESS_MEASURED_AT_UNREADABLE", "freshness.measured_at",
+                                "the measurement time is not a date this validator can read"))
 
     findings += _guarded("coverage", _validate_coverage, report.get("coverage"))
     findings += _guarded("routes", _validate_routes, report.get("routes"))
