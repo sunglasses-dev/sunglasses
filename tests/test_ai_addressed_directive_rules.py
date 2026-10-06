@@ -863,3 +863,51 @@ def test_a_greater_than_sign_inside_a_quoted_value_does_not_split_an_empty_tag_t
 def test_a_void_image_with_tag_like_text_in_a_quoted_title_is_empty_and_stays_excused(engine, quote, style, channel):
     text = '<img title=%s<img>%s style="%s">Example</img>' % (quote, quote, style)
     assert not flagged_hi(engine, text, channel)
+
+
+# A quote opens a quoted span only directly after an equals sign. A quote inside an unquoted value or an attribute name is part of that value or name, so an attribute that follows it is real and a srcdoc among them is not skipped.
+def stray_quote_attributes(quote):
+    return (
+        "title=x%sy srcdoc=content data=z%s" % (quote, quote),
+        "title%sy srcdoc=content data=z%s" % (quote, quote),
+        "title=x%sy SRCDOC=content data=z%s" % (quote, quote),
+        "title=x%sy srcdoc=content\ndata=z%s" % (quote, quote),
+        "title=x%sy srcdoc=content data=%s%s" % (quote, "z" * 2048, quote),
+    )
+
+
+def stray_quote_cases():
+    for tag in ("iframe", "script"):
+        for quote in ('"', "'"):
+            for attributes in stray_quote_attributes(quote):
+                for style in EXEMPT_STYLES:
+                    yield '<%s %s style="%s"></%s>' % (tag, attributes, style, tag)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", list(stray_quote_cases()))
+def test_a_srcdoc_after_a_stray_quote_in_a_value_or_a_name_is_not_skipped(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("snippet", [
+    '<iframe title="y srcdoc=content data=z" style="display:none"></iframe>',
+    "<iframe title='y srcdoc=content data=z' style='display:none'></iframe>",
+    '<iframe style = "display:none" title = \'x\' ></iframe>',
+    '<script title= "y srcdoc=1" style="display:none"></script>',
+])
+def test_a_srcdoc_word_inside_a_real_quoted_value_is_a_value_and_the_empty_tag_stays_excused(engine, snippet, channel):
+    assert not flagged_hi(engine, snippet, channel)
+
+
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("text", [
+    '<iframe style="display:none" srcdoc=x></iframe>',
+    '<iframe SRCDOC style="display:none"></iframe>',
+    '<iframe style="display:none"srcdoc=x></iframe>',
+    '<iframe a=b"c srcdoc style="display:none"></iframe>',
+    "<iframe a=b'c srcdoc style='display:none'></iframe>",
+])
+def test_a_frame_with_a_srcdoc_attribute_is_flagged_however_the_attributes_around_it_are_written(engine, text, channel):
+    assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
