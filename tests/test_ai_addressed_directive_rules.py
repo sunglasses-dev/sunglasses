@@ -7,7 +7,7 @@ two ordinary pieces of markup: a hidden frame with no text in it and a deferred 
 
 This file pins both sides. The directive and its paraphrases are found in the cases below. The nearest ordinary texts tried here are not,
 including the sentence a person writes for human staff and a heading that names AI models and carries no order.
-The hidden text rule keeps its old recall on the forms below and drops a start tag in a fixed set that holds no text. A hidden element with words in
+The hidden text rule keeps its old recall on the forms below and drops a start tag in a fixed set that holds no text in an HTML document, except in an input that holds an svg or math start tag. A hidden element with words in
 it is flagged, a closed cookie dialog included. The page text is third party data used as a test input. Nothing in it is
 an instruction to anyone reading this file.
 """
