@@ -60,17 +60,51 @@ STATE_WORDS = {
 }
 
 
+# The page's own stylesheet. A page is the render of its report or it is not, so nothing else
+# needs to know what is in it.
+STYLESHEET = '\n :root { color-scheme: dark; }\n body { background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;\n        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }\n main { max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }\n h1,h2,h3,h4 { color:#00ccff; line-height:1.25; }\n h1 { font-size:1.7rem; } h2 { font-size:1.25rem; margin-top:2.5rem; }\n h3 { font-size:1rem; margin-top:1.75rem; }\n h4 { font-size:.95rem; margin:.5rem 0; }\n code { background:#151515; padding:.1em .35em; border-radius:3px;\n        font-size:.87em; word-break:break-all; }\n .fig { font-variant-numeric:tabular-nums; font-weight:600; color:#fff;\n        /* Digests are 64 unbroken hex characters. Without this the page is\n           594px wide at a 375px viewport, which the dry run measured rather\n           than guessed. */\n        overflow-wrap:anywhere; word-break:break-word; }\n .bound-text { color:#fff; font-weight:600; }\n .execution { border-left:3px solid #333; padding:.25rem 1rem; margin:1rem 0; }\n .detail { color:#9aa0a6; font-size:.92rem; }\n .state { margin:.4rem 0; }\n .state-unavailable, .state-not_computed, .state-invalid { color:#ffc857; }\n .state-measured, .state-historical { color:#8fe388; }\n .unresolved li { color:#9aa0a6; margin:.3rem 0; }\n #freshness { border:1px solid #333; border-left:3px solid #ffc857;\n              padding:.75rem 1rem; margin:1.5rem 0; }\n @media (max-width:375px) { main { padding:1.25rem .75rem 3rem; } }\n'
+
+
 class WillNotRender(Exception):
     """The artifact did not validate. A page is not built from one that did not."""
 
 
-def _esc(value) -> str:
+# ONE ENCODER PER EMBEDDING CONTEXT. A value from the report reaches the page in exactly one of
+# three places, and each place has its own encoder and no other. Nothing else in this file puts a
+# report value into markup, and `test_hardening_row20` reads this file's syntax tree to hold it to
+# that. A new place a value can land needs a new encoder here first.
+#   text       an element's content           `_text`
+#   attribute  a double quoted attribute      `_attr`
+#   data       JSON inside the script element `_data`
+def _text(value) -> str:
     return html_mod.escape(str(value), quote=True)
+
+
+def _attr(value) -> str:
+    return html_mod.escape(str(value), quote=True)
+
+
+def _data(value) -> str:
+    """JSON that sits inside a script element. json.dumps alone is not safe there, because a
+    string may hold a closing script tag, an opening comment or an ampersand and the markup parser
+    reads those before the script engine does. The three characters are written as JSON escapes,
+    which decode to the same value, so the script reads exactly what the report held."""
+    return (json.dumps(value, sort_keys=True)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
 
 
 def _figure(path: str, value) -> str:
     """A number that cites the field it came from."""
-    return f'<span class="fig" data-bound="{_esc(path)}">{_esc(value)}</span>'
+    return f'<span class="fig" data-bound="{_attr(path)}">{_text(value)}</span>'
+
+
+def _bound_text(path: str, value) -> str:
+    """A sentence or a line that cites the field it was copied from, byte for byte.
+
+    Same contract as `_figure` (escaped once, `data-bound` names the field), but it carries words
+    the validator already pinned, so the page never holds a typed copy of them.
+    """
+    return f'<span class="bound-text" data-bound="{_attr(path)}">{_text(value)}</span>'
 
 
 def _bound_or_not(path: str, value) -> str:
@@ -85,14 +119,14 @@ def _bound_or_not(path: str, value) -> str:
 def _state_note(panel: dict) -> str:
     state = panel.get("state")
     code = panel.get("reason_code")
-    detail = panel.get("detail") or schema.REASON_CODES.get(code, "")
+    fixed = schema.REASON_CODES.get(code, "")
     word = STATE_WORDS.get(state, state)
-    body = f'<p class="state state-{_esc(state)}">{_esc(word)}'
+    body = f'<p class="state state-{_attr(state)}">{_text(word)}'
     if code:
-        body += f' <code>{_esc(code)}</code>'
+        body += f' <code>{_text(code)}</code>'
     body += "</p>"
-    if detail:
-        body += f'<p class="detail">{_esc(detail)}</p>'
+    if fixed:
+        body += f'<p class="detail">{_text(fixed)}</p>'
     return body
 
 
@@ -125,7 +159,7 @@ def _coverage_section(report: dict) -> str:
     ]
 
     ceiling = coverage["ceiling"]
-    state = ceiling["state"]
+    state = ceiling.get("state")
     template = CEILING_TEMPLATES.get(state, "")
     try:
         sentence = template.format(**{k: v for k, v in ceiling.items()
@@ -133,12 +167,13 @@ def _coverage_section(report: dict) -> str:
     except (KeyError, IndexError):
         sentence = ""
     parts.append('<h3>Could adapter work alone unlock the rest</h3>')
-    parts.append(f'<p class="state state-{_esc(state)}">{_esc(sentence)}</p>')
+    parts.append(f'<p class="state state-{_attr(state)}">{_text(sentence)}</p>')
 
     if state == "not_computed":
         parts.append("<ul class='unresolved'>")
-        for op, reason in sorted((ceiling.get("unclassified") or {}).items()):
-            parts.append(f"<li><code>{_esc(op)}</code> {_esc(reason)}</li>")
+        for op, code in sorted((ceiling.get("unclassified") or {}).items()):
+            parts.append(f"<li><code>{_text(op)}</code> "
+                         f"{_text(schema.REASON_CODES.get(code, ''))}</li>")
         parts.append("</ul>")
     parts.append("</section>")
     return "".join(parts)
@@ -148,9 +183,9 @@ def _routes_section(report: dict) -> str:
     parts = ['<section id="routes"><h2>What the product route satisfied</h2>']
     for index, route in enumerate(report.get("routes") or []):
         kind = route.get("implementation_kind")
-        parts.append(f'<h3>{_esc(route.get("name"))}</h3>')
+        parts.append(f'<h3>{_text(route.get("name"))}</h3>')
         parts.append(f'<p class="detail">Implementation kind: '
-                     f'<code>{_esc(kind)}</code>. ')
+                     f'<code>{_text(kind)}</code>. ')
         if kind == "harness_stand_in":
             parts.append("A stand-in is an instrument, not the product. Its "
                          "planning counts are never route conformance.")
@@ -160,9 +195,69 @@ def _routes_section(report: dict) -> str:
                      + (_figure(f"routes[{index}].head", head) if head
                         else "<em>not bound</em>")
                      + f'. Origin reachability: <code>'
-                     f'{_esc(route.get("head_reachable_on_origin"))}</code>.</p>')
+                     f'{_text(route.get("head_reachable_on_origin"))}</code>.</p>')
         parts.append(_state_note(route.get("rows") or {}))
+        if isinstance(route.get("execution"), dict) and isinstance(
+                report.get("execution_run"), dict):
+            parts.append(_execution_block(index, route["execution"]))
     parts.append("</section>")
+    return "".join(parts)
+
+
+def _execution_block(index: int, block: dict) -> str:
+    """What the driver ran on this route, as data, with the limit of what is known about it.
+
+    Everything here is copied from the validated fields. The sentence that says what the
+    examiner's finding covers is `fit_scope`, which the validator requires to equal
+    `schema.STANDIN_SCOPE_SENTENCE`, so the page can neither drop it nor reword it.
+    """
+    base = f"routes[{index}].execution"
+    parts = ['<div class="execution"><h4>What ran on this route</h4>',
+             '<p class="detail">Executed by the driver on the stand in, beside the rows above. '
+             'Not route rows, and never read as the product. State '
+             + _bound_text(f"{base}.state", block.get("state"))
+             + ". Harness head "
+             + _bound_or_not(f"{base}.harness_head", block.get("harness_head"))
+             + ". Records digest "
+             + _bound_or_not(f"{base}.records_digest", block.get("records_digest"))
+             + ".</p>"]
+    counts = block.get("counts")
+    if isinstance(counts, dict) and counts:
+        parts.append('<ul class="counts">')
+        for key in sorted(counts):
+            parts.append(f"<li><code>{_text(key)}</code> "
+                         + _figure(f"{base}.counts.{key}", counts[key]) + "</li>")
+        parts.append("</ul>")
+    parts.append('<p class="scope">'
+                 + _bound_text(f"{base}.fit_scope", block.get("fit_scope")) + "</p></div>")
+    return "".join(parts)
+
+
+def _ledger_lines(panel: dict) -> str:
+    """The ledger as the two labelled lines the validator checked, never as one bare count.
+
+    A line with a text prints that text verbatim. A line without one says it is unavailable and
+    why, so a reader cannot take one line for both.
+    """
+    lines = panel.get("lines")
+    if (not schema.numeric_readable(panel) or not isinstance(lines, list) or not lines):
+        return ""
+    parts = ['<ul class="ledger-lines">']
+    for index, line in enumerate(lines):
+        path = f"ledger.lines[{index}]"
+        if line.get("state") == "unavailable" or line.get("text") is None:
+            code = line.get("reason_code")
+            parts.append(f'<li class="state state-unavailable">'
+                         f'<code>{_text(line.get("scope"))}</code> unavailable '
+                         f'<code>{_text(code)}</code> '
+                         f'<span class="detail">{_text(schema.REASON_CODES.get(code, ""))}'
+                         f'</span></li>')
+            continue
+        parts.append("<li>" + _bound_text(f"{path}.text", line["text"])
+                     + ' <span class="detail">as of '
+                     + _bound_or_not(f"{path}.updated_at", line.get("updated_at"))
+                     + "</span></li>")
+    parts.append("</ul>")
     return "".join(parts)
 
 
@@ -172,7 +267,23 @@ def render(report: dict, *, findings: list | None = None) -> str:
     if findings:
         raise WillNotRender(
             f"{len(findings)} validation finding(s); the first is {findings[0]}")
+    # THE PAGE IS BUILT FROM THE TABLE'S VIEW OF THE REPORT AND FROM NOTHING ELSE. Whatever the
+    # table does not name never reaches a line below, and whatever it names is typed, so a report
+    # that validated cannot make this raise. The guard after it is for a bug, and a test would
+    # see it, because a validated report must render.
+    view, problems = schema.render_view(report)
+    if problems:
+        raise WillNotRender(f"{len(problems)} field(s) the page reads are not as the table says; "
+                            f"the first is {problems[0][0]}, {problems[0][1]}")
+    try:
+        return _page(view)
+    except Exception as exc:                                # noqa: BLE001
+        raise WillNotRender(f"the page could not be built, {type(exc).__name__}") from exc
 
+
+def _page(report: dict) -> str:
+    """The page for a view. Deterministic: no clock, no environment, no iteration order that is
+    not sorted, so the same report is the same bytes every time."""
     run, fresh = report["run"], report["freshness"]
 
     # A META DESCRIPTION THE PAGE CAN STAND BEHIND.
@@ -195,9 +306,9 @@ def render(report: dict, *, findings: list | None = None) -> str:
                    f"{run.get('reason_code') or 'no reason code'}).")
     else:
         summary = f"Nightly gauntlet report: {outcome}."
-    description = html_mod.escape(summary, quote=True)
+    description = _attr(summary)
 
-    embedded = json.dumps({
+    embedded = _data({
         "measured_at": fresh.get("measured_at"),
         "policy_hours": fresh.get("policy_hours"),
         "outcome": run.get("outcome"),
@@ -209,30 +320,7 @@ def render(report: dict, *, findings: list | None = None) -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="{description}">
 <title>Nightly gauntlet</title>
-<style>
- :root {{ color-scheme: dark; }}
- body {{ background:#0a0a0a; color:#e8e8e8; margin:0; overflow-wrap:anywhere;
-        font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif; }}
- main {{ max-width:56rem; margin:0 auto; padding:2rem 1rem 4rem; }}
- h1,h2,h3 {{ color:#00ccff; line-height:1.25; }}
- h1 {{ font-size:1.7rem; }} h2 {{ font-size:1.25rem; margin-top:2.5rem; }}
- h3 {{ font-size:1rem; margin-top:1.75rem; }}
- code {{ background:#151515; padding:.1em .35em; border-radius:3px;
-        font-size:.87em; word-break:break-all; }}
- .fig {{ font-variant-numeric:tabular-nums; font-weight:600; color:#fff;
-        /* Digests are 64 unbroken hex characters. Without this the page is
-           594px wide at a 375px viewport, which the dry run measured rather
-           than guessed. */
-        overflow-wrap:anywhere; word-break:break-word; }}
- .detail {{ color:#9aa0a6; font-size:.92rem; }}
- .state {{ margin:.4rem 0; }}
- .state-unavailable, .state-not_computed, .state-invalid {{ color:#ffc857; }}
- .state-measured, .state-historical {{ color:#8fe388; }}
- .unresolved li {{ color:#9aa0a6; margin:.3rem 0; }}
- #freshness {{ border:1px solid #333; border-left:3px solid #ffc857;
-              padding:.75rem 1rem; margin:1.5rem 0; }}
- @media (max-width:375px) {{ main {{ padding:1.25rem .75rem 3rem; }} }}
-</style>
+<style>{STYLESHEET}</style>
 <main>
 <h1>What our own adversarial harness proved last night</h1>
 <p class="detail">This page is a test our own organization runs on its own work, with
@@ -279,6 +367,7 @@ from its own passing suite.</p>
 <section id="method">
 <h2>Method accounting</h2>
 {_state_note(report["ledger"])}
+{_ledger_lines(report["ledger"])}
 <p class="detail">Counted in charged driver invocations, which are not dollars
 and not provider requests. A deterministic run adds none.</p>
 </section>
@@ -286,12 +375,12 @@ and not provider requests. A deterministic run adds none.</p>
 <section id="inputs">
 <h2>What this was measured against</h2>
 <p class="detail">Corpus digest
-{_bound_or_not("identities.corpus_digest", report["identities"]["corpus_digest"])}.
+{_bound_or_not("identities.corpus_digest", report["identities"].get("corpus_digest"))}.
 Capability map revision
 {_bound_or_not("identities.capability_map_revision",
-         report["identities"]["capability_map_revision"])}, review state
+         report["identities"].get("capability_map_revision"))}, review state
 {_bound_or_not("identities.capability_map_review_state",
-         report["identities"]["capability_map_review_state"])}.</p>
+         report["identities"].get("capability_map_review_state"))}.</p>
 </section>
 </main>
 <script>

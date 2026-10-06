@@ -28,6 +28,9 @@ import produce                                             # noqa: E402
 import publish                                             # noqa: E402
 import render                                              # noqa: E402
 import validate                                            # noqa: E402
+sys.path.insert(0, str(HERE))
+from test_execution_run import corpus_digest, planned, run_doc    # noqa: E402,F401
+from test_hardening_row15 import build_closed, closed_map         # noqa: E402
 
 
 def codes(findings):
@@ -78,7 +81,7 @@ def test_c1_changing_only_the_page_is_caught_by_transcription(honest):
         f'data-bound="coverage.plan_partition.drivable">{target}<',
         'data-bound="coverage.plan_partition.drivable">99<')
     assert mutated != page, "the mutation did not apply; the control is vacuous"
-    assert "TRANSCRIPTION_MISMATCH" in codes(
+    assert "PAGE_NOT_THE_RENDER" in codes(
         validate.check_transcription(mutated, honest))
 
 
@@ -88,9 +91,11 @@ def test_c1_changing_json_and_page_together_is_caught_by_recomputation(honest):
     mutated["coverage"]["plan_partition"]["drivable"] = 99
     mutated["coverage"]["total"] = 99 + mutated["coverage"]["plan_partition"]["blocked"]
     page = render.render(mutated, findings=[])          # render it anyway
-    assert validate.check_transcription(page, mutated) == [], \
+    assert page == render.render(mutated, findings=[]) and "99" in page, \
         "the page and the artifact agree, so only recomputation can catch this"
     assert "AGGREGATE_MISMATCH" in codes(validate.validate_report(mutated))
+    # and the page is not passed either: there is no page this report may have
+    assert codes(validate.check_transcription(page, mutated)) == {"PAGE_REPORT_NOT_RENDERABLE"}
 
 
 # --- control 2 -------------------------------------------------------------
@@ -260,7 +265,8 @@ def test_c5_an_empty_schedule_is_a_missing_document_not_an_empty_run(tmp_path):
 # "Demonstrate an adapter-only blocked variant; then no blocked variants. False
 #  ceiling with matching explanation; then not-applicable."
 
-def test_c6_an_adapter_only_variant_flips_the_ceiling_to_false(capmap):
+def test_c6_an_adapter_only_variant_flips_the_ceiling_to_false(capmap, tmp_path_factory, run_doc,
+                                                              planned):
     """The falsifiability proof. A derivation that cannot go false is worthless.
 
     `arm_fault` with a kind the mediator's cited enumeration DOES contain is
@@ -278,8 +284,21 @@ def test_c6_an_adapter_only_variant_flips_the_ceiling_to_false(capmap):
     assert panel["ceiling"]["state"] == "false"
     assert panel["ceiling"]["reason_code"] == "CEILING_ADAPTER_ONLY_MEMBER"
     assert panel["ceiling"]["blocked_by_adapter_work_alone"] == 1
-    assert validate.validate_report(
-        {**_skeleton(), "coverage": panel}) == []
+
+    # THE SAME FLIP INSIDE A COMPLETE REPORT THAT EXECUTED SOMETHING. The report around the panel
+    # is the produced one for a closed map and a run document of records, so it carries executed
+    # rows backed by the run beneath them, and it says complete. Nothing is typed around the panel.
+    report, code = build_closed(tmp_path_factory, run_doc)
+    assert code == 0 and report["run"]["outcome"] == "complete"
+    assert report["coverage"]["execution_partition"]["passed"] >= 1
+    blocked_here = {**planned["blocked"], **blocked}
+    flipped = produce.coverage_panel(
+        {"drivable": planned["drivable"], "blocked": blocked_here, "invalid": planned["invalid"]},
+        closed_map(), run_doc)
+    assert flipped["ceiling"]["state"] == "false"
+    assert flipped["ceiling"]["reason_code"] == "CEILING_ADAPTER_ONLY_MEMBER"
+    report["coverage"] = flipped
+    assert validate.validate_report(report) == []
 
 
 def test_c6_a_route_only_blocker_gives_a_true_ceiling(capmap):
@@ -500,22 +519,6 @@ def test_c12_an_unknown_implementation_kind_is_rejected(honest):
 
 # --- helpers ---------------------------------------------------------------
 
-def _skeleton():
-    """A minimal valid report around a coverage panel under test."""
-    return {
-        "schema": 2,
-        "run": {"id": "x", "attempt": 1, "started_at": "2026-09-14T00:00:00+00:00",
-                "finished_at": "2026-09-14T00:00:00+00:00",
-                "outcome": "complete", "exit_code": 0},
-        "freshness": {"policy_hours": 36,
-                      "measured_at": "2026-09-14T00:00:00+00:00"},
-        "harness": {"state": "unavailable", "reason_code": "EVIDENCE_UNBOUND"},
-        "ledger": {"state": "unavailable", "reason_code": "EVIDENCE_UNBOUND"},
-        "routes": [],
-        "identities": {},
-    }
-
-
 def _with_rows(honest, row_results):
     mutated = copy.deepcopy(honest)
     mutated["routes"][0].update({
@@ -581,7 +584,7 @@ def test_the_description_states_todays_real_outcome(honest):
 def test_the_description_moves_when_the_outcome_does(honest):
     """THE CONTROL. A fixed string passes the row above and fails this one."""
     other = copy.deepcopy(honest)
-    other["run"]["outcome"] = "completed"
+    other["run"]["outcome"] = "complete"
     moved = _description(render.render(other, findings=[]))
     assert moved != _description(render.render(honest)), \
         "the description did not change when the outcome did — it is not derived"

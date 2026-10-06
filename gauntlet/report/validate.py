@@ -10,7 +10,7 @@ own summary is treated as a claim to be checked rather than a source to be read.
 Two separate checks, and a mutation that defeats one must not defeat the other:
 
   validate_report   recomputes every total from the ids beneath it
-  check_transcription  compares the rendered page against the validated JSON
+  check_transcription  the page must equal render(report) byte for byte
 
 Change a number in the JSON alone and transcription catches it. Change the JSON
 and the HTML together and recomputation catches it. Changing the underlying
@@ -19,6 +19,7 @@ rows changes the measurement, which is the only honest way to move a number.
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import re
 
 import schema
@@ -51,8 +52,28 @@ def _state_of(panel, path, findings) -> str | None:
     return state
 
 
+def _guarded(section: str, check, *args) -> list[Finding]:
+    """A section of the validator that cannot raise. A crash is a finding about the artifact, and
+    it is never an excuse to publish: a report this file cannot read is a report it does not pass."""
+    try:
+        return list(check(*args))
+    except Exception as exc:                                # noqa: BLE001
+        return [Finding("VALIDATOR_CRASHED", section,
+                        f"{type(exc).__name__} while checking this section. An artifact the "
+                        "validator cannot read does not pass it")]
+
+
 def validate_report(report: dict) -> list[Finding]:
-    """Everything wrong with this artifact. Empty means publishable."""
+    """Everything wrong with this artifact. Empty means publishable. Never raises."""
+    # Every field the page is built from is named in `schema.REPORT_READS` and typed here, so a
+    # report that passes can be rendered and one that does not is a finding and not a crash. It is
+    # read first and apart, because a section that cannot read a wrong typed field takes the rest
+    # of its own findings with it, and this one must survive that.
+    shape = [Finding("REPORT_FIELD_TYPE", path, why) for path, why in schema.render_view(report)[1]]
+    return shape + _guarded("report", _validate_report, report)
+
+
+def _validate_report(report: dict) -> list[Finding]:
     findings: list[Finding] = []
 
     if report.get("schema") != schema.SCHEMA_VERSION:
@@ -79,6 +100,14 @@ def validate_report(report: dict) -> list[Finding]:
         findings.append(Finding("COMPLETE_EXITED_NONZERO", "run.exit_code",
                                 f"outcome complete with exit {run.get('exit_code')}"))
 
+    # V16. A run that says complete with nothing executed is a page of planning counts with a
+    # clean exit on it. Whatever the ceiling says, nothing run is a refusal.
+    if run.get("outcome") == "complete" and schema.executed_total(report.get("coverage")) == 0:
+        findings.append(Finding(
+            "EXEC_NONE_NOT_REFUSED", "run.outcome",
+            "the run says complete and no variant has an executed outcome. Nothing run is a "
+            "refusal with EXEC_NONE and exit 3, whatever the ceiling is"))
+
     fresh = report.get("freshness") or {}
     if not isinstance(fresh.get("policy_hours"), (int, float)):
         findings.append(Finding(
@@ -88,11 +117,19 @@ def validate_report(report: dict) -> list[Finding]:
     if not fresh.get("measured_at"):
         findings.append(Finding("FRESHNESS_NO_MEASURED_AT", "freshness.measured_at",
                                 "generation time cannot stand in for measurement time"))
+    elif not isinstance(fresh["measured_at"], str) or _when(fresh["measured_at"]) is None:
+        # The same parse rule the executed run is held to (`_when`), applied to every report. A
+        # refusal report has no run to compare it with, and a value that is not a date was
+        # being printed and embedded as if it were one.
+        findings.append(Finding("FRESHNESS_MEASURED_AT_UNREADABLE", "freshness.measured_at",
+                                "the measurement time is not a date this validator can read"))
 
-    findings += _validate_coverage(report.get("coverage"))
-    findings += _validate_routes(report.get("routes"))
+    findings += _guarded("coverage", _validate_coverage, report.get("coverage"))
+    findings += _guarded("routes", _validate_routes, report.get("routes"))
 
-    findings += _validate_harness(report.get("harness"))
+    findings += _guarded("harness", _validate_harness, report.get("harness"))
+    findings += _guarded("execution", _validate_execution, report)
+    findings += _guarded("ledger", _validate_ledger, report)
 
     for name in ("harness", "ledger"):
         panel = report.get(name)
@@ -112,6 +149,445 @@ def validate_report(report: dict) -> list[Finding]:
                 "REASON_CODE_UNKNOWN", f"{name}.reason_code",
                 f"{panel['reason_code']!r} is not in the closed set. Free prose "
                 "in this slot has no falsifier, which is why the set is closed."))
+    return findings
+
+
+def _when(value) -> datetime.datetime | None:
+    return schema.parse_when(str(value))
+
+
+def _is_count(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+# Keys that would make an execution record or the route's execution block read as route
+# conformance. The stand in's rows stay unavailable, and nothing beside them may stand in for them.
+ROUTE_ROW_KEYS = frozenset({"rows", "row_results", "route_rows", "conformance", "conformant"})
+
+
+def _validate_execution(report) -> list[Finding]:
+    """The driver's records, read as a hostile reader would, rule V1 to V14.
+
+    The run document is embedded in the report so every count below is RECOMPUTED from the
+    records and never read from a summary. A document that fails here is not a smaller number,
+    it is an invalid artifact: the validator accepting a wrong `passed` is the page's only guard.
+    """
+    findings: list[Finding] = []
+    coverage = report.get("coverage")
+    run = report.get("execution_run")
+    identities = report.get("identities") or {}
+    measured_cov = isinstance(coverage, dict) and coverage.get("state") == "measured"
+    declared = coverage.get("execution_state") if measured_cov else None
+    valid_shape = (isinstance(run, dict) and isinstance(run.get("header"), dict)
+                   and isinstance(run.get("records"), list))
+
+    # V12. A measured execution state exists only with a run document beneath it, and a run
+    # document exists only beneath a measured execution state. A zero `passed` presented as
+    # measured, with nothing run, is the failure this guards.
+    if declared == "measured" and not valid_shape:
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "coverage.execution_state",
+            "the execution state is measured and no run document is beneath it"))
+    if run is not None and (declared != "measured" or not valid_shape):
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "execution_run",
+            "a run document is present and the execution state does not stand on it"))
+    bound = declared == "measured" and valid_shape
+    part = coverage.get("execution_partition") if measured_cov else None
+    if declared == "not_run" and coverage.get("execution_reason_code") != "EXEC_NOT_RUN":
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "coverage.execution_reason_code",
+            "nothing was run, and the reason says otherwise"))
+    # R2. An executed count needs a measured state AND the run beneath it. `not_run` is only one
+    # of the ways to have no run: unavailable, unknown and missing states may not carry a pass.
+    if measured_cov and not bound and isinstance(part, dict) and any(
+            part.get(k) for k in ("passed", "failed", "refused", "errored")):
+        findings.append(Finding(
+            "EXEC_STATE_UNBACKED", "coverage.execution_partition",
+            "an executed count with no measured execution state and no run document beneath it"))
+    # R1. Every route's execution block is checked, and none stands without a run.
+    findings += _validate_route_blocks(report, run if bound else None)
+    if not valid_shape or not measured_cov:
+        return findings
+
+    header, records = run["header"], run["records"]
+    drivable = coverage.get("drivable_ids") or []
+    routes = [r for r in (report.get("routes") or []) if isinstance(r, dict)]
+    route_entry = next((r for r in routes if r.get("name") == "proxy_strict"), {})
+
+    # V1
+    if header.get("schema") != schema.EXEC_RUN_SCHEMA:
+        findings.append(Finding("EXEC_RECORD_SCHEMA", "execution_run.header.schema",
+                                f"{header.get('schema')!r} is not run schema {schema.EXEC_RUN_SCHEMA}"))
+    seen = set()
+    for index, record in enumerate(records):
+        path = f"execution_run.records[{index}]"
+        problem = schema.record_shape_problem(record)
+        if problem:
+            findings.append(Finding("EXEC_RECORD_SCHEMA", path,
+                                    f"the record cannot be read, {problem}"))
+            if isinstance(record, dict) and ROUTE_ROW_KEYS & set(record):
+                findings.append(Finding(
+                    "STANDIN_CLAIMED_AS_ROUTE", path,
+                    f"a driver record carries {sorted(ROUTE_ROW_KEYS & set(record))}, which read "
+                    "as route conformance. The stand in is an instrument, not the product"))
+            outcome = record.get("outcome") if isinstance(record, dict) else None
+            if not isinstance(outcome, str) or outcome not in schema.EXEC_STATES or (
+                    outcome == "not_run"):
+                findings.append(Finding(
+                    "EXEC_OUTCOME_UNKNOWN", f"{path}.outcome",
+                    f"{outcome!r} is not an executed outcome. `not_run` is the absence of a "
+                    "record"))
+            continue
+        variant_id = record.get("variant_id")
+        if record.get("record_schema") != schema.EXEC_RECORD_SCHEMA:
+            findings.append(Finding("EXEC_RECORD_SCHEMA", f"{path}.record_schema",
+                                    f"{record.get('record_schema')!r} is not record schema "
+                                    f"{schema.EXEC_RECORD_SCHEMA}"))
+        # V2
+        if variant_id not in drivable:
+            findings.append(Finding(
+                "EXEC_RECORD_NOT_DRIVABLE", f"{path}.variant_id",
+                f"{variant_id!r} is not a drivable variant of this corpus, so the run was not "
+                "made against this report's planning"))
+        if variant_id in seen:
+            findings.append(Finding("DUPLICATE_IDS", f"{path}.variant_id",
+                                    f"{variant_id!r} has two records and would be counted twice"))
+        seen.add(variant_id)
+        # V3
+        if (record.get("route") != "proxy_strict"
+                or record.get("implementation_kind") != "harness_stand_in"
+                or route_entry.get("implementation_kind") != "harness_stand_in"):
+            findings.append(Finding(
+                "EXEC_RECORD_KIND", path,
+                f"route {record.get('route')!r} and kind {record.get('implementation_kind')!r} "
+                "are not the harness stand in, or the report's route entry is not one. The driver "
+                "runs the stand in and nothing else"))
+        # V4
+        outcome, reason = record.get("outcome"), record.get("reason_code")
+        if outcome not in schema.EXEC_STATES or outcome == "not_run":
+            findings.append(Finding(
+                "EXEC_OUTCOME_UNKNOWN", f"{path}.outcome",
+                f"{outcome!r} is not an executed outcome. `not_run` is the absence of a record"))
+        if outcome != "passed" and not reason:
+            findings.append(Finding("REASON_CODE_MISSING", f"{path}.reason_code",
+                                    f"outcome {outcome!r} with no reason code"))
+        if reason and reason not in schema.REASON_CODES:
+            findings.append(Finding("REASON_CODE_UNKNOWN", f"{path}.reason_code", repr(reason)))
+        # V5
+        head = record.get("harness_head")
+        if not FULL_SHA.match(str(head or "")) or head != header.get("harness_head"):
+            findings.append(Finding(
+                "IDENTITY_UNPINNED", f"{path}.harness_head",
+                f"{head!r} is not a full commit equal to the run header's"))
+        # V6, the per record half
+        if not record.get("delivered_digest") and not (
+                outcome == "errored"
+                or (outcome == "refused" and reason == "EVIDENCE_UNBOUND")):
+            findings.append(Finding(
+                "EXEC_RUN_STALE_CORPUS", f"{path}.delivered_digest",
+                "no delivered digest, so this variant is not bound to the delivered corpus"))
+        # V8
+        if outcome == "passed":
+            control = record.get("control") or {}
+            evidence = record.get("assertions") or {}
+            expectation = record.get("expectation") or {}
+            if control.get("stimulus_delivered") is not True:
+                findings.append(Finding(
+                    "PASSED_WITHOUT_STIMULUS_PROOF", f"{path}.control",
+                    "passed with no proof that the hostile stimulus reached the client on the "
+                    "route with no mediation. An unplayed scenario also leaves nothing behind"))
+            if not record.get("graded_on") or not evidence.get("held"):
+                findings.append(Finding(
+                    "PASSED_WITHOUT_SUBJECT", f"{path}.graded_on",
+                    "passed with nothing graded and no check that held. No assertion failing is "
+                    "not the same as one holding"))
+            if (evidence.get("not_held")
+                    or (expectation.get("assert_original_payload_absent") is True
+                        and evidence.get("payload_at_destination") is not False)
+                    or (evidence.get("expect_original") is True
+                        and evidence.get("declared_frames_delivered_unchanged") is not True)):
+                findings.append(Finding(
+                    "PASSED_CONTRADICTED", f"{path}.assertions",
+                    "passed while the record's own evidence says a check did not hold, or says "
+                    "the payload the seed requires absent reached its destination"))
+        # V9
+        if (record.get("control") or {}).get("stimulus_delivered") is not True and outcome in (
+                "passed", "failed"):
+            findings.append(Finding(
+                "EXEC_UNPROVEN_COUNTED", f"{path}.outcome",
+                f"{outcome} with an unproven stimulus. A variant whose control did not deliver "
+                "the stimulus is refused, so the count of refusals is never below the unproven"))
+        # V14, the record half
+        if ROUTE_ROW_KEYS & set(record):
+            findings.append(Finding(
+                "STANDIN_CLAIMED_AS_ROUTE", path,
+                f"a driver record carries {sorted(ROUTE_ROW_KEYS & set(record))}, which read as "
+                "route conformance. The stand in is an instrument, not the product"))
+
+    # V5, the header half
+    for key in ("harness_head", "engine_head"):
+        if not FULL_SHA.match(str(header.get(key) or "")):
+            findings.append(Finding("IDENTITY_UNPINNED", f"execution_run.header.{key}",
+                                    f"{header.get(key)!r} is not a full commit"))
+    pin = identities.get("engine_head")
+    if not FULL_SHA.match(str(pin or "")) or header.get("engine_head") != pin:
+        findings.append(Finding(
+            "IDENTITY_UNPINNED", "execution_run.header.engine_head",
+            "the run's engine commit is not the engine commit this report is pinned to. A run "
+            "document cannot name the engine it is judged against"))
+    if identities.get("execution_harness_head") != header.get("harness_head"):
+        findings.append(Finding("IDENTITY_UNPINNED", "identities.execution_harness_head",
+                                "does not equal the run header's harness head"))
+    # V6, the header half
+    if header.get("corpus_digest") != identities.get("corpus_digest") or not header.get("corpus_digest"):
+        findings.append(Finding(
+            "EXEC_RUN_STALE_CORPUS", "execution_run.header.corpus_digest",
+            "the run was made against a different corpus than this report was planned from"))
+    if header.get("adapter_digest") != identities.get("adapter_source_digest") or not header.get(
+            "adapter_digest"):
+        findings.append(Finding(
+            "EXEC_RUN_STALE_CODE", "execution_run.header.adapter_digest",
+            "the run was made with different adapter code than this report was planned with"))
+
+    # V7. Both the header's counts and the report's partition recomputed from the records.
+    drivable_set = set(drivable)
+    counted = {"passed": 0, "failed": 0, "refused": 0, "errored": 0}
+    once = set()
+    for record in records:
+        if (isinstance(record, dict) and isinstance(record.get("variant_id"), str)
+                and record.get("variant_id") in drivable_set
+                and record.get("variant_id") not in once
+                and isinstance(record.get("outcome"), str) and record.get("outcome") in counted):
+            once.add(record["variant_id"])
+            counted[record["outcome"]] += 1
+    if header.get("counts") != counted:
+        findings.append(Finding("AGGREGATE_MISMATCH", "execution_run.header.counts",
+                                f"declared {header.get('counts')}, recomputed {counted}"))
+    part = coverage.get("execution_partition") or {}
+    total = coverage.get("total")
+    if isinstance(total, int):
+        expected = dict(counted, not_run=total - sum(counted.values()))
+        for key, value in expected.items():
+            if part.get(key) != value:
+                findings.append(Finding(
+                    "AGGREGATE_MISMATCH", f"coverage.execution_partition.{key}",
+                    f"the report says {part.get(key)}; recomputing from the records beneath it "
+                    f"gives {value}"))
+
+    # V10, V11
+    if header.get("records_digest") != schema.records_digest(records):
+        findings.append(Finding("EXEC_RECORDS_DIGEST", "execution_run.header.records_digest",
+                                "does not recompute from the records beneath it"))
+    if identities.get("execution_run_digest") != schema.canonical_digest(run):
+        findings.append(Finding("EXEC_RUN_DIGEST", "identities.execution_run_digest",
+                                "does not equal the digest of the run document in this report"))
+    # V13
+    fresh = report.get("freshness") or {}
+    finished, measured = _when(header.get("finished_at")), _when(fresh.get("measured_at"))
+    policy = fresh.get("policy_hours")
+    if (finished is None or measured is None or not isinstance(policy, (int, float))
+            or measured - finished > datetime.timedelta(hours=policy)
+            or finished > measured
+            or finished > datetime.datetime.now(datetime.timezone.utc)):
+        findings.append(Finding(
+            "EXEC_RUN_STALE", "execution_run.header.finished_at",
+            "the run is older than the freshness policy allows, finished after the measurement "
+            "that carries it or after now, or its date cannot be read. Republishing an old run "
+            "does not refresh it"))
+    return findings
+
+
+def _validate_route_blocks(report, run) -> list[Finding]:
+    """V12 and V14, the route half, for EVERY route that carries an execution block.
+
+    The block says what ran and carries the sentence that states what the examiner's finding
+    covers. It is data the page prints, so it is validated wherever the page can print it: a block
+    with no run beneath it, or on a route the run did not execute, is a claim nothing backs.
+    """
+    findings: list[Finding] = []
+    routes = report.get("routes")
+    if not isinstance(routes, list):
+        return findings
+    header = run["header"] if run is not None else {}
+    for index, route in enumerate(routes):
+        if not isinstance(route, dict) or "execution" not in route:
+            continue
+        path, block = f"routes[{index}].execution", route["execution"]
+        if run is None:
+            findings.append(Finding(
+                "EXEC_STATE_UNBACKED", path,
+                "an execution block with no run document beneath it. Counts and a scope "
+                "sentence that nothing ran are the claim this page exists to refuse"))
+            continue
+        if not isinstance(block, dict) or block.get("state") != "measured":
+            findings.append(Finding("EXEC_STATE_UNBACKED", path,
+                                    "the execution block is not a measured block of the run"))
+            continue
+        if route.get("name") != header.get("route") or route.get(
+                "implementation_kind") != "harness_stand_in":
+            findings.append(Finding(
+                "EXEC_RECORD_KIND", path,
+                "the block sits on a route the run did not execute, or one that is not the "
+                "harness stand in"))
+        if ROUTE_ROW_KEYS & set(block):
+            findings.append(Finding(
+                "STANDIN_CLAIMED_AS_ROUTE", path,
+                f"the execution block carries {sorted(ROUTE_ROW_KEYS & set(block))}"))
+        if block.get("fit_scope") != schema.STANDIN_SCOPE_SENTENCE:
+            findings.append(Finding(
+                "STANDIN_SCOPE_MISSING", f"{path}.fit_scope",
+                "the route's execution block does not carry the sentence that states what the "
+                "examiner's finding covers. Executed variants beside a FIT word read as an "
+                "examined executor, and this one was not"))
+        if (block.get("records_digest") != header.get("records_digest")
+                or block.get("counts") != header.get("counts")
+                or block.get("harness_head") != header.get("harness_head")):
+            findings.append(Finding("AGGREGATE_MISMATCH", path,
+                                    "the block does not equal the run header it summarises"))
+    # The route the run executed must say so. This is the old rule, kept: a run is embedded and
+    # the route entry does not say what ran.
+    if run is not None:
+        executed = [r for r in routes if isinstance(r, dict) and r.get("name") == "proxy_strict"]
+        if not executed or not isinstance(executed[0].get("execution"), dict) or executed[
+                0]["execution"].get("state") != "measured":
+            findings.append(Finding(
+                "EXEC_STATE_UNBACKED", "routes[proxy_strict].execution",
+                "a run is embedded and the route entry does not say what ran"))
+    return findings
+
+
+def _digest_or_none(doc) -> str | None:
+    try:
+        return schema.canonical_digest(doc)
+    except (TypeError, ValueError):
+        return None
+
+
+def _validate_ledger(report) -> list[Finding]:
+    """Two labelled lines, each with its own scope, built from a record and never typed.
+
+    Until this existed the panel passed validation if it was any object at all, so a bare number
+    under any label would have published. The scope is the whole point: the delivered ledger
+    counts the charges of ONE run, and under the cumulative cap's label it would have been a
+    scope error wearing a citation.
+    """
+    findings: list[Finding] = []
+    panel = report.get("ledger")
+    if isinstance(panel, dict) and panel.get("state") not in schema.NUMERIC_STATES:
+        if panel.get("lines"):
+            findings.append(Finding(
+                "LEDGER_COUNT_INVALID", "ledger.lines",
+                "labelled lines beneath a panel whose state states no numbers. A state is not a "
+                "number, and lines under it would print one"))
+        return findings
+    if not isinstance(panel, dict):
+        return findings
+    run = report.get("execution_run") if isinstance(report.get("execution_run"), dict) else None
+    header = (run or {}).get("header") if isinstance((run or {}).get("header"), dict) else {}
+    measured = _when((report.get("freshness") or {}).get("measured_at"))
+
+    if panel.get("unit") != schema.LEDGER_UNIT:
+        findings.append(Finding(
+            "LEDGER_UNIT_WRONG", "ledger.unit",
+            f"{panel.get('unit')!r} is not {schema.LEDGER_UNIT!r}. A count is not dollars and "
+            "not provider requests"))
+    lines = panel.get("lines")
+    if not isinstance(lines, list) or not lines:
+        findings.append(Finding("LEDGER_LINES_MISSING", "ledger.lines",
+                                "a numeric ledger panel with no labelled lines beneath it"))
+        return findings
+    scopes = [line.get("scope") for line in lines if isinstance(line, dict)]
+    for needed in ("cumulative_gate2", "no_live_calls_standin_run"):
+        if needed not in scopes:
+            findings.append(Finding(
+                "LEDGER_LINES_MISSING", "ledger.lines",
+                f"no line for scope {needed!r}. The two lines are shown together or the reader "
+                "takes the one that is shown for the whole"))
+
+    for index, line in enumerate(lines):
+        path = f"ledger.lines[{index}]"
+        if not isinstance(line, dict):
+            findings.append(Finding("LEDGER_COUNT_INVALID", path, "a line is not an object"))
+            continue
+        scope = line.get("scope")
+        if scope not in schema.LEDGER_SCOPES:
+            findings.append(Finding("LEDGER_SCOPE_UNKNOWN", f"{path}.scope",
+                                    f"{scope!r} is not in {list(schema.LEDGER_SCOPES)}"))
+        if line.get("state") == "unavailable":
+            if line.get("reason_code") not in schema.REASON_CODES:
+                findings.append(Finding("REASON_CODE_MISSING", path,
+                                        "an unavailable line with no reason code in the closed set"))
+            carried = sorted(set(line) - {"scope", "state", "reason_code", "source", "text"})
+            if carried:
+                findings.append(Finding("LEDGER_COUNT_INVALID", path,
+                                        f"an unavailable line that still carries {carried}"))
+            if line.get("text") is not None:
+                findings.append(Finding(
+                    "LEDGER_LINE_TYPED", f"{path}.text",
+                    "an unavailable line with words on it. A line with no record has no text, "
+                    "and text beside a state is a number nobody can trace"))
+            continue
+        charges, cap, unsettled = line.get("charges"), line.get("cap"), line.get("unsettled")
+        needs_cap = scope in ("cumulative_gate2", "live_driver_batch")
+        if (not _is_count(charges)
+                or (needs_cap and (not _is_count(cap) or not _is_count(unsettled)))
+                or (cap is not None and not _is_count(cap))
+                or (_is_count(cap) and _is_count(charges) and charges > cap)):
+            findings.append(Finding(
+                "LEDGER_COUNT_INVALID", path,
+                f"charges {charges!r}, cap {cap!r}, unsettled {unsettled!r}. Counts are "
+                "non negative whole numbers and charges never exceed the cap"))
+        updated = _when(line.get("updated_at"))
+        if updated is None or (measured is not None and updated > measured):
+            findings.append(Finding(
+                "LEDGER_UNDATED", f"{path}.updated_at",
+                "a count with no date, or dated after the measurement that carries it"))
+        # The words are generated. A hand typed line is a number nobody can trace.
+        if line.get("text") != schema.ledger_line_text(line):
+            findings.append(Finding(
+                "LEDGER_LINE_TYPED", f"{path}.text",
+                f"the line reads {line.get('text')!r} and its own fields say "
+                f"{schema.ledger_line_text(line)!r}"))
+        # An import, not a mint.
+        if line.get("source") == "ledger_record":
+            record = panel.get("record")
+            if (not isinstance(record, dict) or not panel.get("record_digest")
+                    or _digest_or_none(record) != panel.get("record_digest")
+                    or line.get("record_digest") != panel.get("record_digest")
+                    or any(record.get(k) != line.get(k)
+                           for k in ("scope", "cap", "charges", "unsettled", "updated_at"))):
+                findings.append(Finding(
+                    "LEDGER_NOT_IMPORTED", path,
+                    "the line is not the imported ledger record it cites"))
+        elif line.get("source") == "execution_run":
+            ledger_header = header.get("ledger") if isinstance(header.get("ledger"), dict) else {}
+            if (run is None or line.get("records_digest") != header.get("records_digest")
+                    or line.get("run_id") != header.get("run_id")
+                    or line.get("updated_at") != header.get("finished_at")
+                    or ledger_header.get("scope") != scope
+                    or ledger_header.get("charges") != charges):
+                findings.append(Finding(
+                    "LEDGER_NOT_IMPORTED", path,
+                    "the line is not the ledger block of the run document in this report"))
+        else:
+            findings.append(Finding("LEDGER_NOT_IMPORTED", f"{path}.source",
+                                    f"{line.get('source')!r} is not an imported record"))
+        # The zero trap. A zero is readable only where the scope says why it is zero.
+        if charges == 0 and scope != "no_live_calls_standin_run":
+            findings.append(Finding(
+                "LEDGER_ZERO_UNSCOPED", f"{path}.charges",
+                "a zero count under a scope that does not say why it is zero reads as 'nothing "
+                "spent' when it may be 'nothing counted'"))
+        # A stand in run made no live call, and a run that made some is not a stand in run.
+        if scope == "live_driver_batch" and run is not None:
+            findings.append(Finding(
+                "LEDGER_SCOPE_CONTRADICTED", f"{path}.scope",
+                "a stand in run carries a live driver batch scope"))
+        if scope == "no_live_calls_standin_run" and charges not in (0, None):
+            findings.append(Finding(
+                "LEDGER_SCOPE_CONTRADICTED", f"{path}.charges",
+                f"scope says no live calls and the count is {charges!r}"))
     return findings
 
 
@@ -434,45 +910,34 @@ def _validate_rows(rows, path, route) -> list[Finding]:
     return findings
 
 
-BOUND = re.compile(r'data-bound="([^"]+)"[^>]*>([^<]*)<')
-
-
-def resolve(report: dict, path: str):
-    """Follow a dotted path with [index] segments into the report."""
-    node = report
-    for part in path.split("."):
-        if part.endswith("]") and "[" in part:
-            name, index = part[:-1].split("[")
-            node = node[name][int(index)]
-        else:
-            node = node[part]
-    return node
-
-
 def check_transcription(html: str, report: dict) -> list[Finding]:
-    """Every rendered figure equals the validated artifact it cites.
+    """The page is the render of the report, byte for byte, or it is not.
 
-    This is the weaker of the two checks and is labelled as such, because a
-    coordinated edit to both files passes it. It exists to catch the renderer,
-    not the author.
+    One comparison. The page is `render.render(report)` and nothing else, so there is no reading
+    of markup here: no parser, no list of tags, no list of attributes and no reading of a
+    stylesheet. A figure retyped, a sentence reworded, a section dropped, an element wrapped, a
+    sheet added, a script added or an overlay laid on top is a different page, whatever it does
+    in a browser. The check is weaker than recomputation in one way and labelled as such: a
+    report and a page edited together still pass it, which is why `validate_report` recomputes.
     """
-    findings: list[Finding] = []
-    seen = 0
-    for path, rendered in BOUND.findall(html):
-        seen += 1
-        try:
-            value = resolve(report, path)
-        except (KeyError, IndexError, TypeError, ValueError):
-            findings.append(Finding("BOUND_PATH_MISSING", path,
-                                    "the page cites a field the artifact lacks"))
-            continue
-        if str(value) != rendered.strip():
-            findings.append(Finding(
-                "TRANSCRIPTION_MISMATCH", path,
-                f"the page shows {rendered.strip()!r}; the artifact says {value!r}"))
-    if not seen:
-        findings.append(Finding(
-            "NOTHING_BOUND", "html",
-            "no rendered figure cites an artifact field. An unbound page is a "
-            "page of hand-typed numbers, which is the defect this exists for."))
-    return findings
+    import render                                           # render imports this module
+    try:
+        expected = render.render(report)
+    except render.WillNotRender as exc:
+        return [Finding("PAGE_REPORT_NOT_RENDERABLE", "html",
+                        f"there is no page this report would produce, so none can match it: {exc}")]
+    except Exception as exc:                                # noqa: BLE001
+        return [Finding("PAGE_REPORT_NOT_RENDERABLE", "html",
+                        f"the report could not be rendered, {type(exc).__name__}")]
+    if isinstance(html, str) and html == expected:
+        return []
+    if not isinstance(html, str):
+        return [Finding("PAGE_NOT_THE_RENDER", "html", "the page is not text")]
+    shown, wanted = html.split("\n"), expected.split("\n")
+    line = next((n for n in range(max(len(shown), len(wanted)))
+                 if shown[n:n + 1] != wanted[n:n + 1]), 0)
+    return [Finding(
+        "PAGE_NOT_THE_RENDER", "html",
+        f"the page is not what the renderer makes of this report. First difference at line "
+        f"{line + 1}: the page has {(shown[line:line + 1] or ['(nothing)'])[0][:120]!r}, the "
+        f"render has {(wanted[line:line + 1] or ['(nothing)'])[0][:120]!r}")]

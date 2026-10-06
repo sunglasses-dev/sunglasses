@@ -29,11 +29,14 @@ import pytest
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
+sys.path.insert(0, str(HERE))
 
 import classify     # noqa: E402
 import produce      # noqa: E402
 import publish      # noqa: E402
 import write_page   # noqa: E402
+from test_execution_run import corpus_digest, planned, run_doc   # noqa: E402,F401
+from test_hardening_row15 import build_closed   # noqa: E402
 
 UTC = datetime.timezone.utc
 
@@ -117,13 +120,18 @@ def test_a_DIFFERENT_report_with_the_same_finish_time_is_refused(honest, tmp_pat
                                                        run_id="b")), landing, attempts)
 
 
-def test_a_refusal_replaces_a_green_page_latest_attempt_not_latest_success(honest, tmp_path):
+def test_a_refusal_replaces_a_green_page_latest_attempt_not_latest_success(
+        honest, tmp_path, tmp_path_factory, run_doc):
     landing, attempts = tmp_path / "landing", tmp_path / "attempts.jsonl"
     landing.mkdir()
-    green = _at(honest, "2026-09-23T03:00:00+00:00", run_id="green")
-    green["run"].update({"outcome": "complete", "exit_code": 0})
-    green["run"].pop("reason_code", None)
-    refused = _at(honest, "2026-09-23T04:00:00+00:00", run_id="refused")
+    # A green page is a run that executed something. It is built, not typed (V16).
+    built, code = build_closed(tmp_path_factory, run_doc)
+    assert (code, built["run"]["outcome"]) == (0, "complete")
+    green = copy.deepcopy(built)                 # its own dates stand: V13 ties the run to them
+    green["run"]["id"] = "green"
+    later = (datetime.datetime.fromisoformat(green["run"]["finished_at"])
+             + datetime.timedelta(hours=1)).isoformat()
+    refused = _at(honest, later, run_id="refused")
     refused["run"].update({"outcome": "refused", "exit_code": 3, "reason_code": "RUN_REFUSED"})
     write_page.write(_dump(tmp_path, "g.json", green), landing, attempts)
     write_page.write(_dump(tmp_path, "r.json", refused), landing, attempts)
