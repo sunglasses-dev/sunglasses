@@ -3,7 +3,25 @@
 All notable changes to Sunglasses are documented here.
 
 
-## [Unreleased]
+## [0.6.6] — 2026-10-06
+
+### Added
+
+- The benchmark script has a new flag, `--installed`, that measures the package you installed and
+  not the source checkout. Until now the script put the checkout first on the import path, so the
+  README command measured the source tree and not the wheel a user installs. With `--installed`
+  the script leaves the import path alone and measures the engine it finds there, and it refuses
+  with exit code 2 when nothing is installed or when the importable package is the checkout
+  itself, such as an editable install. The report now says which engine it measured, in an
+  `engine` key beside the metrics, and the sealed hash means what it did before. An unknown flag
+  is now an error. Without the flag the script still measures the checkout. The README documents
+  both. (#303)
+
+- Three rules for text that dresses itself as an instruction channel. GLS-TMS-255 reads a command
+  fence marker in a message, file, tool result or API response, GLS-TOP-651 reads a bracketed role label followed within a
+  short span by wording such as decided or approved and GLS-TOP-652 reads an invented priority tag followed
+  by text that opens with an order word. Each one keys on literal markup. A shell here document, a page that only
+  names a role label and one well known README are pinned as not matching. (#315)
 
 ### Changed
 
@@ -14,6 +32,167 @@ All notable changes to Sunglasses are documented here.
   Sentences about a missing or empty policy file were wrong. Where they speak
   of an ask, they now say that the firewall asks on a call nothing else settles
   until the file is restored. (#313)
+
+- The WARN lane now stops its own pattern scan after 7 seconds, below the 10
+  second hook timeout, and asks you instead of being killed by the host with no
+  answer. Two limits remain. On Python 3.9 and 3.10 (and 3.11 before 3.11.6,
+  3.12.0) a single regex call made of many short match attempts cannot be
+  interrupted, so the WARN lane can still run past its budget on that input
+  shape, while Python 3.11.6, 3.12.1 and newer stop it close to the 7 seconds.
+  And on large content passed as tool input, about 200 KB and up, the WARN lane
+  can use up its 7 seconds on any Python and ask you without a completed
+  pattern check, because the time adds up over hundreds of checks plus the
+  first pattern database build. Hard blocks do not use this budget. (#307)
+
+- Eight rules now carry medium severity, GLS-PI-INFO, GLS-TOP-245, GLS-TD-001,
+  GLS-SCHEMA-LEAK-215, GLS-CAI-243, GLS-TS-252, GLS-SO-001 and GLS-TP-003. Each
+  of them has matched short lines found in project documentation files, and at
+  high or critical severity one such line was enough for a scan to block the
+  text it sat in. The scan decides by the worst finding, so a text where one of these
+  rules is the only finding is now quarantined and was blocked before. A text
+  that holds one of these shapes and also trips a rule of high or critical
+  severity is still blocked. This is a design change to those rules and not a
+  bug fix. (#316)
+
+- The stored benchmark receipt `tests/benchmark/results/benchmark_latest.json` is refreshed from a
+  tool run at engine 0.6.5. It was stale at engine 0.5.0 and one negative short. The public numbers
+  match the published ones, and only the engine version, the negatives count, the true negatives
+  count and the metrics hash moved. No code and no README change. (#306)
+
+### Fixed
+
+- The hook receipt now records whether a policy existed. A call made with no policy file and a
+  call that a policy checked and passed both wrote the same GLS-FW-CLEAN receipt, so the record
+  could not tell them apart. The receipt now carries `policy_state`, set to `none_configured` when
+  there is no policy file and to `inert` when the file has no enabled entry. A policy that lists
+  something carries no state. What the hook decides is the same as before. Two sentences were also
+  wrong. The policy file header said an empty file enforces nothing, and it asks before each tool
+  call. The README opening line said the hook blocks credential leaks, and it blocks secret
+  material in tool calls and the paths and hosts your policy lists. (#301)
+
+- A server that writes its answer and exits right away no longer has the clean answer replaced by
+  a `MALFORMED_UPSTREAM` fault. This hit one shot tools and an echo server that closes on end of
+  input. In a window of about a millisecond the exit watcher saw the call as unanswered and closed
+  the session while the answer was still being read or scanned. The reader now judges the exit
+  once nothing is left to read, so the answer always wins over the news of the exit. If the reader
+  cannot judge within 1 second the watcher judges it as before, and a server that exits while it
+  still owes an answer is still a fault. One limit remains. A batch of answers that are each slow
+  to scan can still lose the last ones to a refusal once that 1 second has passed. (#310)
+
+- GLS-SMP-023 could take far longer than the scan budget on inputs of a few
+  kilobytes. GLS-AW-613 carries the same chained shape and is restacked with it
+  as related hardening. Both rules chained their signal checks with a wildcard
+  between them, so when the first signals were present and a later one was
+  missing the engine retried the checks over and over. The checks now sit side
+  by side. A match starts and ends where it did on the generated texts the tests
+  compare. A new test reads the shipped regexes and fails when a rule chains
+  lookaheads in the shape it recognizes. (#312)
+
+- The proxy no longer forwards a tool call after the client was told it was cancelled. A cancel
+  could be recorded and answered while the request was still being scanned, and the call was then
+  released to the server anyway. The proxy now checks at release whether the request was
+  cancelled, and a cancelled request goes nowhere. A late cancel for a request that was already
+  answered no longer speaks for a later request that reuses the same id, which before could run on
+  the server and still be answered to the client as cancelled. A cancel that arrives while its
+  call is being written is answered only after the write has finished, so the client is never told
+  a call was cancelled before its bytes have left, and a failed write still answers the cancel
+  once. A tool call approved against tool descriptors that changed before the call left is held
+  back with one DESCRIPTOR_CHANGED answer, while a call approved again against the new descriptors
+  goes through. The check runs when a scan has finished and does not stop a scan that has started.
+  A cancel that arrives after the write began is answered after it, so the server may still run
+  that call. No scan decision, rule or verdict changes. (#317)
+
+- GLS-CF-252 no longer retries the status alternative at every position of a whitespace run.
+  The alternative began with an optional bracket and optional whitespace, so on a text with
+  the word applied in it followed by a long run of whitespace the search read the whole run
+  again from each position, and the time grew with the square of the length. Whitespace is now taken only from the
+  start of a run. A match starts at the same place as before and the words of the rule are
+  not changed. (#319)
+
+- GLS-CMP-009 reads the gap between its verb and its noun in a different shape. Three of
+  its alternatives joined the two words with leading whitespace, a bounded stretch of text and
+  trailing whitespace, and those three parts could take the same spaces, so a text that held the
+  anchor words followed by a long run of whitespace made the search read that run again for each
+  way of splitting it. The gap now reads a run of two or more whitespace characters, or leading
+  whitespace, a core that starts and ends with a character that is not whitespace, and trailing
+  whitespace. The words of the rule, its severity and its channels are not changed. A match
+  starts and ends where it did on the generated texts the tests compare. (#320)
+
+- Eighteen rules (GLS-SE-010, GLS-MR-003, GLS-MR-004, GLS-MR-015, GLS-MR-035, GLS-MR-036,
+  GLS-MR-039, GLS-MR-040, GLS-MR-041, GLS-MR-047, GLS-MR-049, GLS-MR-056, GLS-AW-671,
+  GLS-AW-676, GLS-AW-679, GLS-AW-683, GLS-AW-685 and GLS-AW-712) read the whitespace at the
+  start of the text in a different shape. Each of them begins with whitespace and then tests the
+  whole text, and when that test failed the search gave back one character of the run at a time and
+  tested the text again. The run is now read in one step by a lookahead and a backreference. The
+  rules stay in the plain mode with the same required words. The words of the rules, their severity
+  and their channels are not changed. A match starts and ends where it did on the generated texts
+  the tests compare. (#322)
+
+### Continuous integration
+
+- The release workflow now sets the build timestamp from the commit time of the tagged commit
+  before it builds. Two builds of one commit then give one wheel, so the wheel hash says something
+  about the commit and not about the moment CI ran. A workflow check fails when that step is
+  missing, is not taken from the commit time or comes after the build. (#300)
+
+- The release workflow now repacks the source distribution with a new script,
+  `scripts/repack_sdist.sh`, so its bytes follow the tagged commit. Two builds of one tag used to
+  give two different files because the archive carried file times, owner names and an order that
+  depended on the machine. The script keeps every member name, mode, size and content hash, and it
+  refuses and leaves its input alone when the commit time is missing or the file is not a tar.gz.
+  The build step also checks that the wheel hash did not move. The wheel is not affected. The
+  source distribution already on PyPI for 0.6.5 stays as published, and the claim holds for
+  releases built after this change. (#304)
+
+- The release workflow has a new postcondition job that runs after the upload and fails the run
+  when PyPI holds something other than what the tag builds. `scripts/release_postcondition.sh`
+  fetches the files PyPI lists for the version, refuses any file whose hash differs from the one
+  PyPI states, builds the same tag in a fresh clone and compares the unpacked wheels and source
+  distributions by content. A file PyPI has not served yet is retried every 20 seconds for up to
+  300 seconds. The job never uploads, yanks or deletes anything, and the SBOM and the checksums
+  do not wait for it. (#305)
+
+- The CLI matrix test now runs one test for each output format, so a failure names the surface,
+  the state and the format. The human and sarif legs carry a `full_matrix` marker. A pull request
+  that touches none of a short list of output and CI files skips those legs in CI, and a push to
+  main, a tag, a schedule and a manual run always run them. A plain `pytest` still runs every
+  leg. (#325)
+
+### Tests
+
+- The proxy serve tests now keep the client's stdin open until the first reply has been read. They
+  closed it together with the request, so an echo server that exits on end of input could race its
+  own answer and the ordinary call test failed with a missing result in some CI runs. The poisoned
+  result test also asserts the reason code `PROHIBITED_CONTENT`, because a session torn down during
+  the scan gave the same withheld message and let that test pass without the result ever being
+  scanned. Only tests change. (#309)
+
+- One firewall test no longer depends on how fast the process runs. It checks that an alarm landing
+  at the first line of the warn lane cleanup still restores the signal handler and still stops the
+  call. Its short budget began before the tracer reached that line, so a stalled process could run
+  the timer out first. The call now gets a long budget and the real expiry starts once the tracer
+  reaches the cleanup. Only the test changes. (#323)
+
+- The gauntlet and installed benchmark tests now share their repeated real runs. Three gauntlet
+  tests that each started the same full run and two benchmark tests that each ran the same default
+  JSON run now read one module scoped run each. Every assertion is unchanged and each test job
+  does four fewer full runs. Only tests change. (#324)
+
+- The stacked lookahead tests now count the matches of each rule, so one rule can no longer pass on
+  the count of the other, and the agreement test compares the whole matched text and not a cut of
+  its start. The corpus reader used to hand the test the label words of the attack db files and now
+  reads the real example texts. A failure message now says quadratic for one gap and cubic for two.
+  Only tests change. (#326)
+
+### Documentation
+
+- The benchmark table in the README is now headed Metric (v0.6.5). The benchmark was run again on
+  the installed 0.6.5 wheel and on a clone at the v0.6.5 tag, every row read the same on both, and
+  no value in the table changed. (#302)
+
+- The README now shows the install command and the demo before the proxy section. The demo image
+  and the Sixty seconds section moved up to sit just ahead of What the proxy enforces, and no word
+  was edited. (#327)
 
 ## [0.6.5] — 2026-10-02
 
