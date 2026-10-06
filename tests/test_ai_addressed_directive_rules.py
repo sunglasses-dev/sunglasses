@@ -854,3 +854,12 @@ def test_a_frame_with_a_srcdoc_stays_flagged_when_a_quoted_value_holds_a_tag_bou
 ])
 def test_a_greater_than_sign_inside_a_quoted_value_does_not_split_an_empty_tag_that_is_excused(engine, snippet, channel):
     assert not flagged_hi(engine, snippet, channel)
+
+
+# A void image tag is empty whatever its quoted values hold. Tag like text in its title is part of the value, and the text after the tag is a separate visible node, so the tag stays excused.
+@pytest.mark.parametrize("channel", BOUNDARY_CHANNELS)
+@pytest.mark.parametrize("quote", ('"', "'"))
+@pytest.mark.parametrize("style", EXEMPT_STYLES)
+def test_a_void_image_with_tag_like_text_in_a_quoted_title_is_empty_and_stays_excused(engine, quote, style, channel):
+    text = '<img title=%s<img>%s style="%s">Example</img>' % (quote, quote, style)
+    assert not flagged_hi(engine, text, channel)
