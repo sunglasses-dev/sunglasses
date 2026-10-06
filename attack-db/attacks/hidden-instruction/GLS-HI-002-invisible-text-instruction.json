@@ -8,7 +8,7 @@
     "web_content",
     "file"
   ],
-  "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. Any of the hiding styles is flagged wherever it appears, with one structural exception that keys on the tag name alone: a frame or a script tag closed at once, or an image, input, link, meta, source, track, embed, line break or rule tag, none of which holds text. What the attributes say is never read, except that a frame with a srcdoc is flagged. Any other hidden element is flagged, including hidden interface text such as a closed cookie dialog.",
+  "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. Any of the hiding styles is flagged wherever it appears, with one structural tag-name exception: a start tag whose name is exactly an image, input, meta, source, track, embed, line break or rule tag, or a frame or a script tag closed at once, followed by whitespace, a slash or the end of the tag, none of which holds text. A name that only starts like one of these is another element and is flagged, and so is a link tag. What the attributes say is never read, except that a frame with a srcdoc is flagged. Any other hidden element is flagged, including hidden interface text such as a closed cookie dialog.",
   "keywords": [
     "font-size:0",
     "font-size: 0",
@@ -22,7 +22,7 @@
     "opacity: 0"
   ],
   "regex": [
-    "(?i)(?:(?<![\\s\\S])|(?!<(?:(?P<v>img|input|[li]ink|meta|source|track|embed|br|hr)|(?P<t>iframe|script))(?![\\w:-])(?![^<>]*\\bsrcdoc\\b)[^<>]*>(?(v)|\\s*</(?P=t)\\s*>))<)[^<]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_])"
+    "(?i)(?:(?<![\\s\\S])|(?!<(?:(?P<v>img|input|meta|source|track|embed|br|hr)|(?P<t>iframe|script))(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>(?(v)|[ \\t\\n\\r\\f]*</(?P=t)[ \\t\\n\\r\\f]*>))<)[^<]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_])"
   ],
   "examples": {
     "malicious": [],
