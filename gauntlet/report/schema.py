@@ -424,19 +424,56 @@ def _has_kind(value, kind) -> bool:
     if kind == NUMBER:
         return (isinstance(value, (int, float)) and not isinstance(value, bool)
                 and value == value and value not in (float("inf"), float("-inf")))
-    return isinstance(value, dict)                          # OBJECT
+    if kind == OBJECT:                                      # opaque only when the table says so
+        return isinstance(value, dict)
+    return False                                            # a declaration nothing here knows is no kind
+
+
+_WRAPPERS = ("opt", "nul", "list")
+
+
+def declaration_problems(kind, path=""):
+    """(path, why) for every declaration in the table that the view does not recognise. A schema
+    defect is a finding like any other and is reported whether or not the report carries the field,
+    so an unknown declaration is never read as an opaque object (row 27)."""
+    where = path or "report"
+    if isinstance(kind, Kind) or (isinstance(kind, str) and kind in (TEXT, WHOLE, NUMBER, OBJECT)):
+        return []
+    if isinstance(kind, dict):
+        found = []
+        for key, sub in kind.items():
+            if sub != REFUSED_FIELD:
+                found += declaration_problems(sub, f"{path}.{key}" if path else str(key))
+        return found
+    if isinstance(kind, tuple) and len(kind) == 2 and kind[0] in _WRAPPERS:
+        return declaration_problems(kind[1], path + ("[]" if kind[0] == "list" else ""))
+    if isinstance(kind, tuple) and len(kind) in (2, 3) and kind[0] == "map":
+        return declaration_problems(kind[1], path + ".*")
+    return [(where, "a declaration the view does not recognise. It is not read, so it can not "
+                    "stand for a thing the page shows")]
+
+
+def _wrap_of(kind):
+    """The wrapper a declaration names, or None. A tuple of any other shape names none."""
+    if isinstance(kind, tuple) and len(kind) == 2 and kind[0] in _WRAPPERS:
+        return kind[0]
+    if isinstance(kind, tuple) and len(kind) in (2, 3) and kind[0] == "map":
+        return "map"
+    return None
 
 
 def _cut(value, kind, path, problems, present=True):
     """The part of `value` the table names, appending a (path, why) for every field that is not
     what the table says. Returns None for a field that is null or absent."""
-    wrap = kind[0] if isinstance(kind, tuple) else None
+    wrap = _wrap_of(kind)
     if wrap in ("opt", "nul"):
         if value is None:
             if wrap == "nul" and not present:
                 problems.append((path, "absent. The page shows this field, so it must be named"))
             return None
-        kind, wrap = kind[1], (kind[1][0] if isinstance(kind[1], tuple) else None)
+        while wrap in ("opt", "nul"):                       # to any depth, the same checks run
+            kind = kind[1]
+            wrap = _wrap_of(kind)
     elif value is None:
         problems.append((path, "absent" if not present else "null, and this field is required"))
         return None
@@ -478,6 +515,8 @@ def _cut(value, kind, path, problems, present=True):
                 continue
             out[key] = _cut(item, kind[1], f"{path}.{key}", problems)
         return out
+    if not (isinstance(kind, Kind) or (isinstance(kind, str) and kind in (TEXT, WHOLE, NUMBER, OBJECT))):
+        return None                                         # not recognised, `declaration_problems` says so
     if kind == TEXT:
         problems.append((path, "a text field that declares no kind. Nothing binds what it says, "
                                "so the page may not read it"))
@@ -497,8 +536,9 @@ def render_view(report) -> tuple[dict, list[tuple[str, str]]]:
     """(view, problems). The view holds only fields `REPORT_READS` names. Never raises."""
     problems: list[tuple[str, str]] = []
     try:
+        problems += declaration_problems(REPORT_READS)
         if not isinstance(report, dict):
-            return {}, [("report", "not an object")]
+            return {}, problems + [("report", "not an object")]
         view = _cut(report, REPORT_READS, "", problems) or {}
         coverage = view.get("coverage")
         if isinstance(coverage, dict) and numeric_readable(coverage):
