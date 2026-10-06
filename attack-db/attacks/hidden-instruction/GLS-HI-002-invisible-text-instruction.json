@@ -22,7 +22,8 @@
     "opacity: 0"
   ],
   "regex": [
-    "(?i)(?<![\\s\\S])(?:(?=[\\s\\S]*?<(?-i:[sS][vV][gG]|[mM][aA][tT][hH])(?=[ \\t\\n\\r\\f/>]))[\\s\\S]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_])|(?![\\s\\S]*?<(?-i:[sS][vV][gG]|[mM][aA][tT][hH])(?=[ \\t\\n\\r\\f/>]))[\\s\\S]*?(?:(?<![\\s\\S])|(?!<(?:(?-i:[iI][mM][gG]|[iI][nN][pP][uU][tT]|[mM][eE][tT][aA]|[sS][oO][uU][rR][cC][eE]|[tT][rR][aA][cC][kK]|[eE][mM][bB][eE][dD]|[bB][rR]|[hH][rR])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>|(?-i:[iI][fF][rR][aA][mM][eE])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>[ \\t\\n\\r\\f]*</(?-i:[iI][fF][rR][aA][mM][eE])[ \\t\\n\\r\\f]*>|(?-i:[sS][cC][rR][iI][pP][tT])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>[ \\t\\n\\r\\f]*</(?-i:[sS][cC][rR][iI][pP][tT])[ \\t\\n\\r\\f]*>))<)[^<]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_]))"
+    "(?i)(?:(?<![\\s\\S])|(?!<(?:(?-i:[iI][mM][gG]|[iI][nN][pP][uU][tT]|[mM][eE][tT][aA]|[sS][oO][uU][rR][cC][eE]|[tT][rR][aA][cC][kK]|[eE][mM][bB][eE][dD]|[bB][rR]|[hH][rR])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>|(?-i:[iI][fF][rR][aA][mM][eE])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>[ \\t\\n\\r\\f]*</(?-i:[iI][fF][rR][aA][mM][eE])[ \\t\\n\\r\\f]*>|(?-i:[sS][cC][rR][iI][pP][tT])(?=[ \\t\\n\\r\\f/>])(?![^<>]*\\bsrcdoc\\b)[^<>]*>[ \\t\\n\\r\\f]*</(?-i:[sS][cC][rR][iI][pP][tT])[ \\t\\n\\r\\f]*>))<)[^<]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_])",
+    "(?i)(?<![\\s\\S])(?=[\\s\\S]*?<(?-i:[sS][vV][gG]|[mM][aA][tT][hH])(?=[ \\t\\n\\r\\f/>]))(?=[\\s\\S]*?(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\\#fff;background:\\#fff)(?![^\\W_]))[\\s\\S]*"
   ],
   "examples": {
     "malicious": [],
