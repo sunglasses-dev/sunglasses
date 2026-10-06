@@ -27,7 +27,7 @@
   ],
   "regex": [
     "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}\\b(?:in\\s+your\\s+(?:reply|response|output|answer))\\b",
-    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}(?:<\\s*(?:iframe|script|form)\\b|onclick\\s*=|onerror\\s*=|onload\\s*=(?!\\s*(?:\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\"|'this\\.media\\s*=\\s*\"all\"\\s*;?\\s*'))|javascript:)"
+    "(?i)\\b(?:render|embed|include|insert|output|display)\\b.{0,80}(?:<\\s*(?:iframe|script|form)\\b|onclick\\s*=|onerror\\s*=|onload\\s*=(?!\\s*(?:\\\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\\\"|'this\\.media\\s*=\\s*\\\"all\\\"\\s*;?\\s*'))|javascript:)|(?:(?<![\\s\\S])|>|(?!<[li]ink\\b(?=[^<>]*?\\bmedia\\s*=\\s*[\\\"']?print\\b)(?=[^<>]*?\\bonload\\s*=\\s*(?:\\\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\\\"|'this\\.media\\s*=\\s*\\\"all\\\"\\s*;?\\s*')))<)[^<>]*?\\b(?:render|embed|include|insert|output|display)\\b[^<>]{0,80}?onload\\s*=\\s*(?:\\\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\\\"|'this\\.media\\s*=\\s*\\\"all\\\"\\s*;?\\s*')|\\b(?:render|embed|include|insert|output|display)\\b.{0,80}?(?!<[li]ink\\b(?=[^<>]*?\\bmedia\\s*=\\s*[\\\"']?print\\b)(?=[^<>]*?\\bonload\\s*=\\s*(?:\\\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\\\"|'this\\.media\\s*=\\s*\\\"all\\\"\\s*;?\\s*')))<[^<>]{0,80}?onload\\s*=\\s*(?:\\\"this\\.media\\s*=\\s*'all'\\s*;?\\s*\\\"|'this\\.media\\s*=\\s*\\\"all\\\"\\s*;?\\s*')"
   ],
   "examples": {
     "malicious": [],
