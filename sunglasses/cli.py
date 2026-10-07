@@ -1798,21 +1798,25 @@ def _offer_starter_policy(args):
     a `| sh` install) writes the same rules COMMENTED OUT — discoverable,
     enforcing nothing. Silence is never read as consent.
     """
-    from .firewall import STARTER_POLICY_PATHS, sunglasses_home, write_starter_policy
+    from .firewall import (STARTER_POLICY_PATHS, existing_policy_kind, sunglasses_home,
+                           write_starter_policy)
 
     existing = sunglasses_home() / "policy.yaml"
-    if existing.exists():
+    if existing.exists() or existing.is_symlink():
         if args.policy:
             # The advertised "re-run with --policy" path. write_starter_policy
-            # upgrades ONLY our own untouched commented-out starter file.
+            # enables only a disabled starter this project wrote, and does not say
+            # who changed a file it leaves alone.
             upgraded = write_starter_policy(enabled=True)
             if upgraded:
                 print(f"\n  {GREEN}Starter policy ENABLED{RESET} "
                       f"{DIM}-> {upgraded} (was commented out){RESET}")
+            elif existing_policy_kind() == "enabled_starter":
+                print(f"\n  {DIM}Your {existing} is already enabled. Left untouched.{RESET}")
             else:
-                print(f"\n  {DIM}Your {existing} has your own edits — left "
-                      f"untouched. Uncomment the blocked_paths lines to "
-                      f"enable the starter blocks.{RESET}")
+                print(f"\n  {DIM}Your {existing} is not an unchanged disabled starter, "
+                      f"so it was left untouched. Add or uncomment the blocked_paths "
+                      f"lines yourself to enable those blocks.{RESET}")
         else:
             print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
         return

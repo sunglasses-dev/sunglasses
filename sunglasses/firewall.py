@@ -2406,10 +2406,10 @@ STARTER_POLICY_PATHS: tuple = (
 
 _POLICY_HEADER = """\
 # SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
-# Written by `sunglasses init`. Edit it freely. No file at all enforces
-# nothing, and a file with only comments enforces nothing. An empty file is
-# treated as a broken policy, and a tool call that nothing else settles asks
-# until the file is repaired.
+# Written by `sunglasses init`. Edit it freely. Detected secret material in
+# outbound tool calls is denied even without this file. This file adds your
+# path and host rules. An empty file is treated as a broken policy, and a tool
+# call that nothing else settles asks until the file is repaired.
 #
 # blocked_paths — any tool call that touches one of these paths is denied.
 #   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,
@@ -2424,6 +2424,212 @@ _POLICY_HOSTS_TAIL = """
 #   - api.github.com
 #   - pypi.org
 """
+
+
+# sha256 of the starter text each earlier release wrote, kept as a hash so the old text is not
+# repeated here. `write_starter_policy` enables a disabled starter only when the bytes of the file
+# are a starter this project wrote, and the header was reworded between releases, so the running
+# code's own text is not the only one such a file can hold. The tags that wrote each text are in
+# the comment beside it. When the header or the path list changes, add the hash of the text being
+# replaced here. `provenance.py` in the review packet rebuilds both sets from the release tags.
+_EARLIER_DISABLED_STARTER_SHA256: frozenset = frozenset({
+    "47b9fe35d84b6af69b60cc89078fdcd025019b4149e6d18622474e67af0e5b4a",  # v0.4.1 to v0.6.5
+    "bb68349c8fd83ce2d4422d9b4fdc61c737b8c6785c0711fa22c453e460950bb8",  # v0.6.6
+})
+_EARLIER_ENABLED_STARTER_SHA256: frozenset = frozenset({
+    "cf4af074e20e6a2d2c5d62eade67ae6c31b8a03aeb360b8f38583032f5e11b68",  # v0.4.1 to v0.6.5
+    "971ce41b7e2cdee9408517905ef417e26ed85c508034ea2267715f5a2467477a",  # v0.6.6
+})
+
+# The two open flags below are missing on some systems, so each is read from the os module in a
+# try and falls back to 0 where it is missing.
+try:
+    _O_NOFOLLOW = _os.O_NOFOLLOW
+except AttributeError:
+    _O_NOFOLLOW = 0
+try:
+    _O_NONBLOCK = _os.O_NONBLOCK
+except AttributeError:
+    _O_NONBLOCK = 0
+
+# A starter is a little over a kilobyte. A file past this size is read only far enough to see it
+# is not one.
+_POLICY_READ_CAP = 1 << 20
+
+
+def _is_our_untouched_disabled_starter(data: bytes) -> bool:
+    """True when the bytes are the disabled starter this code writes or one an earlier release wrote."""
+    if data == starter_policy_text(enabled=False).encode("utf-8"):
+        return True
+    return hashlib.sha256(data).hexdigest() in _EARLIER_DISABLED_STARTER_SHA256
+
+
+def _is_our_enabled_starter(data: bytes) -> bool:
+    """True when the bytes are the enabled starter this code writes or one an earlier release wrote."""
+    if data == starter_policy_text(enabled=True).encode("utf-8"):
+        return True
+    return hashlib.sha256(data).hexdigest() in _EARLIER_ENABLED_STARTER_SHA256
+
+
+def _file_identity(st):
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _read_policy_file(path):
+    """Read policy.yaml as raw bytes without following a link or waiting on anything that is not a file.
+
+    Returns (kind, data, mode, identity). kind is "absent", "unsafe" or "file". "unsafe" is a link, a
+    folder, a fifo, a file that cannot be opened or read, a path that did not name the same file
+    from the first look to the last, or a file that changed while it was read. A path that
+    already looks like a fifo or a folder is not opened. A node put there between the first look
+    and the open is opened without waiting and then refused. identity is (device, inode, size,
+    modification time) of the file the bytes came from.
+    """
+    try:
+        st = _os.lstat(path)
+    except FileNotFoundError:
+        return "absent", None, None, None
+    except OSError:
+        return "unsafe", None, None, None
+    if not _stat.S_ISREG(st.st_mode):
+        return "unsafe", None, None, None
+    try:
+        fd = _os.open(path, _os.O_RDONLY | _O_NOFOLLOW | _O_NONBLOCK)
+    except OSError:
+        return "unsafe", None, None, None
+    try:
+        before = _os.fstat(fd)
+        if not _stat.S_ISREG(before.st_mode) or (before.st_dev, before.st_ino) != (st.st_dev, st.st_ino):
+            return "unsafe", None, None, None
+        chunks, size = [], 0
+        while size <= _POLICY_READ_CAP:
+            chunk = _os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        after = _os.fstat(fd)
+        now = _os.lstat(path)
+        if not _stat.S_ISREG(now.st_mode) or len({_file_identity(before), _file_identity(after), _file_identity(now)}) != 1:
+            return "unsafe", None, None, None
+        return "file", b"".join(chunks), _stat.S_IMODE(before.st_mode), _file_identity(now)
+    except OSError:
+        return "unsafe", None, None, None
+    finally:
+        _os.close(fd)
+
+
+def _write_all(fd, data: bytes) -> None:
+    view = memoryview(data)
+    while view:
+        view = view[_os.write(fd, view):]
+
+
+def _sync_folder(folder) -> None:
+    """Best effort. Some systems cannot open a folder for this."""
+    try:
+        fd = _os.open(folder, _os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        _os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        _os.close(fd)
+
+
+def _remove_own_file(path) -> None:
+    """Remove a file this process made. It is called on staging files and not on the policy path."""
+    try:
+        _os.unlink(path)
+    except OSError:
+        pass
+
+
+def _create_policy_file(path, data: bytes) -> bool:
+    """Create policy.yaml without replacing or removing anything. False when the name is taken.
+
+    The bytes are written and synced to a private file in the same folder. Then os.link gives that
+    finished file the name policy.yaml, which fails when something already has the name, and the
+    private file is removed. So policy.yaml is not seen part written, and a policy someone saved
+    there is not replaced or removed. When a call fails with an exception, only the private file is
+    removed. A process that dies mid write (killed, power lost) cannot run that cleanup, so it can
+    leave one private file named `.policy.yaml.<hex>.tmp` in the folder. It does not leave a partial
+    policy.yaml.
+    """
+    folder = _os.path.dirname(path) or "."
+    staging = _os.path.join(folder, ".policy.yaml." + _os.urandom(8).hex() + ".tmp")
+    fd = _os.open(staging, _os.O_WRONLY | _os.O_CREAT | _os.O_EXCL | _O_NOFOLLOW, 0o666)
+    try:
+        try:
+            _write_all(fd, data)
+            _os.fsync(fd)
+        finally:
+            _os.close(fd)
+        try:
+            _os.link(staging, path)
+        except FileExistsError:
+            return False
+    finally:
+        _remove_own_file(staging)
+    _sync_folder(folder)
+    return True
+
+
+def _replace_policy_file_if_unchanged(path, expected: bytes, identity, data: bytes, mode: int) -> bool:
+    """Swap policy.yaml for `data` through a file in the same folder, only if it is still the file that was read.
+
+    The new bytes are written and synced to a staging file first. Then policy.yaml is read again and
+    must be the same file as before (same device, inode, size and modification time) holding the same
+    bytes, with the path still naming the file that was read. If not, nothing is replaced, which keeps a
+    policy saved in the meantime, including one saved over the path while it was being read. A call that
+    fails with an exception leaves the old file in place and removes the staging file. A process that
+    dies in the middle (killed, power lost) can leave the staging file behind and does not leave a half
+    written policy.
+
+    One window stays. A save that lands after that last check and before os.replace runs is replaced.
+    Reading a file and renaming over it are two calls, and the system offers no single call that
+    renames over a file only when it is unchanged, so this cannot be closed here. It is the time
+    between those two calls.
+    """
+    import tempfile
+    folder = _os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(prefix=".policy.yaml.", suffix=".tmp", dir=folder)
+    try:
+        try:
+            _write_all(fd, data)
+            _os.fchmod(fd, mode)
+            _os.fsync(fd)
+        finally:
+            _os.close(fd)
+        kind, now, _mode, now_identity = _read_policy_file(path)
+        if kind != "file" or now != expected or now_identity != identity:
+            return False
+        _os.replace(tmp, path)
+        tmp = None
+        _sync_folder(folder)
+        return True
+    finally:
+        if tmp is not None:
+            _remove_own_file(tmp)
+
+
+def existing_policy_kind(home=None) -> str:
+    """What sits at policy.yaml. "absent", "disabled_starter", "enabled_starter" or "other".
+
+    The starter kinds are decided on the raw bytes, so a changed line ending is "other".
+    """
+    home = home or sunglasses_home()
+    kind, data, _mode, _identity = _read_policy_file(home / "policy.yaml")
+    if kind == "absent":
+        return "absent"
+    if kind == "file":
+        if _is_our_untouched_disabled_starter(data):
+            return "disabled_starter"
+        if _is_our_enabled_starter(data):
+            return "enabled_starter"
+    return "other"
 
 
 def starter_policy_text(enabled: bool = True) -> str:
@@ -2446,11 +2652,17 @@ def write_starter_policy(home=None, enabled: bool = True):
     file is theirs, and silently rewriting the one control they hand-tuned would
     be worse than the gap this closes.
 
-    One exception (0.4.3): if the existing file is byte-identical to OUR OWN
-    commented-out starter (a non-interactive first run), `enabled=True` may
-    upgrade it in place. Before 0.4.3 that run printed "re-run with --policy"
-    and the re-run then hit this exists-guard and changed nothing — a dead end.
-    A file the user has edited in any way is still never touched.
+    One exception (0.4.3): if the existing file holds the bytes of a disabled
+    starter this project wrote, now or in an earlier release (a non-interactive
+    first run), `enabled=True` replaces it. Before 0.4.3 that run printed "re-run
+    with --policy" and the re-run then hit this exists-guard and left the file as it
+    was, a dead end. The compare is on raw bytes, a link or a file that is not a plain
+    file is left as it is, and the replace goes through a staging file in the same
+    folder. It is dropped when policy.yaml is no longer the file that was read. A save
+    landing between the last check and the rename is the one case that is not caught,
+    see `_replace_policy_file_if_unchanged`. A new file is made through a staging file
+    and a link that fails when the name is taken, so it is not seen part written and
+    a policy saved there meanwhile is neither replaced nor removed.
     """
     home = home or sunglasses_home()
     path = home / "policy.yaml"
@@ -2475,17 +2687,22 @@ def write_starter_policy(home=None, enabled: bool = True):
             "is down and the firewall will ask rather than fall through silently.\n",
             encoding="utf-8")
 
-    if path.exists():
-        is_our_untouched_disabled = (
-            path.read_text(encoding="utf-8") == starter_policy_text(enabled=False))
-        if enabled and is_our_untouched_disabled:
-            path.write_text(starter_policy_text(enabled=True), encoding="utf-8")
-            _mark_enrolled()
-            return path
+    kind, data, mode, identity = _read_policy_file(path)
+    if kind == "file":
+        if enabled and _is_our_untouched_disabled_starter(data):
+            text = starter_policy_text(enabled=True).encode("utf-8")
+            if _replace_policy_file_if_unchanged(path, data, identity, text, mode):
+                _mark_enrolled()
+                return path
+        _mark_enrolled()
+        return None
+    if kind == "unsafe":
         _mark_enrolled()
         return None
     home.mkdir(parents=True, exist_ok=True)
-    path.write_text(starter_policy_text(enabled), encoding="utf-8")
+    if not _create_policy_file(path, starter_policy_text(enabled).encode("utf-8")):
+        _mark_enrolled()
+        return None
     _mark_enrolled()
     return path
 
