@@ -509,6 +509,9 @@ class SunglassesEngine:
         self._anchor_refusals = {}
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
+        # rule id -> the same compiled list with the tag exemption removed from
+        # the entries that carry one. See _compile_unexempted.
+        self._unexempted_by_id = {}
 
         for pattern in self._patterns:
             for kw in pattern.get("keywords", []):
@@ -591,6 +594,9 @@ class SunglassesEngine:
                         compiled.append(("plain", rx, None))
                 if compiled:
                     self._regex_patterns.append((pattern, compiled))
+                    if pattern.get("regex_unexempted"):
+                        self._unexempted_by_id[pattern["id"]] = \
+                            self._compile_unexempted(pattern, compiled)
 
         # CORROBORATE, DON'T STAMP (Jul 16 2026, v0.3.3) — ids of patterns that
         # carry at least one USABLE compiled regex. For these, a bare keyword
@@ -611,6 +617,10 @@ class SunglassesEngine:
             id(rx): _prefilter.requirement(rx.pattern)
             for _p, rxs in self._regex_patterns for _m, rx, _g in rxs
         }
+        for rxs in self._unexempted_by_id.values():
+            for _m, rx, _g in rxs:
+                self._regex_requirement.setdefault(
+                    id(rx), _prefilter.requirement(rx.pattern))
         self._literal_index = _prefilter.LiteralIndex(
             self._regex_requirement.values())
         self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
@@ -730,6 +740,46 @@ class SunglassesEngine:
     # normalize_with_length() returns (see scan step 3.5). The raw length is not
     # used: whitespace collapse shrinks the text and NFKC can grow it.
     CORROBORATE_NORM_MAX = ENRICH_MAX_LEN
+
+    # The characters that decide where an HTML start tag ends and where an
+    # attribute value starts and stops.
+    _TAG_BOUNDARY_NOISE = re.compile("[^\"'<>=`]+")
+
+    @classmethod
+    def _tag_boundaries(cls, view):
+        """The quotes, equals signs, backticks and angle brackets of a view, in
+        order. A view that carries the extra enrichment copies is read up to the
+        first of them."""
+        return cls._TAG_BOUNDARY_NOISE.sub("", view.split(VIEW_SEP, 1)[0])
+
+    def _cuts_tag_differently(self, raw, view):
+        """True when `view` has a different run of tag boundary characters than
+        the raw text. A character reference, a percent or hex escape, a full
+        width mark or a decoded blob can write a quote or an angle bracket that
+        the raw text does not have, and the browser cuts the tag on the raw
+        text. A rule that grants an exception on a tag's shape cannot grant it on
+        such a view, so it reads the list without the exception instead."""
+        return self._tag_boundaries(raw) != self._tag_boundaries(view)
+
+    def _compile_unexempted(self, pattern, compiled):
+        """The compiled list with each entry named in `regex_unexempted` swapped
+        for its exception free form. A rule that names an entry this cannot swap,
+        or one that is not read in plain mode, fails at load: a silent skip would
+        leave the exception granted on a view that cannot support it."""
+        if len(compiled) != len(pattern["regex"]):
+            raise ValueError(
+                "%s: regex_unexempted needs every regex entry to compile" % pattern["id"])
+        swapped = []
+        for index, entry in enumerate(compiled):
+            replacement = pattern["regex_unexempted"].get(index)
+            if replacement is None:
+                swapped.append(entry)
+                continue
+            if entry[0] != "plain":
+                raise ValueError(
+                    "%s: regex_unexempted entry %d is not a plain regex" % (pattern["id"], index))
+            swapped.append(("plain", re.compile(replacement, re.IGNORECASE), None))
+        return swapped
 
     def _eval_regex(self, mode: str, rx, guards, text: str):
         """Evaluate one compiled pattern regex against `text` per its mode
@@ -1165,9 +1215,14 @@ class SunglassesEngine:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
                 subjects.append((normalized, normalized_present, text))
+            unexempted = self._unexempted_by_id.get(pattern["id"])
             for subject, present, frame in subjects:
               matched_here = False
-              for mode, rx, guards in regexes:
+              entries = regexes
+              if unexempted is not None and subject is not text \
+                      and self._cuts_tag_differently(text, subject):
+                  entries = unexempted
+              for mode, rx, guards in entries:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
                                        present):
                     continue
@@ -1225,7 +1280,11 @@ class SunglassesEngine:
         for pid, pattern in candidates.items():
             if pid in seen_ids:
                 continue  # regex already confirmed on raw text in step 3
-            for mode, rx, guards in self._compiled_by_id.get(pid, ()):
+            entries = self._compiled_by_id.get(pid, ())
+            unexempted = self._unexempted_by_id.get(pid)
+            if unexempted is not None and self._cuts_tag_differently(text, normalized):
+                entries = unexempted
+            for mode, rx, guards in entries:
                 match = self._eval_regex(mode, rx, guards, normalized)
                 if match:
                     seen_ids.add(pid)

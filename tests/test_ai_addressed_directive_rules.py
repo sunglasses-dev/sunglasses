@@ -973,3 +973,33 @@ def test_the_empty_tag_exemption_still_holds_when_no_reference_moves_a_boundary(
 ])
 def test_a_reference_that_writes_a_boundary_withdraws_the_exemption_for_the_whole_text(engine, snippet, channel):
     assert flagged_hi(engine, snippet, channel)
+
+
+def without_the_exception(rx):
+    """The regex with its `(?!<(?:...))` exception lookahead cut out, found by
+    counting brackets so a nested group does not end the cut early."""
+    start = rx.index("(?!<(?:")
+    depth, i = 0, start
+    while True:
+        if rx[i] == "\\":
+            i += 2
+            continue
+        depth += (rx[i] == "(") - (rx[i] == ")")
+        if depth == 0:
+            return rx[:start] + rx[i + 1:]
+        i += 1
+
+
+def test_the_exception_free_entries_are_the_entries_with_the_exception_cut_out():
+    rule = by_id("GLS-HI-002")
+    assert rule["regex_unexempted"]
+    for index, text in rule["regex_unexempted"].items():
+        assert text == without_the_exception(rule["regex"][index])
+
+
+def test_only_the_tag_boundary_characters_decide_whether_a_view_cuts_the_tag_differently(engine):
+    same = lambda raw, view: not engine._cuts_tag_differently(raw, view)
+    assert same('<img alt="a" x=b>', '<img alt="a" x=b> \x1e >b=x "a"=tla gmi<')
+    assert same('<p>Fish &amp; chips</p>', '<p>fish & chips</p>')
+    assert not same('<img title=&quot;a&quot;>', '<img title="a">')
+    assert not same('<img title=a%3Eb>', '<img title=a>b>')
