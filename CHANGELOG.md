@@ -3,6 +3,79 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.7] — 2026-10-07
+
+### Added
+
+- Two rules for text on a page or in a file that is written to AI models and tells them how to
+  answer. GLS-IP-007 is medium and reads three forms. The first is a heading or label that names AI
+  assistants or models followed by a sentence that orders or obliges the model. The second is a
+  label such as AI assistants with a colon and an order. The third is a sentence that tells AI
+  assistants what to say when they answer or discuss a subject. A heading followed by a description,
+  or by an instruction aimed at human staff, is not held in the cases tested. A sentence that itself
+  names the model and orders it is found after a staff line. Documentation that tells an AI
+  assistant how to behave may be held at medium. GLS-IP-008 is low. It reads an order to put a
+  marker such as an emoji or a phrase in the reply. Both rules read web content and files and not a
+  plain message, and neither one blocks on its own. (#332)
+
+### Changed
+
+- GLS-SEM-UI-219 no longer reads a deferred stylesheet loader as an element injection. The exception
+  covers only the exact media switch handler on a link tag that has one media attribute set to a
+  quoted print and no other event handler, with the element name spelled in ASCII letters. The same
+  handler on another tag, beside a second handler, on a link with unquoted values or on a link with
+  a second media attribute is read as before. Render orders that name a form, a frame, a script or a
+  handler are still found in the cases tested. (#332)
+
+- The gauntlet report now counts executed variants from the records its driver writes. Each run is
+  bound to the corpus of the night, the adapter code, the schema and its age, and a run that fails
+  one of these is set aside and not counted. An executed count with no measured run beneath it is
+  refused, and a published page must equal what the renderer makes of the report byte for byte, so
+  an altered page is a finding. A run that completes with nothing executed now ends in a refusal,
+  exit code 3 with the reason EXEC_NONE. A nightly that exports an archive of the checkout must set
+  GAUNTLET_ENGINE_HEAD. With no run document the report reads as it did before. (#329)
+
+- The gauntlet capability map classifies its last two route operations, one on a recorded run of the
+  product route and one on source inspection, and records its review. (#335)
+
+- GLS-EX-007 writes its credential words as plain alternatives in place of optional characters. The
+  rule matches the same texts as before and keeps the same group shape, so the regex costs what it
+  did when it runs. The engine now derives required literals and short prefixes from the credential
+  words and skips the regex on an eligible text that holds a curl and none of those literals. A text
+  that holds one credential word still runs the regex in full, so this removes accidental cost and
+  not the cost an attacker can choose. (#337)
+
+- The starter policy header now says that detected secret material in outbound tool calls is denied
+  even without a policy file, and that the file adds your path and host rules. It used to say that a
+  missing file enforces nothing. A second run of `sunglasses init --policy` on an enabled starter
+  now says it is already enabled, and on a file that is not an unchanged disabled starter it says
+  the file was left untouched. (#336)
+
+- The stats file carries the 0.6.6 release date. No code, rule or test changes. (#330)
+
+### Fixed
+
+- `sunglasses init --policy` enables an unchanged disabled starter policy again when an earlier
+  release wrote it. The check compared the file only with the text the running code writes, so after
+  the header was reworded an unchanged older starter no longer matched, and the command left it
+  disabled and said the file had your own edits. The text each earlier release wrote is now kept as
+  a hash and compared on raw bytes, so a file you changed, even by a line ending, is left as it is.
+  A link, a folder or a fifo at the policy path is not followed or replaced. A new policy file is
+  staged in the same folder and published under a name that must still be free, so it is not seen
+  part written. An upgrade replaces the file only when it is still the same unchanged file. One
+  narrow window stays open, a save that lands just before the final rename is replaced. (#336)
+
+- The gauntlet report tool no longer fails with a PermissionError when the review folder exists and
+  cannot be read. It exited with code 1 and wrote no report, where an absent folder ends in the
+  designed refusal. It now ends in that same refusal, exit code 3 with the reason EVIDENCE_UNBOUND,
+  and prints one line to standard error with the error class, the operating system text and the
+  error number, and without the path. (#331)
+
+### Tests
+
+- A gauntlet report test that checks the page does not print a given count no longer matches that
+  count inside a timestamp, a digest or an id. Only the test changes. (#334)
+
 ## [0.6.6] — 2026-10-06
 
 ### Added
