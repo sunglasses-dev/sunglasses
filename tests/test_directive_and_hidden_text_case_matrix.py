@@ -1,8 +1,8 @@
 """A wide case matrix for the four rules the directive detection change touches.
 
 Every case in the fixture file is scanned on every channel the engine accepts, and the set of those four rules that fire on each
-channel is compared with the set written down for it, so a channel is never left out by omission. The cases cover hidden text in many markups, tags that look empty,
-tag names that only start like an exception, font loaders with and without a second handler, ordinary documentation that
+channel is compared with the set written down for it, so a channel is never left out by omission. The cases cover hidden text in many markups, hidden tags that hold no text,
+tag names that only start like an image or a frame tag, font loaders with and without a second handler, ordinary documentation that
 names AI models, and orders to put a marker in a reply. Text in the fixture is data only.
 """
 import json
