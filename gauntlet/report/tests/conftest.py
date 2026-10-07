@@ -38,3 +38,32 @@ def reviewed_map_for_the_suite(tmp_path_factory):
     classify.MAP_PATH = path
     yield path
     classify.MAP_PATH = original
+
+
+OPEN_MAP = HERE / "fixtures" / "capability_map.open.json"
+
+
+@pytest.fixture(scope="session")
+def refused_report(tmp_path_factory):
+    """A real refusal, built from a map that still has unclassified operations.
+
+    The tree map used to be open, so `produce.build()` on it was the refusal the
+    refusal controls need. Closing the map ended that, and a closed map with no
+    executed rows is meant to refuse for another reason (EXEC_NONE, see the last
+    test in test_acceptance_controls). So the refusal controls get their own open
+    map, reviewed THROUGH THE MECHANISM like the session copy above, and the
+    session map is put back afterwards.
+    """
+    import produce
+    import review
+    path = tmp_path_factory.mktemp("capmap-open") / "capability_map.json"
+    path.write_text(OPEN_MAP.read_text())
+    review.record(path, "**GO**: test-suite fixture, not a real review.\n", verdict="GO",
+                  reviewer="TEST-FIXTURE", round_id="suite")
+    session = classify.MAP_PATH
+    classify.MAP_PATH = path
+    try:
+        report, _ = produce.build(run_id="fixture")
+    finally:
+        classify.MAP_PATH = session
+    return report

@@ -213,24 +213,24 @@ def test_c4_an_unknown_fault_selector_is_refused_not_bucketed(capmap):
         "a kind outside the cited enumeration is a real-route capability"
 
 
-def test_c4_refusal_publishes_nulls_and_a_nonzero_run(honest):
-    ceiling = honest["coverage"]["ceiling"]
+def test_c4_refusal_publishes_nulls_and_a_nonzero_run(refused_report):
+    ceiling = refused_report["coverage"]["ceiling"]
     assert ceiling["state"] == "not_computed"
     assert ceiling["blocked_needing_route"] is None
     assert ceiling["blocked_by_adapter_work_alone"] is None
     assert ceiling["unclassified_count"] == len(ceiling["unclassified"])
-    assert honest["run"]["exit_code"] != 0
-    assert honest["run"]["outcome"] == "refused"
+    assert refused_report["run"]["exit_code"] != 0
+    assert refused_report["run"]["outcome"] == "refused"
 
 
-def test_c4_a_refusal_that_exits_zero_is_itself_rejected(honest):
-    mutated = copy.deepcopy(honest)
+def test_c4_a_refusal_that_exits_zero_is_itself_rejected(refused_report):
+    mutated = copy.deepcopy(refused_report)
     mutated["run"]["exit_code"] = 0
     assert "REFUSAL_EXITED_ZERO" in codes(validate.validate_report(mutated))
 
 
-def test_c4_a_refusal_may_not_publish_zero_instead_of_null(honest):
-    mutated = copy.deepcopy(honest)
+def test_c4_a_refusal_may_not_publish_zero_instead_of_null(refused_report):
+    mutated = copy.deepcopy(refused_report)
     mutated["coverage"]["ceiling"]["blocked_by_adapter_work_alone"] = 0
     assert "REFUSAL_PUBLISHED_A_NUMBER" in codes(validate.validate_report(mutated))
 
@@ -572,12 +572,12 @@ def _description(page):
     return m.group(1) if m else None
 
 
-def test_the_description_states_todays_real_outcome(honest):
-    page = render.render(honest)
+def test_the_description_states_todays_real_outcome(refused_report):
+    page = render.render(refused_report)
     d = _description(page)
     assert d, "no meta description — the html site gate fails on this page"
     assert "REFUSED" in d
-    n = honest["coverage"]["ceiling"]["unclassified_count"]
+    n = refused_report["coverage"]["ceiling"]["unclassified_count"]
     assert str(n) in d, f"description does not carry the {n} unclassified operations"
 
 
@@ -682,3 +682,27 @@ def test_a_complete_executed_witness_is_accepted(tmp_path):
 def test_the_existing_bases_still_load(capmap):
     """No entry in the shipped map is invalidated by adding the enumeration."""
     assert {e["basis"] for e in capmap["classified"].values()} <= classify.BASES
+
+
+# --- a closed map with nothing executed ---------------------------------------
+# R756 ban. Closing the capability map ends the refusal the ceiling used to
+# force, and with no executed rows the producer would publish a complete page
+# that reports 0 executed. It must refuse instead (producer rule V15,
+# EXEC_NONE, rc 3). RED until the branch is rebased on the rows 12 to 15 work
+# that adds V15, and that is expected, not a defect.
+
+@pytest.fixture(scope="module")
+def capmap_closed_report():
+    """The tree map as the session copy (closed, reviewed through the mechanism)."""
+    return produce.build(run_id="closed-no-records")
+
+
+def test_a_closed_map_with_no_executed_records_refuses(capmap_closed_report):
+    report, rc = capmap_closed_report
+    # The stimulus is real before the refusal is asked of it: the ceiling is
+    # computed and nothing executed, so a green or red result here is about V15.
+    assert report["coverage"]["ceiling"]["state"] == "true"
+    part = report["coverage"]["execution_partition"]
+    assert sum(v for k, v in part.items() if k != "not_run") == 0
+    assert rc == 3 and report["run"]["outcome"] == "refused"
+    assert "EXEC_NONE" in json.dumps(report)

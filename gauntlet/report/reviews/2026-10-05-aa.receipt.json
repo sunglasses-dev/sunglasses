@@ -1,0 +1,10 @@
+{
+ "map_revision": "2026-10-05-aa",
+ "map_content_sha256": "3949ac53e69e996929c35f9c89589b457c02a0c00f2f3dce6ccf2783497de1aa",
+ "verdict": "GO",
+ "reviewer": "ASTRA",
+ "round": "capmap-aa-r4",
+ "recorded_at": "2026-10-05T20:04:07",
+ "verdict_file": "reviews/2026-10-05-aa.VERDICT.md",
+ "verdict_sha256": "12b7564650c38b38b707ceea17624249736f27921a2354b23d7ad7725ba30314"
+}
