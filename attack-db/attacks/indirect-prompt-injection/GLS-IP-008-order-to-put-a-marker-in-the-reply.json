@@ -1,0 +1,25 @@
+{
+  "id": "GLS-IP-008",
+  "name": "Order To Put A Marker In The Reply",
+  "version": "1.0",
+  "category": "indirect_prompt_injection",
+  "severity": "low",
+  "channels": [
+    "web_content",
+    "file"
+  ],
+  "description": "Text that tells a model that reads it to add a marker to its own reply, such as if you see this add an emoji, a word or a phrase to the end of your response. A marker like that may show that an agent read the text and followed it, which is the mechanism an injection needs. The rule is reported and not blocked, because the text is often benign marketing. It needs the marker to be a token, word, phrase, emoji or similar, so that an order to add a signature or a flag to a message is not found.",
+  "keywords": [],
+  "regex": [
+    "(?is)\\bif\\s+you\\s+(?:see|read|find|are\\s+reading|have\\s+read)\\s+this\\b(?!\\s+(?:error|notice|message|warning|page|email|form|screen|banner|dialog|prompt|alert|popup))[^.\\n]{0,120}\\b(?:add|append|include|insert|end|finish|close|prepend|put|write|say)\\b[^.\\n]{0,80}\\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\\b",
+    "(?is)\\b(?:add|append|insert|include|put)\\b[^.\\n]{0,40}\\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\\b[^.\\n]{0,40}\\b(?:to|at)\\s+the\\s+(?:end|start|beginning)\\s+of\\s+(?:your|the)\\s+(?:response|reply|answer|message|output)\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-06",
+  "source": "patterns.py:GLS-IP-008"
+}
