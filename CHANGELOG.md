@@ -40,10 +40,10 @@ All notable changes to Sunglasses are documented here.
 
 - GLS-EX-007 writes its credential words as plain alternatives in place of optional characters. The
   rule matches the same texts as before and keeps the same group shape, so the regex costs what it
-  did when it runs. The engine now derives required literals and short prefixes from the credential
-  words and skips the regex on an eligible text that holds a curl and none of those literals. A text
-  that holds one credential word still runs the regex in full, so this removes accidental cost and
-  not the cost an attacker can choose. (#337)
+  did when it runs. The engine now derives required literals from the credential words and skips the
+  regex on an eligible text that holds a curl and none of those literals. A text that holds one
+  credential word still runs the regex in full, so this removes accidental cost and not the cost an
+  attacker can choose. (#337)
 
 - The starter policy header now says that detected secret material in outbound tool calls is denied
   even without a policy file, and that the file adds your path and host rules. It used to say that a
