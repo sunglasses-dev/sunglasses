@@ -911,3 +911,65 @@ def test_a_srcdoc_word_inside_a_real_quoted_value_is_a_value_and_the_empty_tag_s
 ])
 def test_a_frame_with_a_srcdoc_attribute_is_flagged_however_the_attributes_around_it_are_written(engine, text, channel):
     assert flagged_hi(engine, text, channel) == (channel in HI_CHANNELS)
+
+
+# A reference, a percent escape, a hex escape or a full width mark can write a
+# quote or a greater sign. The normalized view reads them as the character, the
+# browser does not: it cuts the tag on the characters as written. When the hiding
+# style is written the same way, the plain text cannot rescue the match, so the
+# exemption may not be judged on the normalized view when the two views cut the
+# tag differently.
+DOUBLE_QUOTE_FORMS = ("&quot;", "&#34;", "&#x22;", "%22", "\\x22", "＂")
+SINGLE_QUOTE_FORMS = ("&#39;", "&#x27;", "&apos;", "%27", "\\x27", "＇")
+ENCODED_STYLES = (
+    "display&#58;none",
+    "visibility&#58;hidden",
+    "color&#58;white;background&#58;white",
+    "color&#58;#fff;background&#58;#fff",
+)
+
+
+def encoded_boundary_cases():
+    for tag in ("iframe", "script", "img"):
+        for quote, forms in (('"', DOUBLE_QUOTE_FORMS), ("'", SINGLE_QUOTE_FORMS)):
+            for form in forms:
+                for style in ENCODED_STYLES:
+                    yield (
+                        '<%s style="%s" title=%sa%s x=%s srcdoc=content data=%s z=%sb%s></%s>'
+                        % (tag, style, quote, form, quote, quote, form, quote, tag)
+                    )
+
+
+@pytest.mark.parametrize("channel", HI_CHANNELS)
+@pytest.mark.parametrize("text", list(encoded_boundary_cases()))
+def test_a_real_srcdoc_survives_a_quote_written_as_a_reference_or_an_escape(engine, text, channel):
+    assert flagged_hi(engine, text, channel)
+    assert engine.scan(text, channel=channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", HI_CHANNELS)
+@pytest.mark.parametrize("form", ("&gt;", "&#62;", "&#x3e;", "%3E", "\\x3e", "＞"))
+def test_a_real_srcdoc_survives_a_greater_sign_written_as_a_reference_or_an_escape(engine, form, channel):
+    text = '<img title=a%sb srcdoc=content style=display&#58;none>' % form
+    assert flagged_hi(engine, text, channel)
+
+
+@pytest.mark.parametrize("channel", HI_CHANNELS)
+@pytest.mark.parametrize("snippet", [
+    '<iframe src="https://example.com/ns.html?id=X" height="0" width="0" style="display:none;visibility:hidden"></iframe>',
+    '<img src="https://example.com/p.gif?a=1&amp;b=2" style="display:none">',
+    '<img src="https://example.com/p.gif" alt="caf&eacute; &copy; 2026" style="display:none">',
+    '<p>Fish &amp; chips</p><iframe style="display:none"></iframe>',
+])
+def test_the_empty_tag_exemption_still_holds_when_no_reference_moves_a_boundary(engine, snippet, channel):
+    assert not flagged_hi(engine, snippet, channel)
+
+
+@pytest.mark.parametrize("channel", HI_CHANNELS)
+@pytest.mark.parametrize("snippet", [
+    '<p>He said &quot;hi&quot;</p><iframe style="display:none"></iframe>',
+    '<img title="&quot;" style="display:none">',
+    '<p>a &gt; b</p><img style="display:none">',
+])
+def test_a_reference_that_writes_a_boundary_withdraws_the_exemption_for_the_whole_text(engine, snippet, channel):
+    assert flagged_hi(engine, snippet, channel)
