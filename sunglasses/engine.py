@@ -28,6 +28,19 @@ from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_with_length
 
+# The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
+# boundary character and then any whitespace, newlines included. The twin differs in one
+# place, the whitespace after the boundary may not cross a newline. See _match_leadin.
+_LEADIN_OLD = r"""[\n.!?;:"'\[{(]\s*|"""
+_LEADIN_FAST = r"""[\n.!?;:"'\[{(][^\S\n]*|"""
+# The regex sources that use the mode, read from the rule data. Membership is by the whole
+# source, never by the presence of the lead-in text, because the recovery in _match_leadin is
+# only sound when the lead-in opens the regex and what follows it starts with a character
+# that is not whitespace. A source that is not in this set keeps the mode it always had.
+_LEADIN_SOURCES = frozenset(
+    r for _p in PATTERNS for r in _p.get("regex", ())
+    if r.startswith("(?i)(?:^|" + _LEADIN_OLD) and r.count(_LEADIN_OLD) == 1)
+
 
 # Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
 # 0.055s, 100 KB is 4.9s, 1 MB is 49.6s. Uncapped, a front-line filter handed a
@@ -587,6 +600,20 @@ class SunglassesEngine:
                         # on which rule was declared last.
                         self._anchor_spec[(pattern["id"], index)] = (terms, max(span, 1))
                         compiled.append(("anchored", rx, (pattern["id"], index)))
+                    elif r in _LEADIN_SOURCES:
+                        # Fifth mode, for the exact sources in _LEADIN_SOURCES
+                        # and no other regex. See _match_leadin. The compiled
+                        # regex stays the one the rule wrote, so the prefilter
+                        # key and every match start are the ones the rule has
+                        # always had; the twin only finds where to start it.
+                        try:
+                            twin = re.compile(
+                                r.replace(_LEADIN_OLD, _LEADIN_FAST),
+                                re.IGNORECASE)
+                        except re.error:
+                            compiled.append(("plain", rx, None))
+                        else:
+                            compiled.append(("leadin", rx, twin))
                     else:
                         compiled.append(("plain", rx, None))
                 if compiled:
@@ -747,7 +774,61 @@ class SunglassesEngine:
             return self._match_windowed(rx, text)
         if mode == "anchored":
             return self._match_anchored(rx, guards, text)
+        if mode == "leadin":
+            return self._match_leadin(rx, guards, text)
         return rx.search(text)
+
+    LEADIN_OLD = _LEADIN_OLD
+    LEADIN_FAST = _LEADIN_FAST
+    LEADIN_SOURCES = _LEADIN_SOURCES
+    _LEADIN_PUNCT = frozenset(".!?;:\"'[{(")
+
+    def _match_leadin(self, rx, twin, text: str):
+        """`rx.search(text)` for one of the regexes in LEADIN_SOURCES.
+
+        Those regexes open with LEADIN_OLD, whose `\\s*` takes newlines, so a search
+        over a long run of blank lines retried from every newline in the run and
+        each retry read the rest of it. The rules keep that lead-in in their data
+        because the match START is read by the negation and illustrative-context
+        checks, and a lead-in that consumed less moved the start.
+
+        The twin is the same regex with a lead-in that cannot cross a newline. It
+        finds a candidate place to start. If the candidate is a newline, the start
+        the old regex would use is recovered from the run around it: the boundary
+        character just before the run when there is one, otherwise the first
+        newline of the run. The old regex is then matched from that start, so the
+        Match is the one `rx.search` returns, with the same start, end and text.
+        The twin's own start can be later than the old one, which is why the start
+        is recovered and not taken from the twin.
+
+        This is sound for the sources in LEADIN_SOURCES because the lead-in opens
+        each of them and what follows it begins with a character that is neither
+        whitespace nor a comma. It is not a general rewrite of any regex that
+        contains the lead-in, and the engine does not use it for one.
+
+        There is no call to `rx.search`. If the old regex does not match at the
+        recovered start the search resumes after the twin's position.
+        """
+        pos = 0
+        while True:
+            first = twin.search(text, pos)
+            if first is None:
+                return None
+            at = first.start()
+            if text[at:at + 1] == "\n":
+                run = at
+                while run > 0 and text[run - 1].isspace():
+                    run -= 1
+                if run > 0 and text[run - 1] in self._LEADIN_PUNCT:
+                    start = run - 1
+                else:
+                    start = text.find("\n", run, at + 1)
+            else:
+                start = at
+            match = rx.match(text, start)
+            if match is not None:
+                return match
+            pos = at + 1
 
     def _anchor_refusal(self, pattern, source):
         """Why this rule may not use anchored mode, or None.
