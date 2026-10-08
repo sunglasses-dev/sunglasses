@@ -427,11 +427,84 @@ class _RawAlign:
             walk = self._walks[id(view)] = _Walk(self._raw, self._low, view)
         return walk.origin(pos)
 
+    def covers(self, view: str, pos: int) -> bool:
+        """Whether the walk of `view` got past view[pos] before it ended. False
+        means the raw text does not say where that character came from."""
+        walk = self._walks.get(id(view))
+        if walk is None or walk.view is not view:
+            if self._low is None:
+                self._low = _ascii_lower(self._raw)
+            walk = self._walks[id(view)] = _Walk(self._raw, self._low, view)
+        walk.advance(pos + 1)
+        return walk.i > pos
+
     @staticmethod
     def view_end(view: str, pos: int) -> int:
         """End of the view that holds pos: the next view separator, or the end."""
         end = view.find(" " + VIEW_SEP + " ", pos)
         return len(view) if end == -1 else end
+
+
+class _RawCopies:
+    """Whether the raw text negates every copy of the opening of a match.
+
+    Used for a match in a folded view that the raw text cannot place, because
+    the walk of that view ended before it (an unexplained difference earlier in
+    the text). The view's own lookback may fall short of a negator that the fold
+    pushed out of range, and the raw text cannot say which occurrence the match
+    is. It can still count: the opening of the match, read as it stands, is
+    looked up in the raw text and in the plain stretch of the view. The match is
+    a copy of a raw occurrence, and is negated, only when the view holds no more
+    occurrences than the raw text does and every one of those in the raw text is
+    negated there. A view with an extra occurrence (the same words written in an
+    encoding), one live raw copy, or no raw copy at all (the words exist only
+    after decoding) leaves the match to the view's own judgement. The number of
+    distinct openings looked up is bounded, past it the view's own judgement
+    stands, the stricter side."""
+
+    OPEN = 48      # characters of the match that are looked up
+    DISTINCT = 8   # distinct openings looked up per scan
+
+    def __init__(self, raw: str, negated):
+        self._raw = raw
+        self._low = None
+        self._seen = {}
+        self._negated = negated
+
+    @staticmethod
+    def _count(low: str, key: str) -> int:
+        n, at = 0, low.find(key)
+        while at != -1:
+            n += 1
+            at = low.find(key, at + 1)
+        return n
+
+    def negated(self, view_id: int, plain_low, opening: str) -> bool:
+        """`plain_low()` is the lowered plain stretch of the view `view_id`."""
+        key = _ascii_lower(opening)
+        token = (view_id, key)
+        known = self._seen.get(token)
+        if known is not None:
+            return known
+        if not key or len(self._seen) >= self.DISTINCT:
+            return False
+        if self._low is None:
+            self._low = _ascii_lower(self._raw)
+        verdict = False
+        at = self._low.find(key)
+        if at != -1:
+            verdict = True
+            raw_copies = 0
+            while at != -1:
+                raw_copies += 1
+                if not self._negated(self._raw, at):
+                    verdict = False
+                    break
+                at = self._low.find(key, at + 1)
+            if verdict and self._count(plain_low(), key) > raw_copies:
+                verdict = False
+        self._seen[token] = verdict
+        return verdict
 
 
 class SunglassesEngine:
@@ -1300,25 +1373,30 @@ class SunglassesEngine:
         first occurrence that is not negated is returned, so a warning that
         comes before the real attack cannot hide it.
 
-        `source` is (raw_text, origin) for a view built from the raw text, where
-        `origin(offset)` is the raw index a match starting at `offset` came from,
-        or None unless the opening of the match reads as the same characters at
-        the same place in the raw text (see `_span_origin`). A fold can lengthen
-        the text between a negator and its target, so the view's fixed lookback
-        may no longer reach a negator that the raw text has in range. For a
-        match that is a copy of the raw text the occurrence is judged in both
-        frames and is negated if either one negates it. For any other match
-        only the view's own text speaks, as it did before, so a negator is
-        never lent to a match whose position in the raw text is not known, and
-        a fold cannot turn a hostile match into a negated one."""
+        `source` is (raw_text, origin, copied) for a view built from the raw
+        text. `origin(offset)` is the raw index a match starting at `offset`
+        came from, or None unless the opening of the match reads as the same
+        characters at the same place in the raw text (see `_raw_frame`). A fold
+        can lengthen the text between a negator and its target, so the view's
+        fixed lookback may no longer reach a negator that the raw text has in
+        range. For a match that is a copy of the raw text the occurrence is
+        judged in both frames and is negated if either one negates it. A match
+        the raw text cannot place because the walk of the view ended earlier is
+        asked of `copied(offset)`: True only when the words of the match are in
+        the raw text and every occurrence of them is negated there. For any
+        other match only the view's own text speaks, as it did before, so a
+        negator is never lent to a match whose position in the raw text is not
+        known and that has no copy there, and a fold cannot turn a hostile
+        match into a negated one."""
         def negated_at(position):
             if self._check_negation(text, position):
                 return True
             if source is not None:
-                raw, origin = source
+                raw, origin, copied = source
                 at = origin(position)
                 if at is not None:
                     return self._check_negation(raw, at)
+                return copied(position)
             return False
 
         if not negated_at(first.start()):
@@ -1343,56 +1421,87 @@ class SunglassesEngine:
                 return match, False
 
     @staticmethod
-    def _normalized_origin(align, normalized: str):
-        """`origin(offset)` for the normalized view: the raw index of the one raw
-        character the character at `offset` is, or None.
+    def _raw_frame(align, copies, view: str, shape: bool = False):
+        """(origin, copied) for one view built from the raw text.
 
-        The plain text in front of the first view separator is walked against
-        the raw text by `align`. Behind it the pipeline appends ROT13, reversed
-        and shadow views, which the raw text does not contain and which have no
-        origin, and the shape-confusion view, which is the whole text again
-        with some `l` written as `i`. Its first stretch is the plain text, so a
-        character there is the plain character at the same place and takes that
-        place's origin, but only after the view is found to hold exactly that
-        rewrite of the plain text at that point, and never for a character the
-        rewrite changed."""
-        plain_end = _RawAlign.view_end(normalized, 0)
+        `origin(offset)` is the raw index of the character a match starting at
+        `offset` is, or None. Only when the opening of the match, HIT characters
+        of it, reads as the same characters at the same place in the raw text.
+        A match made of mapped, expanded, decoded or deleted characters is not a
+        copy of anything the raw text says there, so the raw text does not speak
+        for it: a negator near its raw position says nothing about it.
+
+        `copied(offset)` is for a match with no origin whose place the walk of
+        the view never reached, so the raw text cannot say what it is: True
+        when its words are in the raw text and every occurrence of them is
+        negated there (see `_RawCopies`). A match the walk did reach, or one
+        behind the first view separator, is left to the view alone.
+
+        The separators of the view are found once, so each match costs a lookup
+        in a sorted list, not a scan of the rest of the view.
+
+        With `shape`, the view is the normalized one: behind its first separator
+        the pipeline appends ROT13, reversed and shadow views, which the raw text
+        does not contain and which have no origin, and the shape-confusion view,
+        which is the whole text again with some `l` written as `i`. Its first
+        stretch is the plain text, so a character there is the plain character at
+        the same place and takes that place's origin, but only after the view is
+        found to hold exactly that rewrite of the plain text at that point, and
+        never for a character the rewrite changed."""
+        sep = " " + VIEW_SEP + " "
+        seps = []
+        at = view.find(sep)
+        while at != -1:
+            seps.append(at)
+            at = view.find(sep, at + 1)
+
+        def end_of(pos: int) -> int:
+            k = bisect.bisect_left(seps, pos)
+            return seps[k] if k < len(seps) else len(view)
+
+        plain_end = end_of(0)
         shape_at = -1
-        if plain_end < len(normalized):
-            plain = normalized[:plain_end]
-            shape = re.sub(r"\bl(?=[a-z])", "i", plain)
-            sep = " " + VIEW_SEP + " "
-            at = normalized.find(sep, plain_end)
-            while at != -1:
-                if normalized.startswith(shape, at + len(sep)):
+        if shape and plain_end < len(view):
+            rewrite = re.sub(r"\bl(?=[a-z])", "i", view[:plain_end])
+            for at in seps:
+                if view.startswith(rewrite, at + len(sep)):
                     shape_at = at + len(sep)
                     break
-                at = normalized.find(sep, at + 1)
 
-        def origin(offset: int):
+        def place_of(offset: int):
+            """The plain place a character stands for, or None."""
             if offset < plain_end:
-                return SunglassesEngine._span_origin(align, normalized, offset)
+                return offset
             if shape_at >= 0 and shape_at <= offset < shape_at + plain_end:
                 place = offset - shape_at
                 end = min(place + _RawAlign.HIT, plain_end)
-                if normalized[offset:offset + end - place] == normalized[place:end]:
-                    return SunglassesEngine._span_origin(align, normalized, place)
+                if view[offset:offset + end - place] == view[place:end]:
+                    return place
             return None
-        return origin
 
-    @staticmethod
-    def _span_origin(align, view, at: int):
-        """Raw index of the character a match in `view` starts on, or None.
+        def origin(offset: int):
+            place = place_of(offset)
+            if place is None:
+                return None
+            end = min(place + _RawAlign.HIT, end_of(place))
+            if align.holds(view, place, end):
+                return align.origin(view, place)
+            return None
 
-        Only when the opening of the match, HIT characters of it, reads as the
-        same characters at the same place in the raw text. A match made of
-        mapped, expanded, decoded or deleted characters is not a copy of
-        anything the raw text says there, so the raw text does not speak for
-        it: a negator near its raw position says nothing about it."""
-        end = min(at + _RawAlign.HIT, _RawAlign.view_end(view, at))
-        if align.holds(view, at, end):
-            return align.origin(view, at)
-        return None
+        plain_low = []
+
+        def plain_lowered() -> str:
+            if not plain_low:
+                plain_low.append(_ascii_lower(view[:plain_end]))
+            return plain_low[0]
+
+        def copied(offset: int) -> bool:
+            place = place_of(offset)
+            if place is None or align.covers(view, place):
+                return False
+            return copies.negated(id(view), plain_lowered,
+                                  view[offset:min(offset + _RawCopies.OPEN, end_of(offset))])
+        return origin, copied
 
     def _live_occurrence(self, normalized: str, keyword: str, begin: int):
         """Offset of the first word-bounded occurrence of `keyword` at or after
@@ -1678,8 +1787,10 @@ class SunglassesEngine:
         # unreachable by design rather than by oversight. Those rules ask for the
         # normalized view directly here instead.
         normalized_present = None
+        folded_frame = compact_frame = None
         align = _RawAlign(text)              # where each view character sits in the raw text
-        norm_origin = self._normalized_origin(align, normalized)
+        copies = _RawCopies(text, self._check_negation)
+        norm_frame = self._raw_frame(align, copies, normalized, shape=True)
         for pattern, regexes in self._regex_patterns:
             if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
@@ -1699,22 +1810,24 @@ class SunglassesEngine:
                 # fold can lengthen the text between a negator and its target,
                 # so the view's negation check also reads the raw text at the
                 # offset the match came from (see _resolve_negation).
-                subjects.append((folded, folded_present, folded,
-                                 lambda at: self._span_origin(align, folded, at)))
+                if folded_frame is None:
+                    folded_frame = self._raw_frame(align, copies, folded)
+                subjects.append((folded, folded_present, folded, folded_frame))
             if compact is not None:
-                subjects.append((compact, compact_present, compact,
-                                 lambda at: self._span_origin(align, compact, at)))
+                if compact_frame is None:
+                    compact_frame = self._raw_frame(align, copies, compact)
+                subjects.append((compact, compact_present, compact, compact_frame))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
-                subjects.append((normalized, normalized_present, text, norm_origin))
+                subjects.append((normalized, normalized_present, text, norm_frame))
             # A negated hit is provisional: another regex of the rule, or another
             # view of the text, may hold an occurrence that is not negated, and
             # the rule must be judged on that one.
             provisional = None
             decided = False
-            for subject, present, frame, origin_of in subjects:
+            for subject, present, frame, raw_frame in subjects:
               for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
                                        present):
@@ -1732,8 +1845,8 @@ class SunglassesEngine:
                     negated = False
                     if not pattern.get("negation_immune"):
                         source = None
-                        if origin_of is not None:
-                            source = (text, origin_of)
+                        if raw_frame is not None:
+                            source = (text, *raw_frame)
                         match, negated = self._resolve_negation(
                             mode, rx, guards, subject, match, source)
                     finding = {
@@ -1799,7 +1912,7 @@ class SunglassesEngine:
                     negated = False
                     if not pattern.get("negation_immune"):
                         if norm_source is None:
-                            norm_source = (text, norm_origin)
+                            norm_source = (text, *norm_frame)
                         match, negated = self._resolve_negation(
                             mode, rx, guards, normalized, match, norm_source)
                     if negated:
