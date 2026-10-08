@@ -26,7 +26,8 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_with_length
+from .preprocessor import (ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_unicode,
+                           normalize_with_length, replace_homoglyphs, strip_invisible)
 
 
 # Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
@@ -1138,6 +1139,32 @@ class SunglassesEngine:
         shadow_present = None
         if shadow is not None:
             shadow_present = self._literal_index.present(_prefilter.fold(shadow))
+        # The raw text with the preprocessor's three lossless folds applied:
+        # invisible characters stripped, NFKC, homoglyphs mapped to ASCII. The
+        # keyword lane has always matched on a view that had these folds; this
+        # lane never did, so one zero-width space per word, a soft hyphen or a
+        # Cyrillic look-alike letter blinded every rule that lives on its regex
+        # (all GLS-MECH-* and every carrier without a usable keyword). Only
+        # these three folds: the decoding, leet, whitespace-collapse and ROT13 /
+        # reversed steps change length and meaning, and on a long document
+        # they re-create the spread-text false positives the co-occurrence
+        # window exists to prevent (see step 3.5). None of the three changes
+        # ASCII, so ASCII input (the common case) is never folded and never
+        # pays a second pass; non-ASCII input that folds to itself does not
+        # either. Bounded like the raw text: NFKC can expand (one code point
+        # to as many as 18), and a cut view would let padding push a hidden
+        # payload past the cut, so past the cap the fold drops NFKC and keeps
+        # the two steps that cannot grow. Padding then buys nothing.
+        folded = None
+        folded_present = None
+        if not text.isascii():
+            folded = replace_homoglyphs(normalize_unicode(strip_invisible(text)))
+            if self.max_scan_bytes and len(folded) > self.max_scan_bytes:
+                folded = replace_homoglyphs(strip_invisible(text))
+            if folded == text:
+                folded = None
+            else:
+                folded_present = self._literal_index.present(_prefilter.fold(folded))
         # A rule may declare `match_on: "normalized"`. Step 3.5 already gives the
         # normalized view to keyword CANDIDATES, but a rule reaches that pass only
         # if one of its keywords is in the index, and the index drops anything on
@@ -1160,6 +1187,10 @@ class SunglassesEngine:
             subjects = [(text, prefilter_present, text)]
             if shadow is not None:
                 subjects.append((shadow, shadow_present, shadow))
+            if folded is not None:
+                # Raw decided first; this is the second look. The frame is the
+                # folded view itself: the match offsets are offsets into it.
+                subjects.append((folded, folded_present, folded))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
