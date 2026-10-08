@@ -97,6 +97,7 @@ class PDFExtractor:
     MAX_ARRAY_MEMBERS = 4096
     MAX_ARRAY_DEPTH = 16
     _FIELD_TEXT_KEYS = ('/V', '/DV', '/RV', '/TU', '/Opt')
+    _EF_KEYS = ('/UF', '/F', '/DOS', '/Mac', '/Unix')
 
     def __init__(self):
         _check_deps()
@@ -137,39 +138,54 @@ class PDFExtractor:
         with open(pdf_path, 'rb') as f:
             reader = PyPDF2.PdfReader(f)
 
-            # 1. Metadata
-            meta_texts = self._extract_metadata(reader)
-            for field, text in meta_texts:
-                if text.strip():
-                    results.append((f"metadata:{field}", text))
-
-            # 2. Page text
-            for i, page in enumerate(reader.pages):
-                text = page.extract_text()
-                if text and text.strip():
-                    results.append((f"page:{i+1}", text.strip()))
-
-            # 3. Annotations (comments, notes)
-            for i, page in enumerate(reader.pages):
-                annot_texts = self._extract_annotations(page)
-                for label, text in annot_texts:
-                    if text.strip():
-                        results.append((f"page:{i+1}:{label}", text))
-
-            # 4-6. Content outside the page text (finding A3): form field
-            # values, JavaScript actions and embedded files. Appended after the
-            # three groups above so a PDF without them is reported exactly as
-            # before. Each reader records what it could not read.
-            extras = []
+            # The guard on compressed object streams stands before the first read
+            # of an object, so no check below can force a large inflation through
+            # a dereference that the guard would have refused.
             with self._bounded_object_streams(reader):
+                # 1. Metadata
+                meta_texts = self._extract_metadata(reader)
+                for field, text in meta_texts:
+                    if text.strip():
+                        results.append((f"metadata:{field}", text))
+
+                try:
+                    pages = list(reader.pages)
+                except Exception as exc:
+                    pages = []
+                    self.failures.append(
+                        f"pages not read ({exc.__class__.__name__}: {exc})")
+
+                # 2. Page text
+                for i, page in enumerate(pages):
+                    try:
+                        text = page.extract_text()
+                    except Exception as exc:
+                        self.failures.append(
+                            f"page {i+1} text not read ({exc.__class__.__name__}: {exc})")
+                        continue
+                    if text and text.strip():
+                        results.append((f"page:{i+1}", text.strip()))
+
+                # 3. Annotations (comments, notes)
+                for i, page in enumerate(pages):
+                    annot_texts = self._extract_annotations(page)
+                    for label, text in annot_texts:
+                        if text.strip():
+                            results.append((f"page:{i+1}:{label}", text))
+
+                # 4-6. Content outside the page text (finding A3): form field
+                # values, JavaScript actions and embedded files. Appended after the
+                # three groups above so a PDF without them is reported exactly as
+                # before. Each reader records what it could not read.
+                extras = []
                 extras.extend(self._extract_form_fields(reader))
                 extras.extend(self._extract_document_scripts(reader))
-                for i, page in enumerate(reader.pages):
+                for i, page in enumerate(pages):
                     extras.extend(self._extract_page_extras(page, i + 1))
                 extras.extend(self._extract_attachments(reader))
-            for label, text in extras:
-                if text.strip():
-                    results.append((label, text))
+                for label, text in extras:
+                    if text.strip():
+                        results.append((label, text))
 
         return results
 
@@ -193,9 +209,11 @@ class PDFExtractor:
         budget. What is left unread is recorded."""
         value = self._resolve(value)
         if isinstance(value, bytes):
-            return value.decode('utf-8', 'replace')
+            text = value.decode('utf-8', 'replace')
+            return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
         if isinstance(value, str):
-            return str(value)
+            text = str(value)
+            return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
         if not isinstance(value, (list, tuple)):
             return ''
         parts: List[str] = []
@@ -226,7 +244,8 @@ class PDFExtractor:
                 if isinstance(item, bytes):
                     item = item.decode('utf-8', 'replace')
                 if isinstance(item, str) and item:
-                    if not self._spend(len(item)):
+                    # Encoded bytes, and one for the separator that joins it.
+                    if not self._spend(len(item.encode('utf-8', 'replace')) + (1 if parts else 0)):
                         stack.clear()
                         break
                     parts.append(str(item))
@@ -288,7 +307,9 @@ class PDFExtractor:
         that happen to decode as UTF-8 do not make a file text. A UTF-16 byte
         order mark in front is skipped for the format check, so a PDF or another
         container behind a mark is still named, and the byte check is left out
-        for UTF-16 text, which holds zero bytes."""
+        for UTF-16 text, which holds zero bytes. A PDF is named by its header in
+        the first KiB, or by a header anywhere together with a startxref marker,
+        because the reader opens a PDF that has any amount of data in front."""
         utf16 = data.startswith((b'\xff\xfe', b'\xfe\xff'))
         body = data[2:] if utf16 else data
         head = body[:1024]
@@ -297,6 +318,11 @@ class PDFExtractor:
         for magic, kind in _FORMAT_MAGIC:
             if head.startswith(magic):
                 return kind
+        # The PDF reader finds its cross reference table from the end of the data,
+        # so it opens a PDF behind any run of leading bytes. A header further in
+        # than the first KiB counts when the data also holds a startxref marker.
+        if b'%PDF-' in body and b'startxref' in body:
+            return 'PDF'
         if not utf16 and data[:8192].translate(None, _TEXT_BYTES):
             return 'binary'
         return None
@@ -358,18 +384,23 @@ class PDFExtractor:
             limit = min(cap, room)
             inflater = zlib.decompressobj()
             data = inflater.decompress(raw, limit + 1)
+            # What was inflated is charged whether or not it is kept, so a run of
+            # streams that are each too large cannot inflate without the bound.
+            charged = self._spend(len(data))
             if len(data) > limit:
-                if limit < cap:
-                    self._spend(limit + 1)  # records the limit and spends the rest
-                else:
+                if limit >= cap and charged:
                     self.failures.append(f"{name} larger than {cap} bytes; not inspected")
                 return None
-            if not self._spend(len(data)):
+            if not charged:
                 return None
             if not inflater.eof:
                 self.failures.append(
                     f"{name} compressed data ends before its stream does; "
                     f"the rest was not inspected")
+            elif inflater.unused_data:
+                self.failures.append(
+                    f"{name} holds data after the end of its compressed stream; "
+                    f"that data was not inspected")
             return data
         self.failures.append(f"{name} uses filter {','.join(filters)}; not inspected")
         return None
@@ -460,7 +491,14 @@ class PDFExtractor:
             data = self._bounded_stream_bytes(value, name)
             if data is None:
                 return ''
-            return self._decode_text(data, strict=strict) or ''
+            text = self._decode_text(data, strict=strict)
+            if text is None and data.startswith((b'\xff\xfe', b'\xfe\xff')):
+                # A UTF-16 value with units that do not decode: read what does, and
+                # say that the rest was not, instead of turning it into nothing.
+                self._note(f"{name} is not valid UTF-16; the bytes that do not decode "
+                           f"were not inspected")
+                text = data.decode('utf-16', 'replace')
+            return text or ''
         return self._as_text(value)
 
     def _extract_form_fields(self, reader) -> List[Tuple[str, str]]:
@@ -599,37 +637,60 @@ class PDFExtractor:
                         break
             name = name or key or 'unnamed'
             ef = self._resolve(spec.get('/EF')) if '/EF' in spec else None
-            stream = None
+            # A file specification may name a different stream under each of its
+            # alternatives. Each distinct stream is read, and one that was read
+            # before (shared by several alternatives or specifications) is skipped.
+            streams = []
+            has_alternative = False
             if ef is not None and hasattr(ef, 'get'):
-                for k in ('/UF', '/F'):
-                    if k in ef:
-                        stream_ident = self._identity(ef[k])
-                        if stream_ident in self._files_seen:
-                            return []
-                        self._files_seen.add(stream_ident)
-                        stream = self._resolve(ef[k])
+                for k in self._EF_KEYS:
+                    if k not in ef:
+                        continue
+                    has_alternative = True
+                    stream_ident = self._identity(ef[k])
+                    if stream_ident in self._files_seen:
+                        continue
+                    self._files_seen.add(stream_ident)
+                    streams.append((k, self._resolve(ef[k])))
+            if not streams:
+                if not has_alternative:
+                    self.failures.append(
+                        f"attachment {name!r} has no readable stream; not inspected")
+                return []
+            out: List[Tuple[str, str]] = []
+            for position, (k, stream) in enumerate(streams):
+                if position:
+                    if self._attachments_read >= self.MAX_ATTACHMENTS:
+                        self._note(f"attachments beyond {self.MAX_ATTACHMENTS} not inspected")
                         break
-            if stream is None or not hasattr(stream, 'get'):
-                self.failures.append(f"attachment {name!r} has no readable stream; not inspected")
-                return []
-            data = self._bounded_stream_bytes(stream, f"attachment {name!r}")
-            if data is None:
-                return []
-            kind = self._container_kind(data)
-            if kind:
-                self.failures.append(
-                    f"attachment {name!r} ({len(data)} bytes) is a {kind} file; not inspected")
-                return []
-            text = self._decode_text(data, strict=True)
-            if text is None:
-                self.failures.append(
-                    f"attachment {name!r} ({len(data)} bytes) is not text; not inspected")
-                return []
-            return [(f"attachment:{name}", text)]
+                    self._attachments_read += 1
+                label = f"attachment:{name}" if not position else f"attachment:{name}:{k[1:]}"
+                out.extend(self._read_embedded(stream, name, label))
+            return out
         except Exception as exc:
             self.failures.append(
                 f"attachment {key!r} not read ({exc.__class__.__name__}: {exc})")
             return []
+
+    def _read_embedded(self, stream, name: str, label: str) -> List[Tuple[str, str]]:
+        """Text of one embedded stream, or a recorded failure naming the file."""
+        if not hasattr(stream, 'get'):
+            self.failures.append(f"attachment {name!r} has no readable stream; not inspected")
+            return []
+        data = self._bounded_stream_bytes(stream, f"attachment {name!r}")
+        if data is None:
+            return []
+        kind = self._container_kind(data)
+        if kind:
+            self.failures.append(
+                f"attachment {name!r} ({len(data)} bytes) is a {kind} file; not inspected")
+            return []
+        text = self._decode_text(data, strict=True)
+        if text is None:
+            self.failures.append(
+                f"attachment {name!r} ({len(data)} bytes) is not text; not inspected")
+            return []
+        return [(label, text)]
 
     def _extract_attachments(self, reader) -> List[Tuple[str, str]]:
         """The files in the /Names /EmbeddedFiles tree, bounded."""
