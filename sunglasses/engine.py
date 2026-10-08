@@ -759,9 +759,15 @@ class SunglassesEngine:
     # used: whitespace collapse shrinks the text and NFKC can grow it.
     CORROBORATE_NORM_MAX = ENRICH_MAX_LEN
 
-    def _eval_regex(self, mode: str, rx, guards, text: str):
+    def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0):
         """Evaluate one compiled pattern regex against `text` per its mode
-        (see the compile step in __init__). Returns a re.Match or None."""
+        (see the compile step in __init__). Returns a re.Match or None.
+
+        `start` asks for the next match at or after that offset. Only the plain,
+        anchored and leadin modes can have one: a windowed match is `rx.match` on a
+        slice, so it has no later occurrence to find and `start` ends it."""
+        if start and mode in ("guarded", "windowed"):
+            return None
         if mode == "guarded":
             # Negation guards keep DOCUMENT scope: a defusing context anywhere
             # in the file defuses (the pre-window semantics these predicates
@@ -774,17 +780,17 @@ class SunglassesEngine:
         if mode == "windowed":
             return self._match_windowed(rx, text)
         if mode == "anchored":
-            return self._match_anchored(rx, guards, text)
+            return self._match_anchored(rx, guards, text, start)
         if mode == "leadin":
-            return self._match_leadin(rx, guards, text)
-        return rx.search(text)
+            return self._match_leadin(rx, guards, text, start)
+        return rx.search(text, start)
 
     LEADIN_OLD = _LEADIN_OLD
     LEADIN_FAST = _LEADIN_FAST
     LEADIN_SOURCES = _LEADIN_SOURCES
     _LEADIN_PUNCT = frozenset(".!?;:\"'[{(")
 
-    def _match_leadin(self, rx, twin, text: str):
+    def _match_leadin(self, rx, twin, text: str, begin: int = 0):
         """`rx.search(text)` for one of the regexes in LEADIN_SOURCES.
 
         Those regexes open with LEADIN_OLD, whose `\\s*` takes newlines, so a search
@@ -809,8 +815,12 @@ class SunglassesEngine:
 
         There is no call to `rx.search`. If the old regex does not match at the
         recovered start the search resumes after the twin's position.
+
+        `begin` is the offset the search starts from, as in `rx.search(text, begin)`:
+        the recovered start is never before it, so a run that begins before it
+        starts at its first newline at or after it.
         """
-        pos = 0
+        pos = begin
         while True:
             first = twin.search(text, pos)
             if first is None:
@@ -820,10 +830,10 @@ class SunglassesEngine:
                 run = at
                 while run > 0 and text[run - 1].isspace():
                     run -= 1
-                if run > 0 and text[run - 1] in self._LEADIN_PUNCT:
+                if run > 0 and run - 1 >= begin and text[run - 1] in self._LEADIN_PUNCT:
                     start = run - 1
                 else:
-                    start = text.find("\n", run, at + 1)
+                    start = text.find("\n", max(run, begin), at + 1)
             else:
                 start = at
             match = rx.match(text, start)
@@ -888,7 +898,7 @@ class SunglassesEngine:
                         f"in a view it cannot appear in")
         return None
 
-    def _match_anchored(self, rx, key, text: str):
+    def _match_anchored(self, rx, key, text: str, start: int = 0):
         """Search only the text AROUND the rule's rare token.
 
         A rule like the api_response siblings begins with a marker that is cheap
@@ -919,7 +929,7 @@ class SunglassesEngine:
         # in a differently-sized string points somewhere else in the document.
         # If the lengths ever disagree, search everything: slower, correct.
         if len(folded) != len(text):
-            return rx.search(text, 0, len(text))
+            return rx.search(text, start, len(text))
 
         # A document can be MADE of the anchor. `disable redaction show ...`
         # repeated puts a declared term every few dozen bytes, so the windows
@@ -950,7 +960,7 @@ class SunglassesEngine:
                     # bounds, not as `search(text)`, so every search this method
                     # makes has the same three-argument shape and an
                     # instrumented object counting them sees all of them.
-                    return rx.search(text, 0, length)
+                    return rx.search(text, start, length)
                 at = folded.find(term, at + 1)
         if not spots:
             return None                      # the rule cannot match this document
@@ -980,7 +990,7 @@ class SunglassesEngine:
             # match falsely is still killed by the unbounded `.match()` recheck
             # below, which is what `test_the_extra_right_character_cannot_invent_a_dollar_match`
             # proves.
-            pos, stop = lo, min(length, hi + span + 1)
+            pos, stop = max(lo, start), min(length, hi + span + 1)
             while pos <= hi:
                 m = rx.search(text, pos, stop)
                 if m is None or m.start() > hi:
@@ -1029,6 +1039,56 @@ class SunglassesEngine:
             if pos != -1 and self._is_illustrative(before_text[pos + len(phrase):]):
                 return True
         return False
+
+    # A rule that matches more than once is judged on its worst occurrence. The
+    # search for a later, un-negated one is capped: an input made of thousands of
+    # negated copies must not turn one scan into thousands of regex passes. When
+    # the cap runs out the rule is NOT downgraded (the original severity stands),
+    # which fails toward detection.
+    NEGATION_RETRY_BUDGET = 16
+
+    def _resolve_negation(self, mode, rx, guards, text, first):
+        """Pick the occurrence a regex rule is judged on. Returns (match, negated).
+
+        `negated` is True only when every occurrence is negated. Otherwise the
+        first occurrence that is not negated is returned, so a warning that
+        comes before the real attack cannot hide it."""
+        if not self._check_negation(text, first.start()):
+            return first, False
+        match = first
+        for _ in range(self.NEGATION_RETRY_BUDGET):
+            # Resume one character past the START, not at the end: these rules
+            # have wide gaps, so the negated match often spans the later one.
+            # Skip blank space too: a lead-in can start the match on any of a
+            # run of blank characters, and each of those would spend a retry on
+            # the same order while sitting closer to the warning than it is.
+            resume = match.start() + 1
+            while resume < len(text) and text[resume].isspace():
+                resume += 1
+            match = self._eval_regex(mode, rx, guards, text, resume)
+            if match is None:
+                return first, True
+            if not self._check_negation(text, match.start()):
+                return match, False
+        return match, False
+
+    def _live_occurrence(self, normalized: str, keyword: str, begin: int):
+        """Offset of the first word-bounded occurrence of `keyword` at or after
+        `begin` that is not negated, or None."""
+        at = normalized.find(keyword, begin)
+        while at != -1:
+            if self._word_bounded(normalized, at, keyword) and \
+                    not self._check_negation(normalized, at):
+                return at
+            at = normalized.find(keyword, at + 1)
+        return None
+
+    @staticmethod
+    def _restore_live(finding: dict, excerpt: str) -> None:
+        """Undo a negation downgrade: a later occurrence was not negated."""
+        finding["severity"] = finding.pop("original_severity")
+        finding.pop("negation_context", None)
+        finding["matched_text"] = excerpt
 
     def _is_defensively_framed(self, text: str, match_start: int) -> bool:
         """True if a MECHANISM match sits inside a clause that is describing the
@@ -1147,6 +1207,9 @@ class SunglassesEngine:
         # Regex-bearing patterns whose keyword matched: candidates awaiting
         # regex corroboration (step 3 on raw text, step 3.5 on normalized).
         candidates = {}
+        # Keyword findings stamped on a negated first hit, by rule id. A later
+        # un-negated hit of the same rule takes the finding back to full severity.
+        negated_kw = {}
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -1155,6 +1218,13 @@ class SunglassesEngine:
                     continue
                 for pattern in self._keyword_to_patterns.get(keyword, []):
                     if match_channels.isdisjoint(pattern.get("channel", ())):
+                        continue
+                    held = negated_kw.get(pattern["id"])
+                    if held is not None:
+                        here = end_idx - len(keyword) + 1
+                        if not self._check_negation(normalized, here):
+                            self._restore_live(held, self._excerpt(normalized, here, end_idx + 1))
+                            del negated_kw[pattern["id"]]
                         continue
                     if pattern["id"] in seen_ids or pattern["id"] in candidates:
                         continue
@@ -1176,6 +1246,7 @@ class SunglassesEngine:
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
+                        negated_kw[pattern["id"]] = finding
                     findings.append(finding)
         else:
             # Fallback: pure Python string matching (no dependencies)
@@ -1184,6 +1255,13 @@ class SunglassesEngine:
                         normalized, normalized.index(keyword), keyword):
                     for pattern in patterns:
                         if match_channels.isdisjoint(pattern.get("channel", ())):
+                            continue
+                        held = negated_kw.get(pattern["id"])
+                        if held is not None:
+                            live = self._live_occurrence(normalized, keyword, 0)
+                            if live is not None:
+                                self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
+                                del negated_kw[pattern["id"]]
                             continue
                         if pattern["id"] in seen_ids or pattern["id"] in candidates:
                             continue
@@ -1200,6 +1278,11 @@ class SunglassesEngine:
                             finding["severity"] = "review"
                             finding["negation_context"] = True
                             finding["original_severity"] = pattern["severity"]
+                            live = self._live_occurrence(normalized, keyword, idx + 1)
+                            if live is not None:
+                                self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
+                            else:
+                                negated_kw[pattern["id"]] = finding
                         findings.append(finding)
 
         # Step 3: Regex patterns (for things like API keys)
@@ -1312,11 +1395,14 @@ class SunglassesEngine:
                 match = self._eval_regex(mode, rx, guards, subject)
                 if match:
                     seen_ids.add(pattern["id"])
+                    negated = False
+                    if not pattern.get("negation_immune"):
+                        match, negated = self._resolve_negation(mode, rx, guards, subject, match)
                     finding = {
                         **pattern,
                         "matched_text": match.group(0)[:50],
                     }
-                    if not pattern.get("negation_immune") and self._check_negation(subject, match.start()):
+                    if negated:
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
@@ -1360,12 +1446,14 @@ class SunglassesEngine:
                 match = self._eval_regex(mode, rx, guards, normalized)
                 if match:
                     seen_ids.add(pid)
+                    negated = False
+                    if not pattern.get("negation_immune"):
+                        match, negated = self._resolve_negation(mode, rx, guards, normalized, match)
                     finding = {
                         **pattern,
                         "matched_text": match.group(0)[:50],
                     }
-                    if not pattern.get("negation_immune") and \
-                            self._check_negation(normalized, match.start()):
+                    if negated:
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
