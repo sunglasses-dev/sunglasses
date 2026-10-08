@@ -1139,8 +1139,9 @@ class SunglassesEngine:
         shadow_present = None
         if shadow is not None:
             shadow_present = self._literal_index.present(_prefilter.fold(shadow))
-        # The raw text with the preprocessor's three lossless folds applied:
-        # invisible characters stripped, NFKC, homoglyphs mapped to ASCII. The
+        # The raw text with three of the preprocessor's character folds applied:
+        # invisible characters deleted, NFKC (which composes some sequences and
+        # expands some code points), homoglyphs mapped to their ASCII look-alike. The
         # keyword lane has always matched on a view that had these folds; this
         # lane never did, so one zero-width space per word, a soft hyphen or a
         # Cyrillic look-alike letter blinded every rule that lives on its regex
@@ -1152,15 +1153,26 @@ class SunglassesEngine:
         # ASCII, so ASCII input (the common case) is never folded and never
         # pays a second pass; non-ASCII input that folds to itself does not
         # either. Bounded like the raw text: NFKC can expand (one code point
-        # to as many as 18), and a cut view would let padding push a hidden
-        # payload past the cut, so past the cap the fold drops NFKC and keeps
-        # the two steps that cannot grow. Padding then buys nothing.
+        # to as many as 18), so the folded view is cut at max_scan_bytes and
+        # the cut is recorded as a truncated scan, the same way step 0 records
+        # a cut of the raw text. Dropping NFKC instead would let expanding
+        # padding switch the fold off for the whole document and return a
+        # clean, complete result for a payload the fold would have found. In
+        # that expanding case the two folds that cannot grow (delete, map) are
+        # also kept as a subject of their own, in full, so padding cannot push
+        # a payload hidden with invisible characters past the cut either.
         folded = None
         folded_present = None
+        compact = None
         if not text.isascii():
-            folded = replace_homoglyphs(normalize_unicode(strip_invisible(text)))
+            stripped = strip_invisible(text)
+            folded = replace_homoglyphs(normalize_unicode(stripped))
             if self.max_scan_bytes and len(folded) > self.max_scan_bytes:
-                folded = replace_homoglyphs(strip_invisible(text))
+                compact = replace_homoglyphs(stripped)
+                if compact == text:
+                    compact = None
+                folded = folded[: self.max_scan_bytes]
+                truncated = True
             if folded == text:
                 folded = None
             else:
@@ -1191,6 +1203,9 @@ class SunglassesEngine:
                 # Raw decided first; this is the second look. The frame is the
                 # folded view itself: the match offsets are offsets into it.
                 subjects.append((folded, folded_present, folded))
+            if compact is not None:
+                compact_present = self._literal_index.present(_prefilter.fold(compact))
+                subjects.append((compact, compact_present, compact))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
