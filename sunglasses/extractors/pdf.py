@@ -5,12 +5,16 @@ Extracts text from PDFs using multiple methods:
 1. Page text — visible text content on each page
 2. Metadata — document properties (title, author, subject, keywords, creator)
 3. Annotations — comments, notes, form field names
-4. Form field values — /V, /DV, /RV, /TU and /Opt of the AcroForm fields and
-   widget (XFA form data is reported as not inspected)
+4. Form field values — /V, /DV, /RV, /TU and /Opt of the AcroForm fields, and /V
+   of widgets outside /AcroForm (XFA form data is reported as not inspected)
 5. JavaScript — /OpenAction, /AA and /Names /JavaScript actions of the document,
    its pages, annotations and fields (bounded, see MAX_ACTIONS)
 6. Embedded files — text attachments up to MAX_ATTACHMENT_BYTES (raw or plain
-   FlateDecode) are read; other attachments are reported as not inspected
+   FlateDecode) are read; other attachments, including PDF, PostScript and binary
+   files, are reported as not inspected
+
+Decoded content of one document is read from a single _ReadBudget, and the part
+that a bound leaves unread is recorded in `failures`.
 
 Usage:
     from sunglasses.extractors.pdf import scan_pdf
@@ -19,6 +23,7 @@ Usage:
 Install: pip install sunglasses[pdf]  (requires PyPDF2)
 """
 
+import contextlib
 import os
 import zlib
 from typing import List, Optional, Tuple
@@ -35,6 +40,46 @@ def _check_deps():
         )
 
 
+class _WalkBudget(Exception):
+    """The document holds more decoded content than the checks will read."""
+
+
+class _ReadBudget:
+    """Decoded bytes read from one document. Every check that decodes a stream
+    spends from the same budget, so the cost of a document is bounded once and
+    not once per check."""
+
+    MAX_BYTES = 64 << 20
+
+    def __init__(self):
+        self.read = 0
+
+    def remaining(self) -> int:
+        return max(0, self.MAX_BYTES - self.read)
+
+    def spend(self, size: int) -> None:
+        """Charge a read. A read that does not fit spends the rest of the budget
+        and raises, so later reads find nothing left."""
+        if size > self.remaining():
+            self.read = self.MAX_BYTES
+            raise _WalkBudget()
+        self.read += size
+
+
+# Bytes that may appear in text; a file with others in its first 8 KiB is binary.
+_TEXT_BYTES = bytes([9, 10, 11, 12, 13, 27]) + bytes(range(32, 127)) + bytes(range(128, 256))
+_FORMAT_MAGIC = (
+    (b'%!PS', 'PostScript'),
+    (b'PK\x03\x04', 'zip'),
+    (b'PK\x05\x06', 'zip'),
+    (b'\x1f\x8b', 'gzip'),
+    (b'\x7fELF', 'ELF'),
+    (b'\x89PNG', 'PNG'),
+    (b'GIF8', 'GIF'),
+    (b'\xff\xd8\xff', 'JPEG'),
+)
+
+
 class PDFExtractor:
     """Extract text from PDFs for SUNGLASSES scanning."""
 
@@ -49,14 +94,26 @@ class PDFExtractor:
     MAX_ACTIONS = 256
     MAX_ATTACHMENTS = 64
     MAX_ATTACHMENT_BYTES = 1 << 20
+    MAX_ARRAY_MEMBERS = 4096
+    MAX_ARRAY_DEPTH = 16
     _FIELD_TEXT_KEYS = ('/V', '/DV', '/RV', '/TU', '/Opt')
 
     def __init__(self):
         _check_deps()
         self.failures = []
+        self._reset_document_state()
+
+    def _reset_document_state(self) -> None:
+        """Everything that must not leak from one document into the next."""
+        self.budget = _ReadBudget()
         self._seen_values = set()
         self._visited = set()
+        self._fields_visited = set()
+        self._files_seen = set()
+        self._stream_cache = {}
+        self._attachments_read = 0
         self._actions_seen = 0
+        self._actions_capped = False
 
     def extract(self, pdf_path: str) -> List[Tuple[str, str]]:
         """
@@ -73,6 +130,9 @@ class PDFExtractor:
         # Reset per call: a failure from a previous document must never be
         # reported against this one.
         self.failures = []
+        # One budget and one set of seen objects per document, created before the
+        # first check reads anything so every later check charges the same budget.
+        self._reset_document_state()
 
         with open(pdf_path, 'rb') as f:
             reader = PyPDF2.PdfReader(f)
@@ -100,13 +160,13 @@ class PDFExtractor:
             # values, JavaScript actions and embedded files. Appended after the
             # three groups above so a PDF without them is reported exactly as
             # before. Each reader records what it could not read.
-            self._seen_values, self._visited, self._actions_seen = set(), set(), 0
             extras = []
-            extras.extend(self._extract_form_fields(reader))
-            extras.extend(self._extract_document_scripts(reader))
-            for i, page in enumerate(reader.pages):
-                extras.extend(self._extract_page_extras(page, i + 1))
-            extras.extend(self._extract_attachments(reader))
+            with self._bounded_object_streams(reader):
+                extras.extend(self._extract_form_fields(reader))
+                extras.extend(self._extract_document_scripts(reader))
+                for i, page in enumerate(reader.pages):
+                    extras.extend(self._extract_page_extras(page, i + 1))
+                extras.extend(self._extract_attachments(reader))
             for label, text in extras:
                 if text.strip():
                     results.append((label, text))
@@ -126,18 +186,120 @@ class PDFExtractor:
             return ('ref', idnum, getattr(obj, 'generation', 0))
         return ('obj', id(obj))
 
-    @classmethod
-    def _as_text(cls, value) -> str:
-        """A PDF string, name or (nested) array of them as one text; else ''."""
-        value = cls._resolve(value)
+    def _as_text(self, value) -> str:
+        """A PDF string, name or (nested) array of them as one text; else ''.
+        An array is read by identity, so a member that several arrays share is
+        read once, and it is bounded by member count, depth and the document
+        budget. What is left unread is recorded."""
+        value = self._resolve(value)
         if isinstance(value, bytes):
             return value.decode('utf-8', 'replace')
         if isinstance(value, str):
             return str(value)
-        if isinstance(value, (list, tuple)):
-            parts = [cls._as_text(v) for v in value]
-            return ' '.join(part for part in parts if part)
-        return ''
+        if not isinstance(value, (list, tuple)):
+            return ''
+        parts: List[str] = []
+        seen = set()
+        members = 0
+        stack = [(value, 0)]
+        while stack:
+            node, depth = stack.pop()
+            if depth >= self.MAX_ARRAY_DEPTH:
+                self._note(f"a value array nested deeper than {self.MAX_ARRAY_DEPTH} levels; "
+                           f"the rest was not inspected")
+                continue
+            for item in reversed(list(node)):
+                ident = self._identity(item)
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                members += 1
+                if members > self.MAX_ARRAY_MEMBERS:
+                    self._note(f"a value array of more than {self.MAX_ARRAY_MEMBERS} members; "
+                               f"the rest was not inspected")
+                    stack.clear()
+                    break
+                item = self._resolve(item)
+                if isinstance(item, (list, tuple)):
+                    stack.append((item, depth + 1))
+                    continue
+                if isinstance(item, bytes):
+                    item = item.decode('utf-8', 'replace')
+                if isinstance(item, str) and item:
+                    if not self._spend(len(item)):
+                        stack.clear()
+                        break
+                    parts.append(str(item))
+        return ' '.join(parts)
+
+    def _note(self, message: str) -> None:
+        """Record a failure once per document."""
+        if message not in self.failures:
+            self.failures.append(message)
+
+    def _spend(self, size: int) -> bool:
+        """Charge decoded bytes to the document budget; False once it is spent."""
+        try:
+            self.budget.spend(size)
+        except _WalkBudget:
+            self._note(
+                f"decoded content passed the {self.budget.MAX_BYTES >> 20} MiB limit "
+                f"of the document; the rest was not inspected")
+            return False
+        return True
+
+    @contextlib.contextmanager
+    def _bounded_object_streams(self, reader):
+        """Inflate a compressed object stream only if it fits the attachment
+        bound, once per stream. PyPDF2 decodes a whole object stream to read one
+        object out of it, so a small file could otherwise force a large inflation
+        through any dereference. Objects in a stream that does not fit are not
+        resolved, and the stream is recorded as not inspected."""
+        original = reader._get_object_from_stream
+        verdicts = {}
+
+        def guarded(indirect_reference):
+            stmnum = reader.xref_objStm[indirect_reference.idnum][0]
+            if stmnum not in verdicts:
+                verdicts[stmnum] = self._object_stream_fits(reader, stmnum)
+            if not verdicts[stmnum]:
+                raise ValueError(f"object stream {stmnum} was not inflated")
+            return original(indirect_reference)
+
+        reader._get_object_from_stream = guarded
+        try:
+            yield
+        finally:
+            del reader._get_object_from_stream
+
+    def _object_stream_fits(self, reader, stmnum: int) -> bool:
+        from PyPDF2.generic import IndirectObject
+        try:
+            stream = IndirectObject(stmnum, 0, reader).get_object()
+        except Exception:
+            return True  # PyPDF2 raises the same error itself
+        if not hasattr(stream, 'get_data'):
+            return True
+        return self._bounded_stream_bytes(stream, f"object stream {stmnum}") is not None
+
+    @staticmethod
+    def _container_kind(data: bytes) -> Optional[str]:
+        """Name of a non text format by its magic or its bytes, else None. Bytes
+        that happen to decode as UTF-8 do not make a file text. A UTF-16 byte
+        order mark in front is skipped for the format check, so a PDF or another
+        container behind a mark is still named, and the byte check is left out
+        for UTF-16 text, which holds zero bytes."""
+        utf16 = data.startswith((b'\xff\xfe', b'\xfe\xff'))
+        body = data[2:] if utf16 else data
+        head = body[:1024]
+        if b'%PDF-' in head:
+            return 'PDF'
+        for magic, kind in _FORMAT_MAGIC:
+            if head.startswith(magic):
+                return kind
+        if not utf16 and data[:8192].translate(None, _TEXT_BYTES):
+            return 'binary'
+        return None
 
     @staticmethod
     def _decode_text(data: bytes, strict: bool) -> Optional[str]:
@@ -155,7 +317,18 @@ class PDFExtractor:
         """Decoded bytes of a stream, or None (recorded) when that is not cheap
         and bounded: only raw and plain FlateDecode data up to
         MAX_ATTACHMENT_BYTES is inflated, with an output bound, so a small
-        compressed object cannot expand without limit."""
+        compressed object cannot expand without limit. What is left of the
+        document budget is checked before a stream is decoded and bounds the
+        output, and a stream read before is not decoded again."""
+        key = id(stream)
+        if key in self._stream_cache:
+            data = self._stream_cache[key]
+            return data if data is not None and self._spend(len(data)) else None
+        data = self._decode_stream(stream, name)
+        self._stream_cache[key] = data
+        return data
+
+    def _decode_stream(self, stream, name: str) -> Optional[bytes]:
         cap = self.MAX_ATTACHMENT_BYTES
         raw = getattr(stream, '_data', None) or b''
         filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
@@ -169,7 +342,7 @@ class PDFExtractor:
             self.failures.append(f"{name} larger than {cap} bytes; not inspected")
             return None
         if not filters:
-            return raw
+            return raw if self._spend(len(raw)) else None
         if filters in (['/FlateDecode'], ['/Fl']):
             params = self._resolve(stream.get('/DecodeParms')) if '/DecodeParms' in stream else None
             if isinstance(params, (list, tuple)) and params:
@@ -178,10 +351,25 @@ class PDFExtractor:
                 if int(self._resolve(params.get('/Predictor', 1)) or 1) > 1:
                     self.failures.append(f"{name} uses a predictor filter; not inspected")
                     return None
-            data = zlib.decompressobj().decompress(raw, cap + 1)
-            if len(data) > cap:
-                self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+            room = self.budget.remaining()
+            if room <= 0:
+                self._spend(1)  # records that the document limit stopped the read
                 return None
+            limit = min(cap, room)
+            inflater = zlib.decompressobj()
+            data = inflater.decompress(raw, limit + 1)
+            if len(data) > limit:
+                if limit < cap:
+                    self._spend(limit + 1)  # records the limit and spends the rest
+                else:
+                    self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+                return None
+            if not self._spend(len(data)):
+                return None
+            if not inflater.eof:
+                self.failures.append(
+                    f"{name} compressed data ends before its stream does; "
+                    f"the rest was not inspected")
             return data
         self.failures.append(f"{name} uses filter {','.join(filters)}; not inspected")
         return None
@@ -194,7 +382,10 @@ class PDFExtractor:
         while stack and len(out) <= cap:
             node, depth = stack.pop()
             ident = self._identity(node)
-            if ident in seen or depth > 32:
+            if ident in seen:
+                continue
+            if depth > 32:
+                self._note(f"{what} nested deeper than 32 levels; the part below not inspected")
                 continue
             seen.add(ident)
             node = self._resolve(node)
@@ -293,6 +484,10 @@ class PDFExtractor:
 
     def _walk_fields(self, fields, prefix: str, depth: int, counter: List[int], out) -> None:
         for ref in fields:
+            ident = self._identity(ref)
+            if ident in self._fields_visited:
+                continue
+            self._fields_visited.add(ident)
             if counter[0] >= self.MAX_FORM_FIELDS:
                 if counter[0] == self.MAX_FORM_FIELDS:
                     counter[0] += 1
@@ -315,10 +510,11 @@ class PDFExtractor:
                             out.append((f"form:{name}:{key[1:]}", text))
                 if '/AA' in field:
                     out.extend(self._scripts_in(field['/AA'], f"field:{name}", table=True))
-                if '/Kids' in field and depth < 32:
-                    kids = self._resolve(field['/Kids'])
-                    if kids:
-                        self._walk_fields(kids, name, depth + 1, counter, out)
+                kids = self._resolve(field['/Kids']) if '/Kids' in field else None
+                if kids and depth >= 32:
+                    self._note("form fields nested deeper than 32 levels; the fields below not inspected")
+                elif kids:
+                    self._walk_fields(kids, name, depth + 1, counter, out)
             except Exception as exc:
                 self.failures.append(
                     f"form field {name!r} not read ({exc.__class__.__name__}: {exc})")
@@ -381,6 +577,16 @@ class PDFExtractor:
     def _read_filespec(self, spec, key: str) -> List[Tuple[str, str]]:
         """Text of one embedded file, or a recorded failure naming it."""
         try:
+            # One budget for annotation and name tree entry points: a file
+            # specification or a stream reached twice is read once.
+            ident = self._identity(spec)
+            if ident in self._files_seen:
+                return []
+            self._files_seen.add(ident)
+            if self._attachments_read >= self.MAX_ATTACHMENTS:
+                self._note(f"attachments beyond {self.MAX_ATTACHMENTS} not inspected")
+                return []
+            self._attachments_read += 1
             spec = self._resolve(spec)
             if not hasattr(spec, 'get'):
                 self.failures.append(f"attachment {key!r} is not a file specification; not inspected")
@@ -397,6 +603,10 @@ class PDFExtractor:
             if ef is not None and hasattr(ef, 'get'):
                 for k in ('/UF', '/F'):
                     if k in ef:
+                        stream_ident = self._identity(ef[k])
+                        if stream_ident in self._files_seen:
+                            return []
+                        self._files_seen.add(stream_ident)
                         stream = self._resolve(ef[k])
                         break
             if stream is None or not hasattr(stream, 'get'):
@@ -404,6 +614,11 @@ class PDFExtractor:
                 return []
             data = self._bounded_stream_bytes(stream, f"attachment {name!r}")
             if data is None:
+                return []
+            kind = self._container_kind(data)
+            if kind:
+                self.failures.append(
+                    f"attachment {name!r} ({len(data)} bytes) is a {kind} file; not inspected")
                 return []
             text = self._decode_text(data, strict=True)
             if text is None:
