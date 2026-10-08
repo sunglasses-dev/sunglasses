@@ -1448,7 +1448,9 @@ def _ex007_credential_alternations(regex):
 
 def test_ex007_prefilter_requires_a_credential_word_as_well_as_curl():
     """The credential words are plain alternation, so the engine derives a second
-    requirement and skips an eligible text with a `curl` and no credential word.
+    requirement made of literals and short prefixes of the words. An eligible text
+    with a `curl` and none of those literals is skipped, and each credential spelling
+    contains one of the required literals.
 
     Before this the derived requirement was `curl` alone. The words are the same
     language as before, only written so the engine can read them.
