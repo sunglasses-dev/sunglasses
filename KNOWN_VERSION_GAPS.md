@@ -418,3 +418,41 @@ So a Bash command is judged on all of its text. Writing about a blocked path in
 a shell heredoc is refused. The repair needs a real shell grammar rather than
 another special case, and `tests/test_firewall_policy_action_surface.py` carries
 a named test asserting the limit is still present.
+
+## Open limit as of 0.6.7 (2026-10-08) — five pattern entries cost more than they should on a long run of whitespace
+
+A timed check over every regex entry the engine loads finds five entries whose
+cost grows with the square of the length of a single long run of whitespace,
+where every other entry grows in step with the input: `GLS-AW-001`, `GLS-SC-018`,
+`GLS-CF-251`, `GLS-CICD-004` and `GLS-AW-713`. Two of them (`GLS-CICD-004`,
+`GLS-AW-713`) sit behind a leading assertion, so they are reached only on text
+that already carries their required words.
+
+This is the same family as the long-token entry above and carries the same
+consequence: the firewall hook has a fixed timeout, and a timed-out hook does not
+block the call. We have not published timings, for the same reason as before.
+
+`GLS-AW-001` is the first of the five to have a repair, and that repair is in
+review; this entry is updated when it ships. The other four are open. The input
+cap bounds the length of a scan, not its cost, and it is not a fix for any of
+them. The timed check is the gate that finds the rest of this family, and each
+open entry is listed in it as an expected failure, so repairing one without
+removing it from the list fails the suite.
+
+`tests/test_known_gaps_are_listed.py` asserts that these rows stay in this file
+until the entries are repaired.
+
+## Open limit as of 0.6.7 (2026-10-08) — look-alike letters outside the fold table still pass as ordinary letters
+
+The scanner folds look-alike letters back to plain ones with a fixed homoglyph table plus Unicode NFKC, and a letter that is in neither the table nor folded by NFKC stays as it is. Text that spells a blocked phrase with such a letter can be allowed where the plain spelling is blocked.
+
+The table is a hand-picked list of a few dozen letters, and Unicode has thousands of
+look-alikes, so extending it one letter at a time does not close the class. The
+repair is a maintained confusables mapping for the scripts that matter, applied
+with a false-positive run over the benign corpora before it ships; a longer hand
+table, or folding every non-ASCII letter to its nearest ASCII one, is not that
+repair. Neither is in 0.6.7.
+
+`tests/test_known_gaps_are_listed.py` asserts that this row stays in this file until
+the limit is repaired. The behavioral check for it is kept out of the public tree on
+purpose (lab finding E3).
