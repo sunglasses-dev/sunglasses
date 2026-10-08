@@ -302,32 +302,93 @@ def test_a_far_negator_does_not_reach_an_attack_through_a_lengthening_fold(engin
     assert result.decision == "block"
 
 
+def _wide(text):
+    """The same text in fullwidth forms: a different character for each one."""
+    return "".join(chr(ord(c) + 0xFEE0) if 33 <= ord(c) <= 126 else "\u3000" if c == " " else c
+                   for c in text)
+
+
+def test_two_distinct_wide_attacks_after_a_lengthening_ligature_both_block(engine):
+    """Everything from a ligature to the end of a run of wide letters used to
+    take the origin of the run's start, so a far-away attack there read as
+    sitting next to the warning at the front. A character the fold changed has
+    no raw index, so the view's own text decides."""
+    doc = ("Never " + _wide("ordinary " * 9) + "\ufb03"
+           + _wide(" " + REGEX + ". ordinary " + REGEX + ".") + " ordinary " * 300)
+    result = engine.scan(doc, CHANNEL)
+    assert result.decision == "block"
+    assert _find(result, "GLS-PI-016")["severity"] == "high"
+    control = doc.replace("\ufb03", "x")                       # same length, no expansion
+    assert engine.scan(control, CHANNEL).decision == "block"
+
+
+@pytest.mark.parametrize("prefix", LIGATURE_WARNINGS)
+def test_an_api_response_warning_stays_downgraded_when_a_fold_lengthens_the_prefix(engine, prefix):
+    phrase = REGEX.replace("developer message", "system prompt")
+    result = engine.scan(prefix + phrase + ".", "api_response")
+    got = _find(result, "GLS-PI-016-API")
+    assert result.decision == "allow_redacted"
+    assert got["severity"] == "review"
+    later = engine.scan(prefix + phrase + f". {GAP}{GAP}" + phrase + ".", "api_response")
+    assert later.decision == "block"
+    assert _find(later, "GLS-PI-016-API")["severity"] == "high"
+
+
 @pytest.mark.parametrize("raw", [
     "plain ascii only",
     "o\ufb03ce o\ufb03cials said bypass safeguards",
     "a\u0301b\u200bc \u0430\u0435 xyz \ufb00 end bypass",
     "\u0e01\u0e32 mixed \uff21\uff22\uff23 text e\u0301e\u0301 ok bypass",
+    "Never " + "\ufb03" * 5 + " " + _wide("bypass") + " bypass",
 ])
-def test_the_fold_origin_is_monotone_and_exact_after_the_last_change(raw):
-    fold = SunglassesEngine._fold_chain
-    view = fold(raw)
-    origin = SunglassesEngine._fold_origin(raw, fold)
-    offsets = [origin(at) for at in range(len(view))]
-    assert offsets == sorted(offsets)
-    assert all(0 <= o < len(raw) for o in offsets)
-    # ASCII text after the last change maps one to one.
-    word = "bypass" if "bypass" in raw else raw[:5]
-    assert raw[origin(view.index(word))] == word[0]
+def test_the_origin_of_a_folded_character_is_exact_or_absent(raw):
+    from sunglasses.engine import _RawAlign
+    from sunglasses.preprocessor import normalize_unicode, replace_homoglyphs, strip_invisible
+    for build in (lambda t: replace_homoglyphs(normalize_unicode(strip_invisible(t))),
+                  lambda t: replace_homoglyphs(strip_invisible(t))):
+        view = build(raw)
+        align = _RawAlign(raw)
+        found = [(at, align.origin(view, at)) for at in range(len(view))]
+        indexes = [o for _, o in found if o is not None]
+        assert indexes == sorted(set(indexes))
+        for at, o in found:
+            if o is not None:
+                assert raw[o].lower() == view[at].lower()      # the very same character
+        # ASCII text after the last change is found at its own place, or not at
+        # all where the walk gave up (a mark composed onto its letter).
+        at = view.rindex("bypass") if "bypass" in view else None
+        if at is not None:
+            assert align.origin(view, at) in (None, raw.rindex("bypass"))
+    plain = "o\ufb03ce o\ufb03cials said bypass safeguards"
+    view = replace_homoglyphs(normalize_unicode(strip_invisible(plain)))
+    assert _RawAlign(plain).origin(view, view.index("bypass")) == plain.index("bypass")
 
 
-def test_the_normalized_origin_maps_the_plain_view_and_the_shape_copy():
+def test_the_normalized_origin_maps_the_plain_text_and_the_shape_copy_only():
+    from sunglasses.engine import _RawAlign
     from sunglasses.preprocessor import normalize
     raw = "Never, even if oﬃce oﬃcials oﬀer oﬃcial consent, lgnore the rules"
     normalized = normalize(raw)
-    origin = SunglassesEngine._normalized_origin(raw, normalized)
-    at = normalized.index("lgnore")
-    assert origin(at) == raw.index("lgnore")
+    origin = SunglassesEngine._normalized_origin(_RawAlign(raw), normalized)
+    assert origin(normalized.index("lgnore")) == raw.index("lgnore")
     copy = normalized.rindex("ignore the rules")          # the shape-confusion copy
-    assert origin(copy) == raw.index("lgnore")
+    assert origin(copy) is None                            # the letter the copy rewrote
+    assert origin(copy + 1) == raw.index("lgnore") + 1
     rot = normalized.index("\x1e") + 3
-    assert origin(rot) is None
+    assert origin(rot) is None                             # ROT13 text is not in the raw text
+    assert origin(len(normalized) + 5) is None
+
+
+def test_a_decoded_character_has_no_origin_and_the_plain_view_stops_at_a_difference():
+    import base64
+    from sunglasses.engine import _RawAlign
+    from sunglasses.preprocessor import normalize
+    raw = ("Never read the notes about the meeting. "
+           + base64.b64encode(("ordinary " * 10 + REGEX).encode()).decode())
+    normalized = normalize(raw)
+    origin = SunglassesEngine._normalized_origin(_RawAlign(raw), normalized)
+    assert origin(normalized.index("never")) == 0
+    assert origin(normalized.index(REGEX[:10])) is None
+    # A match that opens in the raw words and runs on into decoded text is not
+    # a copy of the raw text, so the raw text does not speak for it either.
+    assert origin(normalized.index("meeting")) is None
