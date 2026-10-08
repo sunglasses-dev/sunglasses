@@ -155,6 +155,32 @@ class ImageExtractor:
     # NOT silently dropped -- they are named in `failures`, which costs coverage.
     MAX_OCR_FRAMES = 64
 
+    # A picture can be a few kilobytes on disk and gigabytes once decoded. PIL
+    # only warns between about 89 and 179 million pixels and raises above that,
+    # so a 12000 by 12000 one bit PNG (31 KB) was fully decoded, copied to RGB
+    # for OCR and again for the hidden text pass, at a cost near a gigabyte. The
+    # size is read from the header, which costs nothing, and an image over the
+    # budget is not decoded at all. It is named in `failures`, so the scan says
+    # it was not fully inspected instead of calling it clean. Metadata is read
+    # without decoding pixels and still is.
+    MAX_IMAGE_PIXELS = 25_000_000
+
+    @classmethod
+    def _pixel_cap_failure(cls, img, reader="OCR"):
+        """Message if this frame is over the pixel budget, else None. Header only.
+
+        The QR reader asks the same question of the same file, so it calls this
+        too: one budget for every reader of the image.
+        """
+        try:
+            width, height = img.size
+        except Exception:
+            return None
+        if width * height > cls.MAX_IMAGE_PIXELS:
+            return (f"{width}x{height} is {width * height:,} pixels, over the "
+                    f"{cls.MAX_IMAGE_PIXELS:,} pixel cap, so it was not decoded or read by {reader}")
+        return None
+
     def _ocr_all_frames(self, image_path: str) -> List[Tuple[str, str]]:
         from PIL import Image
         try:
@@ -167,6 +193,14 @@ class ImageExtractor:
     def _ocr_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
         """OCR each frame. Complete only if EVERY frame reached OCR."""
         from PIL import ImageSequence
+
+        # Frame 0 over the budget: do not walk the file. A GIF shares one canvas
+        # size across its frames and each seek decodes, so stepping through 64 of
+        # them would pay the cost 64 times. The refusal is named once.
+        over = self._pixel_cap_failure(img)
+        if over:
+            self.failures.append(over)
+            return []
 
         # Round 7 (ASTRA I1, same mechanism as QR): `n_frames` is a property that
         # PARSES, so a damaged later descriptor makes it RAISE -- and the `getattr`
@@ -266,6 +300,12 @@ class ImageExtractor:
                     f"({exc.__class__.__name__}) — that frame and any after it "
                     f"were NOT read by OCR")
                 break
+            over = self._pixel_cap_failure(frame)
+            if over:
+                # A per-FRAME refusal: the other pages of the file are still read.
+                self.failures.append(f"frame {index}: {over}")
+                index += 1
+                continue
             try:
                 # Snapshot AT this position. The iterator hands back the shared
                 # object, so anything that defers the actual read until after the
@@ -441,6 +481,9 @@ class ImageExtractor:
         """Run OCR on a PIL Image object. Raises OCRUnavailable on any failure."""
         import pytesseract
 
+        over = self._pixel_cap_failure(img)
+        if over:
+            raise OCRUnavailable(over)
         try:
             # Convert to RGB if needed (handles RGBA, palette, etc.)
             if img.mode not in ('RGB', 'L'):
@@ -961,6 +1004,11 @@ class ImageExtractor:
         try:
             img = Image.open(image_path)
             width, height = img.size
+
+            over = self._pixel_cap_failure(img)
+            if over:
+                self.failures.append(f"hidden-text detection did not run: {over}")
+                return ""
 
             # Get detailed OCR data with bounding boxes
             if img.mode not in ('RGB', 'L'):

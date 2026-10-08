@@ -74,6 +74,15 @@ class QRExtractor:
         """
         from pyzbar.pyzbar import decode
         from PIL import ImageSequence
+        from .image import ImageExtractor
+
+        # The same pixel budget OCR uses, read from the header before any decode.
+        # An image over it is not converted or handed to the decoder, and the
+        # refusal is named so the scan does not call it clean.
+        over = ImageExtractor._pixel_cap_failure(img, "QR decoding")
+        if over:
+            self.failures.append(over)
+            return []
 
         # v0.5.6 round 7 (ASTRA I1). `n_frames` is a PROPERTY THAT PARSES, so on a
         # file whose later frame header is damaged it RAISES -- and `getattr(img,
@@ -154,6 +163,12 @@ class QRExtractor:
                     f"({exc.__class__.__name__}) — that frame and any after it "
                     f"were NOT inspected for QR codes")
                 break
+            over = ImageExtractor._pixel_cap_failure(frame, "QR decoding")
+            if over:
+                # A per-FRAME refusal: the other pages of the file are still read.
+                self.failures.append(f"frame {index}: {over}")
+                index += 1
+                continue
             try:
                 # pyzbar wants a concrete image; an animated frame can be P-mode
                 # with a palette, which it decodes poorly or not at all.
