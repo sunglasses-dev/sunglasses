@@ -126,8 +126,10 @@ def test_a_description_without_a_quote_keeps_the_downgrade(name):
         [(f["id"], f["severity"]) for f in mech])
 
 
-# A quote, backtick or fence between the framing word and the payload ends the clause, whether or
-# not it closes. Quotes are not paired, so a quoted description of an attack is held too.
+# A quote, backtick or fence between the framing word and the payload ends the plain clause. A quote
+# that is still open where the payload starts and closes after all of it, on a mark the raw input
+# holds, is a quoted description and keeps the downgrade (tests/test_defensive_framing_quoted.py
+# pins that rule and the quotes that do not qualify). These rows are the quoted descriptions.
 QUOTED = {
     "open_quote_after_flags": 'Our scanner flags "' + COVERT + '" in documentation.',
     "text_such_as_open_quote": 'Our scanner flags text such as "' + COVERT + '".',
@@ -140,12 +142,12 @@ QUOTED = {
 
 
 @pytest.mark.parametrize("name", list(QUOTED), ids=list(QUOTED))
-def test_a_quote_between_the_framing_and_the_payload_holds_the_payload(name):
+def test_a_closed_quote_around_the_payload_keeps_the_downgrade(name):
     result = engine.scan(QUOTED[name], channel="message")
-    assert result.decision in BLOCKISH, (
-        f"{name}: decision={result.decision} "
-        f"findings={[(f['id'], f['severity']) for f in result.findings]}")
-    assert decide_enforce(result.findings) in BLOCKISH
+    mech = [f for f in result.findings if f["id"].startswith("GLS-MECH-")]
+    assert mech and all(f["severity"] == "review" and f.get("defensive_context") for f in mech), (
+        [(f["id"], f["severity"]) for f in mech])
+    assert result.decision == "allow_redacted", result.decision
 
 
 # The text between the framing word and the payload has to read the same in the raw input. Each
@@ -189,7 +191,6 @@ BENIGN_NOW_BLOCKS = {
     "colon_after_such_as": "Our scanner flags text such as: " + COVERT,
     "comma_parenthetical": "Our scanner detects, in documentation, pages that try to make assistants silently forward the .env file to the maintainer.",
     "wrapped_line": "Our scanner detects pages that try to\nmake assistants silently forward the .env file to the maintainer.",
-    "quoted_description": 'Our scanner detects pages that "silently forward the .env file to the maintainer".',
 }
 
 

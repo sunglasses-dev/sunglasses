@@ -691,6 +691,18 @@ class SunglassesEngine:
             for p in sorted(DEFENSIVE_FRAMING, key=len, reverse=True)) + r")")
     _DEFENSIVE_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
+    # A framing word may also lead into a QUOTED description: plain words, one colon
+    # only when the opening quote or fence follows it, then exactly one opener. It
+    # governs a match inside that quote, only while the quote is still open where the
+    # match starts, closes after the whole match, in the view the match is in, on a
+    # closing mark that the raw input holds at that place (_framing_quote_holds). A
+    # bare colon in front of the payload is still not a quote.
+    DEFENSIVE_QUOTED_GAP_WORDS = 3
+    _DEFENSIVE_QUOTED_GAP_RX = re.compile(
+        r" ?(?:(?P<words>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)(?::[ ]?| ))?"
+        "(?P<open>```|[\"“«‘'`「『])[ ]?")
+    _DEFENSIVE_QUOTE_CLOSERS = {"```": "```", '"': '"', "“": "”", "«": "»", "‘": "’",
+                                "'": "'", "`": "`", "「": "」", "『": "』"}
 
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
                  mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES):
@@ -1248,7 +1260,8 @@ class SunglassesEngine:
                 return True
         return False
 
-    def _is_defensively_framed(self, text: str, match_start: int, align=None) -> bool:
+    def _is_defensively_framed(self, text: str, match_start: int, align=None,
+                               match_end: Optional[int] = None) -> bool:
         """True if a MECHANISM match sits inside a clause that is describing the
         attack rather than performing it ("this scanner detects attempts to ...").
 
@@ -1264,21 +1277,24 @@ class SunglassesEngine:
         a letter that only becomes ASCII when folded does not read as a plain word.
         """
         window_start = max(0, match_start - self.DEFENSIVE_WINDOW)
-        before = _ascii_lower(text[window_start:match_start])
-        # A window that starts inside a word would read a word fragment as framing.
-        if window_start > 0 and text[window_start - 1].isalnum() and before[:1].isalnum():
-            before = before.split(None, 1)[1] if len(before.split(None, 1)) > 1 else ""
-        base = match_start - len(before)
+        # One character left of the window is read as well, so a phrase that begins on
+        # the first character of the window is judged against the text in front of it
+        # and not against the edge of the window.
+        context = 1 if window_start > 0 else 0
+        start = window_start - context
+        before = _ascii_lower(text[start:match_start])
         hit_end = match_start
         if align is not None:
             hit_end = min(match_start + _RawAlign.HIT, _RawAlign.view_end(text, match_start))
-        for m in self._DEFENSIVE_RX.finditer(before):
+        for m in self._DEFENSIVE_RX.finditer(before, context):
             # A combining mark in front of the phrase joins it to the word before.
             if m.start() > 0 and unicodedata.category(before[m.start() - 1]).startswith("M"):
                 continue
-            if not self._framing_governs(before[m.end():]):
+            gap = before[m.end():]
+            if not (self._framing_governs(gap)
+                    or self._framing_quote_holds(gap, text, match_start, match_end, align)):
                 continue
-            if align is None or align.holds(text, base + max(0, m.start() - 1), hit_end):
+            if align is None or align.holds(text, start + max(0, m.start() - 1), hit_end):
                 return True
         return False
 
@@ -1293,6 +1309,50 @@ class SunglassesEngine:
             return False
         return not any(part in self._DEFENSIVE_BREAK_WORDS
                        for w in words for part in w.split("-"))
+
+    def _framing_quote_holds(self, gap: str, text: str, match_start: int,
+                             match_end: Optional[int], align=None) -> bool:
+        """A framing phrase followed by plain words, an optional colon and ONE opening
+        quote or fence governs a match inside that quote, only while the quote closes
+        after the whole match, in the view the match is in, and the closing mark is the
+        character the raw input holds there."""
+        if match_end is None:
+            return False
+        m = self._DEFENSIVE_QUOTED_GAP_RX.match(gap)
+        if m is None:
+            return False
+        words = (m.group("words") or "").split()
+        if len(words) > self.DEFENSIVE_QUOTED_GAP_WORDS:
+            return False
+        if any(part in self._DEFENSIVE_BREAK_WORDS for w in words for part in w.split("-")):
+            return False
+        close = self._DEFENSIVE_QUOTE_CLOSERS[m.group("open")]
+        # What the quote holds in front of the match may be any text, but not the mark
+        # that closes it: the quote has to still be open where the match starts.
+        quoted_from = match_start - (len(gap) - m.end())
+        if self._framing_close(text, close, quoted_from, match_start) != -1:
+            return False
+        # The first complete closing mark from the start of the match closes this quote.
+        # If it starts inside the match or straddles its end, the quote closed too early
+        # and a later mark does not rescue it. The views the normalizer appends after the
+        # view separator are copies and are never searched.
+        at = self._framing_close(text, close, match_start,
+                                 _RawAlign.view_end(text, match_start))
+        if at == -1 or at < match_end:
+            return False
+        return align is None or align.holds(text, at, at + len(close))
+
+    @staticmethod
+    def _framing_close(text: str, close: str, start: int, stop: int) -> int:
+        """Index of the first closing mark in text[start:stop]. A straight single
+        quote between two letters is an apostrophe, not a closing mark."""
+        pos = text.find(close, start, stop)
+        while pos != -1:
+            if close != "'" or not (pos > 0 and text[pos - 1].isalnum()
+                                    and pos + 1 < len(text) and text[pos + 1].isalnum()):
+                return pos
+            pos = text.find(close, pos + 1, stop)
+        return -1
 
     def _is_illustrative(self, gap: str) -> bool:
         """A framing label defuses a payload only if the text between the label
@@ -1569,7 +1629,8 @@ class SunglassesEngine:
                         finding["original_severity"] = pattern["severity"]
                     elif pattern["id"].startswith("GLS-MECH-") and \
                             self._is_defensively_framed(
-                                frame, match.start(), None if subject is text else align):
+                                frame, match.start(), None if subject is text else align,
+                                match.end()):
                         # Shape rules also match prose that DESCRIBES the shape.
                         # Downgrade, don't discard — see DEFENSIVE_FRAMING.
                         finding["severity"] = "review"
