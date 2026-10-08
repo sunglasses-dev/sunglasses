@@ -2373,7 +2373,9 @@ PATTERNS = [
             # language and the same order of tries, with the same number of
             # alternatives. A class of optional pieces gives the engine no word to look
             # for, so it ran on an eligible text whenever it held a curl. With literal words
-            # it skips a text that has none.
+            # the engine derives a second required set of literals and short prefixes of
+            # the words, such as `access` and `secret`, and it skips an eligible text that
+            # holds a curl and none of them. A text with one such literal still runs the regex.
             # Branch A — a payload reference: some upload flag, then `@<credential file>`.
             r"curl\b[^\n]{0,200}?(?:\b|(?<!\S))"
             r"(?:-X\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)"
