@@ -4,8 +4,13 @@ SUNGLASSES PDF Extractor — Scans PDFs for hidden prompt injection.
 Extracts text from PDFs using multiple methods:
 1. Page text — visible text content on each page
 2. Metadata — document properties (title, author, subject, keywords, creator)
-3. Annotations — comments, notes, form fields
-4. Embedded JavaScript — malicious scripts in PDF actions
+3. Annotations — comments, notes, form field names
+4. Form field values — /V, /DV, /RV, /TU and /Opt of the AcroForm fields and
+   widget (XFA form data is reported as not inspected)
+5. JavaScript — /OpenAction, /AA and /Names /JavaScript actions of the document,
+   its pages, annotations and fields (bounded, see MAX_ACTIONS)
+6. Embedded files — text attachments up to MAX_ATTACHMENT_BYTES (raw or plain
+   FlateDecode) are read; other attachments are reported as not inspected
 
 Usage:
     from sunglasses.extractors.pdf import scan_pdf
@@ -15,7 +20,8 @@ Install: pip install sunglasses[pdf]  (requires PyPDF2)
 """
 
 import os
-from typing import List, Tuple
+import zlib
+from typing import List, Optional, Tuple
 
 
 def _check_deps():
@@ -37,9 +43,20 @@ class PDFExtractor:
     # halfway is not a PDF we read.
     failures: List[str] = []
 
+    # Bounds for the containers added for finding A3 (form values, scripts,
+    # attachments). Passing a bound is RECORDED in `failures`, not silent.
+    MAX_FORM_FIELDS = 10_000
+    MAX_ACTIONS = 256
+    MAX_ATTACHMENTS = 64
+    MAX_ATTACHMENT_BYTES = 1 << 20
+    _FIELD_TEXT_KEYS = ('/V', '/DV', '/RV', '/TU', '/Opt')
+
     def __init__(self):
         _check_deps()
         self.failures = []
+        self._seen_values = set()
+        self._visited = set()
+        self._actions_seen = 0
 
     def extract(self, pdf_path: str) -> List[Tuple[str, str]]:
         """
@@ -79,7 +96,341 @@ class PDFExtractor:
                     if text.strip():
                         results.append((f"page:{i+1}:{label}", text))
 
+            # 4-6. Content outside the page text (finding A3): form field
+            # values, JavaScript actions and embedded files. Appended after the
+            # three groups above so a PDF without them is reported exactly as
+            # before. Each reader records what it could not read.
+            self._seen_values, self._visited, self._actions_seen = set(), set(), 0
+            extras = []
+            extras.extend(self._extract_form_fields(reader))
+            extras.extend(self._extract_document_scripts(reader))
+            for i, page in enumerate(reader.pages):
+                extras.extend(self._extract_page_extras(page, i + 1))
+            extras.extend(self._extract_attachments(reader))
+            for label, text in extras:
+                if text.strip():
+                    results.append((label, text))
+
         return results
+
+    # ----- A3 helpers: form values, scripts, attachments ------------------
+
+    @staticmethod
+    def _resolve(obj):
+        return obj.get_object() if hasattr(obj, 'get_object') else obj
+
+    @staticmethod
+    def _identity(obj):
+        idnum = getattr(obj, 'idnum', None)
+        if idnum is not None:
+            return ('ref', idnum, getattr(obj, 'generation', 0))
+        return ('obj', id(obj))
+
+    @classmethod
+    def _as_text(cls, value) -> str:
+        """A PDF string, name or (nested) array of them as one text; else ''."""
+        value = cls._resolve(value)
+        if isinstance(value, bytes):
+            return value.decode('utf-8', 'replace')
+        if isinstance(value, str):
+            return str(value)
+        if isinstance(value, (list, tuple)):
+            parts = [cls._as_text(v) for v in value]
+            return ' '.join(part for part in parts if part)
+        return ''
+
+    @staticmethod
+    def _decode_text(data: bytes, strict: bool) -> Optional[str]:
+        if data.startswith((b'\xff\xfe', b'\xfe\xff')):
+            try:
+                return data.decode('utf-16')
+            except UnicodeDecodeError:
+                return None
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            return None if strict else data.decode('utf-8', 'replace')
+
+    def _bounded_stream_bytes(self, stream, name: str) -> Optional[bytes]:
+        """Decoded bytes of a stream, or None (recorded) when that is not cheap
+        and bounded: only raw and plain FlateDecode data up to
+        MAX_ATTACHMENT_BYTES is inflated, with an output bound, so a small
+        compressed object cannot expand without limit."""
+        cap = self.MAX_ATTACHMENT_BYTES
+        raw = getattr(stream, '_data', None) or b''
+        filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
+        if isinstance(filters, (list, tuple)):
+            filters = [str(self._resolve(f)) for f in filters]
+        elif filters is not None:
+            filters = [str(filters)]
+        else:
+            filters = []
+        if len(raw) > cap:
+            self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+            return None
+        if not filters:
+            return raw
+        if filters in (['/FlateDecode'], ['/Fl']):
+            params = self._resolve(stream.get('/DecodeParms')) if '/DecodeParms' in stream else None
+            if isinstance(params, (list, tuple)) and params:
+                params = self._resolve(params[0])
+            if params is not None and hasattr(params, 'get'):
+                if int(self._resolve(params.get('/Predictor', 1)) or 1) > 1:
+                    self.failures.append(f"{name} uses a predictor filter; not inspected")
+                    return None
+            data = zlib.decompressobj().decompress(raw, cap + 1)
+            if len(data) > cap:
+                self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+                return None
+            return data
+        self.failures.append(f"{name} uses filter {','.join(filters)}; not inspected")
+        return None
+
+    def _name_tree(self, node, what: str, cap: int) -> List[Tuple[str, object]]:
+        """(key, value) pairs of a PDF name tree (/Names and /Kids), bounded."""
+        out: List[Tuple[str, object]] = []
+        stack = [(node, 0)]
+        seen = set()
+        while stack and len(out) <= cap:
+            node, depth = stack.pop()
+            ident = self._identity(node)
+            if ident in seen or depth > 32:
+                continue
+            seen.add(ident)
+            node = self._resolve(node)
+            if not hasattr(node, 'get'):
+                continue
+            names = self._resolve(node.get('/Names')) if '/Names' in node else None
+            if names:
+                for i in range(0, len(names) - 1, 2):
+                    out.append((self._as_text(names[i]), names[i + 1]))
+                    if len(out) > cap:
+                        break
+            kids = self._resolve(node.get('/Kids')) if '/Kids' in node else None
+            if kids:
+                stack.extend((kid, depth + 1) for kid in kids)
+        if len(out) > cap:
+            self.failures.append(f"{what} beyond {cap} not inspected")
+            out = out[:cap]
+        return out
+
+    def _scripts_in(self, action, where: str, table: bool = False) -> List[Tuple[str, str]]:
+        """The /JS text carried by an action, an action chain (/Next) or, with
+        table=True, an /AA table (trigger name -> action), as (label, script).
+        A destination array ("/OpenAction [3 0 R /Fit]") holds no action and is
+        skipped. Bounded by MAX_ACTIONS real actions across the document."""
+        out: List[Tuple[str, str]] = []
+        stack = [(action, table)]
+        while stack:
+            obj, is_table = stack.pop()
+            ident = self._identity(obj)
+            if ident in self._visited:
+                continue
+            self._visited.add(ident)
+            try:
+                obj = self._resolve(obj)
+                if isinstance(obj, (list, tuple)):
+                    # /Next may be an array of actions; a destination array is
+                    # a page reference plus a view name, neither is an action.
+                    for item in obj:
+                        target = self._resolve(item)
+                        if hasattr(target, 'get') and ('/S' in target or '/JS' in target):
+                            stack.append((item, False))
+                    continue
+                if not hasattr(obj, 'get'):
+                    continue
+                if is_table:
+                    stack.extend((value, False) for value in obj.values())
+                    continue
+                if '/S' not in obj and '/JS' not in obj:
+                    continue  # not an action
+                if self._actions_seen >= self.MAX_ACTIONS:
+                    if not getattr(self, '_actions_capped', False):
+                        self._actions_capped = True
+                        self.failures.append(
+                            f"actions beyond {self.MAX_ACTIONS} not inspected")
+                    break
+                self._actions_seen += 1
+                if '/JS' in obj:
+                    text = self._text_of(obj['/JS'], f"script at {where}", strict=False)
+                    if text and text.strip():
+                        out.append((f"javascript:{where}", text))
+                if '/Next' in obj:
+                    stack.append((obj['/Next'], False))
+            except Exception as exc:
+                self.failures.append(
+                    f"script at {where} not read ({exc.__class__.__name__}: {exc})")
+        return out
+
+    def _text_of(self, value, name: str, strict: bool) -> str:
+        """Text of a string, name, array or (bounded) stream value."""
+        value = self._resolve(value)
+        if hasattr(value, 'get_data'):
+            data = self._bounded_stream_bytes(value, name)
+            if data is None:
+                return ''
+            return self._decode_text(data, strict=strict) or ''
+        return self._as_text(value)
+
+    def _extract_form_fields(self, reader) -> List[Tuple[str, str]]:
+        """Values of the AcroForm fields (/V, /DV, /RV, /TU, /Opt) and the
+        scripts in field /AA tables. XFA data is recorded as not inspected."""
+        out: List[Tuple[str, str]] = []
+        try:
+            root = self._resolve(reader.trailer['/Root'])
+            acroform = self._resolve(root.get('/AcroForm')) if '/AcroForm' in root else None
+            if acroform is None or not hasattr(acroform, 'get'):
+                return out
+            if '/XFA' in acroform:
+                self.failures.append("XFA form data not inspected (XFA streams are not parsed)")
+            fields = self._resolve(acroform.get('/Fields')) if '/Fields' in acroform else None
+        except Exception as exc:
+            self.failures.append(f"form fields not read ({exc.__class__.__name__}: {exc})")
+            return out
+        if fields:
+            self._walk_fields(fields, '', 0, [0], out)
+        return out
+
+    def _walk_fields(self, fields, prefix: str, depth: int, counter: List[int], out) -> None:
+        for ref in fields:
+            if counter[0] >= self.MAX_FORM_FIELDS:
+                if counter[0] == self.MAX_FORM_FIELDS:
+                    counter[0] += 1
+                    self.failures.append(
+                        f"form fields beyond {self.MAX_FORM_FIELDS} not inspected")
+                return
+            counter[0] += 1
+            name = f"#{counter[0]}"
+            try:
+                field = self._resolve(ref)
+                if not hasattr(field, 'get'):
+                    continue
+                own = self._as_text(field.get('/T', '')) if '/T' in field else ''
+                name = f"{prefix}.{own}" if prefix and own else (own or prefix or name)
+                for key in self._FIELD_TEXT_KEYS:
+                    if key in field:
+                        text = self._text_of(field[key], f"field {name!r} {key}", strict=False)
+                        if text.strip():
+                            self._seen_values.add(text)
+                            out.append((f"form:{name}:{key[1:]}", text))
+                if '/AA' in field:
+                    out.extend(self._scripts_in(field['/AA'], f"field:{name}", table=True))
+                if '/Kids' in field and depth < 32:
+                    kids = self._resolve(field['/Kids'])
+                    if kids:
+                        self._walk_fields(kids, name, depth + 1, counter, out)
+            except Exception as exc:
+                self.failures.append(
+                    f"form field {name!r} not read ({exc.__class__.__name__}: {exc})")
+
+    def _extract_document_scripts(self, reader) -> List[Tuple[str, str]]:
+        """/OpenAction, the catalog /AA table and the /Names /JavaScript tree."""
+        out: List[Tuple[str, str]] = []
+        try:
+            root = self._resolve(reader.trailer['/Root'])
+            if '/OpenAction' in root:
+                out.extend(self._scripts_in(root['/OpenAction'], 'OpenAction'))
+            if '/AA' in root:
+                out.extend(self._scripts_in(root['/AA'], 'document:aa', table=True))
+            names = self._resolve(root.get('/Names')) if '/Names' in root else None
+            if names is not None and hasattr(names, 'get') and '/JavaScript' in names:
+                tree = self._name_tree(names['/JavaScript'], "document scripts", self.MAX_ACTIONS)
+                for key, action in tree:
+                    out.extend(self._scripts_in(action, f"names:{key}"))
+        except Exception as exc:
+            self.failures.append(
+                f"document scripts not read ({exc.__class__.__name__}: {exc})")
+        return out
+
+    def _extract_page_extras(self, page, index: int) -> List[Tuple[str, str]]:
+        """Page /AA scripts; per annotation: widget values not reached through
+        /AcroForm, /A and /AA scripts, and /FileAttachment file specs."""
+        out: List[Tuple[str, str]] = []
+        label = f"page:{index}"
+        try:
+            if '/AA' in page:
+                out.extend(self._scripts_in(page['/AA'], f"{label}:aa", table=True))
+            annots = self._resolve(page['/Annots']) if '/Annots' in page else []
+        except Exception as exc:
+            self.failures.append(
+                f"page {index} actions not read ({exc.__class__.__name__}: {exc})")
+            return out
+        for i, annot in enumerate(annots or []):
+            try:
+                a = self._resolve(annot)
+                if not hasattr(a, 'get'):
+                    continue  # recorded by _extract_annotations already
+                subtype = a.get('/Subtype')
+                if subtype == '/Widget' and '/V' in a:
+                    text = self._text_of(a['/V'], f"widget {i} on page {index} /V", strict=False)
+                    if text.strip() and text not in self._seen_values:
+                        self._seen_values.add(text)
+                        out.append((f"{label}:widget:{i}:V", text))
+                if '/A' in a:
+                    out.extend(self._scripts_in(a['/A'], f"{label}:annotation:{i}"))
+                if '/AA' in a:
+                    out.extend(self._scripts_in(a['/AA'], f"{label}:annotation:{i}", table=True))
+                if subtype == '/FileAttachment' and '/FS' in a:
+                    out.extend(self._read_filespec(a['/FS'], f"{label}:annotation:{i}"))
+            except Exception as exc:
+                self.failures.append(
+                    f"annotation {i} on page {index} actions not read "
+                    f"({exc.__class__.__name__}: {exc})")
+        return out
+
+    def _read_filespec(self, spec, key: str) -> List[Tuple[str, str]]:
+        """Text of one embedded file, or a recorded failure naming it."""
+        try:
+            spec = self._resolve(spec)
+            if not hasattr(spec, 'get'):
+                self.failures.append(f"attachment {key!r} is not a file specification; not inspected")
+                return []
+            name = ''
+            for k in ('/UF', '/F'):
+                if k in spec:
+                    name = self._as_text(spec[k])
+                    if name:
+                        break
+            name = name or key or 'unnamed'
+            ef = self._resolve(spec.get('/EF')) if '/EF' in spec else None
+            stream = None
+            if ef is not None and hasattr(ef, 'get'):
+                for k in ('/UF', '/F'):
+                    if k in ef:
+                        stream = self._resolve(ef[k])
+                        break
+            if stream is None or not hasattr(stream, 'get'):
+                self.failures.append(f"attachment {name!r} has no readable stream; not inspected")
+                return []
+            data = self._bounded_stream_bytes(stream, f"attachment {name!r}")
+            if data is None:
+                return []
+            text = self._decode_text(data, strict=True)
+            if text is None:
+                self.failures.append(
+                    f"attachment {name!r} ({len(data)} bytes) is not text; not inspected")
+                return []
+            return [(f"attachment:{name}", text)]
+        except Exception as exc:
+            self.failures.append(
+                f"attachment {key!r} not read ({exc.__class__.__name__}: {exc})")
+            return []
+
+    def _extract_attachments(self, reader) -> List[Tuple[str, str]]:
+        """The files in the /Names /EmbeddedFiles tree, bounded."""
+        out: List[Tuple[str, str]] = []
+        try:
+            root = self._resolve(reader.trailer['/Root'])
+            names = self._resolve(root.get('/Names')) if '/Names' in root else None
+            if names is None or not hasattr(names, 'get') or '/EmbeddedFiles' not in names:
+                return out
+            tree = self._name_tree(names['/EmbeddedFiles'], "attachments", self.MAX_ATTACHMENTS)
+        except Exception as exc:
+            self.failures.append(f"attachments not read ({exc.__class__.__name__}: {exc})")
+            return out
+        for key, spec in tree:
+            out.extend(self._read_filespec(spec, key))
+        return out
 
     def _extract_metadata(self, reader) -> List[Tuple[str, str]]:
         """Extract text from PDF metadata fields."""
