@@ -71,7 +71,7 @@ HOSTILE = {
     "comma_before_the_quote": 'Our scanner flags, text "' + COVERT + '"',
     "zero_width_before_the_quote": 'Our scanner flags​ "' + COVERT + '"',
     "line_break_before_the_quote": 'Our scanner flags\n"' + COVERT + '"',
-    "bare_colon_no_quote": "Our scanner flags text such as: " + COVERT,
+    "bare_colon_no_quote": "Our scanner flags text: " + COVERT,
     "two_openers_one_closer": 'Our scanner flags "\'' + COVERT + "'",
 }
 

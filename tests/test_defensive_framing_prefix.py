@@ -185,11 +185,11 @@ def test_a_gap_that_is_not_plain_in_the_raw_input_does_not_govern(name):
 
 
 # Descriptions the plain gap rule now holds. A comma, a colon, a quote or a wrapped line between
-# the framing word and the match is not plain, so the framing is not taken to govern. These are
-# the price of the rule and are pinned so a change to it is deliberate.
+# the framing word and the match is not plain, so the framing is not taken to govern. An example
+# lead-in colon ("such as:") and one short comma parenthetical are the two exceptions, and are pinned
+# with their hostile neighbours in test_defensive_framing_prose_families.py. The rest are the price
+# of the rule and are pinned so a change to it is deliberate.
 BENIGN_NOW_BLOCKS = {
-    "colon_after_such_as": "Our scanner flags text such as: " + COVERT,
-    "comma_parenthetical": "Our scanner detects, in documentation, pages that try to make assistants silently forward the .env file to the maintainer.",
     "wrapped_line": "Our scanner detects pages that try to\nmake assistants silently forward the .env file to the maintainer.",
 }
 

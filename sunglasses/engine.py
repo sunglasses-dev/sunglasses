@@ -691,6 +691,19 @@ class SunglassesEngine:
             for p in sorted(DEFENSIVE_FRAMING, key=len, reverse=True)) + r")")
     _DEFENSIVE_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
+    # Two plain prose shapes keep the clause: an example lead-in with its colon ("flags
+    # text such as: <description>", one colon directly after "such as", "for example" or
+    # "for instance", then plain words), and one comma parenthetical of one to three
+    # words ("detects, in documentation, pages that ..."), which is an aside and is not
+    # counted against DEFENSIVE_GAP_WORDS. Any other colon or comma ends the clause. The
+    # words are checked like any other gap: no clause word, no second person word.
+    _DEFENSIVE_EXAMPLE_RX = re.compile(
+        r"(?P<lead>[a-z0-9 -]*(?<![a-z0-9])(?:such as|for example|for instance)): ?"
+        r"(?P<rest>[a-z0-9 -]*)")
+    _DEFENSIVE_PAREN_RX = re.compile(
+        r" ?(?P<pre>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)?, ?"
+        r"(?P<par>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*){0,2}), ?"
+        r"(?P<post>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)? ?")
     # A framing word may also lead into a QUOTED description: plain words, one colon
     # only when the opening quote or fence follows it, then exactly one opener. It
     # governs a match inside that quote, only while the quote is still open where the
@@ -1301,11 +1314,26 @@ class SunglassesEngine:
     def _framing_governs(self, gap: str) -> bool:
         """True if the text between a framing phrase and the match keeps the match
         inside the described clause: plain ASCII words only, no clause word, no
-        second person word and at most DEFENSIVE_GAP_WORDS words."""
+        second person word and at most DEFENSIVE_GAP_WORDS words. An example lead-in
+        colon or one short comma parenthetical is read as plain words (see
+        _DEFENSIVE_EXAMPLE_RX)."""
+        aside = 0
+        if ":" in gap:
+            m = self._DEFENSIVE_EXAMPLE_RX.fullmatch(gap)
+            if m is None:
+                return False
+            gap = m.group("lead") + " " + m.group("rest")
+        elif "," in gap:
+            m = self._DEFENSIVE_PAREN_RX.fullmatch(gap)
+            if m is None:
+                return False
+            aside = len(m.group("par").split())
+            gap = " ".join(part for part in (m.group("pre"), m.group("par"), m.group("post")) if part) + \
+                (" " if gap.endswith(" ") else "")
         if not self._DEFENSIVE_GAP_RX.fullmatch(gap):
             return False
         words = gap.split()
-        if len(words) > self.DEFENSIVE_GAP_WORDS:
+        if len(words) - aside > self.DEFENSIVE_GAP_WORDS:
             return False
         return not any(part in self._DEFENSIVE_BREAK_WORDS
                        for w in words for part in w.split("-"))
