@@ -1047,8 +1047,13 @@ class SunglassesEngine:
 
         There is no call to `rx.search`. If the old regex does not match at the
         recovered start the search resumes after the twin's position.
+
+        `start` is a lower bound, as it is for `rx.search(text, start)`: the match
+        begins at or after it. A boundary character before the lower bound is not
+        used, and the first newline of the run at or after the bound stands in for it,
+        which is where the old regex would begin when asked to start there.
         """
-        pos = start
+        lower = pos = start
         while True:
             first = twin.search(text, pos)
             if first is None:
@@ -1058,10 +1063,10 @@ class SunglassesEngine:
                 run = at
                 while run > 0 and text[run - 1].isspace():
                     run -= 1
-                if run > 0 and text[run - 1] in self._LEADIN_PUNCT:
+                if run > 0 and run - 1 >= lower and text[run - 1] in self._LEADIN_PUNCT:
                     start = run - 1
                 else:
-                    start = text.find("\n", run, at + 1)
+                    start = text.find("\n", max(run, lower), at + 1)
             else:
                 start = at
             match = rx.match(text, start)
@@ -1249,65 +1254,160 @@ class SunglassesEngine:
 
     # A rule reports its first hit. When that hit sits under a negation, later hits of
     # the same rule are judged on their own, so a quoted first copy cannot hide a
-    # bare second one. At most this many later hits are read per rule and per view;
+    # bare second one. At most this many later hits are read per rule, counted over
+    # all its alternatives, all its subjects and the corroboration pass together;
     # past it the rule keeps its severity, which costs only a text that repeats one
     # warning dozens of times and keeps the work bounded on a text built to waste it.
     LATER_HITS = 32
 
+    @staticmethod
+    def _enrichment_spans(text: str, plain_end: int, stop: int):
+        """The views behind the plain one, as (start, end) pairs inside text[:stop].
+        The normalizer appends ROT13, reversed and l-for-I copies of the text behind
+        view separators, so a hit that only one of them holds is an occurrence in the
+        input that the plain view does not show."""
+        sep = " " + VIEW_SEP + " "
+        spans, pos = [], plain_end
+        while pos + len(sep) < stop:
+            lo = pos + len(sep)
+            hi = text.find(sep, lo, stop)
+            hi = stop if hi == -1 else hi
+            if lo < hi:
+                spans.append((lo, hi))
+            pos = hi
+        return spans
+
+    @staticmethod
+    def _same_place(view: str, a: int, b: int, lo: int, hi: int, base) -> bool:
+        """True when view[a:b], inside the appended view view[lo:hi], is the copy of the
+        same characters at the same place in the plain view `base`, and so is an
+        occurrence the plain view has already shown. The copies the normalizer appends
+        keep the length of the plain view. The characters on both sides are compared
+        too, because a copy that differs there is not the same word-bounded hit."""
+        blo, bhi = base
+        if hi - lo != bhi - blo:
+            return False
+        src = blo + (a - lo)
+        n = b - a
+        if src < blo or src + n > bhi:
+            return False
+        left = 1 if a > lo else 0
+        right = 1 if b < hi else 0
+        return view[a - left:b + right] == view[src - left:src + n + right]
+
+    def _copy_of_judged_hit(self, mode, rx, guards, view, m, lo, hi, base) -> bool:
+        """The regex form of _same_place: the same regex matches the plain view at
+        the same place with the same extent, so that hit was read there already."""
+        blo, bhi = base
+        if hi - lo != bhi - blo:
+            return False
+        src = blo + (m.start() - lo)
+        n = m.end() - m.start()
+        if src < blo or src + n > bhi:
+            return False
+        there = self._eval_regex(mode, rx, guards, view, src)
+        return there is not None and there.start() == src and there.end() == src + n
+
+    def _resume_after(self, mode, view: str, m) -> int:
+        """Where the search for the next hit begins: one character after the start of
+        this one. A lead-in rule that began at a boundary character skips the blanks
+        behind it too, because a start inside them reads the same words again."""
+        pos = m.start() + 1
+        if mode == "leadin" and (view[m.start():m.start() + 1] == "\n"
+                                 or view[m.start():m.start() + 1] in self._LEADIN_PUNCT):
+            while pos < len(view) and view[pos].isspace():
+                pos += 1
+        return pos
+
+    def _lead_in_only(self, view: str, a: int, b: int) -> bool:
+        """True when view[a:b] holds only blanks and boundary characters."""
+        return all(c.isspace() or c in self._LEADIN_PUNCT for c in view[a:b])
+
     def _later_live(self, mode, rx, guards, subject, first, align=None, limit=None,
-                    tail=None) -> bool:
+                    tail=None, spans=None, spent=None, pid=None) -> bool:
         """True when a later hit of the same regex is NOT covered by a negation.
         `limit` ends the part of the text that is read: the normalized text repeats
-        itself after a view separator, and those copies are not later hits. `tail`
-        is the one view after the separators that is not a copy, the input with its
-        invisible shadow characters read as ASCII: (text, end of its plain part).
-        Its hits are read against the raw input like those of any other view."""
+        itself after a view separator. `spans` are the views behind the plain one; a
+        hit in one of them is read unless it is the copy of a hit the plain view has
+        already shown. `tail` is the input with its invisible shadow characters read as
+        ASCII, behind the separators: (text, end of its plain part, its own appended
+        views). Its hits are read against the raw input like those of any other view.
+        `spent` counts the hits read per rule, across every alternative and subject."""
         if mode in ("guarded", "windowed"):
             return False
+        if spent is None:
+            spent = {}
+        # The first hit of the rule is the one that is judged; this hit is a later hit
+        # of the rule when another alternative or another subject had one before it.
+        if (pid, "first") in spent:
+            spent[pid] = spent.get(pid, 0) + 1
+            if spent[pid] > self.LATER_HITS:
+                return True
+        else:
+            spent[(pid, "first")] = True
         # Resume one character after the start of the previous hit, not at its end,
         # so a hit that begins inside a covered one is judged on its own.
-        regions = [(subject, first.start() + 1, limit)]
+        regions = [(subject, self._resume_after(mode, subject, first), limit, None, None)]
+        if spans:
+            plain = (0, _RawAlign.view_end(subject, 0))
+            regions.extend((subject, lo, hi, lo, plain) for lo, hi in spans
+                           if limit is not None and lo > limit)
         if tail is not None:
-            regions.append((tail[0], 0, tail[1]))
-        budget = self.LATER_HITS
-        for view, pos, stop in regions:
+            regions.append((tail[0], 0, tail[1], None, None))
+            plain = (0, tail[1])
+            regions.extend((tail[0], lo, hi, lo, plain) for lo, hi in tail[2])
+        for index, (view, pos, stop, copy_lo, base) in enumerate(regions):
+            prev = first if index == 0 else None
             while True:
                 m = self._eval_regex(mode, rx, guards, view, pos)
                 if m is None or (stop is not None and m.start() >= stop):
                     break
-                if budget == 0:
+                pos = self._resume_after(mode, view, m)
+                if prev is not None and m.end() == prev.end() and \
+                        self._lead_in_only(view, prev.start(), m.start()):
+                    continue  # the same words; only how much of the lead-in is counted differs
+                prev = m
+                if base is not None and self._copy_of_judged_hit(
+                        mode, rx, guards, view, m, copy_lo, stop, base):
+                    continue
+                spent[pid] = spent.get(pid, 0) + 1
+                if spent[pid] > self.LATER_HITS:
                     return True  # the cap is spent and a further hit remains
-                budget -= 1
-                if not self._check_negation(view, m.start(), align, m.end()):
+                if base is not None or not self._check_negation(view, m.start(), align, m.end()):
                     return True
-                pos = m.start() + 1
         return False
 
     def _regex_covered(self, pattern, mode, rx, guards, subject, match, align, limit,
-                       tail=None) -> bool:
+                       tail=None, spans=None, spent=None) -> bool:
         """True when this hit and every later hit of its regex sit under a negation
         or inside a quote. A rule with negation_immune never is."""
         if pattern.get("negation_immune"):
             return False
         return self._check_negation(subject, match.start(), align, match.end()) and not \
-            self._later_live(mode, rx, guards, subject, match, align, limit, tail)
+            self._later_live(mode, rx, guards, subject, match, align, limit, tail, spans,
+                             spent, pattern["id"])
 
     def _later_keyword_live(self, regions, keyword, skip, align, spent, pid) -> bool:
         """The pure Python keyword path: True when another hit of `keyword` in a
         region that is read, other than the hit `skip` that was already judged, is
         not under a negation, or when the rule has used up its cap of later hits.
         Matches the Aho path hit for hit, including the cap, so both give one answer.
-        `regions` are (view, offset in the normalized text, end of the plain part)."""
-        for view, offset, view_end in regions:
-            at = view.find(keyword)
-            while at != -1 and at < view_end:
-                if (keyword, at + offset) != skip and self._word_bounded(view, at, keyword):
+        `regions` are (view, offset of the view in the normalized text, start and end
+        in the view, the plain view it is a copy of or None)."""
+        for view, shift, lo, hi, base in regions:
+            at = view.find(keyword, lo, hi)
+            while at != -1:
+                if (keyword, at + shift) != skip and self._word_bounded(view, at, keyword) \
+                        and not self._keyword_copy(view, at, keyword, lo, hi, base):
                     spent[pid] = spent.get(pid, 0) + 1
-                    if spent[pid] > self.LATER_HITS or not self._check_negation(
-                            view, at, align, at + len(keyword)):
+                    if spent[pid] > self.LATER_HITS or base is not None or not \
+                            self._check_negation(view, at, align, at + len(keyword)):
                         return True
-                at = view.find(keyword, at + 1)
+                at = view.find(keyword, at + 1, hi)
         return False
+
+    def _keyword_copy(self, view, at, keyword, lo, hi, base) -> bool:
+        return base is not None and self._same_place(view, at, at + len(keyword), lo, hi, base)
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
         """
@@ -1540,13 +1640,29 @@ class SunglassesEngine:
         # hit there is a real occurrence in the input, not a copy: it is read as a
         # later hit like one in the plain view, against the raw input.
         shadow = decode_shadow_ascii(text)
-        regions = [(normalized, 0, plain_end)]
+        # Where the views behind the plain one are: ROT13, reversed and l-for-I copies.
+        # A hit that only one of them holds is another occurrence in the input, and is
+        # read like a later hit in the plain view, unless it is the copy of a hit the
+        # plain view already showed. (view, offset of the view, start, end, plain view
+        # this one is a copy of or None); positions are inside the view.
         tail = None
+        tail_start = len(normalized)
         if shadow is not None:
             tail_text = normalize_with_length(shadow)[0]
             if normalized.endswith(tail_text):
-                tail = (tail_text, _RawAlign.view_end(tail_text, 0))
-                regions.append((tail_text, len(normalized) - len(tail_text), tail[1]))
+                tail_start = len(normalized) - len(tail_text)
+                tail_plain = _RawAlign.view_end(tail_text, 0)
+                tail = (tail_text, tail_plain,
+                        self._enrichment_spans(tail_text, tail_plain, len(tail_text)))
+        sep = " " + VIEW_SEP + " "
+        main_stop = tail_start - len(sep) if normalized.startswith(sep, tail_start - len(sep)) \
+            and tail is not None else tail_start
+        spans = self._enrichment_spans(normalized, plain_end, main_stop)
+        regions = [(normalized, 0, 0, plain_end, None)]
+        regions.extend((normalized, 0, lo, hi, (0, plain_end)) for lo, hi in spans)
+        if tail is not None:
+            regions.append((tail[0], tail_start, 0, tail[1], None))
+            regions.extend((tail[0], tail_start, lo, hi, (0, tail[1])) for lo, hi in tail[2])
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -1560,13 +1676,17 @@ class SunglassesEngine:
                         held = downgraded.get(pattern["id"])
                         kw_at = end_idx - len(keyword) + 1
                         region = next((r for r in regions
-                                       if held is not None and r[1] <= kw_at and end_idx < r[1] + r[2]),
-                                      None)
+                                       if held is not None and r[1] + r[2] <= kw_at
+                                       and end_idx < r[1] + r[3]), None)
                         if region is not None:
-                            view, offset, _ = region
+                            view, offset, lo, hi, base = region
+                            local = kw_at - offset
+                            if base is not None and self._same_place(
+                                    view, local, end_idx + 1 - offset, lo, hi, base):
+                                continue  # the copy of a hit the plain view already showed
                             spent = later_spent[pattern["id"]] = later_spent.get(pattern["id"], 0) + 1
-                            if spent > self.LATER_HITS or not self._check_negation(
-                                    view, kw_at - offset, align, end_idx + 1 - offset):
+                            if spent > self.LATER_HITS or base is not None or not self._check_negation(
+                                    view, local, align, end_idx + 1 - offset):
                                 # A later hit that no negation covers, or past the
                                 # cap on hits read: the rule keeps the severity it
                                 # has when the text says it plainly.
@@ -1598,8 +1718,12 @@ class SunglassesEngine:
             # Fallback: pure Python string matching (no dependencies)
             first_hit = {}
             for keyword, patterns in self._keyword_to_patterns.items():
-                if keyword in normalized and self._word_bounded(
-                        normalized, normalized.index(keyword), keyword):
+                # The first occurrence that stands as a word, as the Aho path reads every
+                # occurrence: an unbounded one in front does not hide a bounded one.
+                at = normalized.find(keyword)
+                while at != -1 and not self._word_bounded(normalized, at, keyword):
+                    at = normalized.find(keyword, at + 1)
+                if at != -1:
                     for pattern in patterns:
                         if match_channels.isdisjoint(pattern.get("channel", ())):
                             continue
@@ -1618,7 +1742,7 @@ class SunglassesEngine:
                             candidates[pid] = pattern
                             continue
                         seen_ids.add(pid)
-                        idx = normalized.index(keyword)
+                        idx = at
                         finding = {
                             **pattern,
                             "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
@@ -1755,7 +1879,8 @@ class SunglassesEngine:
                         pattern, mode, rx, guards, subject, match, view_align,
                         _RawAlign.view_end(subject, match.start())
                         if subject is normalized else None,
-                        tail if subject is normalized else None):
+                        tail if subject is normalized else None,
+                        spans if subject is normalized else None, later_spent):
                     if held is None:
                         held = {
                             **pattern,
@@ -1822,7 +1947,8 @@ class SunglassesEngine:
                 if not match:
                     continue
                 if self._regex_covered(pattern, mode, rx, guards, normalized, match, align,
-                                       _RawAlign.view_end(normalized, match.start()), tail):
+                                       _RawAlign.view_end(normalized, match.start()), tail,
+                                       spans, later_spent):
                     if held is None and pending is None:
                         pending = {
                             **pattern,
