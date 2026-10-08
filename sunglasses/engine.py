@@ -1164,6 +1164,7 @@ class SunglassesEngine:
         folded = None
         folded_present = None
         compact = None
+        compact_present = None
         if not text.isascii():
             stripped = strip_invisible(text)
             folded = replace_homoglyphs(normalize_unicode(stripped))
@@ -1171,6 +1172,10 @@ class SunglassesEngine:
                 compact = replace_homoglyphs(stripped)
                 if compact == text:
                     compact = None
+                else:
+                    # Once per scan, like the other subjects: the per-pattern
+                    # loop below only reads it.
+                    compact_present = self._literal_index.present(_prefilter.fold(compact))
                 folded = folded[: self.max_scan_bytes]
                 truncated = True
             if folded == text:
@@ -1204,7 +1209,6 @@ class SunglassesEngine:
                 # folded view itself: the match offsets are offsets into it.
                 subjects.append((folded, folded_present, folded))
             if compact is not None:
-                compact_present = self._literal_index.present(_prefilter.fold(compact))
                 subjects.append((compact, compact_present, compact))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:

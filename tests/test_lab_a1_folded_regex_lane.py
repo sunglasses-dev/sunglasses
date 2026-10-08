@@ -176,6 +176,31 @@ def test_expanding_padding_at_the_default_cap_is_recorded_as_truncated():
     assert not (result.decision == "allow" and result.inspection_complete)
 
 
+def test_compact_subject_prefilter_is_built_once_per_scan(monkeypatch):
+    # Over-cap expansion plus one invisible character: the non-growing fold is
+    # a subject of its own. Its prefilter presence must be computed once per
+    # scan, not once per pattern (measured 4.72 s vs 1.52 s at the default cap).
+    engine = SunglassesEngine()
+    text = EXPANDING * 60000 + "\u200b" + "\n" + PLAIN_PAYLOAD
+    from sunglasses.preprocessor import replace_homoglyphs, strip_invisible
+    compact = replace_homoglyphs(strip_invisible(text))
+    import sunglasses.engine as engine_module
+    real_fold = engine_module._prefilter.fold
+    calls = {"compact": 0, "total": 0}
+
+    def counting_fold(subject):
+        calls["total"] += 1
+        if subject == compact:
+            calls["compact"] += 1
+        return real_fold(subject)
+
+    monkeypatch.setattr(engine_module._prefilter, "fold", counting_fold)
+    result = engine.scan(text, channel="file")
+    assert result.truncated
+    assert calls["compact"] == 1, calls
+    assert calls["total"] <= 6, calls
+
+
 LONG_FILLER = (
     "This section describes the deployment procedure for the reporting service. "
     "It covers environment variables, the rollout schedule and the rollback plan. "
