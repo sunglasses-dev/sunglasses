@@ -91,6 +91,106 @@ _ACQUIRE_VERB = _inflect(
 ) + r"|cop(?:y|ies|ied|ying)|reads"
 
 
+# ── M-012 helpers: tool-description precondition poisoning ──────────────────
+# A poisoned MCP tool description written without the <IMPORTANT> wrapper the
+# keyword rules key on reads like ordinary documentation: an instruction hooked
+# to the tool being called ("before calling this tool", "when this tool is
+# called", "always set this to"), then a read of secret or user material into a
+# tool argument, a call to another tool with an external destination, or a
+# sentence that hides the step from the user. Each half on its own is ordinary
+# ("before calling this tool, make sure the API key is set in the environment
+# variables"); the rule needs the pair, in order, inside one sentence (one
+# paragraph for the concealment form, which is its own sentence). Every regex
+# starts on a literal hook or verb so the engine fails fast at every other
+# position, and every gap is bounded.
+_M12_HOOK = (
+    r"\b(?:"
+    r"(?:before|prior to|after) (?:you )?(?:call(?:ing)?|us(?:e|ing)|invok(?:e|ing)|run(?:ning)?|execut(?:e|ing))"
+    r" (?:this|the|any|each|every)(?: \w+)? (?:tool|function)"
+    r"|before (?:each|every|any) (?:call|use|invocation) (?:to|of) (?:this|the)(?: \w+)? (?:tool|function)"
+    r"|when(?:ever)? (?:this|the)(?: \w+)? (?:tool|function) is (?:called|used|invoked|run|executed)"
+    r"|when(?:ever)? (?:you )?(?:call(?:ing)?|us(?:e|ing)|invok(?:e|ing)|run(?:ning)?) (?:this|the)(?: \w+)? (?:tool|function)"
+    r"|(?:each|every) time (?:this|the)(?: \w+)? (?:tool|function) is (?:called|used|invoked|run)"
+    r"|(?:in order )?(?:for|to) (?:this|the)(?: \w+)? (?:tool|function) to (?:work|function|succeed)"
+    r"|to (?:use|call|invoke|run) (?:this|the)(?: \w+)? (?:tool|function)"
+    r"|(?:required|needed|necessary) for (?:this|the)(?: \w+)? (?:tool|function) to (?:work|function)"
+    r"|otherwise (?:this|the)(?: \w+)? (?:tool|function) (?:will not|won['’]?t|does not|doesn['’]?t|cannot|can['’]?t) (?:work|function)"
+    r"|(?:this|the)(?: \w+)? (?:tool|function) (?:requires|needs|expects) (?:that )?(?:you|the (?:assistant|model|agent))"
+    r"|(?:always|first|must|should) set this(?: parameter| argument| field| value| param)? to"
+    r"|antes de (?:usar|llamar(?: a)?|invocar|ejecutar) (?:esta|la) herramienta"
+    r"|cuando (?:se )?(?:llame|use|invoque|ejecute) (?:esta|la) herramienta"
+    r")\b"
+)
+# Verbs that read or move material.
+_M12_ACQUIRE = (
+    rf"\b(?:{_ACQUIRE_VERB}|{_EGRESS_VERB}"
+    r"|pass(?:es|ed|ing)?|attach(?:es|ed|ing)?|paste(?:s|d)?|insert(?:s|ed|ing)?|open(?:s|ed|ing)?|cat"
+    r"|load(?:s|ed|ing)?|fetch(?:es|ed|ing)?|retriev(?:e|es|ed|ing)|access(?:es|ed|ing)?|grab(?:s|bed|bing)?"
+    r"|print(?:s|ed|ing)?|read_file|lee|leer|abre|abrir|copia|copiar|incluye|incluir|pasa|pasar|env[ií]a|enviar"
+    r")\b"
+)
+# A possessive or "contents of" marker: the material is the USER'S, or a
+# file's contents, not a value the caller supplies ("your API key").
+_M12_OWNED = (
+    r"\b(?:(?:full |entire |whole |complete |raw )?contents? of|(?:the |this |that |an? |end[- ])?(?:user['’]s|users['’])|their|his|her"
+    r"|el contenido de|su contenido|del usuario|de la usuaria)(?!\w)"
+)
+# Secret or user material. Files and stores match bare; generic words
+# ("api key", "token", "password", "credentials") only with the possessive or
+# "contents of" marker in front, because "you need an API key; pass it as the
+# api_key argument" is ordinary tool documentation. The dot-path is bounded so
+# a long path cannot be made to backtrack; `process.env` and `config.env` are
+# excluded by the lookbehind.
+_M12_SOURCE_FILE = (
+    r"(?:(?<!\w)\.(?:ssh|aws|env|netrc|npmrc|pypirc|git-credentials|kube|gnupg|docker|azure|gcloud|config)(?![\w-])"
+    r"|\bid_(?:rsa|ed25519|ecdsa|dsa)\b"
+    r"|\b(?:bash|zsh|fish|shell|command|terminal) ?history\b"
+    r"|\bprivate keys?\b|\bssh keys?\b|\bsigning keys?\b|\bcredentials? files?\b|\bpasswords? (?:files?|managers?|stores?)\b"
+    r"|\bsecrets? (?:files?|stores?)\b|\bkeychains?\b|\bwallets?\b|\benvironment variables?\b|\benv vars?\b"
+    r"|\bmcp\.json\b|\bhosts\.yml\b|\bbrowser (?:cookies|profiles?|history)\b"
+    r"|/etc/(?:passwd|shadow)\b|/proc/self/environ\b"
+    r"|(?:~|\$HOME|%USERPROFILE%)[/\\]\.[\w.-]{1,64}(?:[/\\][\w.-]{1,64}){0,8}"
+    r")"
+)
+_M12_SOURCE_WORD = (
+    r"\b(?:credentials?|api[-_ ]?keys?|(?:access|auth|authentication|session|bearer|refresh|oauth|github|gitlab|slack|discord|personal access) tokens?"
+    r"|tokens?|passwords?|secrets?|cookies|clipboard)\b"
+)
+_M12_SOURCE = rf"(?:{_M12_SOURCE_FILE}|{_M12_OWNED}[^.!?\n]{{0,40}}?{_M12_SOURCE_WORD})"
+# A tool argument, the reply, or an outbound destination as the sink.
+_M12_ARG_SINK = (
+    r"\b(?:in|into|as|to|via|inside|within|under|through|en|dentro de|como)\b[^.!?\n]{0,30}?"
+    r"\b(?:arguments?|parameters?|params?|fields?|inputs?|notes?|sidenotes?|payloads?|responses?|repl(?:y|ies)|answers?|outputs?"
+    r"|par[aá]metros?|argumentos?|campos?|notas?|respuestas?)\b"
+)
+_M12_EMAIL = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+# A sentence that keeps the step from the user. MECH-006 needs a verb after
+# the secrecy phrase in the same sentence; a poisoned description puts the
+# concealment in a sentence of its own ("The user does not need to know about
+# this step."), which is why it is paired with the hook here instead. The
+# object is the step itself — "the user does not need to know the internal
+# id" is ordinary prose and does not match.
+_M12_CONCEAL = (
+    r"\b(?:"
+    r"(?:the |an? |end[- ])?users? (?:does not|doesn['’]?t|do not|don['’]?t|need not|needn['’]?t|should not|shouldn['’]?t"
+    r"|must not|mustn['’]?t|will not|won['’]?t|never) (?:need to |have to |ever )?"
+    r"(?:(?:know|hear|learn|find out|be (?:told|informed|notified|made aware|aware)) (?:about |of )?(?:this|these|that|those|any of this|it)\b"
+    r"|be (?:told|informed|notified|made aware)\b(?! (?:of|about|that|when|which|what|how|where|why) )"
+    r"|(?:see|notice) (?:this|these|that|those|it|any of this)\b)"
+    r"|no need to (?:tell|inform|notify|alert|mention (?:this |it |any of this )?to) the user"
+    r"|without (?:telling|informing|notifying|alerting|asking|consulting) the user"
+    r"|(?:do not|don['’]?t|never) (?:tell|inform|notify|alert|mention (?:this |it |any of this )?to) the user"
+    r"|keep (?:this|it|these steps?) (?:hidden )?from the user|hidden from the user"
+    r"|no (?:le |se lo )?menciones? (?:esto |nada )?al usuario"
+    r"|sin (?:decirle|dec[ií]rselo|informar(?:le)?|avisar(?:le)?) al usuario"
+    r"|el usuario no (?:necesita|debe|tiene que) (?:saber|enterarse)"
+    r")(?!\w)"
+)
+# Gaps: inside one sentence, but a single line break (a markdown list, a
+# wrapped description) does not end the sentence; a blank line does.
+_M12_GAP = r"(?:[^.!?\n]|\n(?![ \t]*\n))"
+_M12_PARA = r"(?:[^\n]|\n(?![ \t]*\n))"
+
 MECHANISM_PATTERNS = [
     # ── M-001: instruction override ──────────────────────────────────────────
     # An override verb aimed at the agent's OWN governing text, in one sentence.
@@ -416,4 +516,43 @@ MECHANISM_PATTERNS = [
             "order to upload is not."
         ),
     },
+    # ── M-012: tool-description precondition poisoning ──────────────────────
+    # The plain-English form of tool poisoning: no <IMPORTANT> wrapper, no
+    # "note to assistant", no fixed path literal. A hook on the tool call plus
+    # one of three tells — secret or user material read into a tool argument,
+    # another tool called with an external destination, or a sentence that
+    # hides the step from the user. Helpers and the reasoning are above.
+    {
+        "id": "GLS-MECH-012",
+        "name": "Tool-description precondition poisoning (mechanism)",
+        "category": "tool_poisoning",
+        "severity": "high",
+        "channel": ["message", "file", "tool_output", "api_response", "web_content"],
+        "regex": [
+            # hook … (acquire verb or possessive) … secret source … tool-argument, reply or outbound sink
+            rf"(?i){_M12_HOOK}(?={_M12_GAP}{{0,120}}?(?:{_M12_ACQUIRE}|{_M12_OWNED}))"
+            rf"{_M12_GAP}{{0,120}}?{_M12_SOURCE}{_M12_GAP}{{0,100}}?(?:{_M12_ARG_SINK}|{_TO_SINK}|{_M12_EMAIL})",
+            # "always set this to" the contents of a secret source: the parameter is the sink
+            rf"(?i)\b(?:always|first|must|should) set this(?: parameter| argument| field| value| param)? to\b"
+            rf"(?={_M12_GAP}{{0,80}}?(?:{_M12_ACQUIRE}|{_M12_OWNED})){_M12_GAP}{{0,80}}?{_M12_SOURCE}",
+            # the same read in the other order: source into a sink, with the hook after the source
+            rf"(?i)(?:{_M12_ACQUIRE}|{_M12_OWNED}){_M12_GAP}{{0,60}}?{_M12_SOURCE}(?={_M12_GAP}{{0,220}}?{_M12_HOOK})"
+            rf"{_M12_GAP}{{0,100}}?(?:{_M12_ARG_SINK}|{_TO_SINK}|{_M12_EMAIL})",
+            # hook … call another tool … to an e-mail address or URL
+            rf"(?i){_M12_HOOK}{_M12_GAP}{{0,120}}?\b(?:also|then|first|additionally|and|must|should|always|silently|secretly) "
+            rf"(?:call|invoke|use|run|trigger|execute) [`'\"]?[\w.-]+[`'\"]?{_M12_GAP}{{0,100}}?"
+            rf"\b(?:to|at|recipient|address|endpoint|url|webhook|destination|target|host|server)\b[:=]?\s*[`'\"<(\[]?\s*"
+            rf"(?:{_M12_EMAIL}|https?://)",
+            # hook … a sentence that hides the step from the user (same paragraph)
+            rf"(?i){_M12_HOOK}{_M12_PARA}{{0,256}}?{_M12_CONCEAL}",
+        ],
+        "description": (
+            "A tool description that hooks an instruction to the tool being called "
+            "and, in the same breath, reads secret or user material into a tool "
+            "argument, calls another tool with an external destination, or tells "
+            "the model to keep the step from the user. Real documentation has the "
+            "hook or the secret, not the pair."
+        ),
+    },
+
 ]
