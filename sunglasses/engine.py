@@ -1041,12 +1041,11 @@ class SunglassesEngine:
         return False
 
     # A rule that matches more than once is judged on its worst occurrence. The
-    # search for a later, un-negated one is capped: an input made of thousands of
-    # negated copies must not turn one scan into thousands of regex passes. When
-    # the cap runs out the rule is NOT downgraded (the original severity stands),
-    # which fails toward detection.
-    NEGATION_RETRY_BUDGET = 16
-
+    # search for a later, un-negated one walks forward one match at a time and
+    # stops at the first live one or when the matches run out, so input made
+    # only of negated copies stays negated. It is bounded by the input itself:
+    # each step starts past the previous match start, so there are at most as
+    # many steps as there are matches in a document that max_scan_bytes caps.
     def _resolve_negation(self, mode, rx, guards, text, first):
         """Pick the occurrence a regex rule is judged on. Returns (match, negated).
 
@@ -1056,12 +1055,12 @@ class SunglassesEngine:
         if not self._check_negation(text, first.start()):
             return first, False
         match = first
-        for _ in range(self.NEGATION_RETRY_BUDGET):
+        while True:
             # Resume one character past the START, not at the end: these rules
             # have wide gaps, so the negated match often spans the later one.
             # Skip blank space too: a lead-in can start the match on any of a
-            # run of blank characters, and each of those would spend a retry on
-            # the same order while sitting closer to the warning than it is.
+            # run of blank characters, and each of those would repeat the same
+            # order while sitting closer to the warning than it is.
             resume = match.start() + 1
             while resume < len(text) and text[resume].isspace():
                 resume += 1
@@ -1070,7 +1069,6 @@ class SunglassesEngine:
                 return first, True
             if not self._check_negation(text, match.start()):
                 return match, False
-        return match, False
 
     def _live_occurrence(self, normalized: str, keyword: str, begin: int):
         """Offset of the first word-bounded occurrence of `keyword` at or after
@@ -1210,6 +1208,7 @@ class SunglassesEngine:
         # Keyword findings stamped on a negated first hit, by rule id. A later
         # un-negated hit of the same rule takes the finding back to full severity.
         negated_kw = {}
+        negated_regex = {}
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -1379,8 +1378,12 @@ class SunglassesEngine:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
                 subjects.append((normalized, normalized_present, text))
+            # A negated hit is provisional: another regex of the rule, or another
+            # view of the text, may hold an occurrence that is not negated, and
+            # the rule must be judged on that one.
+            provisional = None
+            decided = False
             for subject, present, frame in subjects:
-              matched_here = False
               for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
                                        present):
@@ -1406,6 +1409,9 @@ class SunglassesEngine:
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
+                        if provisional is None:
+                            provisional = finding
+                        continue
                     elif pattern["id"].startswith("GLS-MECH-") and \
                             self._is_defensively_framed(frame, match.start()):
                         # Shape rules also match prose that DESCRIBES the shape.
@@ -1414,10 +1420,13 @@ class SunglassesEngine:
                         finding["defensive_context"] = True
                         finding["original_severity"] = pattern["severity"]
                     findings.append(finding)
-                    matched_here = True
+                    decided = True
                     break
-              if matched_here:
+              if decided:
                   break   # raw decided; do not look at the normalized view
+            if not decided and provisional is not None:
+                findings.append(provisional)
+                negated_regex[pattern["id"]] = provisional
 
         # Step 3.5: Corroboration pass for keyword candidates (see
         # _regex_bearing_ids). Step 3 already ran these patterns' regexes on
@@ -1440,8 +1449,13 @@ class SunglassesEngine:
         if folded_length > self.CORROBORATE_NORM_MAX:
             candidates = {}
         for pid, pattern in candidates.items():
-            if pid in seen_ids:
+            if pid in seen_ids and pid not in negated_regex:
                 continue  # regex already confirmed on raw text in step 3
+            # A rule that only matched negated in step 3 gets this view too: the
+            # occurrence that is not negated may be the one written in an
+            # encoding.
+            held = negated_regex.get(pid)
+            provisional = None
             for mode, rx, guards in self._compiled_by_id.get(pid, ()):
                 match = self._eval_regex(mode, rx, guards, normalized)
                 if match:
@@ -1449,16 +1463,26 @@ class SunglassesEngine:
                     negated = False
                     if not pattern.get("negation_immune"):
                         match, negated = self._resolve_negation(mode, rx, guards, normalized, match)
-                    finding = {
-                        **pattern,
-                        "matched_text": match.group(0)[:50],
-                    }
                     if negated:
-                        finding["severity"] = "review"
-                        finding["negation_context"] = True
-                        finding["original_severity"] = pattern["severity"]
-                    findings.append(finding)
+                        if provisional is None:
+                            provisional = match
+                        continue
+                    if held is not None:
+                        self._restore_live(held, match.group(0)[:50])
+                    else:
+                        findings.append({**pattern, "matched_text": match.group(0)[:50]})
+                    provisional = None
+                    held = None
                     break
+            if provisional is not None and held is None:
+                # Every occurrence in this view is negated too.
+                findings.append({
+                    **pattern,
+                    "matched_text": provisional.group(0)[:50],
+                    "severity": "review",
+                    "negation_context": True,
+                    "original_severity": pattern["severity"],
+                })
 
         # Step 3b: Mechanisms are a FALLBACK layer, not a second opinion.
         # A mechanism rule earns its keep by catching what the carrier list
