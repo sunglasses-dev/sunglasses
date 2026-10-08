@@ -80,7 +80,7 @@ not patched — `pip install -U sunglasses`.
 
 | Advisory | Severity | Weakness | Affected | Patched | Published (UTC) |
 |---|---|---|---|---|---|
-| [GHSA-j49m-wpxr-62h8](https://github.com/sunglasses-dev/sunglasses/security/advisories/GHSA-j49m-wpxr-62h8) — scan results reported clean for content that was never inspected (missing path, ZIP, oversized input, audio without `--deep`, among others) | High | CWE-636 (not failing securely) | `>= 0.1.0, < 0.5.6` | 0.5.6 | 2026-09-10 |
+| [GHSA-j49m-wpxr-62h8](https://github.com/sunglasses-dev/sunglasses/security/advisories/GHSA-j49m-wpxr-62h8) — scan results reported clean for content that was never inspected (a missing path, a ZIP archive, input past the size cap, audio without `--deep`) | High | CWE-636 (not failing securely) | `>= 0.1.0, < 0.5.6` | 0.5.6 | 2026-09-10 |
 
 That advisory covers the false-clean class repaired in
 [v0.5.6](https://github.com/sunglasses-dev/sunglasses/releases/tag/v0.5.6): six paths

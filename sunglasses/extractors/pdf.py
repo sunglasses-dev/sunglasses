@@ -4,8 +4,7 @@ SUNGLASSES PDF Extractor — Scans PDFs for hidden prompt injection.
 Extracts text from PDFs using multiple methods:
 1. Page text — visible text content on each page
 2. Metadata — document properties (title, author, subject, keywords, creator)
-3. Annotations — comments, notes, form fields
-4. Embedded JavaScript — malicious scripts in PDF actions
+3. Annotations — comment text and author
 
 Usage:
     from sunglasses.extractors.pdf import scan_pdf
