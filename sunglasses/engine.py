@@ -31,7 +31,7 @@ from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import (ENRICH_MAX_LEN, HOMOGLYPHS, INVISIBLE_CHARS, LEET, VIEW_SEP,
-                           decode_shadow_ascii, normalize_unicode, normalize_with_length,
+                           decode_rot13, decode_shadow_ascii, normalize_unicode, normalize_with_length,
                            replace_homoglyphs, strip_invisible)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
@@ -215,6 +215,7 @@ class ScanResult:
 _ENTITY_RX = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);?")
 _PERCENT_RX = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 _HEXESC_RX = re.compile(r"\\x[0-9A-Fa-f]{2}")
+_ESCAPE_RX = re.compile("[&%\\\\\U000e0020-\U000e007e]")
 
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
@@ -238,7 +239,7 @@ class _Walk:
     other difference ends the walk, and nothing past that point is vouched for.
     """
 
-    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts")
+    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active")
 
     def __init__(self, raw: str, low: str, view: str):
         self.raw = raw
@@ -252,6 +253,7 @@ class _Walk:
         self.dead = False
         self.changed = []  # view indexes whose character is not the raw character
         self.cuts = []     # view indexes where raw characters were deleted before it
+        self.active = None  # raw offsets where an escape the pipeline decodes begins
 
     @staticmethod
     def _variants(text: str):
@@ -291,10 +293,34 @@ class _Walk:
             text = chr(ord(c) - 0xE0000)
         return used, self._variants(text)
 
+    @staticmethod
+    def _decodes(text: str, j: int) -> bool:
+        """True when an escape the pipeline decodes begins at text[j]."""
+        c = text[j]
+        if c == "&":
+            m = _ENTITY_RX.match(text, j)
+            return bool(m) and html.unescape(m.group()) != m.group()
+        if c == "%":
+            return _PERCENT_RX.match(text, j) is not None
+        if c == "\\":
+            return _HEXESC_RX.match(text, j) is not None
+        return "\U000e0020" <= c <= "\U000e007e"
+
+    def _next_escape(self, j: int) -> int:
+        """The first raw offset at or after j where an escape begins (len(raw) if none)."""
+        if self.active is None:
+            raw = self.raw
+            self.active = [m.start() for m in _ESCAPE_RX.finditer(raw) if self._decodes(raw, m.start())]
+        k = bisect.bisect_left(self.active, j)
+        return self.active[k] if k < len(self.active) else len(self.raw)
+
     def _equal_run(self, limit: int) -> int:
-        """Length of the identical run at the current positions, capped by limit."""
+        """Length of the identical run at the current positions, capped by limit. An
+        identical character is the same character from the same place only when the
+        pipeline did not decode anything in front of it: a run never reaches over the
+        start of an escape, which is read as a decoding step instead (see advance)."""
         low, held, i, j = self.low, self.held, self.i, self.j
-        cap = min(limit - i, len(low) - j)
+        cap = min(limit - i, len(low) - j, self._next_escape(j) - j)
         if cap <= 0 or low[j] != held[i]:
             return 0
         step = 64
@@ -343,6 +369,12 @@ class _Walk:
             used, readings = self._produced(j)
             for reading in readings:
                 if view.startswith(reading, i):
+                    if used > 1 and self._decodes(view, i):
+                        # What the decoding produced is itself an escape, so the view
+                        # holds layers of encoding and which raw character each view
+                        # character came from is no longer shown.
+                        self.dead = True
+                        break
                     self.changed.extend(range(i, i + len(reading)))
                     self.i = i + len(reading)
                     self.j = j + used
@@ -1262,10 +1294,12 @@ class SunglassesEngine:
 
     @staticmethod
     def _enrichment_spans(text: str, plain_end: int, stop: int):
-        """The views behind the plain one, as (start, end) pairs inside text[:stop].
-        The normalizer appends ROT13, reversed and l-for-I copies of the text behind
-        view separators, so a hit that only one of them holds is an occurrence in the
-        input that the plain view does not show."""
+        """The views behind the plain one, as (start, end, kept) triples inside
+        text[:stop]. The normalizer appends ROT13, reversed and l-for-I views of the
+        text behind view separators, so a hit that only one of them holds is an
+        occurrence in the input that the plain view does not show. `kept` is True for
+        a view that was shown to hold every character of the plain view at the same
+        offset (see _kept_views); a hit in any other view is never taken for a copy."""
         sep = " " + VIEW_SEP + " "
         spans, pos = [], plain_end
         while pos + len(sep) < stop:
@@ -1275,7 +1309,35 @@ class SunglassesEngine:
             if lo < hi:
                 spans.append((lo, hi))
             pos = hi
-        return spans
+        kept = SunglassesEngine._kept_views(text[:plain_end], text[:stop], len(spans))
+        return [(lo, hi, k) for (lo, hi), k in zip(spans, kept)]
+
+    @staticmethod
+    def _kept_views(plain: str, whole: str, count: int):
+        """For each of the `count` views behind the plain one: True when it keeps the
+        position of every character of the plain view (ROT13, and the l-for-I variant of
+        the plain or the ROT13 view), False for the reversed ones, where offset k holds
+        the character that stands at the mirrored offset of the plain view. The views
+        are rebuilt here the way the normalizer builds them and the result counts only
+        when it is exactly what stands in `whole`; anything else is False for every
+        view, so a view whose origin is not shown is never a copy."""
+        none = [False] * count
+        if len(plain) > ENRICH_MAX_LEN:
+            # A long input only gets the ROT13 view, which keeps every offset.
+            return [True] if count == 1 and len(whole) == 2 * len(plain) + 3 else none
+        sep = " " + VIEW_SEP + " "
+        rot = decode_rot13(plain)
+        base = [plain] + ([rot] if rot != plain else [])
+        views = base + [piece[::-1] for piece in reversed(base)]
+        flags = [True] * len(base) + [False] * len(base)
+        built = sep.join(views).lower()
+        shape = re.sub(r'\bl(?=[a-z])', 'i', built)
+        if shape != built:
+            built = built + sep + shape
+            flags = flags + flags
+        if built != whole or len(flags) - 1 != count:
+            return none
+        return flags[1:]
 
     @staticmethod
     def _same_place(view: str, a: int, b: int, lo: int, hi: int, base) -> bool:
@@ -1296,15 +1358,13 @@ class SunglassesEngine:
         return view[a - left:b + right] == view[src - left:src + n + right]
 
     def _copy_of_judged_hit(self, mode, rx, guards, view, m, lo, hi, base) -> bool:
-        """The regex form of _same_place: the same regex matches the plain view at
-        the same place with the same extent, so that hit was read there already."""
-        blo, bhi = base
-        if hi - lo != bhi - blo:
+        """The regex form of _same_place: the same characters stand at the same place
+        in the plain view and the same regex matches there with the same extent, so
+        that hit was read there already."""
+        if not self._same_place(view, m.start(), m.end(), lo, hi, base):
             return False
-        src = blo + (m.start() - lo)
+        src = base[0] + (m.start() - lo)
         n = m.end() - m.start()
-        if src < blo or src + n > bhi:
-            return False
         there = self._eval_regex(mode, rx, guards, view, src)
         return there is not None and there.start() == src and there.end() == src + n
 
@@ -1328,8 +1388,8 @@ class SunglassesEngine:
         """True when a later hit of the same regex is NOT covered by a negation.
         `limit` ends the part of the text that is read: the normalized text repeats
         itself after a view separator. `spans` are the views behind the plain one; a
-        hit in one of them is read unless it is the copy of a hit the plain view has
-        already shown. `tail` is the input with its invisible shadow characters read as
+        hit in one of them is read, unless the view keeps the offsets of the plain view
+        and the hit is the copy of a hit the plain view has already shown. `tail` is the input with its invisible shadow characters read as
         ASCII, behind the separators: (text, end of its plain part, its own appended
         views). Its hits are read against the raw input like those of any other view.
         `spent` counts the hits read per rule, across every alternative and subject."""
@@ -1350,12 +1410,19 @@ class SunglassesEngine:
         regions = [(subject, self._resume_after(mode, subject, first), limit, None, None)]
         if spans:
             plain = (0, _RawAlign.view_end(subject, 0))
-            regions.extend((subject, lo, hi, lo, plain) for lo, hi in spans
-                           if limit is not None and lo > limit)
+            regions.extend((subject, lo, hi, lo, plain if kept else ())
+                           for lo, hi, kept in spans if limit is not None and lo > limit)
         if tail is not None:
             regions.append((tail[0], 0, tail[1], None, None))
             plain = (0, tail[1])
-            regions.extend((tail[0], lo, hi, lo, plain) for lo, hi in tail[2])
+            regions.extend((tail[0], lo, hi, lo, plain if kept else ())
+                           for lo, hi, kept in tail[2])
+        # A regex with a variable lead-in reaches the same words from several starts in a
+        # row (the blanks and boundary marks in front of them). A start that ends where the
+        # previous one did, with only blanks and boundary marks between them, is the same
+        # occurrence and is stepped over; at most LATER_HITS of these are passed over per
+        # rule, so the work stays bounded, and every other hit is a hit read and counted.
+        skipped = 0
         for index, (view, pos, stop, copy_lo, base) in enumerate(regions):
             prev = first if index == 0 else None
             while True:
@@ -1364,10 +1431,13 @@ class SunglassesEngine:
                     break
                 pos = self._resume_after(mode, view, m)
                 if prev is not None and m.end() == prev.end() and \
+                        skipped < self.LATER_HITS and \
                         self._lead_in_only(view, prev.start(), m.start()):
+                    skipped += 1
+                    prev = m
                     continue  # the same words; only how much of the lead-in is counted differs
                 prev = m
-                if base is not None and self._copy_of_judged_hit(
+                if base and self._copy_of_judged_hit(
                         mode, rx, guards, view, m, copy_lo, stop, base):
                     continue
                 spent[pid] = spent.get(pid, 0) + 1
@@ -1407,7 +1477,7 @@ class SunglassesEngine:
         return False
 
     def _keyword_copy(self, view, at, keyword, lo, hi, base) -> bool:
-        return base is not None and self._same_place(view, at, at + len(keyword), lo, hi, base)
+        return bool(base) and self._same_place(view, at, at + len(keyword), lo, hi, base)
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
         """
@@ -1642,9 +1712,11 @@ class SunglassesEngine:
         shadow = decode_shadow_ascii(text)
         # Where the views behind the plain one are: ROT13, reversed and l-for-I copies.
         # A hit that only one of them holds is another occurrence in the input, and is
-        # read like a later hit in the plain view, unless it is the copy of a hit the
-        # plain view already showed. (view, offset of the view, start, end, plain view
-        # this one is a copy of or None); positions are inside the view.
+        # read like a later hit in the plain view. Only a view that keeps every offset
+        # of the plain one (ROT13, l-for-I) can hold the copy of a hit the plain view
+        # already showed; a reversed view is never a copy. (view, offset of the view,
+        # start, end, the plain view it can be a copy of, () when it cannot, None for
+        # the plain view itself); positions are inside the view.
         tail = None
         tail_start = len(normalized)
         if shadow is not None:
@@ -1659,10 +1731,12 @@ class SunglassesEngine:
             and tail is not None else tail_start
         spans = self._enrichment_spans(normalized, plain_end, main_stop)
         regions = [(normalized, 0, 0, plain_end, None)]
-        regions.extend((normalized, 0, lo, hi, (0, plain_end)) for lo, hi in spans)
+        regions.extend((normalized, 0, lo, hi, (0, plain_end) if kept else ())
+                       for lo, hi, kept in spans)
         if tail is not None:
             regions.append((tail[0], tail_start, 0, tail[1], None))
-            regions.extend((tail[0], tail_start, lo, hi, (0, tail[1])) for lo, hi in tail[2])
+            regions.extend((tail[0], tail_start, lo, hi, (0, tail[1]) if kept else ())
+                           for lo, hi, kept in tail[2])
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -1681,7 +1755,7 @@ class SunglassesEngine:
                         if region is not None:
                             view, offset, lo, hi, base = region
                             local = kw_at - offset
-                            if base is not None and self._same_place(
+                            if base and self._same_place(
                                     view, local, end_idx + 1 - offset, lo, hi, base):
                                 continue  # the copy of a hit the plain view already showed
                             spent = later_spent[pattern["id"]] = later_spent.get(pattern["id"], 0) + 1
