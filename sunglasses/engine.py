@@ -465,18 +465,23 @@ class _RawCopies:
     looked up in the raw text and in the view. The match is a copy of a raw
     occurrence, and is negated, only when every occurrence in the raw text is
     negated there and the view holds no more occurrences than the raw text has
-    that still read as the opening once the text around them is folded the way
-    the view is built. A raw copy that the fold changes (a mark that merges into
-    its last letter, a cut view) is not counted, so the same words written in an
-    encoding fill no slot that a vanished copy left. A view with an extra
-    occurrence, one live raw copy, or no raw copy at all (the words exist only
-    after decoding) leaves the match to the view's own judgement. The number of
-    distinct openings looked up is bounded, past it the view's own judgement
-    stands, the stricter side."""
+    that the view still shows. Whether a raw copy is still shown is read off the
+    view itself: a mark that sits in front of each copy and passes through every
+    step of the pipeline unchanged says which words in the view came from that
+    place, and the view built from the marked text must be the view of the
+    unmarked text with the marks taken out, or no copy is counted. A copy that
+    the fold changes (a mark that merges into its last letter, however far
+    behind it, or invisible characters between) is not shown, so the same words
+    written in an encoding fill no slot that a vanished copy left. Spaces in the
+    opening match any run of blank space in the raw text, because the pipeline
+    collapses a run to one. A view with an extra occurrence, one live raw copy,
+    or no raw copy at all (the words exist only after decoding) leaves the match
+    to the view's own judgement. The number of distinct openings looked up is
+    bounded, past it the view's own judgement stands, the stricter side."""
 
     OPEN = 48      # characters of the match that are looked up
     DISTINCT = 8   # distinct openings looked up per scan
-    AFTER = 8      # characters after a raw copy that are folded with it
+    MARK = "\ue000"  # a private use character that no pipeline step changes
 
     def __init__(self, raw: str, negated):
         self._raw = raw
@@ -492,9 +497,14 @@ class _RawCopies:
             at = low.find(key, at + 1)
         return n
 
-    def negated(self, view_id: int, plain_low, opening: str, build) -> bool:
-        """`plain_low()` is the lowered stretch of the view `view_id` and
-        `build(text)` is the function that built that view from the raw text."""
+    @staticmethod
+    def _pattern(key: str):
+        """The opening as a pattern in which a space is any run of blank space."""
+        return re.compile(r"\s+".join(re.escape(word) for word in key.split(" ")))
+
+    def negated(self, view_id: int, view: str, plain_end: int, opening: str, build) -> bool:
+        """`view` is the view `view_id`, its plain text ends at `plain_end`, and
+        `build(text)` is the function that built it from the raw text."""
         key = _ascii_lower(opening)
         token = (view_id, key)
         known = self._seen.get(token)
@@ -505,26 +515,37 @@ class _RawCopies:
         if self._low is None:
             self._low = _ascii_lower(self._raw)
         verdict = False
-        at = self._low.find(key)
-        if at != -1:
-            wanted = self._count(plain_low(), key)
-            verdict, kept = True, 0
-            while at != -1:
-                if not self._negated(self._raw, at):
-                    verdict = False
-                    break
-                if kept < wanted:
-                    kept += self._reads_as(build, at, key)
-                at = self._low.find(key, at + 1)
-            if verdict and wanted > kept:
-                verdict = False
+        copies = [m.start() for m in self._pattern(key).finditer(self._low)]
+        if copies and self.MARK not in self._raw:
+            verdict = all(self._negated(self._raw, at) for at in copies)
+            if verdict:
+                wanted = self._count(_ascii_lower(view[:plain_end]), key)
+                verdict = wanted <= self._shown(build, view, plain_end, copies, key)
         self._seen[token] = verdict
         return verdict
 
-    def _reads_as(self, build, at: int, key: str) -> bool:
-        """Whether the raw copy at `at` still opens with `key` after the text
-        around it is folded the way the view is."""
-        return _ascii_lower(build(self._raw[at:at + len(key) + self.AFTER])).startswith(key)
+    def _shown(self, build, view: str, plain_end: int, copies, key: str) -> int:
+        """How many of the raw copies the view still shows as `key`, or 0 when
+        the marks changed anything else in the view."""
+        mark, raw = self.MARK, self._raw
+        parts, last = [], 0
+        for at in copies:
+            parts.append(raw[last:at])
+            parts.append(mark)
+            last = at
+        parts.append(raw[last:])
+        marked = build("".join(parts))
+        if marked.replace(mark, "") != view:
+            return 0
+        low = _ascii_lower(marked)
+        shown, seen, at = 0, 0, low.find(mark)
+        while at != -1:
+            # The mark's place in the unmarked view is its place here less the marks before it.
+            if at - seen < plain_end and low.startswith(key, at + 1):
+                shown += 1
+            seen += 1
+            at = low.find(mark, at + 1)
+        return shown
 
 
 class SunglassesEngine:
@@ -1513,19 +1534,12 @@ class SunglassesEngine:
                 return align.origin(view, place)
             return None
 
-        plain_low = []
-
-        def plain_lowered() -> str:
-            if not plain_low:
-                plain_low.append(_ascii_lower(view[:plain_end]))
-            return plain_low[0]
-
         def copied(offset: int, stop: int) -> bool:
             place = place_of(offset)
             if cut or place is None or align.covers(view, place):
                 return False
             opening = view[offset:min(offset + _RawCopies.OPEN, stop, end_of(offset))]
-            return copies.negated(id(view), plain_lowered, opening, build)
+            return copies.negated(id(view), view, plain_end, opening, build)
         return origin, copied
 
     def _live_occurrence(self, normalized: str, keyword: str, begin: int):

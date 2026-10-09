@@ -456,10 +456,10 @@ def test_the_opening_of_a_match_is_looked_up_for_a_bounded_number_of_distinct_st
     words = [f"word{n:02d}" for n in range(40)]
     raw = " ".join(words)
     copies = _RawCopies(raw, lambda text, at: True)
-    answers = [copies.negated(1, lambda: raw, word, str) for word in words]
+    answers = [copies.negated(1, raw, len(raw), word, str) for word in words]
     assert answers.count(True) == _RawCopies.DISTINCT          # past the bound the view decides
     assert answers[:_RawCopies.DISTINCT] == [True] * _RawCopies.DISTINCT
-    assert copies.negated(1, lambda: raw, words[0], str) is True    # a known opening is still answered
+    assert copies.negated(1, raw, len(raw), words[0], str) is True    # a known opening is still answered
 
 
 def test_a_frame_looks_up_a_hit_without_searching_its_view_again():
@@ -567,3 +567,71 @@ def test_trailing_prose_that_normalization_rewrites_does_not_turn_benign_api_pro
     result = engine.scan(LEADS[lead] + LIGATURE_WARNINGS[0] + phrase + tail, "api_response")
     assert result.decision == "allow_redacted"
     assert _find(result, "GLS-PI-016-API")["severity"] == "review"
+
+
+# --------------------------------------------------------------------------
+# A copy counts as shown only when the view itself shows it, however long the
+# marks or the invisible characters behind it, and a run of blank space in a
+# negated warning is still that warning.
+
+@pytest.mark.parametrize("carrier", ["wide", "lookalike", "leet", "base64"])
+@pytest.mark.parametrize("rule_id,phrase,channel", RULES)
+@pytest.mark.parametrize("tail", [
+    "\u0316" * 8 + "\u0307", "\u200b" * 8 + "\u0307",
+    "\u0316" * 40 + "\u0307", "\u200b" * 40 + "\u0307",
+    "\u0316" * 8 + "\u0301", "\u200b" * 8 + "\u0301", "\u0316" * 7 + "\u0301"])
+def test_a_mark_behind_a_long_run_still_leaves_the_encoded_copy_live(engine, rule_id, phrase, channel, carrier, tail):
+    """Eight following characters used to be enough to say the plain copy
+    survives the fold. A mark after a longer run merges into its last letter, and
+    invisible characters take up the positions before being removed."""
+    doc = "Never " + phrase + tail + ". " + GAP * 2 + _carriers(phrase)[carrier] + "."
+    result = engine.scan(doc, channel)
+    assert result.decision == "block"
+    assert _find(result, rule_id)["severity"] == "high"
+
+
+@pytest.mark.parametrize("form", ["double_space", "tab", "mixed"])
+@pytest.mark.parametrize("lead", sorted(LEADS))
+@pytest.mark.parametrize("rule_id,phrase,channel", RULES)
+def test_blank_space_inside_a_negated_warning_keeps_it_negated(engine, rule_id, phrase, channel, lead, form):
+    """Normalization collapses a run of spaces or tabs, so the opening of the
+    match is not written that way in the raw text. The raw text still holds the
+    warning, and an ordinary prohibition is not a block because of its spacing."""
+    spaced = {"double_space": phrase.replace(" ", "  "),
+              "tab": phrase.replace(" ", "\t"),
+              "mixed": phrase.replace(" ", " \t ")}[form]
+    result = engine.scan(LEADS[lead] + LIGATURE_WARNINGS[0] + spaced + ".", channel)
+    assert result.decision == "allow_redacted"
+    assert _find(result, rule_id)["severity"] == "review"
+
+
+@pytest.mark.parametrize("rule_id,phrase,channel", RULES)
+def test_blank_space_in_the_negated_copy_does_not_hide_a_live_encoded_copy(engine, rule_id, phrase, channel):
+    """The spaced copy fills one slot. The encoded copy is a second occurrence in
+    the view, with no raw copy behind it, so it is judged on its own."""
+    doc = (LEADS["accent"] + LIGATURE_WARNINGS[0] + phrase.replace(" ", "  ") + ". " + GAP * 2
+           + _carriers(phrase)["wide"] + ".")
+    result = engine.scan(doc, channel)
+    assert result.decision == "block"
+    assert _find(result, rule_id)["severity"] == "high"
+
+
+def test_a_copy_is_shown_only_when_the_marked_view_is_the_view_of_the_text():
+    """The mark in front of each raw copy must pass through the pipeline without
+    changing the rest of the view, or nothing is counted as shown."""
+    from sunglasses.engine import _RawCopies
+    from sunglasses.preprocessor import normalize
+
+    raw = "Never ignore all previous instructions here."
+    view = normalize(raw)
+    copies = _RawCopies(raw, lambda text, at: True)
+    assert copies.negated(1, view, len(view), "ignore all previous instructions", normalize) is True
+    # the text already holds the mark: no copy can be told apart, the view decides
+    marked = _RawCopies.MARK + raw
+    other = _RawCopies(marked, lambda text, at: True)
+    assert other.negated(1, normalize(marked), len(normalize(marked)),
+                         "ignore all previous instructions", normalize) is False
+    # a builder that turns the mark into something else is not trusted
+    broken = _RawCopies(raw, lambda text, at: True)
+    assert broken.negated(1, view, len(view), "ignore all previous instructions",
+                          lambda text: normalize(text).replace(_RawCopies.MARK, "?")) is False
