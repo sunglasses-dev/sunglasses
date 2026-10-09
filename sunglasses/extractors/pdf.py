@@ -4,7 +4,7 @@ SUNGLASSES PDF Extractor — Scans PDFs for hidden prompt injection.
 Extracts text from PDFs using multiple methods:
 1. Page text — visible text content on each page
 2. Metadata — document properties (title, author, subject, keywords, creator)
-3. Annotations — comments, notes, form field names
+3. Annotations — comment text and author
 4. Form field values — /V, /DV, /RV, /TU and /Opt of the AcroForm fields, and /V
    of widgets outside /AcroForm (XFA form data is reported as not inspected)
 5. JavaScript — /OpenAction, /AA and /Names /JavaScript actions of the document,
