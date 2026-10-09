@@ -214,6 +214,7 @@ class ScanResult:
 
 _ENTITY_RX = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);?")
 _PERCENT_RX = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
+_PERCENT_ONE_RX = re.compile(r"%[0-9A-Fa-f]{2}")
 _HEXESC_RX = re.compile(r"\\x[0-9A-Fa-f]{2}")
 _ESCAPE_RX = re.compile("[&%\\\\\U000e0020-\U000e007e]")
 
@@ -301,7 +302,9 @@ class _Walk:
             m = _ENTITY_RX.match(text, j)
             return bool(m) and html.unescape(m.group()) != m.group()
         if c == "%":
-            return _PERCENT_RX.match(text, j) is not None
+            # One escape is enough to say that a decoding step begins here. Matching the
+            # whole run would read the rest of the run again at every percent sign.
+            return _PERCENT_ONE_RX.match(text, j) is not None
         if c == "\\":
             return _HEXESC_RX.match(text, j) is not None
         return "\U000e0020" <= c <= "\U000e007e"
@@ -369,9 +372,10 @@ class _Walk:
             used, readings = self._produced(j)
             for reading in readings:
                 if view.startswith(reading, i):
-                    if used > 1 and self._decodes(view, i):
-                        # What the decoding produced is itself an escape, so the view
-                        # holds layers of encoding and which raw character each view
+                    if self._decodes(view, i):
+                        # What the reading produced is itself an escape (a nested entity,
+                        # or a full-width or small ampersand that folds into one), so the
+                        # view holds layers of decoding and which raw character each view
                         # character came from is no longer shown.
                         self.dead = True
                         break
@@ -1317,27 +1321,42 @@ class SunglassesEngine:
         """For each of the `count` views behind the plain one: True when it keeps the
         position of every character of the plain view (ROT13, and the l-for-I variant of
         the plain or the ROT13 view), False for the reversed ones, where offset k holds
-        the character that stands at the mirrored offset of the plain view. The views
-        are rebuilt here the way the normalizer builds them and the result counts only
-        when it is exactly what stands in `whole`; anything else is False for every
+        the character that stands at the mirrored offset of the plain view. Each view that
+        keeps the offsets is rebuilt here on its own, the way the normalizer builds it, and
+        counts only when it is exactly what stands in `whole`; a view that does not match
+        is False. A layout that is not the one the normalizer writes is False for every
         view, so a view whose origin is not shown is never a copy."""
         none = [False] * count
         if len(plain) > ENRICH_MAX_LEN:
             # A long input only gets the ROT13 view, which keeps every offset.
             return [True] if count == 1 and len(whole) == 2 * len(plain) + 3 else none
         sep = " " + VIEW_SEP + " "
-        rot = decode_rot13(plain)
-        base = [plain] + ([rot] if rot != plain else [])
-        views = base + [piece[::-1] for piece in reversed(base)]
-        flags = [True] * len(base) + [False] * len(base)
-        built = sep.join(views).lower()
-        shape = re.sub(r'\bl(?=[a-z])', 'i', built)
-        if shape != built:
-            built = built + sep + shape
-            flags = flags + flags
-        if built != whole or len(flags) - 1 != count:
+        pieces = whole.split(sep)
+        if len(pieces) - 1 != count or pieces[0] != plain:
             return none
-        return flags[1:]
+        # Only the views that keep the offsets are rebuilt, each on its own. The reversed
+        # views are never copies, so they are not rebuilt: the normalizer reverses before
+        # it lowers, and one character whose lowercase is longer (a dotted capital I) makes
+        # a rebuild from the lowered plain view differ without any copy being at stake.
+        rot = decode_rot13(plain)
+        base = [plain] + ([rot.lower()] if rot != plain else [])
+        width = 2 * len(base)
+        if count == width - 1:
+            sections = 1
+        elif count == 2 * width - 1:
+            sections = 2
+        else:
+            return none
+        shape = lambda piece: re.sub(r'\bl(?=[a-z])', 'i', piece)
+        flags = []
+        for index in range(1, sections * width):
+            section, within = divmod(index, width)
+            if within >= len(base):
+                flags.append(False)          # a reversed view
+                continue
+            want = base[within] if section == 0 else shape(base[within])
+            flags.append(pieces[index] == want)
+        return flags
 
     @staticmethod
     def _same_place(view: str, a: int, b: int, lo: int, hi: int, base) -> bool:
@@ -1421,8 +1440,7 @@ class SunglassesEngine:
         # row (the blanks and boundary marks in front of them). A start that ends where the
         # previous one did, with only blanks and boundary marks between them, is the same
         # occurrence and is stepped over; at most LATER_HITS of these are passed over per
-        # rule, so the work stays bounded, and every other hit is a hit read and counted.
-        skipped = 0
+        # rule (one count across every alternative and subject), so the work stays bounded, and every other hit is a hit read and counted.
         for index, (view, pos, stop, copy_lo, base) in enumerate(regions):
             prev = first if index == 0 else None
             while True:
@@ -1431,9 +1449,9 @@ class SunglassesEngine:
                     break
                 pos = self._resume_after(mode, view, m)
                 if prev is not None and m.end() == prev.end() and \
-                        skipped < self.LATER_HITS and \
+                        spent.get((pid, "skip"), 0) < self.LATER_HITS and \
                         self._lead_in_only(view, prev.start(), m.start()):
-                    skipped += 1
+                    spent[(pid, "skip")] = spent.get((pid, "skip"), 0) + 1
                     prev = m
                     continue  # the same words; only how much of the lead-in is counted differs
                 prev = m

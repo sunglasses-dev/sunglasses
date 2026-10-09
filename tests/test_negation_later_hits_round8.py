@@ -126,9 +126,11 @@ def test_a_view_layout_that_does_not_match_the_normalizer_output_keeps_nothing()
     whole = normalize_with_length("abc def")[0]
     count = whole.count("\x1e")
     assert any(kept(plain, whole, count))
-    assert kept(plain, whole + "x", count) == [False] * count
     assert kept(plain, whole, count + 1) == [False] * (count + 1)
-    assert kept(plain, whole.replace("cba", "cbz"), count) == [False] * count
+    assert kept(plain, whole.replace("nop", "nox"), count)[0] is False   # the ROT13 view differs
+    # A reversed view is never a copy and is not rebuilt, so a change in it moves no flag.
+    assert kept(plain, whole + "x", count) == kept(plain, whole, count)
+    assert kept(plain, whole.replace("cba", "cbz"), count) == kept(plain, whole, count)
 
 
 def test_the_views_that_keep_the_offsets_are_marked_and_the_reversed_ones_are_not():
