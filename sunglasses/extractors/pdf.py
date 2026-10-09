@@ -16,7 +16,7 @@ Install: pip install sunglasses[pdf]  (requires PyPDF2)
 import os
 import re
 import zlib
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 def _check_deps():
@@ -54,6 +54,207 @@ class _ReadBudget:
             self.read = self.MAX_BYTES
             raise _WalkBudget()
         self.read += size
+
+
+def _lzw_length(data: bytes, limit: int) -> Optional[int]:
+    """The length PyPDF2's LZW decoder would produce, counted without building the
+    output and stopped as soon as it passes `limit`. None when the code stream is not
+    one the decoder reads."""
+    lengths = [1] * 256 + [0] * (4096 - 256)
+    total, pos, bits, dictlen, code = 0, 0, 9, 258, 256
+    nbits = len(data) * 8
+    while True:
+        previous = code
+        if pos + bits > nbits:
+            return None
+        window = int.from_bytes(data[pos >> 3:(pos >> 3) + 3].ljust(3, b"\0"), "big")
+        code = (window >> (24 - (pos & 7) - bits)) & ((1 << bits) - 1)
+        pos += bits
+        if code == 257:
+            return total
+        if code == 256:
+            dictlen, bits = 258, 9
+            continue
+        if previous == 256:
+            total += lengths[code]
+        else:
+            if dictlen >= 4096:
+                return None
+            if code < dictlen:
+                total += lengths[code]
+                lengths[dictlen] = lengths[previous] + 1
+            else:
+                lengths[dictlen] = lengths[previous] + 1
+                total += lengths[dictlen]
+            dictlen += 1
+            if dictlen >= (1 << bits) - 1 and bits < 12:
+                bits += 1
+        if total > limit:
+            return total
+
+
+class _Decoded:
+    """The result of one bounded decode: the data (None when it was refused), the bytes
+    produced by every stage, and why it was refused."""
+
+    __slots__ = ("data", "spent", "state", "detail", "notes")
+
+    def __init__(self, data=None, spent=0, state="ok", detail="", notes=()):
+        self.data = data
+        self.spent = spent
+        self.state = state    # ok | big | unsized | error
+        self.detail = detail
+        self.notes = list(notes)
+
+
+_ASCII85_SKIP = bytes(b for b in range(256) if not 33 <= b <= 117)
+_FLATE = ('/FlateDecode', '/Fl')
+_ASCII85 = ('/ASCII85Decode', '/A85')
+_LZW = ('/LZWDecode', '/LZW')
+
+
+def _inflate(data: bytes, room: int):
+    """Inflate a zlib or gzip stream, no further than `room` bytes. The header is read
+    here and the checksum is not checked, so data whose only fault is a bad checksum is
+    kept, as PyPDF2 keeps it. Returns (output, reached_end, data_after_end, damaged)."""
+    start, trailer = None, 4
+    if len(data) >= 2 and data[0] & 0x0f == 8 and (data[0] << 8 | data[1]) % 31 == 0 \
+            and not data[1] & 0x20:
+        start = 2
+    elif data[:3] == b"\x1f\x8b\x08" and len(data) >= 10:
+        flags, pos, trailer = data[3], 10, 8
+        if flags & 4:
+            pos += 2 + int.from_bytes(data[pos:pos + 2], "little")
+        for bit in (8, 16):
+            if flags & bit:
+                end = data.find(b"\0", pos)
+                pos = len(data) if end < 0 else end + 1
+        if flags & 2:
+            pos += 2
+        if pos <= len(data):
+            start = pos
+    if start is None:
+        raise ValueError("not a zlib or gzip stream")
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    chunks, total, pos, pending, damaged = [], 0, start, b"", False
+    while True:
+        if not pending:
+            if pos >= len(data) or inflater.eof:
+                break
+            pending, pos = data[pos:pos + 65536], pos + 65536
+        try:
+            out = inflater.decompress(pending, room + 1 - total)
+        except zlib.error:
+            damaged = True
+            break
+        rest = inflater.unconsumed_tail
+        if not out and len(rest) == len(pending):
+            break
+        pending = rest
+        chunks.append(out)
+        total += len(out)
+        if total > room or inflater.eof:
+            break
+    after = (inflater.unused_data + pending + data[pos:])[trailer:] if inflater.eof else b""
+    return b"".join(chunks), inflater.eof, after, damaged
+
+
+def _ascii85_length(data: bytes) -> int:
+    """The length ASCII85 decoding produces, counted without decoding."""
+    body = data.split(b"~", 1)[0]
+    digits = len(body.translate(None, _ASCII85_SKIP))
+    return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
+
+
+def _predictor_of(params):
+    """(predictor, columns, bits per component) the way PyPDF2 reads them."""
+    def resolve(obj):
+        return obj.get_object() if hasattr(obj, 'get_object') else obj
+    params = resolve(params)
+    predictor, columns, bits = 1, 1, 8
+    entries = params if isinstance(params, (list, tuple)) else [params]
+    for entry in entries:
+        entry = resolve(entry)
+        if not hasattr(entry, 'get'):
+            continue
+        predictor = resolve(entry.get('/Predictor', predictor))
+        columns = resolve(entry.get('/Columns', columns))
+        bits = resolve(entry.get('/BitsPerComponent', bits))
+    return int(predictor), int(columns), int(bits)
+
+
+def _decode_bounded(stream, room: int) -> "_Decoded":
+    """Decode a stream's filter chain one stage at a time, so that no stage runs past what
+    is left of the budget and nothing is decoded twice. Every stage's output, the
+    intermediate ones included, is added to `spent`, and the chain is refused (state
+    "big") as soon as that sum passes `room`. A Flate stage is inflated no further than
+    `room` and gzip is read as well as zlib. ASCII85 and LZW are counted before they are
+    decoded. A predictor is applied to the bounded output. A chain with a filter that is
+    not sized here (hex, run length, an image filter, /Crypt, LZW that is not the last
+    filter) is refused with state "unsized", and a stage that fails with "error". The
+    reader's own get_data() is never called."""
+    from PyPDF2 import filters as pdf_filters
+
+    def resolve(obj):
+        return obj.get_object() if hasattr(obj, 'get_object') else obj
+
+    names = resolve(stream.get('/Filter')) if '/Filter' in stream else None
+    if isinstance(names, (list, tuple)):
+        names = [str(resolve(n)) for n in names]
+    else:
+        names = [] if names is None else [str(names)]
+    data = getattr(stream, '_data', None) or b""
+    out = _Decoded(data=data)
+    if not data:
+        return out
+    try:
+        for i, name in enumerate(names):
+            if name in _FLATE:
+                data, reached_end, after, damaged = _inflate(data, room - out.spent)
+                out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                if damaged or not reached_end:
+                    out.notes.append("compressed data ends before its stream does; "
+                                     "the rest was not inspected")
+                elif after.strip(b"\x00\t\n\x0c\r "):
+                    out.notes.append("holds data after the end of its compressed stream; "
+                                     "that data was not inspected")
+                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'))
+                if predictor != 1:
+                    if not 10 <= predictor <= 15:
+                        raise ValueError("unsupported predictor")
+                    rowlength = -(-columns * bits // 8) + 1
+                    data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
+                    out.spent += len(data)
+                    if out.spent > room:
+                        return _Decoded(spent=room + 1, state="big")
+            elif name in _ASCII85:
+                size = _ascii85_length(data)
+                out.spent += size
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                data = pdf_filters.ASCII85Decode.decode(data)
+            elif name in _LZW and i == len(names) - 1:
+                size = _lzw_length(data, room - out.spent)
+                if size is None:
+                    return _Decoded(spent=out.spent, state="unsized", detail=name)
+                out.spent += size
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                data = pdf_filters.LZWDecode.decode(data)
+                if len(data) > size:
+                    return _Decoded(spent=room + 1, state="big")
+            else:
+                return _Decoded(spent=out.spent, state="unsized", detail=name)
+    except Exception as exc:
+        return _Decoded(spent=out.spent, state="error", detail=exc.__class__.__name__)
+    if isinstance(data, str):
+        data = data.encode('latin-1', 'replace')
+    out.data = data
+    if not names:
+        out.spent = len(data)
+    return out
 
 
 # A bounded lexer over decoded content. Comments, literal strings, hex strings and the
@@ -149,7 +350,12 @@ class _ImageWalk:
     where a Do operator draws it (or an inline image sits in the content), so an
     unused resource entry does not. A form is read once and its count is kept, so
     pages that share forms or resources cost one visit, and the decoded content
-    read over the whole document is capped.
+    read over the whole document is capped. Content is decoded stage by stage by
+    `_decode_bounded`, which charges every stage (the intermediate output of a chain
+    too) and refuses a chain it cannot size; the reader's own decode is not used. A
+    Type3 font held as a direct dictionary is keyed by the identity of that dictionary,
+    and every stream visit is charged `VISIT_COST` besides its content. An annotation
+    with the Hidden or NoView flag draws nothing and is not visited.
 
     A name is looked up in the resources of the form or group that draws it and then
     in the resources of whatever encloses it, the way a renderer does, so a form with
@@ -164,11 +370,11 @@ class _ImageWalk:
     MAX_GLYPHS = 512
     MAX_APPEARANCES = 64
     VISIT_COST = 32   # bytes of the document budget for each annotation and state visited
-    LZW_RATIO = 4096  # the most a code of LZW (or a run of RunLength) can expand
 
     def __init__(self, budget):
         self.budget = budget
         self.stopped = False
+        self.notes = []      # what the decoder said about streams it read only in part
         self.cache = {}
         self.appearances = {}
         self.open = []       # keys of the forms and fonts being read, outermost first
@@ -197,6 +403,13 @@ class _ImageWalk:
                 return table.raw_get(name)
         return None
 
+    @staticmethod
+    def _not_shown(annot) -> bool:
+        """An annotation whose flags set Hidden (bit 2) or NoView (bit 6) is not drawn. A flag
+        field that is not a number is not read as a flag."""
+        flags = _resolve(annot.get('/F')) if hasattr(annot, 'get') else None
+        return isinstance(flags, int) and not isinstance(flags, bool) and bool(flags & 0b100010)
+
     def _appearances(self, page, scope):
         """Pictures drawn by the normal appearance of each annotation on the page.
         Pages that share an annotation list under the same resources share one visit,
@@ -212,6 +425,8 @@ class _ImageWalk:
         for annot in annots:
             self.budget.spend(self.VISIT_COST)
             annot = _resolve(annot)
+            if self._not_shown(annot):
+                continue
             appearance = _resolve(annot.get('/AP')) if hasattr(annot, 'get') else None
             if not hasattr(appearance, 'raw_get') or '/N' not in appearance:
                 continue
@@ -242,6 +457,7 @@ class _ImageWalk:
         return found
 
     def _count(self, holder, scope, depth):
+        self.budget.spend(self.VISIT_COST)
         data = self._content(holder)
         if not data:
             return (0, 0, 0)
@@ -385,6 +601,10 @@ class _ImageWalk:
                     parts.append(self._count(stream, scope, depth))
             return self._sum((0, 0, 0), *parts)
 
+        # A font held as a direct dictionary has no object number. It is keyed by the
+        # identity of the parsed dictionary, which the reader keeps for the whole walk.
+        if ident is None:
+            ident = ("direct", id(font))
         return self._run(*self._keys("type3", ident, own, parent_scope, scope), scope, compute)
 
     def _form(self, form, ident, parent_scope, depth):
@@ -405,42 +625,10 @@ class _ImageWalk:
                 (kind, ident, "own") if own else None,
                 (kind, ident, tuple(id(r) for r in scope)))
 
-    def _decoded_size_fits(self, stream) -> None:
-        """Raise _WalkBudget, spending what is left, when the stream would decode to more
-        than the budget has left. The size is read from the data before PyPDF2 decodes
-        it: a Flate stream is inflated no further than the room left, and a filter whose
-        output is not read in advance is judged by the most it can expand."""
-        room = self.budget.remaining()
-        data = getattr(stream, '_data', None) or b""
-        try:
-            filters = _resolve(stream.get('/Filter')) if '/Filter' in stream else None
-            filters = ([str(_resolve(f)) for f in filters] if isinstance(filters, list)
-                       else [] if filters is None else [str(filters)])
-            for name in filters:
-                if name in ('/FlateDecode', '/Fl'):
-                    data = zlib.decompressobj().decompress(data, room + 1)
-                    if len(data) > room:
-                        break
-                elif name in ('/ASCIIHexDecode', '/AHx', '/ASCII85Decode', '/A85'):
-                    from PyPDF2 import filters as pdf_filters
-                    decoder = (pdf_filters.ASCIIHexDecode if "Hex" in name or name == '/AHx'
-                               else pdf_filters.ASCII85Decode)
-                    data = decoder.decode(data)
-                elif name in ('/LZWDecode', '/LZW', '/RunLengthDecode', '/RL'):
-                    if len(data) * self.LZW_RATIO > room:
-                        data = b"\0" * (room + 1)
-                    break
-                else:
-                    break
-        except _WalkBudget:
-            raise
-        except Exception:
-            return   # a stream that does not decode is left to the reader, as before
-        if len(data) > room:
-            self.budget.spend(len(data))
-
     def _content(self, holder) -> bytes:
-        """The decoded content of a page (one stream or an array) or a form."""
+        """The decoded content of a page (one stream or an array) or a form. Each stream
+        goes through the bounded decoder: every stage is charged to the budget, the reader's
+        own decode is never used, and a stream whose filters cannot be sized is not decoded."""
         if hasattr(holder, 'get_data'):
             streams = [holder]
         else:
@@ -450,13 +638,19 @@ class _ImageWalk:
             streams = [_resolve(c) for c in contents] if isinstance(contents, list) else [contents]
         out = []
         for stream in streams:
-            if hasattr(stream, 'get_data'):
-                self._decoded_size_fits(stream)
-                data = stream.get_data()
-            else:
-                data = b""
-            self.budget.spend(len(data))
-            out.append(data)
+            if not hasattr(stream, 'get_data'):
+                continue
+            result = _decode_bounded(stream, self.budget.remaining())
+            if result.state == "big":
+                self.budget.spend(result.spent)
+            if result.state == "unsized":
+                raise ValueError(f"a content stream with the filter {result.detail} cannot be sized, "
+                                 f"so it was not decoded")
+            if result.state != "ok":
+                raise ValueError(f"a content stream could not be decoded ({result.detail})")
+            self.budget.spend(result.spent)
+            self.notes.extend(result.notes)
+            out.append(result.data)
         return b"\n".join(out)
 
 
@@ -523,9 +717,11 @@ class PDFExtractor:
 
         return results
 
-    # Form XObjects nest. The depth bound and the in progress set keep a form
-    # that points back at itself from looping.
-    MAX_FORM_DEPTH = 8
+    def _flush_notes(self, walk, number: int) -> None:
+        """Report what the decoder said about streams of this page that it read only in part."""
+        for note in dict.fromkeys(walk.notes):
+            self.failures.append(f"page {number}: content stream {note}")
+        walk.notes.clear()
 
     def _note_unread_images(self, page, number: int, walk) -> None:
         """Record a page that paints pictures this extractor did not read."""
@@ -533,13 +729,16 @@ class PDFExtractor:
             return
         try:
             count, glyph_fonts, unmatched = walk.painted_images(page, 0)
+            self._flush_notes(walk, number)
         except _WalkBudget:
+            self._flush_notes(walk, number)
             walk.stopped = True
             self.failures.append(
                 f"page {number} and later pages not checked for images, the page "
                 f"content passed the {_ReadBudget.MAX_BYTES >> 20} MiB limit")
             return
         except Exception as exc:
+            self._flush_notes(walk, number)
             self.failures.append(
                 f"page {number} images not checked ({exc.__class__.__name__}: {exc})")
             return
