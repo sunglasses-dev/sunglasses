@@ -456,8 +456,9 @@ class PDFExtractor:
         """A PDF string, name or (nested) array of them as one text; else ''.
         An array is read by identity, so a member that several arrays share is
         read once, an array that several keys share is read once for the document,
-        and every member visited is charged to the document budget whatever it
-        holds. It is bounded by member count, depth and that budget. What is left
+        and every entry of an array is counted and charged to the document budget
+        before it is looked at, whatever it holds and whether or not it was seen
+        before. It is bounded by member count, depth and that budget. What is left
         unread is recorded."""
         top = value
         value = self._resolve(value)
@@ -484,11 +485,10 @@ class PDFExtractor:
                 self._note(f"a value array nested deeper than {self.MAX_ARRAY_DEPTH} levels; "
                            f"the rest was not inspected")
                 continue
-            for item in reversed(list(node)):
-                ident = self._identity(item)
-                if ident in seen:
-                    continue
-                seen.add(ident)
+            # The array is read from its end by index, so it is not copied in front of
+            # its first check, and each entry is counted and paid for before anything
+            # about it is looked at: an entry that repeats one already seen costs the same.
+            for k in range(len(node) - 1, -1, -1):
                 members += 1
                 if members > self.MAX_ARRAY_MEMBERS:
                     self._note(f"a value array of more than {self.MAX_ARRAY_MEMBERS} members; "
@@ -498,6 +498,11 @@ class PDFExtractor:
                 if not self._spend(self.VISIT_COST):
                     stack.clear()
                     break
+                item = node[k]
+                ident = self._identity(item)
+                if ident in seen:
+                    continue
+                seen.add(ident)
                 item = self._resolve(item)
                 if isinstance(item, (list, tuple)):
                     stack.append((item, depth + 1))
@@ -743,6 +748,11 @@ class PDFExtractor:
                     # /Next may be an array of actions; a destination array is
                     # a page reference plus a view name, neither is an action.
                     for item in obj:
+                        # Each entry is paid for before it is resolved or queued, so an
+                        # array of repeats costs the budget and not an unbounded walk.
+                        if not self._spend(self.VISIT_COST):
+                            stack.clear()
+                            break
                         target = self._resolve(item)
                         if hasattr(target, 'get') and ('/S' in target or '/JS' in target):
                             stack.append((item, False))
@@ -750,7 +760,11 @@ class PDFExtractor:
                 if not hasattr(obj, 'get'):
                     continue
                 if is_table:
-                    stack.extend((value, False) for value in obj.values())
+                    for value in obj.values():
+                        if not self._spend(self.VISIT_COST):
+                            stack.clear()
+                            break
+                        stack.append((value, False))
                     continue
                 if '/S' not in obj and '/JS' not in obj:
                     continue  # not an action
