@@ -224,11 +224,17 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
                 if predictor != 1:
                     if not 10 <= predictor <= 15:
                         raise ValueError("unsupported predictor")
+                    if columns < 1 or bits < 1:
+                        raise ValueError("unsupported predictor dimensions")
                     rowlength = -(-columns * bits // 8) + 1
-                    data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
-                    out.spent += len(data)
-                    if out.spent > room:
-                        return _Decoded(spent=room + 1, state="big")
+                    # The reader's predictor keeps one row of the declared length even when
+                    # there is nothing to predict, and makes its output before anyone asks
+                    # whether it fits, so both are settled here against what is left.
+                    if data:
+                        if rowlength > room - out.spent or out.spent + len(data) > room:
+                            return _Decoded(spent=room + 1, state="big")
+                        data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
+                        out.spent += len(data)
             elif name in _ASCII85:
                 size = _ascii85_length(data)
                 out.spent += size
@@ -641,14 +647,14 @@ class _ImageWalk:
             if not hasattr(stream, 'get_data'):
                 continue
             result = _decode_bounded(stream, self.budget.remaining())
-            if result.state == "big":
-                self.budget.spend(result.spent)
+            # What was decoded is charged whatever the chain's state, so a chain that is
+            # refused after its first stages cannot be repeated for free on every page.
+            self.budget.spend(result.spent)
             if result.state == "unsized":
                 raise ValueError(f"a content stream with the filter {result.detail} cannot be sized, "
                                  f"so it was not decoded")
             if result.state != "ok":
                 raise ValueError(f"a content stream could not be decoded ({result.detail})")
-            self.budget.spend(result.spent)
             self.notes.extend(result.notes)
             out.append(result.data)
         return b"\n".join(out)
