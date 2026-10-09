@@ -240,7 +240,7 @@ class _Walk:
     other difference ends the walk, and nothing past that point is vouched for.
     """
 
-    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active")
+    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor")
 
     def __init__(self, raw: str, low: str, view: str):
         self.raw = raw
@@ -255,6 +255,7 @@ class _Walk:
         self.changed = []  # view indexes whose character is not the raw character
         self.cuts = []     # view indexes where raw characters were deleted before it
         self.active = None  # raw offsets where an escape the pipeline decodes begins
+        self.cursor = 0     # index into active of the first offset not yet passed
 
     @staticmethod
     def _variants(text: str):
@@ -276,6 +277,16 @@ class _Walk:
                 out.append(leet.lower())
                 out.append("".join(LEET.get(c, c) for c in form.lower()))
         return [v for v in dict.fromkeys(out) if v]
+
+    @staticmethod
+    def _is_case_of(c: str, reading: str) -> bool:
+        """True when reading is the lower case of the single character c. That is the same
+        letter from the same place, so it does not take the character out of the raw
+        input the way a look alike or a leet mapping does. A capital that lowers to
+        more than one character, as the Turkish dotted capital I does, is not one."""
+        if len(reading) != 1 or c == reading or c.isascii():
+            return False
+        return reading == c.lower() or (c == "\u03a3" and reading == "\u03c2")
 
     def _produced(self, j: int):
         """(raw characters used, readings) for the raw text at j."""
@@ -324,13 +335,30 @@ class _Walk:
             return _HEXESC_RX.match(text, j) is not None
         return "\U000e0020" <= c <= "\U000e007e"
 
+    @staticmethod
+    def _folds_to_escape(text: str, j: int) -> bool:
+        """True when text[j] starts an escape that only reads as one after the pipeline's
+        character steps: invisible characters are removed, compatibility forms are folded
+        and look alike letters are mapped before the entity, percent and hex passes run.
+        Whatever the escape produces then came from raw characters other than the ones
+        it is spelled with."""
+        window = text[j:j + 64]
+        if window.isascii():
+            return False
+        return _Walk._decodes(replace_homoglyphs(normalize_unicode(strip_invisible(window))), 0)
+
     def _next_escape(self, j: int) -> int:
         """The first raw offset at or after j where an escape begins (len(raw) if none)."""
         if self.active is None:
             raw = self.raw
-            self.active = [m.start() for m in _ESCAPE_RX.finditer(raw) if self._decodes(raw, m.start())]
-        k = bisect.bisect_left(self.active, j)
-        return self.active[k] if k < len(self.active) else len(self.raw)
+            self.active = [m.start() for m in _ESCAPE_RX.finditer(raw)
+                           if self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start())]
+        active, k = self.active, self.cursor
+        # The walk only moves forward, so the cursor does too.
+        while k < len(active) and active[k] < j:
+            k += 1
+        self.cursor = k
+        return active[k] if k < len(active) else len(self.raw)
 
     def _equal_run(self, limit: int) -> int:
         """Length of the identical run at the current positions, capped by limit. An
@@ -349,14 +377,12 @@ class _Walk:
                 done += n
                 step *= 2
                 continue
-            lo, hi = 0, n - 1
-            while lo < hi:
-                mid = (lo + hi + 1) // 2
-                if low.startswith(held[i + done:i + done + mid], j + done):
-                    lo = mid
-                else:
-                    hi = mid - 1
-            return done + lo
+            # The mismatch is inside this block, which is no longer than twice the
+            # equal run found so far plus one step, so a plain scan stays linear.
+            k = 0
+            while low[j + done + k] == held[i + done + k]:
+                k += 1
+            return done + k
         return done
 
     def advance(self, target: int) -> None:
@@ -394,7 +420,8 @@ class _Walk:
                         # character came from is no longer shown.
                         self.dead = True
                         break
-                    self.changed.extend(range(i, i + len(reading)))
+                    if not (used == 1 and self._is_case_of(c, reading)):
+                        self.changed.extend(range(i, i + len(reading)))
                     self.i = i + len(reading)
                     self.j = j + used
                     break
