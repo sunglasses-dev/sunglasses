@@ -245,8 +245,13 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
                     if data:
                         if rowlength > room - out.spent or out.spent + len(data) > room:
                             return _Decoded(spent=room + 1, state="big")
+                        # The output is at most as long as the input. It is reserved before the
+                        # reader runs, so a predictor that fails after it has made rows is still
+                        # charged for them, and the charge is trued up when it succeeds.
+                        reserved = len(data)
+                        out.spent += reserved
                         data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
-                        out.spent += len(data)
+                        out.spent += len(data) - reserved
             elif name in _ASCII85:
                 size = _ascii85_length(data)
                 out.spent += size
