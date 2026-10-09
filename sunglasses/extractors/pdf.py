@@ -233,8 +233,13 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
                     if data:
                         if rowlength > room - out.spent or out.spent + len(data) > room:
                             return _Decoded(spent=room + 1, state="big")
+                        # The output is at most as long as the input. It is reserved before the
+                        # reader runs, so a predictor that fails after it has made rows is still
+                        # charged for them, and the charge is trued up when it succeeds.
+                        reserved = len(data)
+                        out.spent += reserved
                         data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
-                        out.spent += len(data)
+                        out.spent += len(data) - reserved
             elif name in _ASCII85:
                 size = _ascii85_length(data)
                 out.spent += size
@@ -635,15 +640,25 @@ class _ImageWalk:
         """The decoded content of a page (one stream or an array) or a form. Each stream
         goes through the bounded decoder: every stage is charged to the budget, the reader's
         own decode is never used, and a stream whose filters cannot be sized is not decoded."""
+        paid = False   # a single stream is paid for by the visit that brought us here
         if hasattr(holder, 'get_data'):
-            streams = [holder]
+            entries = [holder]
         else:
             contents = _resolve(holder.get('/Contents'))
             if contents is None:
                 return b""
-            streams = [_resolve(c) for c in contents] if isinstance(contents, list) else [contents]
+            if isinstance(contents, list):
+                entries, paid = contents, True
+            else:
+                entries = [contents]
         out = []
-        for stream in streams:
+        for entry in entries:
+            # An entry of an array is paid for before it is resolved or decoded, so an array
+            # of any length is bounded by the budget whatever its streams decode to. The charge
+            # also covers the separator the join adds between two entries.
+            if paid:
+                self.budget.spend(self.VISIT_COST)
+            stream = _resolve(entry)
             if not hasattr(stream, 'get_data'):
                 continue
             result = _decode_bounded(stream, self.budget.remaining())
