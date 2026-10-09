@@ -486,6 +486,8 @@ class _RawCopies:
     def __init__(self, raw: str, negated):
         self._raw = raw
         self._low = None
+        self._flat = None
+        self._flat_at = self._raw_at = None
         self._seen = {}
         self._negated = negated
 
@@ -497,10 +499,45 @@ class _RawCopies:
             at = low.find(key, at + 1)
         return n
 
-    @staticmethod
-    def _pattern(key: str):
-        """The opening as a pattern in which a space is any run of blank space."""
-        return re.compile(r"\s+".join(re.escape(word) for word in key.split(" ")))
+    _BLANK = re.compile(r"\s+")
+
+    def _collapsed(self):
+        """The lowered raw text with every run of blank space read as one space,
+        and where each piece of it starts in the flat text and in the raw text."""
+        if self._flat is None:
+            low = self._low
+            pieces, flat_at, raw_at, size, last = [], [], [], 0, 0
+            for run in self._BLANK.finditer(low):
+                if run.start() > last:
+                    pieces.append(low[last:run.start()])
+                    flat_at.append(size)
+                    raw_at.append(last)
+                    size += run.start() - last
+                pieces.append(" ")
+                flat_at.append(size)
+                raw_at.append(run.start())
+                size += 1
+                last = run.end()
+            if last < len(low):
+                pieces.append(low[last:])
+                flat_at.append(size)
+                raw_at.append(last)
+            self._flat, self._flat_at, self._raw_at = "".join(pieces), flat_at, raw_at
+        return self._flat
+
+    def _copies(self, key: str):
+        """Where the opening starts in the raw text, a space in it standing for
+        any run of blank space. One pass over the text read with its blank runs
+        collapsed, so a long run costs what it is long and the number of spaces in
+        the opening does not matter."""
+        flat = self._collapsed()
+        want = self._BLANK.sub(" ", key)
+        found, at = [], flat.find(want)
+        while at != -1:
+            k = bisect.bisect_right(self._flat_at, at) - 1
+            found.append(self._raw_at[k] + at - self._flat_at[k])
+            at = flat.find(want, at + len(want))
+        return found
 
     def negated(self, view_id: int, view: str, plain_end: int, opening: str, build) -> bool:
         """`view` is the view `view_id`, its plain text ends at `plain_end`, and
@@ -515,7 +552,7 @@ class _RawCopies:
         if self._low is None:
             self._low = _ascii_lower(self._raw)
         verdict = False
-        copies = [m.start() for m in self._pattern(key).finditer(self._low)]
+        copies = self._copies(key)
         if copies and self.MARK not in self._raw:
             verdict = all(self._negated(self._raw, at) for at in copies)
             if verdict:

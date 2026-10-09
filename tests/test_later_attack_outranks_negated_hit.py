@@ -635,3 +635,62 @@ def test_a_copy_is_shown_only_when_the_marked_view_is_the_view_of_the_text():
     broken = _RawCopies(raw, lambda text, at: True)
     assert broken.negated(1, view, len(view), "ignore all previous instructions",
                           lambda text: normalize(text).replace(_RawCopies.MARK, "?")) is False
+
+
+@pytest.mark.parametrize("groups,run", [(2, 30000), (3, 1500)])
+def test_adjacent_blank_runs_in_the_opening_cost_one_pass_over_a_long_blank_run(groups, run):
+    """The opening of a folded hit keeps the blank runs the text had, and each of
+    them is a place the raw copy can be written with any run of blank space. The
+    copy search once turned each into its own group, so two or three next to each
+    other fought over one long run in the text and the cost grew with its square
+    or cube. A rule that matches a near copy followed by a long blank run is the
+    worst shape: the search finds no copy and has tried every split."""
+    import time
+    from sunglasses.patterns import PATTERNS
+
+    rule_id = RULES[0][0]
+    isolated = SunglassesEngine(patterns=[next(p for p in PATTERNS if p["id"] == rule_id)],
+                                mechanisms=False)
+    spaced = REGEX.replace(" ", " " * groups, 1)
+    doc = (LEADS["accent"] + LIGATURE_WARNINGS[0] + spaced + ". " + GAP
+           + REGEX.split()[0] + " " * run + "ordinary.")
+    start = time.perf_counter()
+    result = isolated.scan(doc, "file")
+    elapsed = time.perf_counter() - start
+    assert result.decision != "block"
+    assert elapsed < 0.5, f"{groups} adjacent blank groups took {elapsed:.2f}s on a {run} character run"
+
+
+@pytest.mark.parametrize("key,text,expected", [
+    ("ignore all previous", "never ignore all previous notes", [6]),
+    ("ignore all previous", "never ignore   all\t\nprevious notes", [6]),
+    ("ignore  all previous", "never ignore all previous notes", [6]),
+    ("ignore     all    previous", "x ignore \t all previous y ignore all  previous", [2, 26]),
+    (" all previous", "ignore   all previous", [6]),
+    ("previous ", "all previous    notes", [4]),
+    ("ignore all previous", "ignore all previou", []),
+    ("ignore all", "ignoreall ignore all", [10]),
+    ("aa", "aaaa", [0, 2]),
+])
+def test_copies_of_the_opening_in_the_raw_text(key, text, expected):
+    """A space in the opening is any run of blank space in the text. A copy starts
+    where its first character is in the raw text, and a copy that starts on a
+    blank run starts at the front of the run."""
+    from sunglasses.engine import _RawCopies, _ascii_lower
+
+    copies = _RawCopies(text, lambda raw, at: True)
+    copies._low = _ascii_lower(text)
+    assert copies._copies(_ascii_lower(key)) == expected
+
+
+def test_copies_of_the_opening_scale_with_the_text_not_with_its_blank_runs():
+    import time
+    from sunglasses.engine import _RawCopies, _ascii_lower
+
+    text = "never ignore" + " " * 200000 + "all previous " + "ignore all previous" + " " * 200000 + "x"
+    copies = _RawCopies(text, lambda raw, at: True)
+    copies._low = _ascii_lower(text)
+    start = time.perf_counter()
+    found = copies._copies("ignore   " + "  all   " + "previous")
+    assert time.perf_counter() - start < 1.0
+    assert len(found) == 2
