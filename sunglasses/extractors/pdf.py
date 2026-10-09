@@ -9,9 +9,9 @@ Extracts text from PDFs using multiple methods:
    of widgets outside /AcroForm (XFA form data is reported as not inspected)
 5. JavaScript — /OpenAction, /AA and /Names /JavaScript actions of the document,
    its pages, annotations and fields (bounded, see MAX_ACTIONS)
-6. Embedded files — text attachments up to MAX_ATTACHMENT_BYTES (raw or plain
-   FlateDecode) are read; other attachments, including PDF, PostScript and binary
-   files, are reported as not inspected
+6. Embedded files — text attachments up to MAX_ATTACHMENT_BYTES (raw, or decoded by
+   a bounded chain of Flate, ASCII85 and LZW stages) are read; other attachments,
+   including PDF, PostScript and binary files, are reported as not inspected
 
 Decoded content of one document is read from a single _ReadBudget, and the part
 that a bound leaves unread is recorded in `failures`.
@@ -105,13 +105,106 @@ def _lzw_length(data: bytes, limit: int) -> Optional[int]:
             return total
 
 
-def _probe_size(stream, limit: int) -> Optional[int]:
-    """How many bytes a stream decodes to, read from its data before the reader decodes
-    it: a Flate stream is inflated no further than `limit` plus one, the ASCII85 filter
-    only shrinks its input, and an LZW stream is counted without being built. A result
-    past `limit` means the stream does not fit. None when the chain holds a filter that
-    is not sized here (a hex filter, run length, an image filter), which the caller
-    treats as not decodable within the bounds."""
+class _Decoded:
+    """The result of one bounded decode: the data (None when it was refused), the bytes
+    produced by every stage, and why it was refused."""
+
+    __slots__ = ("data", "spent", "state", "detail", "notes")
+
+    def __init__(self, data=None, spent=0, state="ok", detail="", notes=()):
+        self.data = data
+        self.spent = spent
+        self.state = state    # ok | big | unsized | error
+        self.detail = detail
+        self.notes = list(notes)
+
+
+_ASCII85_SKIP = bytes(b for b in range(256) if not 33 <= b <= 117)
+_FLATE = ('/FlateDecode', '/Fl')
+_ASCII85 = ('/ASCII85Decode', '/A85')
+_LZW = ('/LZWDecode', '/LZW')
+
+
+def _inflate(data: bytes, room: int):
+    """Inflate a zlib or gzip stream, no further than `room` bytes. The header is read
+    here and the checksum is not checked, so data whose only fault is a bad checksum is
+    kept, as PyPDF2 keeps it. Returns (output, reached_end, data_after_end, damaged)."""
+    start, trailer = None, 4
+    if len(data) >= 2 and data[0] & 0x0f == 8 and (data[0] << 8 | data[1]) % 31 == 0 \
+            and not data[1] & 0x20:
+        start = 2
+    elif data[:3] == b"\x1f\x8b\x08" and len(data) >= 10:
+        flags, pos, trailer = data[3], 10, 8
+        if flags & 4:
+            pos += 2 + int.from_bytes(data[pos:pos + 2], "little")
+        for bit in (8, 16):
+            if flags & bit:
+                end = data.find(b"\0", pos)
+                pos = len(data) if end < 0 else end + 1
+        if flags & 2:
+            pos += 2
+        if pos <= len(data):
+            start = pos
+    if start is None:
+        raise ValueError("not a zlib or gzip stream")
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    chunks, total, pos, pending, damaged = [], 0, start, b"", False
+    while True:
+        if not pending:
+            if pos >= len(data) or inflater.eof:
+                break
+            pending, pos = data[pos:pos + 65536], pos + 65536
+        try:
+            out = inflater.decompress(pending, room + 1 - total)
+        except zlib.error:
+            damaged = True
+            break
+        rest = inflater.unconsumed_tail
+        if not out and len(rest) == len(pending):
+            break
+        pending = rest
+        chunks.append(out)
+        total += len(out)
+        if total > room or inflater.eof:
+            break
+    after = (inflater.unused_data + pending + data[pos:])[trailer:] if inflater.eof else b""
+    return b"".join(chunks), inflater.eof, after, damaged
+
+
+def _ascii85_length(data: bytes) -> int:
+    """The length ASCII85 decoding produces, counted without decoding."""
+    body = data.split(b"~", 1)[0]
+    digits = len(body.translate(None, _ASCII85_SKIP))
+    return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
+
+
+def _predictor_of(params):
+    """(predictor, columns, bits per component) the way PyPDF2 reads them."""
+    def resolve(obj):
+        return obj.get_object() if hasattr(obj, 'get_object') else obj
+    params = resolve(params)
+    predictor, columns, bits = 1, 1, 8
+    entries = params if isinstance(params, (list, tuple)) else [params]
+    for entry in entries:
+        entry = resolve(entry)
+        if not hasattr(entry, 'get'):
+            continue
+        predictor = resolve(entry.get('/Predictor', predictor))
+        columns = resolve(entry.get('/Columns', columns))
+        bits = resolve(entry.get('/BitsPerComponent', bits))
+    return int(predictor), int(columns), int(bits)
+
+
+def _decode_bounded(stream, room: int) -> "_Decoded":
+    """Decode a stream's filter chain one stage at a time, so that no stage runs past what
+    is left of the budget and nothing is decoded twice. Every stage's output, the
+    intermediate ones included, is added to `spent`, and the chain is refused (state
+    "big") as soon as that sum passes `room`. A Flate stage is inflated no further than
+    `room` and gzip is read as well as zlib. ASCII85 and LZW are counted before they are
+    decoded. A predictor is applied to the bounded output. A chain with a filter that is
+    not sized here (hex, run length, an image filter, /Crypt, LZW that is not the last
+    filter) is refused with state "unsized", and a stage that fails with "error". The
+    reader's own get_data() is never called."""
     from PyPDF2 import filters as pdf_filters
 
     def resolve(obj):
@@ -123,24 +216,68 @@ def _probe_size(stream, limit: int) -> Optional[int]:
     else:
         names = [] if names is None else [str(names)]
     data = getattr(stream, '_data', None) or b""
-    for i, name in enumerate(names):
-        if name in ('/FlateDecode', '/Fl'):
-            data = zlib.decompressobj().decompress(data, limit + 1)
-            if len(data) > limit:
-                return limit + 1
-        elif name in ('/ASCII85Decode', '/A85'):
-            data = pdf_filters.ASCII85Decode.decode(data)
-        elif name in ('/LZWDecode', '/LZW') and i == len(names) - 1:
-            return _lzw_length(data, limit)
-        else:
-            return None
-    return len(data)
+    out = _Decoded(data=data)
+    if not data:
+        return out
+    try:
+        for i, name in enumerate(names):
+            if name in _FLATE:
+                data, reached_end, after, damaged = _inflate(data, room - out.spent)
+                out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                if damaged or not reached_end:
+                    out.notes.append("compressed data ends before its stream does; "
+                                     "the rest was not inspected")
+                elif after.strip(b"\x00\t\n\x0c\r "):
+                    out.notes.append("holds data after the end of its compressed stream; "
+                                     "that data was not inspected")
+                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'))
+                if predictor != 1:
+                    if not 10 <= predictor <= 15:
+                        raise ValueError("unsupported predictor")
+                    rowlength = -(-columns * bits // 8) + 1
+                    data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
+                    out.spent += len(data)
+                    if out.spent > room:
+                        return _Decoded(spent=room + 1, state="big")
+            elif name in _ASCII85:
+                size = _ascii85_length(data)
+                out.spent += size
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                data = pdf_filters.ASCII85Decode.decode(data)
+            elif name in _LZW and i == len(names) - 1:
+                size = _lzw_length(data, room - out.spent)
+                if size is None:
+                    return _Decoded(spent=out.spent, state="unsized", detail=name)
+                out.spent += size
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
+                data = pdf_filters.LZWDecode.decode(data)
+                if len(data) > size:
+                    return _Decoded(spent=room + 1, state="big")
+            else:
+                return _Decoded(spent=out.spent, state="unsized", detail=name)
+    except Exception as exc:
+        return _Decoded(spent=out.spent, state="error", detail=exc.__class__.__name__)
+    if isinstance(data, str):
+        data = data.encode('latin-1', 'replace')
+    out.data = data
+    if not names:
+        out.spent = len(data)
+    return out
 
-# The tail the PDF reader needs to find the cross reference table. The reader searches
-# the whole data backwards for %%EOF, takes the offset with int() (so a sign and digit
-# separators are accepted) and does not care what follows, so the tail is looked for
-# anywhere.
-_XREF_TAIL = re.compile(rb'startxref\s+[+-]?\d[\d_]*\s*%%EOF')
+
+# The tail the PDF reader needs to find the cross reference table. The reader searches the
+# whole data backwards for %%EOF and reads the line in front of it: either an offset (taken
+# with int(), so a sign and digit separators are accepted) with a line that starts with
+# "startxref" before that, which may carry other text after the keyword, or one line that
+# starts with "startxref" and holds the offset after it. It does not care what follows
+# %%EOF, so the tail is looked for anywhere.
+_XREF_OFFSET = rb'[+-]?\d[\d_]*'
+_XREF_TAIL = re.compile(
+    rb'startxref(?:[^\r\n]*[\r\n]+\s*' + _XREF_OFFSET + rb'|\s*' + _XREF_OFFSET + rb')\s*%%EOF')
 
 # Bytes that may appear in text; a file with others in its first 8 KiB is binary.
 _TEXT_BYTES = bytes([9, 10, 11, 12, 13, 27]) + bytes(range(32, 127)) + bytes(range(128, 256))
@@ -191,6 +328,7 @@ class PDFExtractor:
         self._seen_values = set()
         self._visited = set()
         self._fields_visited = set()
+        self._kid_arrays = set()
         self._files_seen = set()
         self._stream_cache = {}
         self._text_cache = {}
@@ -476,11 +614,11 @@ class PDFExtractor:
 
     def _bounded_stream_bytes(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
         """Decoded bytes of a stream, or None (recorded) when that is not cheap
-        and bounded: only raw and plain FlateDecode data up to
-        MAX_ATTACHMENT_BYTES is inflated, with an output bound, so a small
-        compressed object cannot expand without limit. What is left of the
-        document budget is checked before a stream is decoded and bounds the
-        output, and a stream read before is not decoded again."""
+        and bounded. The chain is decoded by _decode_bounded, one stage at a time,
+        within what is left of the document budget and `cap`, and every stage is
+        charged as it is produced, so a small compressed object cannot expand
+        without limit and nothing is decoded by the reader's own, unbounded
+        decode. A stream read before is not decoded again."""
         key = id(stream)
         if key in self._stream_cache:
             data = self._stream_cache[key]
@@ -504,69 +642,33 @@ class PDFExtractor:
             return None
         if not filters:
             return raw if self._spend(len(raw)) else None
-        if filters in (['/FlateDecode'], ['/Fl']):
-            params = self._resolve(stream.get('/DecodeParms')) if '/DecodeParms' in stream else None
-            if isinstance(params, (list, tuple)) and params:
-                params = self._resolve(params[0])
-            if params is not None and hasattr(params, 'get'):
-                if int(self._resolve(params.get('/Predictor', 1)) or 1) > 1:
-                    return self._decode_native(stream, name, cap)
-            room = self.budget.remaining()
-            if room <= 0:
-                self._spend(1)  # records that the document limit stopped the read
-                return None
-            limit = min(cap, room)
-            inflater = zlib.decompressobj()
-            data = inflater.decompress(raw, limit + 1)
-            # What was inflated is charged whether or not it is kept, so a run of
-            # streams that are each too large cannot inflate without the bound.
-            charged = self._spend(len(data))
-            if len(data) > limit:
-                if limit >= cap and charged:
-                    self.failures.append(f"{name} larger than {cap} bytes; not inspected")
-                return None
-            if not charged:
-                return None
-            if not inflater.eof:
-                self.failures.append(
-                    f"{name} compressed data ends before its stream does; "
-                    f"the rest was not inspected")
-            elif inflater.unused_data.strip(b"\x00\t\n\x0c\r "):
-                self.failures.append(
-                    f"{name} holds data after the end of its compressed stream; "
-                    f"that data was not inspected")
-            return data
-        return self._decode_native(stream, name, cap)
-
-    def _decode_native(self, stream, name: str, cap: int) -> Optional[bytes]:
-        """A stream in a chain the bounded inflate above does not cover (a predictor, an
-        ASCII85 or LZW filter, a chain of them). Its size is read from the data first and
-        stays within the room left in the budget and the cap, and only then does the reader
-        decode it, so the decode is bounded and its output is charged."""
         room = self.budget.remaining()
         if room <= 0:
             self._spend(1)  # records that the document limit stopped the read
             return None
         limit = min(cap, room)
-        try:
-            size = _probe_size(stream, limit)
-            if size is None:
-                self.failures.append(f"{name} uses filter {','.join(self._filter_names(stream))}; not inspected")
-                return None
-            data = b"" if size > limit else stream.get_data()
-        except Exception as exc:
-            self.failures.append(
-                f"{name} could not be decoded ({exc.__class__.__name__}); not inspected")
-            return None
-        if isinstance(data, str):
-            data = data.encode('latin-1', 'replace')
-        size = max(size, len(data))
-        charged = self._spend(size if size <= limit else limit + 1)
-        if size > limit:
+        # The chain is decoded here, stage by stage, within the room left, and every
+        # stage is charged as it is produced. The reader's own decode is never used.
+        result = _decode_bounded(stream, limit)
+        # What was produced is charged whether or not it is kept, so a run of streams
+        # that are each too large cannot decode without the bound.
+        charged = self._spend(result.spent)
+        if result.state == "big":
             if limit >= cap and charged:
                 self.failures.append(f"{name} larger than {cap} bytes; not inspected")
             return None
-        return data if charged else None
+        if result.state == "unsized":
+            self.failures.append(f"{name} uses filter {result.detail}; not inspected")
+            return None
+        if result.state == "error":
+            self.failures.append(
+                f"{name} could not be decoded ({result.detail}); not inspected")
+            return None
+        if not charged:
+            return None
+        for note in result.notes:
+            self.failures.append(f"{name} {note}")
+        return result.data
 
     def _filter_names(self, stream) -> List[str]:
         filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
@@ -579,6 +681,7 @@ class PDFExtractor:
         out: List[Tuple[str, object]] = []
         stack = [(node, 0)]
         seen = set()
+        arrays = set()
         while stack and len(out) <= cap:
             node, depth = stack.pop()
             ident = self._identity(node)
@@ -598,8 +701,18 @@ class PDFExtractor:
                     if len(out) > cap:
                         break
             kids = self._resolve(node.get('/Kids')) if '/Kids' in node else None
-            if kids:
-                stack.extend((kid, depth + 1) for kid in kids)
+            if kids and self._identity(node.get('/Kids')) in arrays:
+                kids = None  # a /Kids array that was walked under another node
+            elif kids:
+                arrays.add(self._identity(node.get('/Kids')))
+            for kid in kids or ():
+                # Each kid is charged, and one already seen is not pushed, so nodes
+                # that share an array cost the budget and not a square.
+                if not self._spend(self.VISIT_COST):
+                    stack.clear()
+                    break
+                if self._identity(kid) not in seen:
+                    stack.append((kid, depth + 1))
         if len(out) > cap:
             self.failures.append(f"{what} beyond {cap} not inspected")
             out = out[:cap]
@@ -691,6 +804,10 @@ class PDFExtractor:
 
     def _walk_fields(self, fields, prefix: str, depth: int, counter: List[int], out) -> None:
         for ref in fields:
+            # Every reference that is iterated is charged, also one that was visited
+            # before, so a /Kids array that many parents list is bounded by the budget.
+            if not self._spend(self.VISIT_COST):
+                return
             ident = self._identity(ref)
             if ident in self._fields_visited:
                 continue
@@ -718,6 +835,10 @@ class PDFExtractor:
                 if '/AA' in field:
                     out.extend(self._scripts_in(field['/AA'], f"field:{name}", table=True))
                 kids = self._resolve(field['/Kids']) if '/Kids' in field else None
+                if kids and self._identity(field.get('/Kids')) in self._kid_arrays:
+                    kids = None  # this array was walked under another parent
+                elif kids:
+                    self._kid_arrays.add(self._identity(field.get('/Kids')))
                 if kids and depth >= 32:
                     self._note("form fields nested deeper than 32 levels; the fields below not inspected")
                 elif kids:

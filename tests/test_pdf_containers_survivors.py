@@ -86,3 +86,84 @@ def test_additional_action_on_a_template_page_is_found_or_reported_unread(engine
     d.catalog_extra = f"/Names << /Templates << /Names [(t) {template} 0 R] >> >>".encode()
     r = _scan_one(engine, tmp_path, d.build())
     assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+# Eight more locations the review of the sixth round listed. Main reads none of them either;
+# each is pinned here with its reason and becomes its own follow up.
+def _plain_annot(d, body: str) -> int:
+    return d.widget(f"<< /Type /Annot /Rect [0 0 1 1] /F 4 {body} >>".encode(), field=False)
+
+
+@pytest.mark.xfail(strict=True, reason="the related files (/RF) of a file specification are neither read nor recorded")
+def test_related_file_of_a_filespec_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    main = d.add(_stream(b"harmless", b"/Type /EmbeddedFile"))
+    related = d.add(_stream(PAYLOAD.encode(), b"/Type /EmbeddedFile"))
+    rel_array = d.add(f"[(r.txt) {related} 0 R]".encode())
+    spec = d.add((f"<< /Type /Filespec /F (a.txt) /EF << /F {main} 0 R >> "
+                  f"/RF << /F {rel_array} 0 R >> >>").encode())
+    d.catalog_extra = f"/Names << /EmbeddedFiles << /Names [(a.txt) {spec} 0 R] >> >>".encode()
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the /URI of a link action is neither read nor recorded")
+def test_link_uri_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    _plain_annot(d, f"/Subtype /Link /A << /S /URI /URI ({_s(PAYLOAD)}) >>")
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the parameters of a launch action are neither read nor recorded")
+def test_launch_parameters_are_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    _plain_annot(d, f"/Subtype /Link /A << /S /Launch /Win << /F (run.exe) /P ({_s(PAYLOAD)}) >> >>")
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="an annotation /Contents that is an indirect string is neither read nor recorded")
+def test_indirect_annotation_contents_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    text = d.add(f"({_s(PAYLOAD)})".encode())
+    _plain_annot(d, f"/Subtype /Text /Contents {text} 0 R")
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the rich text (/RC) of a free text annotation is neither read nor recorded")
+def test_free_text_rich_contents_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    _plain_annot(d, f"/Subtype /FreeText /DA (/Helv 0 Tf) /RC (<body>{_s(PAYLOAD)}</body>)")
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the caption (/MK /CA) of a widget is neither read nor recorded")
+def test_widget_caption_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    n = d.add(f"<< /Type /Annot /Subtype /Widget /FT /Btn /T (go) /Rect [0 0 1 1] /MK << /CA ({_s(PAYLOAD)}) >> /F 4 >>".encode())
+    d.fields.append(n)
+    d.annots.append(n)
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the XMP packet in the catalog /Metadata stream is neither read nor recorded")
+def test_xmp_metadata_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    xmp = d.add(_stream(f"<x:xmpmeta><dc:description>{PAYLOAD}</dc:description></x:xmpmeta>".encode(),
+                        b"/Type /Metadata /Subtype /XML"))
+    d.catalog_extra = f"/Metadata {xmp} 0 R".encode()
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
+
+
+@pytest.mark.xfail(strict=True, reason="the media clip of a screen annotation rendition is neither read nor recorded")
+def test_rendition_media_clip_is_found_or_reported_unread(engine, tmp_path):
+    d = Doc()
+    _plain_annot(d, ("/Subtype /Screen /A << /S /Rendition /OP 0 /R << /Type /Rendition /S /MR "
+                     f"/C << /Type /MediaClip /S /MCD /N ({_s(PAYLOAD)}) /D (clip.mp3) >> >> >>"))
+    r = _scan_one(engine, tmp_path, d.build())
+    assert _found_or_reported(r), (r.decision, r.inspection_complete, r.extraction_sources)
