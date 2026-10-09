@@ -267,6 +267,10 @@ class _Walk:
             for form in (base, mapped):
                 out.append(form)
                 out.append(form.lower())
+                if "\u03a3" in form:
+                    # Lowering the whole text gives the final sigma at the end of a word,
+                    # and lowering this run on its own gives the medial one.
+                    out.append(form.lower().replace("\u03c3", "\u03c2"))
                 leet = "".join(LEET.get(c, c) for c in form)
                 out.append(leet)
                 out.append(leet.lower())

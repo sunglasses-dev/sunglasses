@@ -15,7 +15,7 @@ Review of the ninth round found:
 import pytest
 
 from sunglasses.engine import SunglassesEngine
-from sunglasses.preprocessor import ENRICH_MAX_LEN, VIEW_SEP, normalize_with_length
+from sunglasses.preprocessor import ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_with_length
 
 from test_negation_later_hits_round8 import ATTACK, BLOCKING, ROUTES, _covered, _rule
 
@@ -151,8 +151,57 @@ def _decision(alternatives, run):
 @pytest.mark.parametrize("alternatives,run,expected", [
     (1, 31, "covered"), (1, 32, "block"),
     (2, 15, "covered"), (2, 16, "block"),
-    (3, 5, "covered"), (3, 10, "block"),
-    (4, 5, "covered"), (4, 10, "block"),
+    (3, 5, "covered"), (3, 9, "covered"), (3, 10, "block"),
+    (4, 5, "covered"), (4, 7, "covered"), (4, 8, "block"), (4, 10, "block"),
 ])
 def test_the_skip_cap_threshold_falls_as_the_alternatives_of_a_rule_grow(alternatives, run, expected):
     assert _decision(alternatives, run) == expected, (alternatives, run)
+
+
+# 4. Found in the review of the tenth round.
+#
+# A capital sigma at the end of a word lowers to the final sigma when the whole text is
+# lowered, and to the medial one when the run is lowered on its own. The walk read only the
+# second, so the word before a covered hit did not pair with the view and the hit blocked.
+@pytest.mark.parametrize("route", sorted(ROUTES))
+@pytest.mark.parametrize("lead", ["ΟΔΟΣ ", "Σ ", "ΟΣΟΣ ", "ΣΑΣ, ΟΔΟΣ ", "ΟΔΟΣ"])
+def test_a_word_final_capital_sigma_before_a_covered_hit_keeps_it_covered(route, lead):
+    result = ROUTES[route]().scan(lead.rstrip() + " " + COVERED, channel="message")
+    assert result.decision == "allow_redacted" and _covered(result), (route, lead)
+
+
+# A decimal reference of more than 4300 digits makes the pipeline's entity pass leave every
+# entity in the text undecoded. The walk cannot pair an ordinary entity in front of a covered
+# hit then, and ends there: the hit blocks, where main allows it. This is disclosed, and
+# pinned here so that a change in either direction is seen. Only 4301 reaches this state: the
+# base64 pass rewrites a reference of 5000 or 20000 digits.
+@pytest.mark.parametrize("route", ["aho_keyword", "python_keyword", "normalized_regex"])
+def test_an_entity_before_a_covered_hit_blocks_beside_a_4301_digit_reference_after_it(route):
+    text = "&amp; " + COVERED + " &#" + "9" * 4301 + ";"
+    result = ROUTES[route]().scan(text, channel="message")
+    assert result.decision in BLOCKING and not _covered(result), route
+
+
+@pytest.mark.parametrize("route", ["aho_keyword", "python_keyword", "normalized_regex"])
+def test_the_same_entity_before_a_covered_hit_stays_covered_without_the_long_reference(route):
+    result = ROUTES[route]().scan("&amp; " + COVERED, channel="message")
+    assert result.decision == "allow_redacted" and _covered(result), route
+
+
+# The normalizer measures the shadow view on its own, and the walk must pass that length to
+# the views it keeps in front of it. Reading the lowered length instead lets a dotted
+# capital I push a short view over the limit.
+def _shadow_tail(dotted, folded):
+    base = COVERED + " lamp " + "".join(chr(0xE0000 + ord(c)) for c in "a")
+    measured = normalize_with_length(decode_shadow_ascii(base))[1]
+    return base + "x" * (folded - measured - dotted) + "İ" * dotted
+
+
+@pytest.mark.parametrize("route", ["aho_keyword", "python_keyword"])
+@pytest.mark.parametrize("dotted", [1, 5, 20])
+@pytest.mark.parametrize("folded", [ENRICH_MAX_LEN - 2, ENRICH_MAX_LEN - 1, ENRICH_MAX_LEN])
+def test_a_covered_hit_beside_a_shadow_tail_near_the_limit_stays_covered(route, dotted, folded):
+    text = _shadow_tail(dotted, folded)
+    assert normalize_with_length(decode_shadow_ascii(text))[1] == folded
+    result = ROUTES[route]().scan(text, channel="message")
+    assert result.decision == "allow_redacted" and _covered(result), (route, dotted, folded)
