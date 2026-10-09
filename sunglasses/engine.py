@@ -281,7 +281,13 @@ class _Walk:
         if c == "&":
             m = _ENTITY_RX.match(raw, j)
             if m:
-                used, text = m.end() - j, html.unescape(m.group())
+                try:
+                    used, text = m.end() - j, html.unescape(m.group())
+                except ValueError:
+                    # A decimal reference of more than 4300 digits is refused by the
+                    # int conversion. The pipeline leaves the text as it is, so no
+                    # reading is shown here and the walk ends.
+                    return 1, []
         elif c == "%":
             m = _PERCENT_RX.match(raw, j)
             if m:
@@ -300,7 +306,12 @@ class _Walk:
         c = text[j]
         if c == "&":
             m = _ENTITY_RX.match(text, j)
-            return bool(m) and html.unescape(m.group()) != m.group()
+            if not m:
+                return False
+            try:
+                return html.unescape(m.group()) != m.group()
+            except ValueError:
+                return True   # a reference too long to convert is an escape, not text
         if c == "%":
             # One escape is enough to say that a decoding step begins here. Matching the
             # whole run would read the rest of the run again at every percent sign.
@@ -1297,7 +1308,7 @@ class SunglassesEngine:
     LATER_HITS = 32
 
     @staticmethod
-    def _enrichment_spans(text: str, plain_end: int, stop: int):
+    def _enrichment_spans(text: str, plain_end: int, stop: int, folded_length: int = None):
         """The views behind the plain one, as (start, end, kept) triples inside
         text[:stop]. The normalizer appends ROT13, reversed and l-for-I views of the
         text behind view separators, so a hit that only one of them holds is an
@@ -1313,11 +1324,11 @@ class SunglassesEngine:
             if lo < hi:
                 spans.append((lo, hi))
             pos = hi
-        kept = SunglassesEngine._kept_views(text[:plain_end], text[:stop], len(spans))
+        kept = SunglassesEngine._kept_views(text[:plain_end], text[:stop], len(spans), folded_length)
         return [(lo, hi, k) for (lo, hi), k in zip(spans, kept)]
 
     @staticmethod
-    def _kept_views(plain: str, whole: str, count: int):
+    def _kept_views(plain: str, whole: str, count: int, folded_length: int = None):
         """For each of the `count` views behind the plain one: True when it keeps the
         position of every character of the plain view (ROT13, and the l-for-I variant of
         the plain or the ROT13 view), False for the reversed ones, where offset k holds
@@ -1325,9 +1336,12 @@ class SunglassesEngine:
         keeps the offsets is rebuilt here on its own, the way the normalizer builds it, and
         counts only when it is exactly what stands in `whole`; a view that does not match
         is False. A layout that is not the one the normalizer writes is False for every
-        view, so a view whose origin is not shown is never a copy."""
+        view, so a view whose origin is not shown is never a copy. The short or long layout is
+        chosen by `folded_length`, the length the normalizer measured before it lowered the
+        text: a dotted capital I is longer once lowered, so the plain view can read as long
+        when the normalizer wrote the short layout."""
         none = [False] * count
-        if len(plain) > ENRICH_MAX_LEN:
+        if (len(plain) if folded_length is None else folded_length) > ENRICH_MAX_LEN:
             # A long input only gets the ROT13 view, which keeps every offset.
             return [True] if count == 1 and len(whole) == 2 * len(plain) + 3 else none
         sep = " " + VIEW_SEP + " "
@@ -1738,16 +1752,16 @@ class SunglassesEngine:
         tail = None
         tail_start = len(normalized)
         if shadow is not None:
-            tail_text = normalize_with_length(shadow)[0]
+            tail_text, tail_folded = normalize_with_length(shadow)
             if normalized.endswith(tail_text):
                 tail_start = len(normalized) - len(tail_text)
                 tail_plain = _RawAlign.view_end(tail_text, 0)
                 tail = (tail_text, tail_plain,
-                        self._enrichment_spans(tail_text, tail_plain, len(tail_text)))
+                        self._enrichment_spans(tail_text, tail_plain, len(tail_text), tail_folded))
         sep = " " + VIEW_SEP + " "
         main_stop = tail_start - len(sep) if normalized.startswith(sep, tail_start - len(sep)) \
             and tail is not None else tail_start
-        spans = self._enrichment_spans(normalized, plain_end, main_stop)
+        spans = self._enrichment_spans(normalized, plain_end, main_stop, folded_length)
         regions = [(normalized, 0, 0, plain_end, None)]
         regions.extend((normalized, 0, lo, hi, (0, plain_end) if kept else ())
                        for lo, hi, kept in spans)
