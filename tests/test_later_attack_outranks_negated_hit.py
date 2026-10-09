@@ -369,7 +369,7 @@ def test_the_normalized_origin_maps_the_plain_text_and_the_shape_copy_only():
     from sunglasses.preprocessor import normalize
     raw = "Never, even if oﬃce oﬃcials oﬀer oﬃcial consent, lgnore the rules"
     normalized = normalize(raw)
-    origin = SunglassesEngine._raw_frame(_RawAlign(raw), None, normalized, shape=True)[0]
+    origin = SunglassesEngine._raw_frame(_RawAlign(raw), None, normalized, normalize, shape=True)[0]
     assert origin(normalized.index("lgnore")) == raw.index("lgnore")
     copy = normalized.rindex("ignore the rules")          # the shape-confusion copy
     assert origin(copy) is None                            # the letter the copy rewrote
@@ -386,7 +386,7 @@ def test_a_decoded_character_has_no_origin_and_the_plain_view_stops_at_a_differe
     raw = ("Never read the notes about the meeting. "
            + base64.b64encode(("ordinary " * 10 + REGEX).encode()).decode())
     normalized = normalize(raw)
-    origin = SunglassesEngine._raw_frame(_RawAlign(raw), None, normalized, shape=True)[0]
+    origin = SunglassesEngine._raw_frame(_RawAlign(raw), None, normalized, normalize, shape=True)[0]
     assert origin(normalized.index("never")) == 0
     assert origin(normalized.index(REGEX[:10])) is None
     # A match that opens in the raw words and runs on into decoded text is not
@@ -456,30 +456,114 @@ def test_the_opening_of_a_match_is_looked_up_for_a_bounded_number_of_distinct_st
     words = [f"word{n:02d}" for n in range(40)]
     raw = " ".join(words)
     copies = _RawCopies(raw, lambda text, at: True)
-    answers = [copies.negated(1, lambda: raw, word) for word in words]
+    answers = [copies.negated(1, lambda: raw, word, str) for word in words]
     assert answers.count(True) == _RawCopies.DISTINCT          # past the bound the view decides
     assert answers[:_RawCopies.DISTINCT] == [True] * _RawCopies.DISTINCT
-    assert copies.negated(1, lambda: raw, words[0]) is True    # a known opening is still answered
+    assert copies.negated(1, lambda: raw, words[0], str) is True    # a known opening is still answered
 
 
-def test_the_origin_lookup_does_not_rescan_the_view_for_every_hit(monkeypatch):
-    """Doubling the number of hits must not double the separator searches: the
-    separators of a view are found once, a hit costs a lookup in a sorted list.
-    This counts the searches, which is deterministic, not the time."""
-    from sunglasses import engine as engine_module
-    original = engine_module._RawAlign.view_end if hasattr(engine_module, "_RawAlign") else None
-    counts = []
-    eng = SunglassesEngine()
-    if original is not None:
-        def counted(view, pos):
-            counts.append(len(view) - pos)
-            return original(view, pos)
-        monkeypatch.setattr(engine_module._RawAlign, "view_end", staticmethod(counted))
-    searched = []
-    for copies in (50, 100, 200):
-        counts.clear()
-        eng.scan((LIGATURE_WARNINGS[0] + REGEX + f". {GAP}") * copies, CHANNEL)
-        searched.append((len(counts), sum(counts)))
-    # The number of searches and the characters they cover do not grow with the hits.
-    assert searched[2][0] <= searched[0][0] + 4
-    assert searched[2][1] <= searched[0][1] * 6
+def test_a_frame_looks_up_a_hit_without_searching_its_view_again():
+    """The separators of a view are found when its frame is built, so a hit
+    costs a lookup in a sorted list and not a scan of the rest of the view.
+    The view here counts every search made on it; after the first lookup, which
+    builds the walk, a few hundred hits make none."""
+    from sunglasses.engine import _RawAlign, _RawCopies
+    from sunglasses.preprocessor import normalize
+    searches = []
+
+    class Counted(str):
+        def find(self, *args):
+            searches.append(args)
+            return str.find(self, *args)
+
+    raw = (LIGATURE_WARNINGS[0] + REGEX + f". {GAP}") * 300
+    view = Counted(normalize(raw))
+    align = _RawAlign(raw)
+    origin, copied = SunglassesEngine._raw_frame(
+        align, _RawCopies(raw, lambda text, at: True), view, normalize, shape=True)
+    offsets = [at for at in range(len(view)) if view.startswith(REGEX, at)]
+    assert len(offsets) >= 300
+    origin(offsets[0])
+    copied(offsets[0], offsets[0] + len(REGEX))
+    del searches[:]
+    for at in offsets:
+        origin(at)
+        copied(at, at + len(REGEX))
+    assert searches == []
+
+
+# --------------------------------------------------------------------------
+# The count rule must not read a live encoded copy as the negated plain one.
+
+MARK = "́"                      # a combining acute accent
+
+
+def _carriers(phrase):
+    import base64
+    return {
+        "wide": _wide(phrase),
+        "lookalike": phrase.replace("a", "а"),
+        "leet": phrase.replace("a", "4").replace("o", "0").replace("e", "3"),
+        "base64": base64.b64encode(phrase.encode()).decode(),
+    }
+
+
+RULES = [("GLS-PI-016", REGEX, CHANNEL), ("GLS-PI-016-API", REGEX.replace("developer message", "system prompt"), "api_response")]
+
+
+@pytest.mark.parametrize("carrier", ["wide", "lookalike", "leet", "base64"])
+@pytest.mark.parametrize("rule_id,phrase,channel", RULES)
+def test_a_mark_after_the_negated_copy_does_not_make_the_encoded_copy_negated(engine, rule_id, phrase, channel, carrier):
+    """The mark merges into the last letter of the plain copy, so the folded view
+    no longer holds that copy. The raw text still does, but it fills no slot."""
+    encoded = _carriers(phrase)[carrier]
+    doc = "Never " + phrase + MARK + ". " + GAP + GAP + encoded + "."
+    result = engine.scan(doc, channel)
+    assert result.decision == "block"
+    assert _find(result, rule_id)["severity"] == "high"
+
+
+@pytest.mark.parametrize("carrier", ["wide", "lookalike", "leet", "base64"])
+def test_a_mark_after_the_words_that_follow_an_api_phrase_does_not_hide_the_encoded_copy(engine, carrier):
+    """The same, with the mark further on: it sits in the text after the phrase,
+    and the encoded copy still has to read as a second occurrence."""
+    phrase = REGEX.replace("developer message", "system prompt")
+    doc = "Never " + phrase + " don" + MARK + "e. " + GAP + GAP + _carriers(phrase)[carrier] + " done."
+    result = engine.scan(doc, "api_response")
+    assert result.decision == "block"
+    assert _find(result, "GLS-PI-016-API")["severity"] == "high"
+
+
+@pytest.mark.parametrize("carrier", ["wide", "lookalike"])
+@pytest.mark.parametrize("rule_id,phrase,channel", RULES)
+def test_a_planted_view_separator_does_not_hide_the_encoded_copy_in_a_long_document(engine, rule_id, phrase, channel, carrier):
+    pad = "ordinary words about the quarterly schedule. " * (SunglassesEngine.CORROBORATE_NORM_MAX // 40)
+    encoded = _carriers(phrase)[carrier]
+    doc = LEADS["accent"] + GAP + encoded + ". " + GAP + " \x1e " + "Never " + phrase + ". " + pad
+    result = engine.scan(doc, channel)
+    assert result.decision == "block"
+    assert _find(result, rule_id)["severity"] == "high"
+
+
+def test_a_folded_view_cut_short_leaves_the_encoded_copy_to_its_own_view():
+    small = SunglassesEngine(max_scan_bytes=6000)
+    body = LEADS["accent"] + GAP + "".join(
+        chr(0x1D41A + ord(c) - 97) if "a" <= c <= "z" else c for c in REGEX) + ". " + GAP
+    pad = "\ufdfa" * 330                                      # one code point folds to eighteen
+    doc = body + pad + " " + GAP + "Never " + REGEX + ". "
+    result = small.scan(doc, CHANNEL)
+    assert result.truncated is True
+    assert _find(result, "GLS-PI-016")["severity"] == "high"
+    assert result.decision == "block"
+
+
+@pytest.mark.parametrize("tail", [" 10 times.", " @ once.", "  now.", " for $5.", ".", "!"])
+@pytest.mark.parametrize("lead", sorted(LEADS))
+def test_trailing_prose_that_normalization_rewrites_does_not_turn_benign_api_prose_live(engine, lead, tail):
+    """The opening that is looked up ends with the match, so words after it that
+    the normalized view rewrites (digits, an at sign, a doubled space) are not part
+    of it."""
+    phrase = REGEX.replace("developer message", "system prompt")
+    result = engine.scan(LEADS[lead] + LIGATURE_WARNINGS[0] + phrase + tail, "api_response")
+    assert result.decision == "allow_redacted"
+    assert _find(result, "GLS-PI-016-API")["severity"] == "review"
