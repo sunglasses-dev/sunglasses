@@ -194,6 +194,7 @@ def test_an_oversized_object_stream_behind_an_annotation_is_not_inflated(tmp_pat
         return result
 
     monkeypatch.setattr(EncodedStreamObject, "get_data", tracked)
+    monkeypatch.setattr(pdf_module._ReadBudget, "MAX_BYTES", 1 << 20)
     extractor, _ = _extract(tmp_path, "annot_bomb.pdf", _annotation_object_stream_doc(4 << 20))
     big = [n for first, n in fresh if first and n > extractor.MAX_ATTACHMENT_BYTES]
     assert big == [], fresh

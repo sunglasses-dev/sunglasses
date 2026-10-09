@@ -615,7 +615,10 @@ def test_field_in_a_small_object_stream_is_read(engine, tmp_path):
     assert "form:packed:V" in _labels(r)
 
 
-def test_oversized_object_stream_is_not_inflated_and_is_reported(engine, tmp_path):
+def test_oversized_object_stream_is_not_inflated_and_is_reported(engine, tmp_path, monkeypatch):
+    # An object stream is bounded by the document budget, so the budget is lowered
+    # to make this one too large.
+    monkeypatch.setattr(pdf_module._ReadBudget, "MAX_BYTES", 1 << 20)
     data = _object_stream_field_doc(pad=4 << 20)
     assert len(data) < 16 << 10
     path = tmp_path / "packed_bomb.pdf"
@@ -627,7 +630,7 @@ def test_oversized_object_stream_is_not_inflated_and_is_reported(engine, tmp_pat
     finally:
         tracemalloc.stop()
     assert not r.inspection_complete
-    assert any("object stream" in w and "not inspected" in w for w in _warnings(r)), _warnings(r)
+    assert any("object stream" in w and "not inspected" in w.lower() for w in _warnings(r)), _warnings(r)
     assert peak < 3 << 20, peak
 
 
@@ -640,9 +643,9 @@ def test_one_budget_covers_the_decoded_bytes_of_a_document(engine, tmp_path, mon
     decodes = []
     real = PDFExtractor._decode_stream
 
-    def counting(self, stream, name):
+    def counting(self, stream, name, cap=None):
         decodes.append(name)
-        return real(self, stream, name)
+        return real(self, stream, name, cap)
 
     monkeypatch.setattr(PDFExtractor, "_decode_stream", counting)
     r = _scan(engine, tmp_path, "budget.pdf", d.build())

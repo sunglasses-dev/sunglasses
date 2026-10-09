@@ -25,6 +25,7 @@ Install: pip install sunglasses[pdf]  (requires PyPDF2)
 
 import contextlib
 import os
+import re
 import zlib
 from typing import List, Optional, Tuple
 
@@ -66,6 +67,9 @@ class _ReadBudget:
         self.read += size
 
 
+# The tail the PDF reader needs to find the cross reference table.
+_XREF_TAIL = re.compile(rb'startxref\s+\d+\s*%%EOF')
+
 # Bytes that may appear in text; a file with others in its first 8 KiB is binary.
 _TEXT_BYTES = bytes([9, 10, 11, 12, 13, 27]) + bytes(range(32, 127)) + bytes(range(128, 256))
 _FORMAT_MAGIC = (
@@ -96,6 +100,11 @@ class PDFExtractor:
     MAX_ATTACHMENT_BYTES = 1 << 20
     MAX_ARRAY_MEMBERS = 4096
     MAX_ARRAY_DEPTH = 16
+    MAX_OUTLINE_ITEMS = 4096
+    MAX_PARENT_DEPTH = 32
+    # Charged to the document budget for every member, annotation or outline item
+    # that is visited, whatever it holds, so walk work is bounded by the budget.
+    VISIT_COST = 32
     _FIELD_TEXT_KEYS = ('/V', '/DV', '/RV', '/TU', '/Opt')
     _EF_KEYS = ('/UF', '/F', '/DOS', '/Mac', '/Unix')
 
@@ -112,6 +121,10 @@ class PDFExtractor:
         self._fields_visited = set()
         self._files_seen = set()
         self._stream_cache = {}
+        self._text_cache = {}
+        self._annots_seen = set()
+        self._parents_seen = set()
+        self._outline_items = 0
         self._attachments_read = 0
         self._actions_seen = 0
         self._actions_capped = False
@@ -180,6 +193,8 @@ class PDFExtractor:
                 extras = []
                 extras.extend(self._extract_form_fields(reader))
                 extras.extend(self._extract_document_scripts(reader))
+                extras.extend(self._extract_outlines(reader))
+                extras.extend(self._extract_associated_files(reader))
                 for i, page in enumerate(pages):
                     extras.extend(self._extract_page_extras(page, i + 1))
                 extras.extend(self._extract_attachments(reader))
@@ -202,20 +217,41 @@ class PDFExtractor:
             return ('ref', idnum, getattr(obj, 'generation', 0))
         return ('obj', id(obj))
 
+    def _bytes_text(self, value: bytes) -> str:
+        """Text of a PDF byte string. One that starts with a UTF-16 byte order mark
+        and does not decode is read with replacement, and the undecodable part is
+        recorded as not inspected."""
+        if value.startswith((b'\xff\xfe', b'\xfe\xff')):
+            try:
+                return value.decode('utf-16')
+            except UnicodeDecodeError:
+                self._note("a string value is not valid UTF-16; the bytes that do not "
+                           "decode were not inspected")
+                return value.decode('utf-16', 'replace')
+        return value.decode('utf-8', 'replace')
+
     def _as_text(self, value) -> str:
         """A PDF string, name or (nested) array of them as one text; else ''.
         An array is read by identity, so a member that several arrays share is
-        read once, and it is bounded by member count, depth and the document
-        budget. What is left unread is recorded."""
+        read once, an array that several keys share is read once for the document,
+        and every member visited is charged to the document budget whatever it
+        holds. It is bounded by member count, depth and that budget. What is left
+        unread is recorded."""
+        top = value
         value = self._resolve(value)
         if isinstance(value, bytes):
-            text = value.decode('utf-8', 'replace')
+            text = self._bytes_text(value)
             return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
         if isinstance(value, str):
             text = str(value)
             return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
         if not isinstance(value, (list, tuple)):
             return ''
+        ident = self._identity(top)
+        if ident in self._text_cache:
+            return ''
+        # The array is kept with its key so that the identity cannot be reused.
+        self._text_cache[ident] = value
         parts: List[str] = []
         seen = set()
         members = 0
@@ -237,12 +273,15 @@ class PDFExtractor:
                                f"the rest was not inspected")
                     stack.clear()
                     break
+                if not self._spend(self.VISIT_COST):
+                    stack.clear()
+                    break
                 item = self._resolve(item)
                 if isinstance(item, (list, tuple)):
                     stack.append((item, depth + 1))
                     continue
                 if isinstance(item, bytes):
-                    item = item.decode('utf-8', 'replace')
+                    item = self._bytes_text(item)
                 if isinstance(item, str) and item:
                     # Encoded bytes, and one for the separator that joins it.
                     if not self._spend(len(item.encode('utf-8', 'replace')) + (1 if parts else 0)):
@@ -299,7 +338,20 @@ class PDFExtractor:
             return True  # PyPDF2 raises the same error itself
         if not hasattr(stream, 'get_data'):
             return True
-        return self._bounded_stream_bytes(stream, f"object stream {stmnum}") is not None
+        # An object stream is bounded by what is left of the document budget and not
+        # by the attachment bound, because it can hold the page tree and the page
+        # text. It is inflated here once, charged, and handed to the reader, so the
+        # reader's own decode of the same stream is not a second, uncharged one.
+        data = self._bounded_stream_bytes(stream, f"object stream {stmnum}",
+                                          cap=self.budget.MAX_BYTES)
+        if data is None:
+            return False
+        if getattr(stream, 'decoded_self', 0) is None:
+            from PyPDF2.generic import DecodedStreamObject
+            decoded = DecodedStreamObject()
+            decoded._data = data
+            stream.decoded_self = decoded
+        return True
 
     @staticmethod
     def _container_kind(data: bytes) -> Optional[str]:
@@ -323,6 +375,11 @@ class PDFExtractor:
         # than the first KiB counts when the data also holds a startxref marker.
         if b'%PDF-' in body and b'startxref' in body:
             return 'PDF'
+        # The header is not needed either: outside strict mode the reader opens any
+        # data that ends in the cross reference tail, so data that ends in
+        # "startxref", an offset and "%%EOF" is named a PDF whatever its start.
+        if _XREF_TAIL.search(body[-2048:]):
+            return 'PDF'
         if not utf16 and data[:8192].translate(None, _TEXT_BYTES):
             return 'binary'
         return None
@@ -339,7 +396,7 @@ class PDFExtractor:
         except UnicodeDecodeError:
             return None if strict else data.decode('utf-8', 'replace')
 
-    def _bounded_stream_bytes(self, stream, name: str) -> Optional[bytes]:
+    def _bounded_stream_bytes(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
         """Decoded bytes of a stream, or None (recorded) when that is not cheap
         and bounded: only raw and plain FlateDecode data up to
         MAX_ATTACHMENT_BYTES is inflated, with an output bound, so a small
@@ -350,12 +407,12 @@ class PDFExtractor:
         if key in self._stream_cache:
             data = self._stream_cache[key]
             return data if data is not None and self._spend(len(data)) else None
-        data = self._decode_stream(stream, name)
+        data = self._decode_stream(stream, name, cap)
         self._stream_cache[key] = data
         return data
 
-    def _decode_stream(self, stream, name: str) -> Optional[bytes]:
-        cap = self.MAX_ATTACHMENT_BYTES
+    def _decode_stream(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
+        cap = cap or self.MAX_ATTACHMENT_BYTES
         raw = getattr(stream, '_data', None) or b''
         filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
         if isinstance(filters, (list, tuple)):
@@ -584,6 +641,8 @@ class PDFExtractor:
         try:
             if '/AA' in page:
                 out.extend(self._scripts_in(page['/AA'], f"{label}:aa", table=True))
+            if '/AF' in page:
+                out.extend(self._associated_files(page['/AF'], f"{label}:af"))
             annots = self._resolve(page['/Annots']) if '/Annots' in page else []
         except Exception as exc:
             self.failures.append(
@@ -591,6 +650,15 @@ class PDFExtractor:
             return out
         for i, annot in enumerate(annots or []):
             try:
+                # An annotation that several pages share (one /Annots array, or one
+                # annotation listed twice) is read once for the document. Every one
+                # that is visited is charged, so the walk is bounded by the budget.
+                ident = self._identity(annot)
+                if ident in self._annots_seen:
+                    continue
+                self._annots_seen.add(ident)
+                if not self._spend(self.VISIT_COST):
+                    break
                 a = self._resolve(annot)
                 if not hasattr(a, 'get'):
                     continue  # recorded by _extract_annotations already
@@ -600,6 +668,10 @@ class PDFExtractor:
                     if text.strip() and text not in self._seen_values:
                         self._seen_values.add(text)
                         out.append((f"{label}:widget:{i}:V", text))
+                if subtype == '/Widget' and '/Parent' in a:
+                    out.extend(self._parent_values(a['/Parent'], f"{label}:widget:{i}"))
+                if '/AF' in a:
+                    out.extend(self._associated_files(a['/AF'], f"{label}:annotation:{i}:af"))
                 if '/A' in a:
                     out.extend(self._scripts_in(a['/A'], f"{label}:annotation:{i}"))
                 if '/AA' in a:
@@ -610,6 +682,102 @@ class PDFExtractor:
                 self.failures.append(
                     f"annotation {i} on page {index} actions not read "
                     f"({exc.__class__.__name__}: {exc})")
+        return out
+
+    def _parent_values(self, parent, where: str) -> List[Tuple[str, str]]:
+        """The /V of the field chain above a widget that is not listed in /AcroForm.
+        The value of a widget can sit on its /Parent. A parent that the form walk
+        already read is skipped, and the chain is bounded by depth and visited
+        by identity."""
+        out: List[Tuple[str, str]] = []
+        node = parent
+        for _ in range(self.MAX_PARENT_DEPTH):
+            ident = self._identity(node)
+            if ident in self._fields_visited or ident in self._parents_seen:
+                return out
+            self._parents_seen.add(ident)
+            if not self._spend(self.VISIT_COST):
+                return out
+            field = self._resolve(node)
+            if not hasattr(field, 'get'):
+                return out
+            if '/V' in field:
+                text = self._text_of(field['/V'], f"{where} parent /V", strict=False)
+                if text.strip() and text not in self._seen_values:
+                    self._seen_values.add(text)
+                    out.append((f"{where}:parentV", text))
+            if '/Parent' not in field:
+                return out
+            node = field['/Parent']
+        self._note(f"a field chain above {where} nested deeper than "
+                   f"{self.MAX_PARENT_DEPTH} levels; the fields above were not inspected")
+        return out
+
+    def _associated_files(self, files, where: str) -> List[Tuple[str, str]]:
+        """The file specifications of an /AF array, read like any other embedded
+        file under the same attachment cap, visited set and budget."""
+        out: List[Tuple[str, str]] = []
+        array = self._resolve(files)
+        if not isinstance(array, (list, tuple)):
+            return out
+        for n, spec in enumerate(array):
+            if n >= self.MAX_ARRAY_MEMBERS:
+                self._note(f"an /AF array of more than {self.MAX_ARRAY_MEMBERS} members; "
+                           f"the rest was not inspected")
+                break
+            if not self._spend(self.VISIT_COST):
+                break
+            out.extend(self._read_filespec(spec, f"{where}:{n}"))
+        return out
+
+    def _extract_associated_files(self, reader) -> List[Tuple[str, str]]:
+        """Embedded files listed in the catalog /AF array."""
+        try:
+            root = self._resolve(reader.trailer['/Root'])
+            if '/AF' not in root:
+                return []
+            return self._associated_files(root['/AF'], 'catalog:af')
+        except Exception as exc:
+            self.failures.append(
+                f"associated files not read ({exc.__class__.__name__}: {exc})")
+            return []
+
+    def _extract_outlines(self, reader) -> List[Tuple[str, str]]:
+        """Script actions on outline (bookmark) items, walked by identity and
+        bounded by MAX_OUTLINE_ITEMS, the action cap and the budget."""
+        out: List[Tuple[str, str]] = []
+        try:
+            root = self._resolve(reader.trailer['/Root'])
+            if '/Outlines' not in root:
+                return out
+            outlines = self._resolve(root['/Outlines'])
+            if not hasattr(outlines, 'get') or '/First' not in outlines:
+                return out
+            stack = [outlines['/First']]
+            seen = set()
+            while stack:
+                node = stack.pop()
+                ident = self._identity(node)
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                if self._outline_items >= self.MAX_OUTLINE_ITEMS:
+                    self._note(f"outline items beyond {self.MAX_OUTLINE_ITEMS} not inspected")
+                    break
+                self._outline_items += 1
+                if not self._spend(self.VISIT_COST):
+                    break
+                item = self._resolve(node)
+                if not hasattr(item, 'get'):
+                    continue
+                if '/A' in item:
+                    out.extend(self._scripts_in(item['/A'], f"outline:{self._outline_items}"))
+                if '/Next' in item:
+                    stack.append(item['/Next'])
+                if '/First' in item:
+                    stack.append(item['/First'])
+        except Exception as exc:
+            self.failures.append(f"outlines not read ({exc.__class__.__name__}: {exc})")
         return out
 
     def _read_filespec(self, spec, key: str) -> List[Tuple[str, str]]:
