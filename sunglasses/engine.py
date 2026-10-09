@@ -217,6 +217,8 @@ _PERCENT_RX = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 _PERCENT_ONE_RX = re.compile(r"%[0-9A-Fa-f]{2}")
 _HEXESC_RX = re.compile(r"\\x[0-9A-Fa-f]{2}")
 _ESCAPE_RX = re.compile("[&%\\\\\U000e0020-\U000e007e]")
+# What an entity, a percent escape or a hex escape looks like before its last character.
+_UNFINISHED_ESCAPE_RX = re.compile(r"&(?:#[xX]?[0-9a-fA-F]*|[A-Za-z][A-Za-z0-9]*)?|%[0-9A-Fa-f]?|\\(?:x[0-9A-Fa-f]?)?")
 
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
@@ -283,10 +285,16 @@ class _Walk:
         """True when reading is the lower case of the single character c. That is the same
         letter from the same place, so it does not take the character out of the raw
         input the way a look alike or a leet mapping does. A capital that lowers to
-        more than one character, as the Turkish dotted capital I does, is not one."""
+        more than one character, as the Turkish dotted capital I does, is not one. Nor is
+        a character the pipeline also folds or maps before it lowers it (the Kelvin sign,
+        the Ohm sign, a digraph capital, a Greek or Cyrillic look alike): that one is a
+        different character that reads as the letter, and it is a change."""
         if len(reading) != 1 or c == reading or c.isascii():
             return False
-        return reading == c.lower() or (c == "\u03a3" and reading == "\u03c2")
+        if not (reading == c.lower() or (c == "\u03a3" and reading == "\u03c2")):
+            return False
+        return (unicodedata.normalize("NFKC", c) == c and unicodedata.normalize("NFKC", reading) == reading
+                and c not in HOMOGLYPHS and reading not in HOMOGLYPHS)
 
     def _produced(self, j: int):
         """(raw characters used, readings) for the raw text at j."""
@@ -345,7 +353,13 @@ class _Walk:
         window = text[j:j + 64]
         if window.isascii():
             return False
-        return _Walk._decodes(replace_homoglyphs(normalize_unicode(strip_invisible(window))), 0)
+        folded = replace_homoglyphs(normalize_unicode(strip_invisible(window)))
+        if _Walk._decodes(folded, 0):
+            return True
+        # A window that ends before the escape does leaves a name that is only a start (the
+        # padding between its letters used up the window). Whether it is an escape is then
+        # not known, and an unknown start is treated as one: nothing past it is vouched for.
+        return j + 64 < len(text) and _UNFINISHED_ESCAPE_RX.fullmatch(folded) is not None
 
     def _next_escape(self, j: int) -> int:
         """The first raw offset at or after j where an escape begins (len(raw) if none)."""
