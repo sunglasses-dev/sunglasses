@@ -308,7 +308,7 @@ SUNGLASSES is a free, open-source input inspection layer. It does not sit invisi
 - **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
 - **The MCP server**, exposes scanning to an agent as a tool it can call.
 
-It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean.
+It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note.
 
 **What it scans:**
 - Text: emails, messages, files, APIs, web content, logs
@@ -558,8 +558,8 @@ shipped patterns, counted from `sunglasses/patterns.py`:
 | **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** (previously listed as covered) |
 
 So a two-pattern seed is not language coverage, and you should not deploy SUNGLASSES expecting
-non-English parity with English. Normalization (romanization, Unicode confusables and 17 other
-obfuscation techniques) is language-independent and does apply throughout.
+non-English parity with English. Normalization runs before matching and is language-independent.
+Obfuscation coverage is tested per technique and is not complete; see `KNOWN_VERSION_GAPS.md`.
 
 Deepening this is a v0.6+ lane with per-language controls and per-language false-positive corpora
 (a language you cannot measure separately is a language you cannot honestly claim). Community
@@ -573,7 +573,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)
-- ✅ PDF scanning: page text + metadata + annotations
+- ✅ PDF scanning: page text, metadata and annotations. PDF results are partial for embedded or visual content; do not treat a clean PDF result as full assurance.
 - ✅ QR code scanning: decode and scan content (requires pyzbar)
 - ✅ Audio scanning: Whisper transcription → text scan (experimental, needs `--deep`, requires Whisper)
 - ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental, requires FFmpeg + Whisper)
