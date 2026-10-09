@@ -67,8 +67,80 @@ class _ReadBudget:
         self.read += size
 
 
-# The tail the PDF reader needs to find the cross reference table.
-_XREF_TAIL = re.compile(rb'startxref\s+\d+\s*%%EOF')
+
+def _lzw_length(data: bytes, limit: int) -> Optional[int]:
+    """The length PyPDF2's LZW decoder would produce, counted without building the
+    output and stopped as soon as it passes `limit`. None when the code stream is not
+    one the decoder reads."""
+    lengths = [1] * 256 + [0] * (4096 - 256)
+    total, pos, bits, dictlen, code = 0, 0, 9, 258, 256
+    nbits = len(data) * 8
+    while True:
+        previous = code
+        if pos + bits > nbits:
+            return None
+        window = int.from_bytes(data[pos >> 3:(pos >> 3) + 3].ljust(3, b"\0"), "big")
+        code = (window >> (24 - (pos & 7) - bits)) & ((1 << bits) - 1)
+        pos += bits
+        if code == 257:
+            return total
+        if code == 256:
+            dictlen, bits = 258, 9
+            continue
+        if previous == 256:
+            total += lengths[code]
+        else:
+            if dictlen >= 4096:
+                return None
+            if code < dictlen:
+                total += lengths[code]
+                lengths[dictlen] = lengths[previous] + 1
+            else:
+                lengths[dictlen] = lengths[previous] + 1
+                total += lengths[dictlen]
+            dictlen += 1
+            if dictlen >= (1 << bits) - 1 and bits < 12:
+                bits += 1
+        if total > limit:
+            return total
+
+
+def _probe_size(stream, limit: int) -> Optional[int]:
+    """How many bytes a stream decodes to, read from its data before the reader decodes
+    it: a Flate stream is inflated no further than `limit` plus one, the ASCII85 filter
+    only shrinks its input, and an LZW stream is counted without being built. A result
+    past `limit` means the stream does not fit. None when the chain holds a filter that
+    is not sized here (a hex filter, run length, an image filter), which the caller
+    treats as not decodable within the bounds."""
+    from PyPDF2 import filters as pdf_filters
+
+    def resolve(obj):
+        return obj.get_object() if hasattr(obj, 'get_object') else obj
+
+    names = resolve(stream.get('/Filter')) if '/Filter' in stream else None
+    if isinstance(names, (list, tuple)):
+        names = [str(resolve(n)) for n in names]
+    else:
+        names = [] if names is None else [str(names)]
+    data = getattr(stream, '_data', None) or b""
+    for i, name in enumerate(names):
+        if name in ('/FlateDecode', '/Fl'):
+            data = zlib.decompressobj().decompress(data, limit + 1)
+            if len(data) > limit:
+                return limit + 1
+        elif name in ('/ASCII85Decode', '/A85'):
+            data = pdf_filters.ASCII85Decode.decode(data)
+        elif name in ('/LZWDecode', '/LZW') and i == len(names) - 1:
+            return _lzw_length(data, limit)
+        else:
+            return None
+    return len(data)
+
+# The tail the PDF reader needs to find the cross reference table. The reader searches
+# the whole data backwards for %%EOF, takes the offset with int() (so a sign and digit
+# separators are accepted) and does not care what follows, so the tail is looked for
+# anywhere.
+_XREF_TAIL = re.compile(rb'startxref\s+[+-]?\d[\d_]*\s*%%EOF')
 
 # Bytes that may appear in text; a file with others in its first 8 KiB is binary.
 _TEXT_BYTES = bytes([9, 10, 11, 12, 13, 27]) + bytes(range(32, 127)) + bytes(range(128, 256))
@@ -155,12 +227,10 @@ class PDFExtractor:
             # of an object, so no check below can force a large inflation through
             # a dereference that the guard would have refused.
             with self._bounded_object_streams(reader):
-                # 1. Metadata
-                meta_texts = self._extract_metadata(reader)
-                for field, text in meta_texts:
-                    if text.strip():
-                        results.append((f"metadata:{field}", text))
-
+                # The page tree and the page text are read first, before the metadata,
+                # so a metadata object stream that uses up the budget cannot keep the
+                # page tree from being resolved. They are reported in the order they
+                # always had: metadata, then page text.
                 try:
                     pages = list(reader.pages)
                 except Exception as exc:
@@ -169,6 +239,7 @@ class PDFExtractor:
                         f"pages not read ({exc.__class__.__name__}: {exc})")
 
                 # 2. Page text
+                page_results = []
                 for i, page in enumerate(pages):
                     try:
                         text = page.extract_text()
@@ -177,7 +248,14 @@ class PDFExtractor:
                             f"page {i+1} text not read ({exc.__class__.__name__}: {exc})")
                         continue
                     if text and text.strip():
-                        results.append((f"page:{i+1}", text.strip()))
+                        page_results.append((f"page:{i+1}", text.strip()))
+
+                # 1. Metadata
+                meta_texts = self._extract_metadata(reader)
+                for field, text in meta_texts:
+                    if text.strip():
+                        results.append((f"metadata:{field}", text))
+                results.extend(page_results)
 
                 # 3. Annotations (comments, notes)
                 for i, page in enumerate(pages):
@@ -376,9 +454,9 @@ class PDFExtractor:
         if b'%PDF-' in body and b'startxref' in body:
             return 'PDF'
         # The header is not needed either: outside strict mode the reader opens any
-        # data that ends in the cross reference tail, so data that ends in
-        # "startxref", an offset and "%%EOF" is named a PDF whatever its start.
-        if _XREF_TAIL.search(body[-2048:]):
+        # data that holds the cross reference tail, whatever stands before or after
+        # it, so data with "startxref", an offset and "%%EOF" together is named a PDF.
+        if _XREF_TAIL.search(body):
             return 'PDF'
         if not utf16 and data[:8192].translate(None, _TEXT_BYTES):
             return 'binary'
@@ -432,8 +510,7 @@ class PDFExtractor:
                 params = self._resolve(params[0])
             if params is not None and hasattr(params, 'get'):
                 if int(self._resolve(params.get('/Predictor', 1)) or 1) > 1:
-                    self.failures.append(f"{name} uses a predictor filter; not inspected")
-                    return None
+                    return self._decode_native(stream, name, cap)
             room = self.budget.remaining()
             if room <= 0:
                 self._spend(1)  # records that the document limit stopped the read
@@ -454,13 +531,48 @@ class PDFExtractor:
                 self.failures.append(
                     f"{name} compressed data ends before its stream does; "
                     f"the rest was not inspected")
-            elif inflater.unused_data:
+            elif inflater.unused_data.strip(b"\x00\t\n\x0c\r "):
                 self.failures.append(
                     f"{name} holds data after the end of its compressed stream; "
                     f"that data was not inspected")
             return data
-        self.failures.append(f"{name} uses filter {','.join(filters)}; not inspected")
-        return None
+        return self._decode_native(stream, name, cap)
+
+    def _decode_native(self, stream, name: str, cap: int) -> Optional[bytes]:
+        """A stream in a chain the bounded inflate above does not cover (a predictor, an
+        ASCII85 or LZW filter, a chain of them). Its size is read from the data first and
+        stays within the room left in the budget and the cap, and only then does the reader
+        decode it, so the decode is bounded and its output is charged."""
+        room = self.budget.remaining()
+        if room <= 0:
+            self._spend(1)  # records that the document limit stopped the read
+            return None
+        limit = min(cap, room)
+        try:
+            size = _probe_size(stream, limit)
+            if size is None:
+                self.failures.append(f"{name} uses filter {','.join(self._filter_names(stream))}; not inspected")
+                return None
+            data = b"" if size > limit else stream.get_data()
+        except Exception as exc:
+            self.failures.append(
+                f"{name} could not be decoded ({exc.__class__.__name__}); not inspected")
+            return None
+        if isinstance(data, str):
+            data = data.encode('latin-1', 'replace')
+        size = max(size, len(data))
+        charged = self._spend(size if size <= limit else limit + 1)
+        if size > limit:
+            if limit >= cap and charged:
+                self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+            return None
+        return data if charged else None
+
+    def _filter_names(self, stream) -> List[str]:
+        filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
+        if isinstance(filters, (list, tuple)):
+            return [str(self._resolve(f)) for f in filters]
+        return [] if filters is None else [str(filters)]
 
     def _name_tree(self, node, what: str, cap: int) -> List[Tuple[str, object]]:
         """(key, value) pairs of a PDF name tree (/Names and /Kids), bounded."""

@@ -323,9 +323,9 @@ def test_binary_attachment_is_reported_not_inspected(engine, tmp_path):
 
 
 def test_exotic_filter_attachment_is_reported_not_inspected(engine, tmp_path):
-    r = _scan(engine, tmp_path, "lzw.pdf", _attachment_doc(_stream(b"\x80\x0b\x60\x50\x22\x0c\x0c\x85\x01", b"/Type /EmbeddedFile /Filter /LZWDecode")))
+    r = _scan(engine, tmp_path, "rl.pdf", _attachment_doc(_stream(b"\x04hello\x80", b"/Type /EmbeddedFile /Filter /RunLengthDecode")))
     assert not r.inspection_complete
-    assert any("LZWDecode" in w for w in r.extraction_warnings), r.extraction_warnings
+    assert any("RunLengthDecode" in w for w in r.extraction_warnings), r.extraction_warnings
 
 
 def test_oversized_flate_attachment_is_bounded_and_reported(engine, tmp_path):
