@@ -2676,7 +2676,7 @@ def _frame_reader_offenders(source: str, filename: str = "<src>"):
                     ("ImageSequence", "_frames_of", "_decode_frames", ".seek("))
         doc = _ast.get_docstring(enclosing) or ""
         declared = "FRAME 0" in doc.upper()
-        # r3 (ASTRA E7 r2): the opener hands out an object it has not walked, so
+        # E7 round 2: the opener hands out an object it has not walked, so
         # it may say so -- but only by the exact marker below, and the guard
         # `_opener_contract_offenders` then holds every CALLER to the walk rule.
         opener = "OPENER:" in doc
@@ -2730,7 +2730,7 @@ def _opener_contract_offenders(sources: dict):
     holds every function that CALLS one to walk frames (through the one walker or
     a `*_frames_of` / `_decode_frames` helper) or to declare itself frame 0 only.
 
-    r3 (ASTRA E7 r2). The old rule accepted an `Image.open` only if its own
+    E7 round 2. The old rule accepted an `Image.open` only if its own
     function seeked. The opener now refuses and plans before PIL is asked, so the
     walking lives in the callers; this keeps that from becoming a hole.
     """
@@ -2758,28 +2758,51 @@ def _opener_contract_offenders(sources: dict):
 
 
 def _unplanned_seek_offenders(sources: dict):
-    """An image seek outside the one walker is a seek nobody charged.
+    """A `.seek(` call that is neither the walker's nor a file handle's is a seek
+    nobody charged.
 
-    `ImageSequence` anywhere but `_reachable_frames`, and `.seek(` on an image
-    (`img`, `frame`, `im`, `image`) anywhere but `_reachable_frames` and the
-    rewind to frame 0 in `extract_from_bytes`, which the plan allows because the
-    first frame is reachable by construction. Seeks on a file handle are not.
+    What it enforces, exactly. For every `.seek(...)` call in the extractor
+    sources, wherever it sits (module level included):
+      * inside `_reachable_frames`, the one walker: allowed;
+      * on a plain name `fp` or `fh` (a file handle, as `_gif_plan` reads blocks):
+        allowed;
+      * in `extract_from_bytes`, on `img`, with the single literal argument `0`
+        (the rewind to the first frame, which the plan allows because the first
+        frame is reachable by construction): allowed;
+      * anything else is reported, whatever the receiver is called, so an image
+        under another name, an attribute (`self.image.seek`) or an alias that
+        was assigned from an image is caught.
+    The name `ImageSequence` is reported wherever it appears as a name.
+    What it does NOT see: a seek reached without a `.seek(` call (for example
+    `getattr(img, "seek")(1)`), and a file handle that is really an image bound
+    to the name `fp` or `fh`.
     """
     import ast as _ast
 
-    allowed = {"_reachable_frames", "extract_from_bytes"}
+    handles = ("fp", "fh")
     offenders = []
-    for filename, fns in _image_function_table(sources).items():
-        for fn, _src in fns:
-            if fn.name in allowed:
-                continue
-            for n in _ast.walk(fn):
-                if isinstance(n, _ast.Name) and n.id == "ImageSequence":
-                    offenders.append(f"{filename}:{n.lineno} ({fn.name}: ImageSequence)")
-                if (isinstance(n, _ast.Call) and isinstance(n.func, _ast.Attribute)
-                        and n.func.attr == "seek" and isinstance(n.func.value, _ast.Name)
-                        and n.func.value.id in ("img", "frame", "im", "image")):
-                    offenders.append(f"{filename}:{n.lineno} ({fn.name}: image seek)")
+
+    def visit(node, filename, function):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            function = node.name
+        if isinstance(node, _ast.Name) and node.id == "ImageSequence":
+            offenders.append(f"{filename}:{node.lineno} ({function}: ImageSequence)")
+        if (isinstance(node, _ast.Call) and isinstance(node.func, _ast.Attribute)
+                and node.func.attr == "seek"):
+            receiver = node.func.value
+            rewind = (function == "extract_from_bytes"
+                      and isinstance(receiver, _ast.Name) and receiver.id == "img"
+                      and len(node.args) == 1 and not node.keywords
+                      and isinstance(node.args[0], _ast.Constant)
+                      and type(node.args[0].value) is int and node.args[0].value == 0)
+            handle = isinstance(receiver, _ast.Name) and receiver.id in handles
+            if not (function == "_reachable_frames" or handle or rewind):
+                offenders.append(f"{filename}:{node.lineno} ({function}: seek)")
+        for child in _ast.iter_child_nodes(node):
+            visit(child, filename, function)
+
+    for filename, source in sources.items():
+        visit(_ast.parse(source, filename=filename), filename, "<module>")
     return offenders
 
 
@@ -2841,6 +2864,42 @@ def test_the_opener_guards_reject_a_caller_that_does_not_walk_and_a_stray_seek()
     handle = "    def _skip(self, fp):\n        fp.seek(3, 1)\n"
     assert not _unplanned_seek_offenders({"o.py": opener + handle}), (
         "a seek on a file handle was reported as an image seek")
+
+    # Negative controls for the tightened rule.
+    rewind = (
+        "    def extract_from_bytes(self, img):\n"
+        "        img.seek(0)\n"
+    )
+    assert not _unplanned_seek_offenders({"o.py": opener + rewind}), (
+        "the literal rewind in extract_from_bytes was reported")
+    for call in ("img.seek(1)", "img.seek(0, 1)", "img.seek(n)", "img.seek(whence=0)",
+                 "img.seek(0.0)", "img.seek(False)"):
+        nonzero = rewind.replace("img.seek(0)", call)
+        assert _unplanned_seek_offenders({"o.py": opener + nonzero}), (
+            f"{call} in extract_from_bytes was accepted")
+    elsewhere = rewind.replace("extract_from_bytes", "extract_other")
+    assert _unplanned_seek_offenders({"o.py": opener + elsewhere}), (
+        "the rewind outside extract_from_bytes was accepted")
+    aliased = (
+        "    def _peek(self, img):\n"
+        "        reader = img\n"
+        "        reader.seek(1)\n"
+        "    def _attr(self):\n"
+        "        self.image.seek(1)\n"
+        "    def _called(self, source):\n"
+        "        Image.open(source).seek(1)\n"
+    )
+    assert len(_unplanned_seek_offenders({"o.py": opener + aliased})) == 3, (
+        "an aliased image, an attribute receiver or a call receiver was accepted")
+    module_level = "img.seek(1)\n"
+    assert _unplanned_seek_offenders({"o.py": module_level}), (
+        "a module level seek was accepted")
+    walker = (
+        "    def _reachable_frames(cls, img):\n"
+        "        img.seek(7)\n"
+    )
+    assert not _unplanned_seek_offenders({"o.py": opener + walker}), (
+        "the walker's own seek was reported")
 
 
 def test_the_frame_reader_guard_rejects_a_frame_zero_only_reader():

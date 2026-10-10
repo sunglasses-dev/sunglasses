@@ -25,6 +25,7 @@ Install: pip install sunglasses[image]  (requires Pillow + pytesseract + Tessera
 
 import os
 import json
+import struct
 from typing import List, Tuple
 
 
@@ -283,6 +284,15 @@ class ImageExtractor:
         decoded before any size could be asked. A WebP is the one listed format
         that decodes its first frame inside `open`, so its declared size is
         checked first and an over budget WebP is not opened.
+
+        CONTRACT: everything `Image.open` can say about a file it cannot read comes
+        out of here as `ImageRefused` (Pillow's pixel limit as its subclass
+        `ImageOverPixelBudget`), with the exception class and message in the text.
+        An entry point therefore needs one `except ImageRefused` and no list of
+        Pillow's exceptions. Not folded in: a missing or unreadable FILE (raised by
+        the header read before Pillow is involved) stays an operational error, and
+        anything that is not an `Exception` (MemoryError, KeyboardInterrupt) is
+        never swallowed.
         """
         from PIL import Image, UnidentifiedImageError
         import io
@@ -320,7 +330,24 @@ class ImageExtractor:
             if plan is not None and plan.total and plan.allowed == 0:
                 raise ImageOverPixelBudget(
                     cls._over_budget(*plan.refused_size, "opened"))
-        img = Image.open(target, formats=[fmt])
+        try:
+            img = Image.open(target, formats=[fmt])
+        except Image.DecompressionBombError as exc:
+            # Pillow's own pixel limit, hit while it read the header.
+            raise ImageOverPixelBudget(
+                f"{label} is over Pillow's pixel limit, so it was not opened "
+                f"({exc.__class__.__name__}: {exc})") from exc
+        except (UnidentifiedImageError, OSError, SyntaxError, ValueError,
+                struct.error, EOFError) as exc:
+            # Whatever the format plugin says about a file it cannot read is one
+            # answer here, so no caller keeps a list of Pillow's exception types.
+            # Pillow's "cannot identify" message carries an object repr, which
+            # says nothing and changes on every run, so the class name stands alone.
+            said = (exc.__class__.__name__ if isinstance(exc, UnidentifiedImageError)
+                    else f"{exc.__class__.__name__}: {exc}")
+            raise ImageRefused(
+                f"cannot read image file {label}: Pillow could not open it as "
+                f"{fmt} ({said})") from exc
         if plan is not None:
             img._sg_frame_plan = plan
         return img

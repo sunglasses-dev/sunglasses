@@ -678,6 +678,219 @@ def test_every_refusal_of_the_opener_is_a_named_failure_on_every_entry_point(dat
         assert any("cannot identify image file" in f for f in ex.failures), ex.failures
 
 
+def _chunk(kind, data):
+    import struct
+    import zlib
+
+    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+
+def _png_header_only(width, height):
+    """A PNG signature and header that declare this size, with no real pixels."""
+    import struct
+    import zlib
+
+    return (b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+            + _chunk(b"IDAT", zlib.compress(b"\0")) + _chunk(b"IEND", b""))
+
+
+def _a_real_image(fmt):
+    import io
+
+    out = io.BytesIO()
+    Image.new("RGB", (40, 30), "white").save(out, fmt)
+    return out.getvalue()
+
+
+def _webp_that_claims_a_size_it_cannot_decode():
+    import struct
+
+    return (b"RIFF" + struct.pack("<I", 30) + b"WEBPVP8X" + struct.pack("<I", 10)
+            + b"\0" * 4 + (39).to_bytes(3, "little") + (29).to_bytes(3, "little")
+            + b"\0" * 8)
+
+
+# What `Image.open` can say about a file it will not read, one input per way found.
+# The size cases cover Pillow's own limit, a zero width, and a WebP whose first
+# chunk declares a size its decoder then refuses.
+_BAD_INPUTS = {
+    "empty": lambda: b"",
+    "text": lambda: b"x" * 40,
+    "zeros": lambda: b"\x00" * 5000,
+    "png-cut-in-header": lambda: _a_real_image("PNG")[:20],
+    "jpeg-cut-in-header": lambda: _a_real_image("JPEG")[:6],
+    "gif-cut-in-header": lambda: _a_real_image("GIF")[:8],
+    "bmp-cut-in-header": lambda: _a_real_image("BMP")[:20],
+    "tiff-cut-in-header": lambda: _a_real_image("TIFF")[:10],
+    "webp-cut-in-header": lambda: _a_real_image("WEBP")[:20],
+    "png-zero-width": lambda: _png_header_only(0, 10),
+    "png-beyond-pillows-limit": lambda: _png_header_only(20000, 20000),
+    "webp-bytes-that-do-not-match": _webp_that_claims_a_size_it_cannot_decode,
+    "png-signature-then-zeros": lambda: b"\x89PNG\r\n\x1a\n" + b"\0" * 30,
+    "bmp-header-type-zero": lambda: b"BM" + b"\0" * 60,
+    "tiff-header-then-ff": lambda: b"II*\x00" + b"\xff" * 20,
+    "jpeg-marker-then-zeros": lambda: b"\xff\xd8\xff" + b"\0" * 30,
+}
+
+
+@pytest.mark.parametrize("name", sorted(_BAD_INPUTS))
+@pytest.mark.parametrize("entry", ["image-bytes", "image-path", "qr-bytes", "qr-path"])
+def test_every_file_pillow_will_not_open_is_a_named_failure_on_every_entry_point(
+        name, entry, tmp_path, ocr):
+    """The opener owns the contract, so no entry point keeps a list of Pillow's
+    exceptions. Each input raised on `extract_from_bytes` of the image reader and
+    on both QR entry points before the opener converted what `Image.open` says."""
+    from sunglasses.extractors.qr import QRExtractor
+
+    data = _BAD_INPUTS[name]()
+    path = tmp_path / "bad.bin"
+    path.write_bytes(data)
+    ex = QRExtractor() if entry.startswith("qr") else ImageExtractor()
+    if entry.endswith("bytes"):
+        found = (ex.extract_from_bytes(data) if entry.startswith("qr")
+                 else ex.extract_from_bytes(data, "bad.png"))
+    else:
+        found = ex.extract(str(path))
+    assert found == []
+    assert ex.failures, f"{entry} refused {name} without a named failure"
+    assert all(isinstance(f, str) and f for f in ex.failures)
+
+
+def test_a_file_over_pillows_own_pixel_limit_is_named_as_over_the_pixel_limit():
+    ex = ImageExtractor()
+    assert ex.extract_from_bytes(_png_header_only(20000, 20000), "big.png") == []
+    assert len(ex.failures) == 1
+    assert "pixel limit" in ex.failures[0] and "DecompressionBombError" in ex.failures[0]
+
+
+def test_the_failure_names_pillows_exception_class_and_has_no_object_address():
+    ex = ImageExtractor()
+    ex.extract_from_bytes(_a_real_image("PNG")[:20], "cut.png")
+    assert "OSError" in ex.failures[0] and "PNG" in ex.failures[0], ex.failures
+    ex.extract_from_bytes(_png_header_only(0, 10), "zero.png")
+    assert "UnidentifiedImageError" in ex.failures[0], ex.failures
+    assert " at 0x" not in ex.failures[0], ex.failures
+
+
+def test_a_missing_or_unreadable_file_stays_an_operational_error(tmp_path):
+    """Not Pillow's to say: the header read fails before Pillow is involved."""
+    import os
+
+    from sunglasses.extractors.image import ImageRefused
+
+    with pytest.raises(FileNotFoundError):
+        ImageExtractor().extract(str(tmp_path / "missing.png"))
+    shut = tmp_path / "shut.png"
+    shut.write_bytes(_a_real_image("PNG"))
+    shut.chmod(0)
+    try:
+        if os.access(shut, os.R_OK):
+            pytest.skip("this account can read a mode 0 file")
+        with pytest.raises(PermissionError) as raised:
+            ImageExtractor._open_lazy(str(shut))
+        assert not isinstance(raised.value, ImageRefused)
+    finally:
+        shut.chmod(0o600)
+
+
+@pytest.mark.parametrize("error", [MemoryError, KeyboardInterrupt, SystemExit])
+def test_what_is_not_a_pillow_rejection_is_not_swallowed_by_the_opener(error, monkeypatch):
+    def refuse(*a, **k):
+        raise error()
+
+    monkeypatch.setattr(Image, "open", refuse)
+    with pytest.raises(error):
+        ImageExtractor().extract_from_bytes(_a_real_image("PNG"), "x.png")
+    from sunglasses.extractors.qr import QRExtractor
+
+    with pytest.raises(error):
+        QRExtractor().extract_from_bytes(_a_real_image("PNG"))
+
+
+_REFUSAL_CLASSES = {"ImageRefused", "ImageOverPixelBudget"}
+_PILLOW_REJECTIONS = {"UnidentifiedImageError", "OSError", "SyntaxError", "ValueError",
+                      "EOFError", "DecompressionBombError", "error"}
+
+
+def _open_calls_that_can_escape(source, filename="<src>"):
+    """Every `Image.open` call that is not inside a `try` whose handlers between
+    them name every Pillow rejection, each handler ending in a raise of
+    `ImageRefused` (or its subclass)."""
+    import ast
+
+    tree = ast.parse(source, filename=filename)
+    parent = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+
+    def names(handler):
+        kinds = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+        return {k.attr if isinstance(k, ast.Attribute) else getattr(k, "id", None)
+                for k in kinds if k is not None}
+
+    def raises_refusal(handler):
+        for n in ast.walk(handler):
+            if isinstance(n, ast.Raise) and isinstance(n.exc, ast.Call):
+                f = n.exc.func
+                if (f.id if isinstance(f, ast.Name) else getattr(f, "attr", None)) in _REFUSAL_CLASSES:
+                    return True
+        return False
+
+    found = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "open" and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "Image"):
+            continue
+        covered, up, child = set(), parent.get(node), node
+        while up is not None:
+            if isinstance(up, ast.Try) and child in up.body:
+                if all(raises_refusal(h) for h in up.handlers):
+                    for h in up.handlers:
+                        covered |= names(h)
+            child, up = up, parent.get(up)
+        if not _PILLOW_REJECTIONS <= covered:
+            found.append(f"{filename}:{node.lineno}")
+    return found
+
+
+def test_the_one_image_open_in_the_package_converts_every_rejection():
+    import os
+
+    import sunglasses
+
+    pkg = os.path.join(os.path.dirname(os.path.abspath(sunglasses.__file__)), "extractors")
+    opens = []
+    for name in sorted(os.listdir(pkg)):
+        if name.endswith(".py"):
+            with open(os.path.join(pkg, name), encoding="utf-8") as fh:
+                src = fh.read()
+            opens.extend(_open_calls_that_can_escape(src, name))
+            if "Image.open(" in src:
+                assert name == "image.py", f"{name} opens an image outside the opener"
+    assert not opens, opens
+
+
+def test_the_open_guard_rejects_an_open_that_can_let_a_rejection_through():
+    good = (
+        "def f(t):\n"
+        "    try:\n"
+        "        return Image.open(t)\n"
+        "    except Image.DecompressionBombError as e:\n"
+        "        raise ImageOverPixelBudget('x') from e\n"
+        "    except (UnidentifiedImageError, OSError, SyntaxError, ValueError,\n"
+        "            struct.error, EOFError) as e:\n"
+        "        raise ImageRefused('x') from e\n"
+    )
+    assert not _open_calls_that_can_escape(good)
+    assert _open_calls_that_can_escape("def f(t):\n    return Image.open(t)\n")
+    assert _open_calls_that_can_escape(good.replace("SyntaxError, ", ""))
+    assert _open_calls_that_can_escape(good.replace("raise ImageRefused('x') from e", "pass"))
+    assert _open_calls_that_can_escape(good.replace("raise ImageRefused", "raise RuntimeError"))
+    assert _open_calls_that_can_escape(
+        good.replace("        return Image.open(t)\n", "        pass\n")
+        + "    img = Image.open(t)\n")
+
+
 def test_scanning_a_gif_whose_disposal_bitmap_is_over_the_budget_stays_in_memory_budget(tmp_path):
     """The memory bound, measured in a fresh process: a GIF a few hundred bytes long
     whose first frame is 36 million pixels with a disposal method that makes PIL
