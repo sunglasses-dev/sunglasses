@@ -230,21 +230,27 @@ def _predictor_of(params, charge):
     return int(predictor), int(columns), int(bits)
 
 
-def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
+def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
     """Decode a stream's filter chain one stage at a time, so that no stage runs past what
     is left of the budget and nothing is decoded twice. Every stage's output, the
     intermediate ones included, is added to `spent`, and the chain is refused (state
     "big") as soon as that sum passes `room`. A Flate stage is inflated no further than
     `room` and gzip is read as well as zlib. ASCII85 and LZW are counted before they are
-    decoded. A predictor is applied to the bounded output. A chain with a filter that is
+    decoded, and the input they read to count is charged first when it is the stream's own. A predictor is applied to the bounded output. A chain with a filter that is
     not sized here (hex, run length, an image filter, /Crypt, LZW that is not the last
     filter) is refused with state "unsized", and a stage that fails with "error". The
     reader's own get_data() is never called. `charge` is called before every entry of the
     filter list and of the decode parameters is resolved, and raises _WalkBudget when the
-    document budget is gone; that exception is not caught here."""
+    document budget is gone; that exception is not caught here. It returns the bytes it
+    charged, and they come off `room` as soon as they are spent, so the stages are sized
+    against what is left and not against what was left when the call began."""
     from PyPDF2 import filters as pdf_filters
 
-    names = _filters_of(stream, charge)
+    def paid():
+        nonlocal room
+        room -= charge() or 0
+
+    names = _filters_of(stream, paid)
     if names is None:
         return _Decoded(state="unsized", detail=f"a chain of more than {_MAX_CHAIN} filters")
     data = getattr(stream, '_data', None) or b""
@@ -264,7 +270,7 @@ def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
                 elif after.strip(b"\x00\t\n\x0c\r "):
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
-                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), charge)
+                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), paid)
                 if predictor != 1:
                     if not 10 <= predictor <= 15:
                         raise ValueError("unsupported predictor")
@@ -285,12 +291,24 @@ def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
                         data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
                         out.spent += len(data) - reserved
             elif name in _ASCII85:
+                # Sizing reads every input byte, so the input is paid for before it is read
+                # (a later stage's input is the stage before's output, charged already).
+                if i == 0:
+                    out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
                 size = _ascii85_length(data)
                 out.spent += size
                 if out.spent > room:
                     return _Decoded(spent=room + 1, state="big")
                 data = pdf_filters.ASCII85Decode.decode(data)
             elif name in _LZW and i == len(names) - 1:
+                # The same for the code stream: it is charged before it is scanned, and the
+                # charge stays on the "unsized" return below.
+                if i == 0:
+                    out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
                 size = _lzw_length(data, room - out.spent)
                 if size is None:
                     return _Decoded(spent=out.spent, state="unsized", detail=name)
@@ -502,12 +520,8 @@ class PDFExtractor:
         unread is recorded."""
         top = value
         value = self._resolve(value)
-        if isinstance(value, bytes):
-            text = self._bytes_text(value)
-            return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
-        if isinstance(value, str):
-            text = str(value)
-            return text if self._spend(len(text.encode('utf-8', 'replace'))) else ''
+        if isinstance(value, (bytes, str)):
+            return self._charged_text(value) or ''
         if not isinstance(value, (list, tuple)):
             return ''
         ident = self._identity(top)
@@ -547,15 +561,26 @@ class PDFExtractor:
                 if isinstance(item, (list, tuple)):
                     stack.append((item, depth + 1))
                     continue
-                if isinstance(item, bytes):
-                    item = self._bytes_text(item)
-                if isinstance(item, str) and item:
-                    # Encoded bytes, and one for the separator that joins it.
-                    if not self._spend(len(item.encode('utf-8', 'replace')) + (1 if parts else 0)):
+                if isinstance(item, (bytes, str)):
+                    text = self._charged_text(item, 1 if parts else 0)
+                    if text is None:
                         stack.clear()
                         break
-                    parts.append(str(item))
+                    if text:
+                        parts.append(text)
         return ' '.join(parts)
+
+    def _charged_text(self, raw, separator: int = 0):
+        """The text of a byte string or string, or None once the document budget is gone.
+        Its length is charged before it is converted, and the encoded size of the text
+        beyond that (with `separator` bytes for the joint when there is text) after."""
+        if not self._spend(len(raw)):
+            return None
+        text = self._bytes_text(raw) if isinstance(raw, bytes) else str(raw)
+        more = len(text.encode('utf-8', 'replace')) + (separator if text else 0) - len(raw)
+        if more > 0 and not self._spend(more):
+            return None
+        return text
 
     def _note(self, message: str) -> None:
         """Record a failure once per document."""
@@ -726,9 +751,11 @@ class PDFExtractor:
             self.failures.append(f"{name} {note}")
         return result.data
 
-    def _charge_visit(self) -> None:
-        """One visit charged to the document budget; raises _WalkBudget when it is gone."""
+    def _charge_visit(self) -> int:
+        """One visit charged to the document budget, and what was charged; raises _WalkBudget
+        when it is gone."""
         self.budget.spend(self.VISIT_COST)
+        return self.VISIT_COST
 
     def _name_tree(self, node, what: str, cap: int) -> List[Tuple[str, object]]:
         """(key, value) pairs of a PDF name tree (/Names and /Kids), bounded."""
@@ -751,6 +778,11 @@ class PDFExtractor:
             names = self._resolve(node.get('/Names')) if '/Names' in node else None
             if names:
                 for i in range(0, len(names) - 1, 2):
+                    # Each pair is charged before its key is looked at, so a budget that is
+                    # spent ends the walk with the rest of the pairs unread.
+                    if not self._spend(self.VISIT_COST):
+                        stack.clear()
+                        break
                     out.append((self._as_text(names[i]), names[i + 1]))
                     if len(out) > cap:
                         break
