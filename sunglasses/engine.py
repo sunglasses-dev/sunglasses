@@ -229,9 +229,13 @@ _BLANKS = " \t\n\r\x0b\x0c"
 
 @functools.lru_cache(maxsize=4096)
 def _folds_to_a_start(c: str) -> bool:
-    """True when the pipeline's character steps turn the non-ASCII character c into one that
-    begins with the start of an escape (a full-width or small ampersand, percent sign or backslash)."""
-    return replace_homoglyphs(normalize_unicode(strip_invisible(c)))[:1] in ("&", "%", "\\")
+    """True when the pipeline's character steps turn the non-ASCII character c into text that
+    holds the start of an escape (a full-width or small ampersand, percent sign or backslash).
+    Anywhere in the folded text counts, not only its first character. The steps are read one
+    character at a time because none of the three starts is made by composing two characters
+    (none has a canonical decomposition) or lost by reordering them, so a start in the folded
+    text comes from a single character that folds to it."""
+    return any(x in "&%\\" for x in replace_homoglyphs(normalize_unicode(strip_invisible(c))))
 
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
@@ -469,6 +473,11 @@ class _Walk:
             seen = k + 1
         return guards
 
+    @staticmethod
+    def _candidate(c: str) -> bool:
+        """True when c is, or folds to, the start of an escape the pipeline decodes."""
+        return c in "&%\\" or "\U000e0020" <= c <= "\U000e007e" or (not c.isascii() and _folds_to_a_start(c))
+
     def _next_guard(self, j: int) -> int:
         """The first raw offset at or after j that is a guard (len(raw) if none)."""
         self._next_escape(0)
@@ -482,8 +491,14 @@ class _Walk:
         """The first raw offset at or after j where an escape begins (len(raw) if none)."""
         if self.active is None:
             raw = self.raw
-            self.active = [m.start() for m in _ESCAPE_RX.finditer(raw)
-                           if self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start())]
+            # Every character that is, or folds to, the start of an escape is a candidate: the
+            # inventory is the set of start characters, taken one character at a time from the
+            # same steps the pipeline runs, and not the set of places a pattern finds in the raw
+            # text. A start that only a folded character spells (a full-width percent sign inside
+            # an entity) is therefore in it, and so is the start in front of it.
+            self.active = [m.start() for m in _GUARD_RX.finditer(raw)
+                           if self._candidate(raw[m.start()])
+                           and (self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start()))]
             self.guards = self._find_guards()
         active, k = self.active, self.cursor
         # The walk only moves forward, so the cursor does too.
