@@ -47,7 +47,7 @@ def _pid_from_marker(marker, timeout=5.0):
             return int(text)
         time.sleep(0.02)
     raise AssertionError(
-        f"no pid in {marker} within {timeout}s "
+        f"marker empty after {timeout:g} s: no pid in {marker} "
         f"(exists={os.path.exists(marker)}); the child never finished writing")
 
 supervisor = pytest.importorskip(
@@ -97,11 +97,7 @@ def test_a_group_is_killed_even_after_its_leader_has_exited(tmp_path):
     leader.wait(timeout=10)
     assert leader.poll() == 0, "the leader is supposed to have exited cleanly"
 
-    for _ in range(100):
-        if os.path.exists(marker):
-            break
-        time.sleep(0.05)
-    grandchild = int(open(marker).read())
+    grandchild = _pid_from_marker(marker)
     assert _alive(grandchild), "the descendant did not survive its leader"
 
     supervisor.stop_group(leader.pid, grace_ms=250)
