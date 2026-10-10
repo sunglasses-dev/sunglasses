@@ -21,6 +21,7 @@ document missing either family is skipped.
 Every derivation rule errs toward extracting LESS. An empty requirement means
 "no prefilter, evaluate as before", which is always correct.
 """
+import functools
 import re
 
 try:
@@ -437,7 +438,7 @@ def _max_len(seq):
     """
     total = 0
     for op, av in seq:
-        name = getattr(op, "name", str(op))
+        name = (getattr(op, "name", None) or str(op))
         if name in _ZERO_WIDTH:
             continue
         if name in _ONE_CHAR:
@@ -512,7 +513,7 @@ def _has_lookaround(seq) -> bool:
     from the neighbouring characters, which a bounded search still has.
     """
     for op, av in seq:
-        name = getattr(op, "name", str(op))
+        name = (getattr(op, "name", None) or str(op))
         if name in ("ASSERT", "ASSERT_NOT"):
             return True
         if any(_has_lookaround(sub) for sub in _subtrees(name, av)):
@@ -551,7 +552,7 @@ def _one_char_source(node):
     """A regex source that matches exactly the characters this one-character
     parse node matches, or None when it cannot be rebuilt."""
     op, av = node
-    name = getattr(op, "name", str(op))
+    name = (getattr(op, "name", None) or str(op))
     if name == "ANY":
         return "."
     if name == "LITERAL":
@@ -611,7 +612,7 @@ def _span(seq, flags, text, cache):
     would be wrong)."""
     advance = forward = back = 0
     for op, av in seq:
-        name = getattr(op, "name", str(op))
+        name = (getattr(op, "name", None) or str(op))
         if name in _ONE_CHAR:
             node = (1, 1, 0)
         elif name == "AT":
@@ -684,7 +685,7 @@ def _first_source(seq):
     consumes), a repeat that may be empty, an empty branch or a node this function
     does not know gives None."""
     for op, av in seq:
-        name = getattr(op, "name", str(op))
+        name = (getattr(op, "name", None) or str(op))
         if name == "AT":
             continue
         if name in _ONE_CHAR:
@@ -715,7 +716,7 @@ def _count_nodes(seq) -> int:
     total = 0
     for op, av in seq:
         total += 1
-        name = getattr(op, "name", str(op))
+        name = (getattr(op, "name", None) or str(op))
         if name in ("SUBPATTERN", "ATOMIC_GROUP", "ASSERT", "ASSERT_NOT", "MAX_REPEAT",
                     "MIN_REPEAT", "POSSESSIVE_REPEAT"):
             total += _count_nodes(av[-1] if name != "ATOMIC_GROUP" else av)
@@ -725,6 +726,25 @@ def _count_nodes(seq) -> int:
     return total
 
 
+@functools.lru_cache(maxsize=4096)
+def _parsed(pattern: str, flags: int):
+    """The parse tree of a pattern, kept: the walk asks for it on every scan that
+    meets a negated hit, and a rule's tree does not depend on the text. Callers only
+    read it."""
+    return _sre_parse.parse(pattern, flags)
+
+
+@functools.lru_cache(maxsize=4096)
+def _start_plan(pattern: str, flags: int):
+    """(compiled one-character start regex, node count) of a pattern, or None when
+    no start character can be derived. Text-free, so it is kept."""
+    tree = _parsed(pattern, flags)
+    source = _first_source(tree)
+    if source is None:
+        return None
+    return re.compile(source, flags & (re.IGNORECASE | re.ASCII)), _count_nodes(tree)
+
+
 def start_positions(rx, text: str):
     """(positions, miss) for one compiled regex in `text`: the sorted offsets whose
     character is one a match can start with, and the most an attempt at any other
@@ -732,14 +752,19 @@ def start_positions(rx, text: str):
     the tree). positions is None when no such offsets can be derived, in which case
     every offset is an attempt of full span."""
     try:
-        tree = _sre_parse.parse(rx.pattern, rx.flags)
-        source = _first_source(tree)
-        if source is None:
+        plan = _start_plan(rx.pattern, rx.flags)
+        if plan is None:
             return None, 0
-        found = re.compile(source, rx.flags & (re.IGNORECASE | re.ASCII)).finditer(text)
-        return [m.start() for m in found], _count_nodes(tree)
+        found = plan[0].finditer(text)
+        return [m.start() for m in found], plan[1]
     except Exception:
         return None, 0
+
+
+# A rule's span depends on the text only through the longest run of each class its
+# unbounded one-class repeats use. Kept per rule as {those runs: span}, so the
+# walk does not re-derive the span of the same rule on every scan.
+_SPANS: dict = {}
 
 
 def max_read_extent(rx, text: str, cache: dict) -> int:
@@ -752,9 +777,24 @@ def max_read_extent(rx, text: str, cache: dict) -> int:
     of a branch, backtracking), which every search has on main too and which a
     pattern's size bounds.
     """
+    key = (rx.pattern, rx.flags)
     try:
-        tree = _sre_parse.parse(rx.pattern, rx.flags)
-        found = _span(tree, rx.flags, text, cache)
+        known = _SPANS.get(key)
+        if known is None:
+            tree = _parsed(rx.pattern, rx.flags)
+            found = _span(tree, rx.flags, text, cache)
+            if len(_SPANS) < 4096:
+                keys = tuple(cache)
+                _SPANS[key] = (keys, {tuple(cache[k] for k in keys): found})
+        else:
+            keys, table = known
+            runs = tuple(_longest_run(source, flags, text, cache) for source, flags in keys)
+            if runs in table:
+                found = table[runs]
+            else:
+                found = _span(_parsed(rx.pattern, rx.flags), rx.flags, text, cache)
+                if len(table) < 64:
+                    table[runs] = found
     except Exception:
         found = None
     if found is None:

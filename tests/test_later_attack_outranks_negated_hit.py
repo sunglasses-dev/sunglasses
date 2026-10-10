@@ -1056,3 +1056,19 @@ def test_a_wide_gap_rule_over_dense_negated_repeats_stays_inside_the_budget():
     text = "Never zorbit now, " * 3000
     decision, found, steps = _walk(rule, text)
     assert found["severity"] == "review" and found["negation_context"] is True
+
+
+def test_a_kept_span_follows_the_text_it_is_asked_about():
+    """The span of a rule is kept between scans, but it depends on the longest run
+    of the class an unbounded repeat uses, so the same rule over two texts must give
+    two spans, each the one a fresh derivation gives."""
+    import re
+
+    rx = re.compile(r"warn[ ]*now")
+    short, long_ = "warn now", "warn" + " " * 400 + "now"
+    first = _prefilter.max_read_extent(rx, short, {})
+    second = _prefilter.max_read_extent(rx, long_, {})
+    again = _prefilter.max_read_extent(rx, short, {})
+    _prefilter._SPANS.clear()
+    fresh_long = _prefilter.max_read_extent(rx, long_, {})
+    assert second > first and again == first and second == fresh_long
