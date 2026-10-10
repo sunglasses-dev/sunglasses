@@ -204,4 +204,4 @@ def test_a_damaged_stream_is_charged_for_the_call_that_failed():
 def test_a_stream_that_is_not_damaged_is_charged_for_what_it_made_only():
     stream = _Stream(zlib.compress(bytes(5000)), **{"/Filter": "/FlateDecode"})
     result = pdf_module._decode_bounded(stream, 1 << 30)
-    assert result.state == "ok" and result.spent == 5000
+    assert result.state == "ok" and result.spent == len(stream._data) + 5000

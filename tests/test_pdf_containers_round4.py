@@ -143,8 +143,9 @@ def test_no_inflation_starts_once_the_budget_is_spent(monkeypatch):
 def test_a_stream_that_fits_is_charged_what_it_decoded(monkeypatch):
     extractor = PDFExtractor()
     extractor.MAX_ATTACHMENT_BYTES = 1000
-    assert extractor._bounded_stream_bytes(_flate_stream(300), "s") == b" " * 300
-    assert extractor.budget.read == 300
+    stream = _flate_stream(300)
+    assert extractor._bounded_stream_bytes(stream, "s") == b" " * 300
+    assert extractor.budget.read == 300 + len(stream._data)   # the input and what it made
 
 
 # 3. A string value or an array is charged by its encoded bytes.

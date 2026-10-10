@@ -46,9 +46,10 @@ def predictor_calls(monkeypatch):
 
 @pytest.mark.parametrize("columns", [10 ** 6, 10 ** 9, 2 ** 40])
 def test_an_empty_stream_never_reaches_the_predictor_whatever_its_columns(predictor_calls, columns):
-    result = pdf_module._decode_bounded(_stream(b"", columns), 1_000_000)
+    stream = _stream(b"", columns)
+    result = pdf_module._decode_bounded(stream, 1_000_000)
     assert predictor_calls == []
-    assert result.state == "ok" and result.spent == 0
+    assert result.state == "ok" and result.spent == len(stream._data)   # the input only
 
 
 @pytest.mark.parametrize("columns", [10 ** 6, 10 ** 9, 2 ** 40])
@@ -82,7 +83,8 @@ def test_dimensions_that_cannot_describe_a_row_are_an_error_before_the_predictor
 
 def test_an_ordinary_predicted_stream_is_still_decoded_and_charged():
     rows = [b"\x01\x01\x01\x01\x01", b"\x01\x02\x02\x02\x02"]
-    result = pdf_module._decode_bounded(_stream(b"".join(rows), 4), 1_000_000)
+    stream = _stream(b"".join(rows), 4)
+    result = pdf_module._decode_bounded(stream, 1_000_000)
     assert result.state == "ok"
     assert result.data == bytes([1, 2, 3, 4, 2, 4, 6, 8])
-    assert result.spent == 10 + 8
+    assert result.spent == len(stream._data) + 10 + 8

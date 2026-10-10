@@ -44,7 +44,8 @@ def test_a_predictor_that_fails_keeps_the_charge_for_the_output_it_may_have_made
 
 def test_the_charge_for_a_predictor_that_succeeds_is_what_it_made():
     rows = [b"\x01\x01\x01\x01\x01", b"\x01\x02\x02\x02\x02"]
-    result = pdf_module._decode_bounded(_predicted(b"".join(rows), 4), 1_000_000)
+    stream = _predicted(b"".join(rows), 4)
+    result = pdf_module._decode_bounded(stream, 1_000_000)
     assert result.state == "ok"
     assert result.data == bytes([1, 2, 3, 4, 2, 4, 6, 8])
-    assert result.spent == 10 + 8
+    assert result.spent == len(stream._data) + 10 + 8   # the input, the inflated stream, the rows

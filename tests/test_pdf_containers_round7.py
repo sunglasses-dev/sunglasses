@@ -105,7 +105,7 @@ def test_every_stage_of_a_chain_is_charged_and_the_chain_is_refused_when_the_sum
     packed = zlib.compress(middle, 9)
     chain = _encoded(packed, '/FlateDecode', '/ASCII85Decode')
     ok = pdf_module._decode_bounded(chain, 4 << 20)
-    assert ok.state == "ok" and ok.data == final and ok.spent == len(middle) + len(final)
+    assert ok.state == "ok" and ok.data == final and ok.spent == len(packed) + len(middle) + len(final)
     # The final output fits in a megabyte; the stage in front of it does not leave room.
     refused = pdf_module._decode_bounded(chain, 1 << 20)
     assert refused.state == "big" and refused.data is None
