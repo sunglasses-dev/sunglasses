@@ -589,6 +589,68 @@ class _RawCopies:
         return shown
 
 
+class _ReadBudget:
+    """The reads one walk over later occurrences of ONE regex in ONE text may make.
+
+    `reserve(resume)` is asked before every search and says whether the budget
+    holds the worst case of a search that starts at `resume`; `charge` takes what
+    the search really cost. What a search costs depends on the mode, and each mode
+    is priced from what it really does:
+
+    * plain (and the anchored mode's "whole" plan): an attempt at every offset. An
+      offset whose character cannot start a match fails at its first node and
+      costs at most the nodes of the tree; any other offset costs the span an
+      attempt can look at, plus one.
+    * anchored with windows: attempts only at the offsets inside the windows at or
+      after `resume`, and each candidate is re-run unbounded, so an offset costs
+      two spans.
+    * lead-in: the twin searches from every offset and each candidate is matched by
+      the rule's own regex, so an offset costs both spans."""
+
+    __slots__ = ("size", "left", "starts", "miss", "hit", "windows", "ends", "idle")
+
+    def __init__(self, mode: str, rx, twin, text: str, factor: int, floor: int, plan=None):
+        self.size = len(text)
+        self.left = factor * self.size + floor
+        self.starts, self.miss, self.windows, self.ends, self.idle = None, 0, None, None, False
+        span = _prefilter.max_read_extent(rx, text, {}) + 1
+        self.hit = span
+        if mode == "anchored" and plan is not None and plan[0] != "whole":
+            if plan[0] == "none":
+                self.idle = True                     # the rule cannot match this text
+            else:
+                self.windows, self.ends = plan[1], plan[2]
+                self.hit = 2 * span
+        elif mode == "leadin":
+            self.hit = span + _prefilter.max_read_extent(twin, text, {}) + 1
+        elif mode in ("plain", "anchored"):
+            self.starts, self.miss = _prefilter.start_positions(rx, text)
+
+    def _cost(self, lo: int, hi: int) -> int:
+        """Worst case of attempts at offsets lo .. hi inclusive."""
+        if self.idle or hi < lo:
+            return 0
+        if self.windows is not None:
+            offsets = 0
+            for index in range(bisect.bisect_left(self.ends, lo), len(self.windows)):
+                begin, end = self.windows[index]
+                if begin > hi:
+                    break
+                offsets += min(end, hi) - max(begin, lo) + 1
+            return offsets * self.hit
+        count = hi - lo + 1
+        if self.starts is None:
+            return count * self.hit
+        near = bisect.bisect_right(self.starts, hi) - bisect.bisect_left(self.starts, lo)
+        return near * self.hit + (count - near) * self.miss
+
+    def reserve(self, resume: int) -> bool:
+        return self._cost(resume, self.size) <= self.left
+
+    def charge(self, resume: int, found_at) -> None:
+        self.left -= self._cost(resume, self.size if found_at is None else found_at)
+
+
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
@@ -1448,20 +1510,20 @@ class SunglassesEngine:
     # only of negated copies stays negated. Each step starts past the previous
     # match start, so there are at most as many steps as there are matches, but
     # a step is a search: an attempt at every position it passes, and each
-    # attempt reads as far forward as the pattern lets it, which can be well past
-    # where the match ends (a lookahead, or an alternative that read on and
-    # failed). Steps that overlap read the same tail again. So the walk is charged
-    # in READS: each step costs the attempts it makes (the positions it passes
-    # over to its match, plus one) times
-    # the farthest one attempt of this rule can read in this text
-    # (`_prefilter.max_read_extent`), and the walk has a budget of them: a
-    # multiple of the text plus a floor. Repeated warnings stay under it (the
-    # ordinary rules read a short, bounded distance); a rule whose attempts read
-    # to the end of the text does not. When the budget is spent the search stops
-    # and the occurrence is NOT treated as negated: the rest of the text was not
-    # judged, and unjudged text is never lent the benefit of a warning. What is
-    # bounded is reads, not the backtracking inside one search, which a single
-    # search has on main too.
+    # attempt looks at a stretch of text around its position (a lookahead, a
+    # lookbehind, an alternative that read on and failed), so steps that overlap
+    # look at the same text again. Every search the walk makes is therefore
+    # RESERVED before it runs, in `_ReadBudget`, the one place that decides:
+    # the search may start at most at every remaining position, and an attempt
+    # looks at most `_prefilter.max_read_extent` characters, so the search costs
+    # at most (remaining positions) x (that span), and it runs only when the
+    # budget still holds that much. After it runs, what it really cost (the
+    # positions it passed to its match, or to the end of the text when it found
+    # none) is charged. A reservation that does not fit ends the walk with the
+    # occurrence judged live, not negated: the rest of the text was not judged,
+    # and unjudged text is never lent the benefit of a warning. What is bounded
+    # is the text one attempt looks at, summed over the attempts; backtracking
+    # inside one attempt is not, and a single search has it on main too.
     NEGATION_SEARCH_BUDGET_FACTOR = 1024
     NEGATION_SEARCH_BUDGET_FLOOR = 1 << 18
 
@@ -1505,9 +1567,14 @@ class SunglassesEngine:
         # what the anchored mode derives from the text is kept across the steps.
         memo = {}
         match = first
-        budget = (self.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
-                  + self.NEGATION_SEARCH_BUDGET_FLOOR)
-        extent = _prefilter.max_read_extent(rx, text, {}) + 1
+        plan = None
+        if mode == "anchored":
+            anchors, window = self._anchor_spec[guards]
+            plan = memo.get(guards)
+            if plan is None:
+                plan = memo[guards] = self._anchor_plan(anchors, window, text)
+        budget = _ReadBudget(mode, rx, guards, text, self.NEGATION_SEARCH_BUDGET_FACTOR,
+                             self.NEGATION_SEARCH_BUDGET_FLOOR, plan)
         while True:
             # Resume one character past the START, not at the end: these rules
             # have wide gaps, so the negated match often spans the later one.
@@ -1517,13 +1584,14 @@ class SunglassesEngine:
             resume = match.start() + 1
             while resume < len(text) and text[resume].isspace():
                 resume += 1
-            match = self._eval_regex(mode, rx, guards, text, resume, memo)
-            if match is None:
-                return first, True
-            if not negated_at(match):
+            if not budget.reserve(resume):
                 return match, False
-            budget -= (match.start() - resume + 1) * extent
-            if budget < 0:
+            found = self._eval_regex(mode, rx, guards, text, resume, memo)
+            budget.charge(resume, None if found is None else found.start())
+            if found is None:
+                return first, True
+            match = found
+            if not negated_at(match):
                 return match, False
 
     @staticmethod

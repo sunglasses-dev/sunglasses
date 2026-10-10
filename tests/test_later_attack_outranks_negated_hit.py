@@ -749,14 +749,17 @@ def test_finding_the_copies_of_an_opening_does_no_lookup_per_copy(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# The search for a later occurrence has a budget of READS. Each step starts past
-# the previous match start, which bounds the number of steps, but a step is a
-# search: an attempt at every position it passes, and each attempt reads as far
-# forward as the pattern lets it -- past the match end for a lookahead, or for an
-# alternative that read on and failed. So a step costs (attempts) x (the farthest
-# one attempt of the rule can read in this text), and the walk has a budget of
-# those.
+# Every search the walk over later occurrences makes is RESERVED before it runs.
+# A step is a search: an attempt at every offset it passes, and each attempt looks
+# at a stretch of text around its offset (a lookahead, a lookbehind, anything nested
+# in either, an alternative that read on and failed). The walk charges the offsets
+# a search passes times the span an attempt can look at, against a budget, and a
+# search whose worst case does not fit the budget is not run: the occurrence is
+# judged live. The tests below do not take the span from the code under test: a
+# brute-force oracle measures how far from an offset the answer still depends on
+# the text, and the span must be at least that.
 from sunglasses import _prefilter  # noqa: E402
+import sunglasses.engine as _engine_module  # noqa: E402
 
 
 def _rule(rule_id, regex):
@@ -772,66 +775,118 @@ def _overlap_rule():
 
 
 def _walk(rule, text):
-    """Scan `text` with one rule and meter the walk over later occurrences.
-
-    Returns (decision, finding, steps, reads, budget). `reads` is what the steps
-    before the last one cost, by the same formula the walk charges: attempts
-    (positions passed over to the match, plus one) x (read extent + 1)."""
+    """Scan `text` with one rule. Returns (decision, finding, steps), where `steps`
+    is how many searches the walk ran after the first match."""
     eng = SunglassesEngine(patterns=[rule], mechanisms=False)
-    rx = eng._regex_patterns[0][1][0][1]
     original = eng._eval_regex
-    calls = []
+    steps = []
 
     def counted(mode, rx_, guards, text_, start=0, memo=None):
-        match = original(mode, rx_, guards, text_, start, memo)
+        hit = original(mode, rx_, guards, text_, start, memo)
         if start:
-            end = match.start() if match is not None else len(text_)
-            calls.append((end - start + 1, match is not None))
-        return match
+            steps.append((start, None if hit is None else hit.start()))
+        return hit
 
     eng._eval_regex = counted
     result = eng.scan(text, "message")
     found = [f for f in result.findings if f["id"] == rule["id"]]
-    extent = _prefilter.max_read_extent(rx, text, {}) + 1
-    charged = [attempts * extent for attempts, _ in calls[:-1]]
-    budget = (SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
-              + SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR)
-    return result.decision, (found[0] if found else None), len(calls), sum(charged), budget
+    _walk.steps = steps
+    return result.decision, (found[0] if found else None), len(steps)
 
 
-@pytest.mark.parametrize("pattern,text,expected", [
-    (r"abc", "x" * 50, 3),
-    (r"a{2,5}b", "x" * 50, 6),
-    (r"\bfoo\b", "x" * 50, 4),
-    (r"foo(?=.{40}END)", "x" * 200, 46),                    # the lookahead is read
-    (r"foo(?!bar)", "x" * 50, 6),
-    (r"(?<=ab)foo", "x" * 50, 4),                           # a lookbehind reads backwards
-    (r"a|bcdef", "x" * 50, 5),                              # the widest alternative
-    (r"\s*x", "ab   cd" + " " * 20 + "e", 21 + 1),           # the longest run of blanks, plus the stop
-    (r"x[^q]*y", "ab" * 10, 20),                            # a run of the class
-    (r"(?s)x.*y", "ab" * 10, 21),                           # the whole text, as one run
-    (r"x.*y", "ab\ncd\nefgh\n", 6),                       # no DOTALL: the longest line
-])
-def test_the_read_extent_counts_every_way_an_attempt_reads(pattern, text, expected):
+def _budget_of(text):
+    return (SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
+            + SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR)
+
+
+def _tail_reads(text):
+    """Reads of the walk that an outside observer can count: each search that found
+    a match ran an attempt at the match start whose assertion read to the end of
+    the text. A lower bound on what the walk really read."""
+    return sum(len(text) - hit for _start, hit in _walk.steps if hit is not None)
+
+
+def _forward_need(rx, text, at):
+    """The fewest characters ahead of `at` that `rx.match(text, at)` needs to see to
+    give the answer it gives on the whole text: with the text cut shorter than that
+    the answer changes. A lower bound on how far an attempt at `at` looks."""
+    whole = rx.match(text, at)
+    want = None if whole is None else whole.span()
+    need = 0
+    for stop in range(at, len(text) + 1):
+        cut = rx.match(text, at, stop)
+        got = None if cut is None else cut.span()
+        if got != want:
+            need = stop - at + 1
+    return need
+
+
+def _backward_need(rx, text, at):
+    """The same for the text behind `at`: how many characters behind it can be cut
+    off before the answer changes."""
+    whole = rx.match(text, at)
+    want = None if whole is None else whole.span()[1] - at
+    need = 0
+    for keep in range(0, at + 1):
+        cut = rx.match(text[at - keep:], keep)
+        got = None if cut is None else cut.span()[1] - keep
+        if got != want:
+            need = keep + 1
+    return need
+
+
+_SHAPES = [
+    (r"abc", "xxabcxxabdxx"),
+    (r"a{2,5}b", "aaaaaabaaabaab"),
+    (r"\bfoo\b", "foo foox xfoo foo."),
+    (r"foo(?=.{40}END)", "foo" + "x" * 37 + "END foo" + "x" * 40),
+    (r"foo(?!bar)", "foobar foobaz"),
+    (r"(?<=ab)foo", "abfoo cdfoo abfoo"),
+    (r"(?<=(?=.*zzz)[ ])w", "never warn never warn never warn zzz"),
+    (r"(?<![a-z]{6})foo", "abcdeffoo ab foo"),
+    (r"a|bcdef", "bcdex bcdef a"),
+    (r"(?:ab|abcd)e", "abcde abe abcdx"),
+    (r"warn(?=(?s:.*?zzz))", "warn\nwarn\nzzz"),
+    (r"(?is)warn(?=.*zzz)", "never warn never warn zzz"),
+    (r"\s*x", "ab   cd" + " " * 20 + "x"),
+    (r"x[^q]*y", "xabababy xab"),
+    (r"(?s)x.*y", "xab\ncdy"),
+    (r"x.*y", "xab\ncdefghy xabcy"),
+    (r"(?:ab){1,4}c", "abababac ababababab"),
+    (r"((?:a|b){2,3})c", "abbcabc"),
+]
+
+
+@pytest.mark.parametrize("pattern,text", _SHAPES)
+def test_the_span_covers_how_far_an_attempt_really_looks(pattern, text):
+    """Independent of the estimator: cut the text shorter ahead of an offset, or
+    shorter behind it, until the answer changes. The span must be at least that."""
     import re
 
-    assert _prefilter.max_read_extent(re.compile(pattern), text, {}) >= expected - 1
-    assert _prefilter.max_read_extent(re.compile(pattern), text, {}) <= expected + 1
+    rx = re.compile(pattern)
+    span = _prefilter.max_read_extent(rx, text, {})
+    for at in range(len(text) + 1):
+        forward, backward = _forward_need(rx, text, at), _backward_need(rx, text, at)
+        assert span >= forward, (pattern, at, span, forward)
+        assert span >= backward, (pattern, at, span, backward)
+        assert span >= forward + backward - 1 or forward == 0 or backward == 0, (pattern, at)
 
 
 @pytest.mark.parametrize("pattern", [
     r"(a)\1x",                                             # a backreference
     r"(?:ab )*zorbit",                                      # an unbounded repeat of more than one character
     r"(a)?(?(1)b|c)",                                       # a conditional
+    r"warn(?=(?s:.*?zzz))",                                 # scoped flags change what `.` matches
+    r"x(?i:y*z)",                                           # scoped flags change what a class matches
 ])
-def test_a_shape_that_cannot_be_read_is_charged_as_the_whole_text(pattern):
+def test_a_shape_that_cannot_be_bounded_is_charged_as_the_whole_text(pattern):
     import re
 
     text = "x" * 777
     assert _prefilter.max_read_extent(re.compile(pattern), text, {}) == len(text)
 
 
-def test_the_read_extent_never_exceeds_the_text_and_survives_an_unreadable_regex():
+def test_the_span_never_exceeds_the_text_and_survives_an_unreadable_regex():
     import re
 
     assert _prefilter.max_read_extent(re.compile(r"a{0,100000}b"), "xyz", {}) == 3
@@ -842,86 +897,162 @@ def test_the_read_extent_never_exceeds_the_text_and_survives_an_unreadable_regex
     assert _prefilter.max_read_extent(Broken(), "xyz", {}) == 3
 
 
-def test_the_ordinary_rules_read_a_short_distance():
-    """The catalog keeps its repeated-warning behaviour because its extent is small."""
+@pytest.mark.parametrize("pattern,flags", [
+    (r"\bignore\b", 0), (r"(?i)ignore", 0), (r"(?:ab|cd)e", 0), (r"[xyz]+q", 0),
+    (r"(?:ig|no)re{1,3}", 0), (r"ignore", __import__("re").I), (r"(?<=a)ignore", 0),
+    (r"(?=.*zz)ignore", 0), (r"i?gnore", 0), (r"\w+ignore", 0), (r"(?:)ignore", 0),
+])
+def test_an_offset_outside_the_start_positions_cannot_start_a_match(pattern, flags):
+    """The walk prices an offset whose character cannot start a match at the nodes
+    of the tree. Any offset that is not a listed start must really fail to match."""
     import re
 
+    rx = re.compile(pattern, flags)
+    text = "Ignore IGNORE xyzq cdE abE ignoree zz\nignore  iggnore noignore 1gnore ſ"
+    starts, miss = _prefilter.start_positions(rx, text)
+    if starts is None:
+        return
+    allowed = set(starts)
+    for at in range(len(text) + 1):
+        if at not in allowed:
+            assert rx.match(text, at) is None, (pattern, at)
+
+
+def test_a_rule_that_cannot_be_filtered_has_no_start_positions():
+    import re
+
+    for pattern in (r"(?=.*zz)ignore", r"(?<=a)ignore", r"x*ignore", r"(?i:a)b"):
+        assert _prefilter.start_positions(re.compile(pattern), "ignore")[0] is None, pattern
+
+
+def test_the_ordinary_rules_look_at_a_short_distance():
+    """The catalog keeps its repeated-warning behaviour because its span is small."""
     text = "x" * 100_000
     eng = SunglassesEngine(mechanisms=False)
-    extents = sorted(_prefilter.max_read_extent(rx, text, {})
-                     for _pattern, rxs in eng._regex_patterns for _mode, rx, _guards in rxs
-                     if _mode == "plain")
-    assert extents[len(extents) // 2] < 1500, extents[len(extents) // 2]
+    spans = sorted(_prefilter.max_read_extent(rx, text, {})
+                   for _pattern, rxs in eng._regex_patterns for _mode, rx, _guards in rxs
+                   if _mode == "plain")
+    assert spans[len(spans) // 2] < 500, spans[len(spans) // 2]
 
 
-def test_a_lookahead_that_reads_the_rest_of_the_text_is_charged_for_it():
-    """The assertion tail: each match is four characters, and each attempt reads to
-    the end of the text. Charging the match alone let the walk repeat that read at
-    every occurrence."""
-    rule = _rule("TEST-TAIL-001", r"(?is)warn(?=.*zzz)")
-    rows = []
+def _budget(rule_regex, text, mode="plain"):
+    import re
+
+    rx = re.compile(rule_regex)
+    return _engine_module._ReadBudget(mode, rx, None, text, SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR,
+                                      SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR)
+
+
+def test_a_search_is_reserved_before_it_runs_and_charged_for_what_it_cost():
+    text = "z" * 10_000
+    budget = _budget(r"zz(?=.*qq)", text)
+    assert budget.reserve(1) is False                      # every offset starts, each can read the whole text
+    cheap = _budget(r"zzq", text)
+    assert cheap.reserve(1) is True
+    before = cheap.left
+    cheap.charge(1, None)                                  # a failed search charges to the end
+    assert before - cheap.left > 0
+    after_failed = cheap.left
+    cheap.charge(9_000, 9_500)
+    assert after_failed - cheap.left > 0
+
+
+def test_a_filtered_rule_is_charged_less_than_a_rule_that_starts_with_anything():
+    text = "the quick brown fox " * 500
+    narrow, wide = _budget(r"zorbit now(?=.{0,60}x)", text), _budget(r".?zorbit now(?=.{0,60}x)", text)
+    assert narrow._cost(1, len(text)) * 4 < wide._cost(1, len(text))
+
+
+def _assert_tail_walk_is_bounded(rule, unit):
+    """`unit` repeats, then the tail the assertion looks for. Each search reads to
+    the end of the text, so the number of searches the walk may run is the budget
+    over the text, whatever the text: counted from the outside, not from the code
+    under test. Where the budget is spent the occurrence is judged live."""
+    outcomes = []
     for copies in (1000, 2000, 4000, 8000):
-        text = "never warn " * copies + "zzz"
-        decision, found, steps, reads, budget = _walk(rule, text)
-        rows.append((len(text), steps, reads))
-        assert reads <= budget, (len(text), reads, budget)
-        # The walk stopped: not every one of the copies was visited.
-        assert steps <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 8, steps
-        # Unjudged text is not lent the benefit of the warning.
-        assert decision == "block" and found["severity"] == "high"
-    assert rows[-1][1] <= rows[0][1] + 8, rows
+        text = unit * copies + "zzz"
+        decision, found, steps = _walk(rule, text)
+        assert found is not None
+        assert _tail_reads(text) <= _budget_of(text), (copies, steps)
+        outcomes.append((copies, found["severity"], steps))
+    assert outcomes[-1][1] == "high", outcomes             # the long text is not lent the warning
+    assert outcomes[-1][2] <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 2, outcomes
 
 
-def test_an_alternative_that_reads_to_the_end_of_the_line_and_fails_is_charged():
+def test_a_lookahead_that_reads_the_rest_of_the_text_stops_the_walk():
+    _assert_tail_walk_is_bounded(_rule("TEST-TAIL-001", r"(?is)warn(?=.*zzz)"), "never warn ")
+
+
+def test_a_lookbehind_that_holds_a_forward_assertion_stops_the_walk():
+    _assert_tail_walk_is_bounded(_rule("TEST-BEHIND-001", r"(?<=(?=.*zzz)[ ])warn"), "never warn ")
+
+
+def test_a_scoped_flag_rule_stops_the_walk():
+    _assert_tail_walk_is_bounded(_rule("TEST-SCOPED-001", r"warn(?=(?s:.*?zzz))"), "never warn\n")
+
+
+def test_the_search_that_would_end_the_walk_is_not_run_when_it_cannot_fit():
+    """One negated hit, then nothing: the closing search that proves there is no
+    later hit is the last step, and it has to fit the budget too. A rule that can
+    look at the whole text in a long document is not searched again; the occurrence
+    is judged live."""
+    rule = _rule("TEST-TERMINAL-001", r"(?is)warn(?=.*zzz)")
+    text = "Never warn. " + "wxyz " * 20000 + "zzz"
+    decision, found, steps = _walk(rule, text)
+    assert steps == 0
+    assert found is not None and found["severity"] == "high"
+    # The same rule in a short document is searched, finds nothing more, and stays
+    # downgraded: the reservation fits.
+    decision, found, steps = _walk(rule, "Never warn. filler zzz")
+    assert steps == 1
+    assert found["severity"] == "review" and found["negation_context"] is True
+
+
+def test_an_alternative_that_reads_to_the_end_of_the_line_and_fails_stops_the_walk():
     rule = _rule("TEST-ALT-001", r"(?i)\bnever\b|a.*Z")
     text = "never a " * 8000
-    decision, found, steps, reads, budget = _walk(rule, text)
-    assert reads <= budget
+    decision, found, steps = _walk(rule, text)
     assert steps < 8000
     assert decision == "block"
 
 
-def test_an_unreadable_shape_spends_the_budget_and_fails_closed():
+def test_an_unbounded_shape_spends_the_budget_and_fails_closed():
     rule = _rule("TEST-BACKREF-001", r"(?i)(w)arn \1")
     text = "never warn w " * 6000
-    decision, found, steps, reads, budget = _walk(rule, text)
-    assert reads <= budget
+    decision, found, steps = _walk(rule, text)
     assert steps < 6000
     assert found["severity"] == "high"
 
 
 def test_overlapping_matches_that_each_reach_the_end_of_the_text_cost_a_bounded_search():
-    rows = []
+    counts = []
     for repeats in (1000, 2000, 4000):
         text = "Never " + "note never " * repeats + "zorbit now"
-        decision, found, steps, reads, budget = _walk(_overlap_rule(), text)
-        rows.append((len(text), steps, reads))
-        assert reads <= budget, (len(text), reads, budget)
+        decision, found, steps = _walk(_overlap_rule(), text)
+        counts.append(steps)
         # Unjudged text is not lent the benefit of the warning.
         assert decision == "block" and found is not None and found["severity"] == "high"
-    assert all(steps <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 8 for _, steps, _ in rows), rows
+    assert max(counts) <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 8, counts
 
 
 def test_a_few_overlapping_negated_matches_stay_downgraded():
     text = "Never " + "note never " * 6 + "zorbit now"
-    decision, found, steps, reads, budget = _walk(_overlap_rule(), text)
+    decision, found, steps = _walk(_overlap_rule(), text)
     assert decision == "allow_redacted"
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert reads < budget
 
 
 @pytest.mark.parametrize("copies", [100, 2000])
 def test_many_separate_negated_matches_of_the_same_rule_stay_downgraded(copies):
     rule = _rule("TEST-SEPARATE-001", r"(?i)(?:note never ){0,3}zorbit now")
     text = ("Never zorbit now. " + FILLER) * copies
-    decision, found, steps, reads, budget = _walk(rule, text)
+    decision, found, steps = _walk(rule, text)
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert reads <= budget and steps == copies
+    assert steps == copies
 
 
 def test_a_wide_gap_rule_over_dense_negated_repeats_stays_inside_the_budget():
     rule = _rule("TEST-WIDE-001", r"(?i)zorbit.{0,300}now")
     text = "Never zorbit now, " * 3000
-    decision, found, steps, reads, budget = _walk(rule, text)
+    decision, found, steps = _walk(rule, text)
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert reads < budget / 2, (reads, budget)

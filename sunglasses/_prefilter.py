@@ -590,90 +590,176 @@ def _longest_run(source: str, flags: int, text: str, cache: dict):
     return cache[key]
 
 
-def _reach(seq, flags, text, cache):
-    """(consumed, read) for one attempt at a parse tree: the most characters it can
-    consume and the farthest forward it can read, or None when either cannot be
-    bounded from the tree and the text."""
-    off = reach = 0
+def _span(seq, flags, text, cache):
+    """(advance, forward, back) for one parse tree, or None when none can be derived
+    from the tree and the text. `advance` is the most characters an attempt at it
+    consumes, `forward` the farthest it looks ahead of where it started and `back`
+    the farthest it looks behind it, so one attempt looks at no more than the
+    `forward + back` characters around its start.
+
+    Everything an attempt looks at is in it: what it consumes, a lookahead, a
+    lookbehind and anything nested inside either (a forward assertion inside a
+    lookbehind included), the neighbour an anchor or `\\b` looks at on each side,
+    the widest of the alternatives of a branch (every alternative starts where the
+    others do, so the ones that read on and failed are covered by the widest), and
+    a repeat's bound. An unbounded repeat of one character class counts the longest
+    run of that class in this text plus the character that ends it. Anything else
+    cannot be bounded here and gives None: a backreference, a conditional, an
+    unbounded repeat of more than one character, a class that cannot be rebuilt, a
+    node this function does not know, and any subpattern with scoped flags (they
+    change what `.` and a class match, so a run measured under the outer flags
+    would be wrong)."""
+    advance = forward = back = 0
     for op, av in seq:
         name = getattr(op, "name", str(op))
         if name in _ONE_CHAR:
-            off += 1
-            reach = max(reach, off)
+            node = (1, 1, 0)
+        elif name == "AT":
+            node = (0, 1, 1)
         elif name == "NEGATE":
             continue
-        elif name == "AT":
-            reach = max(reach, off + 1)          # \b, ^, $ look at a neighbour
         elif name in ("ASSERT", "ASSERT_NOT"):
             direction, sub = av
-            if direction > 0:
-                inner = _reach(sub, flags, text, cache)
-                if inner is None:
-                    return None
-                reach = max(reach, off + max(inner))
-            else:
-                reach = max(reach, off + 1)
-        elif name in ("SUBPATTERN", "ATOMIC_GROUP"):
-            inner = _reach(av[3] if name == "SUBPATTERN" else av, flags, text, cache)
+            inner = _span(sub, flags, text, cache)
             if inner is None:
                 return None
-            reach = max(reach, off + inner[1])
-            off += inner[0]
-        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
-            _, hi, sub = av
-            if len(sub) == 1 and getattr(sub[0][0], "name", str(sub[0][0])) in _ONE_CHAR:
-                if hi >= _sre_parse.MAXREPEAT:
-                    source = _one_char_source(sub[0])
-                    if source is None:
-                        return None
-                    hi = _longest_run(source, flags, text, cache)
-                count, extra = hi, 1
-                reach = max(reach, off + count + extra)
-                off += count
+            if direction > 0:
+                node = (0, inner[1], inner[2])
             else:
-                if hi >= _sre_parse.MAXREPEAT:
+                # The body is matched backward from the position: it starts
+                # `inner[0]` characters before it, and what it looks at ahead of
+                # its own start can still reach past the position.
+                node = (0, inner[1], inner[0] + inner[2])
+        elif name in ("SUBPATTERN", "ATOMIC_GROUP"):
+            if name == "SUBPATTERN":
+                _group, added, removed, sub = av
+                if added or removed:
                     return None
-                inner = _reach(sub, flags, text, cache)
+            else:
+                sub = av
+            node = _span(sub, flags, text, cache)
+            if node is None:
+                return None
+        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            _lo, hi, sub = av
+            one = len(sub) == 1 and getattr(sub[0][0], "name", str(sub[0][0])) in _ONE_CHAR
+            if hi >= _sre_parse.MAXREPEAT:
+                if not one:
+                    return None
+                source = _one_char_source(sub[0])
+                if source is None:
+                    return None
+                run = _longest_run(source, flags, text, cache)
+                node = (run, run + 1, 0)
+            else:
+                inner = (1, 1, 0) if one else _span(sub, flags, text, cache)
                 if inner is None:
                     return None
-                reach = max(reach, off + (hi - 1) * inner[0] + inner[1])
-                off += hi * inner[0]
+                if hi <= 0:
+                    node = (0, 0, 0)
+                else:
+                    node = (hi * inner[0], (hi - 1) * inner[0] + inner[1], inner[2])
         elif name == "BRANCH":
-            widest = wide_read = 0
+            node = (0, 0, 0)
             for branch in av[1]:
-                inner = _reach(branch, flags, text, cache)
+                inner = _span(branch, flags, text, cache)
                 if inner is None:
                     return None
-                widest, wide_read = max(widest, inner[0]), max(wide_read, inner[1])
-            reach = max(reach, off + wide_read)
-            off += widest
+                node = tuple(max(x, y) for x, y in zip(node, inner))
         else:
             return None                          # GROUPREF, GROUPREF_EXISTS, ...
-    return off, max(reach, off)
+        forward = max(forward, advance + node[1])
+        back = max(back, node[2])
+        advance += node[0]
+    return advance, forward, back
+
+
+def _first_source(seq):
+    """A regex source for ONE character that every match of `seq` must start with,
+    or None when that cannot be said from the tree.
+
+    Only a tree whose first real node consumes a character gives one: a literal, a
+    class, a group or a nonempty-repeat of those, or a branch of them. Anything
+    zero-width in front other than an anchor (an assertion reads before it
+    consumes), a repeat that may be empty, an empty branch or a node this function
+    does not know gives None."""
+    for op, av in seq:
+        name = getattr(op, "name", str(op))
+        if name == "AT":
+            continue
+        if name in _ONE_CHAR:
+            return _one_char_source((op, av))
+        if name == "SUBPATTERN":
+            _group, added, removed, sub = av
+            if added or removed:
+                return None
+            return _first_source(sub)
+        if name == "ATOMIC_GROUP":
+            return _first_source(av)
+        if name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            lo, _hi, sub = av
+            return _first_source(sub) if lo >= 1 else None
+        if name == "BRANCH":
+            parts = []
+            for branch in av[1]:
+                part = _first_source(branch)
+                if part is None:
+                    return None
+                parts.append(part)
+            return "(?:" + "|".join(parts) + ")"
+        return None
+    return None
+
+
+def _count_nodes(seq) -> int:
+    total = 0
+    for op, av in seq:
+        total += 1
+        name = getattr(op, "name", str(op))
+        if name in ("SUBPATTERN", "ATOMIC_GROUP", "ASSERT", "ASSERT_NOT", "MAX_REPEAT",
+                    "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            total += _count_nodes(av[-1] if name != "ATOMIC_GROUP" else av)
+        elif name == "BRANCH":
+            for branch in av[1]:
+                total += _count_nodes(branch)
+    return total
+
+
+def start_positions(rx, text: str):
+    """(positions, miss) for one compiled regex in `text`: the sorted offsets whose
+    character is one a match can start with, and the most an attempt at any other
+    offset can read (it fails at its first node, so at most the number of nodes in
+    the tree). positions is None when no such offsets can be derived, in which case
+    every offset is an attempt of full span."""
+    try:
+        tree = _sre_parse.parse(rx.pattern, rx.flags)
+        source = _first_source(tree)
+        if source is None:
+            return None, 0
+        found = re.compile(source, rx.flags & (re.IGNORECASE | re.ASCII)).finditer(text)
+        return [m.start() for m in found], _count_nodes(tree)
+    except Exception:
+        return None, 0
 
 
 def max_read_extent(rx, text: str, cache: dict) -> int:
-    """The farthest forward one attempt of this compiled regex can read in `text`.
+    """The most characters one attempt of this compiled regex can look at in `text`.
 
-    Counts everything an attempt looks at, not only what a match consumes: the
-    match, lookaheads, anchors, the widest alternative and a repeat's bound. An
-    unbounded repeat of one character class counts the longest run of that
-    class in `text` plus the character that ends it. What cannot be read from the
-    tree (a backreference, a conditional, an unbounded repeat of more than one
-    character, a class that cannot be rebuilt) counts as the whole text, the
-    worst a read can be. Never more than the length of the text.
-
-    It bounds how far an attempt reads, not how much backtracking happens inside
-    one search, which every search has.
+    It is the span of text around its start that an attempt may touch, forward and
+    backward; never more than the length of the text, which is also what a shape
+    that cannot be bounded counts as. It bounds where an attempt looks. It does not
+    count looking at the same characters again inside one attempt (the alternatives
+    of a branch, backtracking), which every search has on main too and which a
+    pattern's size bounds.
     """
     try:
         tree = _sre_parse.parse(rx.pattern, rx.flags)
-        found = _reach(tree, rx.flags, text, cache)
+        found = _span(tree, rx.flags, text, cache)
     except Exception:
         found = None
     if found is None:
         return len(text)
-    return min(found[1], len(text))
+    return min(found[1] + found[2], len(text))
 
 
 def can_skip(req, present) -> bool:
