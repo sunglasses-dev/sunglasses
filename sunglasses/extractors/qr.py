@@ -73,8 +73,7 @@ class QRExtractor:
         walk it or name what it skipped.
         """
         from pyzbar.pyzbar import decode
-        from PIL import ImageSequence
-        from .image import ImageExtractor
+        from .image import FrameRefused, ImageExtractor
 
         # The same pixel budget OCR uses, read from the header before any decode.
         # An image over it is not converted or handed to the decoder, and the
@@ -132,7 +131,7 @@ class QRExtractor:
         index = 0
         iterator = None
         try:
-            iterator = iter(ImageSequence.Iterator(img))
+            iterator = iter(ImageExtractor._reachable_frames(img, "QR decoding"))
         except Exception as exc:
             self.failures.append(
                 f"frame sequence unreadable for QR ({exc.__class__.__name__}) — "
@@ -162,6 +161,15 @@ class QRExtractor:
                     f"frame {index} could not be reached for QR "
                     f"({exc.__class__.__name__}) — that frame and any after it "
                     f"were NOT inspected for QR codes")
+                break
+            if isinstance(frame, FrameRefused):
+                # Refused from the plan of the file before the seek: nothing was
+                # allocated for it, and the frames after it build on it.
+                self.failures.append(f"frame {frame.index}: {frame.message}")
+                left = ImageExtractor._left_after_refusal(
+                    frame.index, total, total_known, "QR decoding")
+                if left:
+                    self.failures.append(left)
                 break
             over = ImageExtractor._pixel_cap_failure(frame, "QR decoding")
             if over:
@@ -211,7 +219,7 @@ class QRExtractor:
 
         Returns list of (source_label, decoded_text) tuples.
         """
-        from .image import ImageExtractor, ImageOverPixelBudget
+        from .image import ImageExtractor, ImageRefused
 
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
@@ -224,7 +232,7 @@ class QRExtractor:
         self.failures = []
         try:
             img = ImageExtractor._open_lazy(image_path)
-        except ImageOverPixelBudget as exc:
+        except ImageRefused as exc:
             self.failures.append(str(exc))
             return []
         return self._decode_frames(img, source=os.path.basename(image_path))
@@ -237,12 +245,12 @@ class QRExtractor:
         of them is a quieter version of H1 (see `ImageExtractor.extract_from_bytes`
         and ASTRA H5).
         """
-        from .image import ImageExtractor, ImageOverPixelBudget
+        from .image import ImageExtractor, ImageRefused
 
         self.failures = []          # round 7 (I5b): same reset on the bytes entry point
         try:
             img = ImageExtractor._open_lazy(image_bytes)
-        except ImageOverPixelBudget as exc:
+        except ImageRefused as exc:
             self.failures.append(str(exc))
             return []
         return self._decode_frames(img, source="image bytes")

@@ -2676,7 +2676,11 @@ def _frame_reader_offenders(source: str, filename: str = "<src>"):
                     ("ImageSequence", "_frames_of", "_decode_frames", ".seek("))
         doc = _ast.get_docstring(enclosing) or ""
         declared = "FRAME 0" in doc.upper()
-        if not (walks or declared):
+        # r3 (ASTRA E7 r2): the opener hands out an object it has not walked, so
+        # it may say so -- but only by the exact marker below, and the guard
+        # `_opener_contract_offenders` then holds every CALLER to the walk rule.
+        opener = "OPENER:" in doc
+        if not (walks or declared or opener):
             offenders.append(f"{filename}:{node.lineno} ({enclosing.name})")
     return offenders
 
@@ -2703,6 +2707,140 @@ def test_every_image_reader_either_walks_frames_or_is_marked_frame_zero_only():
     assert not offenders, (
         "these image readers neither walk frames nor declare themselves "
         f"frame-0-only: {offenders}")
+
+
+def _image_function_table(sources: dict):
+    """{filename: [(FunctionDef, source)]} for every function in the sources."""
+    import ast as _ast
+
+    table = {}
+    for filename, source in sources.items():
+        tree = _ast.parse(source, filename=filename)
+        table[filename] = [(n, source) for n in _ast.walk(tree)
+                           if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+    return table
+
+
+_WALK_TOKENS = ("ImageSequence", "_frames_of", "_decode_frames", "_reachable_frames",
+                ".seek(")
+
+
+def _opener_contract_offenders(sources: dict):
+    """Every function marked `OPENER:` hands out an image it has not walked. This
+    holds every function that CALLS one to walk frames (through the one walker or
+    a `*_frames_of` / `_decode_frames` helper) or to declare itself frame 0 only.
+
+    r3 (ASTRA E7 r2). The old rule accepted an `Image.open` only if its own
+    function seeked. The opener now refuses and plans before PIL is asked, so the
+    walking lives in the callers; this keeps that from becoming a hole.
+    """
+    import ast as _ast
+
+    table = _image_function_table(sources)
+    openers = {fn.name for fns in table.values() for fn, _src in fns
+               if "OPENER:" in (_ast.get_docstring(fn) or "")}
+    offenders = []
+    for filename, fns in table.items():
+        for fn, src in fns:
+            if fn.name in openers:
+                continue
+            calls = any(isinstance(n, _ast.Call)
+                        and ((isinstance(n.func, _ast.Attribute) and n.func.attr in openers)
+                             or (isinstance(n.func, _ast.Name) and n.func.id in openers))
+                        for n in _ast.walk(fn))
+            if not calls:
+                continue
+            body = _ast.get_source_segment(src, fn) or ""
+            doc = _ast.get_docstring(fn) or ""
+            if not (any(t in body for t in _WALK_TOKENS) or "FRAME 0" in doc.upper()):
+                offenders.append(f"{filename}:{fn.lineno} ({fn.name})")
+    return offenders
+
+
+def _unplanned_seek_offenders(sources: dict):
+    """An image seek outside the one walker is a seek nobody charged.
+
+    `ImageSequence` anywhere but `_reachable_frames`, and `.seek(` on an image
+    (`img`, `frame`, `im`, `image`) anywhere but `_reachable_frames` and the
+    rewind to frame 0 in `extract_from_bytes`, which the plan allows because the
+    first frame is reachable by construction. Seeks on a file handle are not.
+    """
+    import ast as _ast
+
+    allowed = {"_reachable_frames", "extract_from_bytes"}
+    offenders = []
+    for filename, fns in _image_function_table(sources).items():
+        for fn, _src in fns:
+            if fn.name in allowed:
+                continue
+            for n in _ast.walk(fn):
+                if isinstance(n, _ast.Name) and n.id == "ImageSequence":
+                    offenders.append(f"{filename}:{n.lineno} ({fn.name}: ImageSequence)")
+                if (isinstance(n, _ast.Call) and isinstance(n.func, _ast.Attribute)
+                        and n.func.attr == "seek" and isinstance(n.func.value, _ast.Name)
+                        and n.func.value.id in ("img", "frame", "im", "image")):
+                    offenders.append(f"{filename}:{n.lineno} ({fn.name}: image seek)")
+    return offenders
+
+
+def _extractor_sources():
+    import sunglasses
+
+    pkg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
+        sunglasses.__file__))), "sunglasses", "extractors")
+    sources = {}
+    for filename in sorted(os.listdir(pkg)):
+        if filename.endswith(".py"):
+            with open(os.path.join(pkg, filename), encoding="utf-8") as handle:
+                sources[filename] = handle.read()
+    return sources
+
+
+def test_every_caller_of_the_opener_walks_frames_and_only_the_walker_seeks():
+    sources = _extractor_sources()
+    assert not _opener_contract_offenders(sources), _opener_contract_offenders(sources)
+    assert not _unplanned_seek_offenders(sources), _unplanned_seek_offenders(sources)
+
+
+def test_the_opener_guards_reject_a_caller_that_does_not_walk_and_a_stray_seek():
+    opener = (
+        "from PIL import Image\n"
+        "class X:\n"
+        "    @classmethod\n"
+        "    def _open_lazy(cls, p):\n"
+        '        """OPENER: hands out an image it has not walked."""\n'
+        "        return Image.open(p)\n"
+    )
+    assert not _frame_reader_offenders(opener, "o.py"), "a marked opener was rejected"
+    unmarked = opener.replace("OPENER:", "Opens")
+    assert _frame_reader_offenders(unmarked, "o.py"), "an unmarked opener was accepted"
+
+    lazy = (
+        "    def _ocr(self, p):\n"
+        '        """Reads text."""\n'
+        "        img = self._open_lazy(p)\n"
+        "        return img.size\n"
+    )
+    assert _opener_contract_offenders({"o.py": opener + lazy}), (
+        "a caller of the opener that never walks frames was accepted")
+    walks = lazy.replace("img.size", "list(self._reachable_frames(img, 'OCR'))")
+    assert not _opener_contract_offenders({"o.py": opener + walks})
+    declared = lazy.replace('"""Reads text."""', '"""FRAME 0 ONLY."""')
+    assert not _opener_contract_offenders({"o.py": opener + declared})
+
+    stray = (
+        "    def _peek(self, img):\n"
+        '        """Looks ahead."""\n'
+        "        img.seek(1)\n"
+        "    def _also(self, img):\n"
+        "        from PIL import ImageSequence\n"
+        "        return list(ImageSequence.Iterator(img))\n"
+    )
+    found = _unplanned_seek_offenders({"o.py": opener + stray})
+    assert len(found) == 2, found
+    handle = "    def _skip(self, fp):\n        fp.seek(3, 1)\n"
+    assert not _unplanned_seek_offenders({"o.py": opener + handle}), (
+        "a seek on a file handle was reported as an image seek")
 
 
 def test_the_frame_reader_guard_rejects_a_frame_zero_only_reader():

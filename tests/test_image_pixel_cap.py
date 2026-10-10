@@ -359,7 +359,6 @@ def test_a_gif_refused_on_its_first_frame_is_not_walked_for_metadata(tmp_path, o
 
 @pytest.mark.parametrize("how", ["path", "bytes"])
 def test_a_container_that_decodes_inside_open_is_never_opened(tmp_path, ocr, decoded, small, monkeypatch, how):
-    from PIL import UnidentifiedImageError
     from pyzbar import pyzbar as zbar
 
     from sunglasses.extractors.qr import QRExtractor
@@ -369,21 +368,18 @@ def test_a_container_that_decodes_inside_open_is_never_opened(tmp_path, ocr, dec
     path.write_bytes(_ico_holding_a_png((200, 200)))
     data = path.read_bytes()
 
-    image = ImageExtractor()
+    image, qr = ImageExtractor(), QRExtractor()
     if how == "path":
-        image.extract(str(path))
-        with pytest.raises(UnidentifiedImageError):
-            QRExtractor().extract(str(path))
+        assert image.extract(str(path)) == []
+        assert qr.extract(str(path)) == []
     else:
-        with pytest.raises(UnidentifiedImageError):
-            image.extract_from_bytes(data, "icon.png")
-        with pytest.raises(UnidentifiedImageError):
-            QRExtractor().extract_from_bytes(data)
+        assert image.extract_from_bytes(data, "icon.png") == []
+        assert qr.extract_from_bytes(data) == []
 
     assert decoded == []
     assert ocr == []
-    if how == "path":
-        assert any("cannot identify image file" in f for f in image.failures), image.failures
+    for ex in (image, qr):
+        assert any("cannot identify image file" in f for f in ex.failures), ex.failures
 
 
 def test_the_full_scan_of_a_container_that_decodes_inside_open_is_incomplete(tmp_path, ocr, decoded, small):
@@ -504,3 +500,210 @@ def test_scanning_a_31_kb_file_that_decodes_to_144_million_pixels_stays_in_memor
     grew_mb, complete = out.stdout.split()
     assert int(grew_mb) < 256, f"peak memory grew by {grew_mb} MB scanning a 31 KB file"
     assert complete == "False"
+
+
+# --------------------------------------------------------------------------
+# A GIF open or seek allocates for the frame it lands on before any caller can
+# read that frame's size, so counting decodes is not enough. These tests count
+# the allocations, and they build the GIFs block by block so each frame's
+# rectangle and disposal method are exactly what the test says.
+
+@pytest.fixture
+def allocated(monkeypatch):
+    """Sizes of every bitmap PIL allocates through its core, and of every region
+    copied out for a disposal."""
+    from PIL import Image as PILImage
+
+    sizes = []
+    for name in ("fill", "new"):
+        real = getattr(PILImage.core, name)
+
+        def spy(mode, size, *a, __real=real, **k):
+            sizes.append(tuple(size))
+            return __real(mode, size, *a, **k)
+
+        monkeypatch.setattr(PILImage.core, name, spy)
+
+    real_crop = PILImage.Image._crop
+
+    def crop(self, im, box):
+        sizes.append((box[2] - box[0], box[3] - box[1]))
+        return real_crop(self, im, box)
+
+    monkeypatch.setattr(PILImage.Image, "_crop", crop)
+    return sizes
+
+
+def _lzw_zeros(count):
+    """A GIF image stream of `count` zero pixels, 8-bit codes, no compression."""
+    out, acc, nbits = bytearray(), 0, 0
+
+    def put(code):
+        nonlocal acc, nbits
+        acc |= code << nbits
+        nbits += 9
+        while nbits >= 8:
+            out.append(acc & 255)
+            acc >>= 8
+            nbits -= 8
+
+    left = count
+    while left > 0:
+        put(256)
+        for _ in range(min(left, 200)):
+            put(0)
+        left -= 200
+    put(257)
+    if nbits:
+        out.append(acc & 255)
+    blocks = bytearray([8])
+    for at in range(0, len(out), 255):
+        chunk = out[at:at + 255]
+        blocks += bytes([len(chunk)]) + chunk
+    return bytes(blocks) + b"\x00"
+
+
+def _raw_gif(screen, frames, small_cap=SMALL_CAP):
+    """A GIF from the blocks up. `frames` is (x0, y0, width, height, disposal).
+    A frame within `small_cap` pixels carries real pixel data; a bigger one
+    carries one pixel's worth, because a reader that is behaving never decodes it."""
+    import struct
+
+    out = bytearray(b"GIF89a" + struct.pack("<HH", *screen) + bytes([0x80, 0, 0]) + bytes(6))
+    for x0, y0, width, height, disposal in frames:
+        out += b"\x21\xf9\x04" + bytes([disposal << 2, 0, 0, 0, 0])
+        out += b"\x2c" + struct.pack("<HHHH", x0, y0, width, height) + b"\x00"
+        out += _lzw_zeros(width * height if width * height <= small_cap else 1)
+    return bytes(out) + b";"
+
+
+GIF_LAYOUTS = {
+    "big first frame, fill": ((200, 200), [(0, 0, 200, 200, 2), (0, 0, 20, 20, 0)]),
+    "big first frame, restore": ((200, 200), [(0, 0, 200, 200, 3), (0, 0, 20, 20, 0)]),
+    "big screen, small frames": ((300, 300), [(0, 0, 20, 20, 2), (0, 0, 20, 20, 0)]),
+    "small first, big second, fill": ((20, 20), [(0, 0, 20, 20, 0), (0, 0, 200, 200, 2), (0, 0, 20, 20, 0)]),
+    "small first, big second, restore": ((20, 20), [(0, 0, 20, 20, 0), (0, 0, 200, 200, 3), (0, 0, 20, 20, 0)]),
+    "canvas grows to a big third": ((20, 20), [(0, 0, 20, 20, 0), (0, 0, 20, 20, 2), (0, 0, 150, 150, 2), (0, 0, 20, 20, 0)]),
+}
+
+
+def _read_everything(how, data, tmp_path):
+    from sunglasses.extractors.qr import QRExtractor
+
+    image, qr = ImageExtractor(), QRExtractor()
+    if how == "path":
+        path = tmp_path / "g.gif"
+        path.write_bytes(data)
+        image.extract(str(path))
+        qr.extract(str(path))
+    else:
+        image.extract_from_bytes(data, "g.gif")
+        qr.extract_from_bytes(data)
+    return image, qr
+
+
+@pytest.mark.parametrize("how", ["path", "bytes"])
+@pytest.mark.parametrize("layout", sorted(GIF_LAYOUTS))
+def test_a_gif_frame_over_the_budget_allocates_nothing_over_it(tmp_path, ocr, decoded, allocated, small, monkeypatch, layout, how):
+    from pyzbar import pyzbar as zbar
+
+    monkeypatch.setattr(zbar, "decode", lambda frame, *a, **k: [])
+    screen, frames = GIF_LAYOUTS[layout]
+    image, qr = _read_everything(how, _raw_gif(screen, frames), tmp_path)
+
+    assert _over(allocated) == [], allocated
+    assert _over(decoded) == [], decoded
+    assert _over(ocr) == []
+    for ex in (image, qr):
+        assert any("pixel cap" in f for f in ex.failures), ex.failures
+
+
+def test_a_gif_walk_reads_the_frames_before_the_first_refused_one_and_counts_the_rest(tmp_path, ocr, allocated, small, monkeypatch):
+    from pyzbar import pyzbar as zbar
+
+    monkeypatch.setattr(zbar, "decode", lambda frame, *a, **k: [])
+    frames = [(0, 0, 20, 20, 0), (0, 0, 20, 20, 2), (0, 0, 150, 150, 2), (0, 0, 20, 20, 0), (0, 0, 20, 20, 0)]
+    image, qr = _read_everything("bytes", _raw_gif((20, 20), frames), tmp_path)
+
+    assert ocr.count((20, 20)) == 2, ocr
+    for ex in (image, qr):
+        assert any(f.startswith("frame 2:") for f in ex.failures), ex.failures
+        assert any("2 later frames build on frame 2" in f for f in ex.failures), ex.failures
+
+
+def test_a_gif_plan_finds_the_frames_pillow_finds(tmp_path):
+    for sizes in ([(30, 30)], [(30, 30), (30, 30), (30, 30)], [(10, 10), (40, 40), (20, 20)]):
+        path = tmp_path / "w.gif"
+        total = _frames_gif(path, sizes)
+        with open(path, "rb") as fh:
+            plan = ImageExtractor._gif_plan(fh)
+        assert plan.total == total
+        assert plan.allowed == total
+
+
+def test_a_gif_plan_stops_where_the_file_stops(tmp_path):
+    data = _raw_gif((20, 20), [(0, 0, 20, 20, 0), (0, 0, 20, 20, 0)])
+    import io
+
+    for cut in range(0, len(data)):
+        plan = ImageExtractor._gif_plan(io.BytesIO(data[:cut]))
+        assert plan is None or 0 <= plan.allowed <= plan.total <= 2
+
+
+def test_a_gif_refused_by_its_plan_is_not_opened_by_pillow(tmp_path, ocr, monkeypatch, small):
+    from PIL import GifImagePlugin
+
+    opened = []
+    real = GifImagePlugin.GifImageFile._open
+
+    def spy(self):
+        opened.append(1)
+        return real(self)
+
+    monkeypatch.setattr(GifImagePlugin.GifImageFile, "_open", spy)
+    ex = ImageExtractor()
+    ex.extract_from_bytes(_raw_gif((200, 200), [(0, 0, 200, 200, 2)]), "g.gif")
+    assert opened == []
+    assert any("pixel cap" in f for f in ex.failures), ex.failures
+
+
+@pytest.mark.parametrize("data", [b"", b"x" * 40, b"\x00" * 5000])
+def test_every_refusal_of_the_opener_is_a_named_failure_on_every_entry_point(data, ocr):
+    from sunglasses.extractors.qr import QRExtractor
+
+    image, qr = ImageExtractor(), QRExtractor()
+    assert image.extract_from_bytes(data, "x.png") == []
+    assert qr.extract_from_bytes(data) == []
+    for ex in (image, qr):
+        assert any("cannot identify image file" in f for f in ex.failures), ex.failures
+
+
+def test_scanning_a_gif_whose_disposal_bitmap_is_over_the_budget_stays_in_memory_budget(tmp_path):
+    """The memory bound, measured in a fresh process: a GIF a few hundred bytes long
+    whose first frame is 36 million pixels with a disposal method that makes PIL
+    allocate a bitmap of that size."""
+    path = tmp_path / "dispose.gif"
+    path.write_bytes(_raw_gif((6000, 6000), [(0, 0, 6000, 6000, 2), (0, 0, 20, 20, 0)]))
+    code = """
+import resource, sys, warnings
+warnings.simplefilter("ignore")
+import pytesseract
+pytesseract.image_to_string = lambda *a, **k: ""
+pytesseract.image_to_data = lambda *a, **k: {"text": [], "width": [], "height": [], "conf": [], "left": [], "top": []}
+from sunglasses.extractors.image import ImageExtractor
+from sunglasses.extractors.qr import QRExtractor
+from PIL import Image
+Image.open
+before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+ex = ImageExtractor()
+ex.extract(sys.argv[1])
+QRExtractor().extract(sys.argv[1])
+after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+grown = (after - before) * (1 if sys.platform == "darwin" else 1024)
+print(int(grown), bool(ex.failures))
+"""
+    out = subprocess.run([sys.executable, "-c", code, str(path)], capture_output=True, text=True, timeout=120)
+    assert out.returncode == 0, out.stderr
+    grown, refused = out.stdout.split()
+    assert refused == "True"
+    assert int(grown) < 48 * 1024 * 1024

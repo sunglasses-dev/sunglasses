@@ -46,8 +46,27 @@ def _check_deps():
         )
 
 
-class ImageOverPixelBudget(Exception):
+class ImageRefused(Exception):
+    """The opener declined a file. A policy result, not a fault: every entry point
+    turns it into a named failure and an empty result, never an exception."""
+
+
+class ImageOverPixelBudget(ImageRefused):
     """A file declares more pixels than the budget, and opening it would decode them."""
+
+
+class FrameRefused:
+    """What `_reachable_frames` yields in place of a frame it will not seek to."""
+
+    def __init__(self, index, message):
+        self.index, self.message = index, message
+
+
+class _GifPlan:
+    """What a GIF's own blocks say about its frames, read without Pillow."""
+
+    def __init__(self, total, allowed, refused_size):
+        self.total, self.allowed, self.refused_size = total, allowed, refused_size
 
 
 class OCRUnavailable(RuntimeError):
@@ -114,7 +133,7 @@ class ImageExtractor:
         self.failures = []
         try:
             img = self._open_lazy(image_bytes)
-        except ImageOverPixelBudget as exc:
+        except ImageRefused as exc:
             # A refusal is a result, not an exception: named, so the scan is
             # incomplete, and nothing was opened.
             self.failures.append(str(exc))
@@ -175,8 +194,11 @@ class ImageExtractor:
     #   * Metadata of a refused frame is read from the header alone. A PNG reads
     #     its trailing chunks by decoding the pixels, so those are named as not
     #     read instead.
-    #   * A GIF frame is built on the frame before it, so stepping past a refused
-    #     frame would decode it. The walk stops there and names what it left.
+    #   * A GIF frame is built on the frame before it, and a seek allocates for the
+    #     frame it lands on before any caller can look at its size. So a GIF's
+    #     frame extents are read from its own blocks first (`_gif_plan`), and the
+    #     walks (`_reachable_frames`) seek only to frames the plan allows. The walk
+    #     stops at the first frame it will not seek to and names what it left.
     # Every refusal is named in `failures`, so the scan says it was not fully
     # inspected instead of calling it clean.
     MAX_IMAGE_PIXELS = 25_000_000
@@ -248,7 +270,11 @@ class ImageExtractor:
 
     @classmethod
     def _open_lazy(cls, source):
-        """Open a path or bytes as an image whose open reads only a header.
+        """OPENER: open a path or bytes as an image whose open reads only a header.
+
+        It hands back an image it has not walked: every caller walks frames through
+        `_reachable_frames`, or says in its own docstring that it reads frame 0 only
+        (`test_every_caller_of_the_opener_walks_frames_and_only_the_walker_seeks`).
 
         The format comes from the bytes at the front of the file, not from its
         name, and PIL is told to open it as that format and no other. Any other
@@ -269,7 +295,7 @@ class ImageExtractor:
             target, label = source, repr(os.path.basename(source))
         fmt = cls._sniff_format(head)
         if fmt is None:
-            raise UnidentifiedImageError(
+            raise ImageRefused(
                 f"cannot identify image file {label}: it is not a PNG, JPEG, GIF, "
                 f"BMP, TIFF or WebP, and no other container is opened because some "
                 f"decode inside open")
@@ -278,13 +304,128 @@ class ImageExtractor:
             # from the first chunk and checked before PIL is involved.
             size = cls._webp_size(head)
             if size is None:
-                raise UnidentifiedImageError(
+                raise ImageRefused(
                     f"cannot identify image file {label}: its WebP header does not "
                     f"declare a size")
             over = cls._over_budget(*size, "opened")
             if over:
                 raise ImageOverPixelBudget(over)
-        return Image.open(target, formats=[fmt])
+        plan = None
+        if fmt == "GIF":
+            # A GIF open and every seek allocate for the frame they land on, before
+            # a caller can read its size. Its extents come from its own blocks.
+            with (io.BytesIO(source) if isinstance(source, (bytes, bytearray))
+                  else open(source, "rb")) as fh:
+                plan = cls._gif_plan(fh)
+            if plan is not None and plan.total and plan.allowed == 0:
+                raise ImageOverPixelBudget(
+                    cls._over_budget(*plan.refused_size, "opened"))
+        img = Image.open(target, formats=[fmt])
+        if plan is not None:
+            img._sg_frame_plan = plan
+        return img
+
+    @classmethod
+    def _gif_plan(cls, fp):
+        """How many frames of a GIF may be seeked to, read without Pillow.
+
+        Walks the blocks the way `GifImageFile._seek` does, so the frames counted
+        here are the frames it will find, and keeps the canvas as it grows: the
+        logical screen widened by each frame's rectangle. A frame is reachable if
+        that canvas is within the budget. The canvas only grows, so the reachable
+        frames are a prefix, and a frame's own rectangle sits inside its canvas,
+        so the disposal bitmap a seek allocates for it is within the budget too.
+        Returns None if the header is too short to say.
+        """
+        def u16(b, at):
+            return b[at] | (b[at + 1] << 8)
+
+        def data():
+            # `GifImageFile.data`: one length byte, then that many bytes.
+            n = fp.read(1)
+            if n and n[0]:
+                return fp.read(n[0])
+            return None
+
+        head = fp.read(13)
+        if len(head) < 13:
+            return None
+        width, height = u16(head, 6), u16(head, 8)
+        if head[10] & 128:
+            fp.seek(3 << ((head[10] & 7) + 1), 1)
+        total = allowed = 0
+        refused = None
+        while True:
+            s = fp.read(1)
+            if not s or s == b";":
+                break
+            found = False
+            while True:
+                if not s:
+                    s = fp.read(1)
+                if not s or s == b";":
+                    break
+                if s == b"!":
+                    label = fp.read(1)
+                    if not label:
+                        break
+                    block = data()
+                    if label[0] == 254:
+                        while block:
+                            block = data()
+                        s = b""
+                        continue
+                    while data():
+                        pass
+                elif s == b",":
+                    d = fp.read(9)
+                    if len(d) < 9:
+                        break
+                    x1 = u16(d, 0) + u16(d, 4)
+                    y1 = u16(d, 2) + u16(d, 6)
+                    width, height = max(width, x1), max(height, y1)
+                    if d[8] & 128:
+                        fp.seek(3 << ((d[8] & 7) + 1), 1)
+                    if not fp.read(1):
+                        break
+                    found = True
+                    break
+                s = b""
+            if not found:
+                break
+            total += 1
+            if refused is None:
+                if width * height > cls.MAX_IMAGE_PIXELS:
+                    refused = (width, height)
+                else:
+                    allowed += 1
+            while data():
+                pass
+        return _GifPlan(total, allowed, refused)
+
+    @classmethod
+    def _reachable_frames(cls, img, reader):
+        """Walk the frames of an open image, seeking only where it is allowed.
+
+        The one place a frame walk is driven. It yields the image parked on each
+        frame in turn, and where the plan of a GIF says a frame is over the budget
+        it yields a `FrameRefused` instead of seeking, and stops: the seek would
+        allocate for that frame before its size could be asked. Other formats
+        are checked after each seek by the caller, as before.
+        """
+        plan = getattr(img, "_sg_frame_plan", None)
+        index = 0
+        while True:
+            if plan is not None and plan.allowed < plan.total and index >= plan.allowed:
+                yield FrameRefused(index, cls._over_budget(
+                    *plan.refused_size, f"decoded or read by {reader}"))
+                return
+            try:
+                img.seek(index)
+            except EOFError:
+                return
+            yield img
+            index += 1
 
     @classmethod
     def _frames_depend(cls, img) -> bool:
@@ -312,8 +453,6 @@ class ImageExtractor:
 
     def _ocr_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
         """OCR each frame. Complete only if EVERY frame reached OCR."""
-        from PIL import ImageSequence
-
         # Frame 0 over the budget: do not walk the file. A GIF shares one canvas
         # size across its frames and each seek decodes, so stepping through 64 of
         # them would pay the cost 64 times. The refusal is named once.
@@ -384,7 +523,7 @@ class ImageExtractor:
         index = 0
         iterator = None
         try:
-            iterator = iter(ImageSequence.Iterator(img))
+            iterator = iter(self._reachable_frames(img, "OCR"))
         except Exception as exc:
             self.failures.append(
                 f"frame sequence unreadable for OCR ({exc.__class__.__name__}) — "
@@ -419,6 +558,14 @@ class ImageExtractor:
                     f"frame {index} could not be reached for OCR "
                     f"({exc.__class__.__name__}) — that frame and any after it "
                     f"were NOT read by OCR")
+                break
+            if isinstance(frame, FrameRefused):
+                # The plan of a GIF refused it before the seek: nothing was
+                # allocated for it, and every later frame builds on it.
+                self.failures.append(f"frame {frame.index}: {frame.message}")
+                left = self._left_after_refusal(frame.index, total, total_known, "OCR")
+                if left:
+                    self.failures.append(left)
                 break
             over = self._pixel_cap_failure(frame)
             if over:
@@ -502,8 +649,6 @@ class ImageExtractor:
         `getattr(..., 1)` does not catch a getter that throws. Frames we can read
         are read; what we cannot reach is named.
         """
-        from PIL import ImageSequence
-
         try:
             total = getattr(img, "n_frames", 1) or 1
             total_known = True
@@ -534,7 +679,7 @@ class ImageExtractor:
 
         iterator = None
         try:
-            iterator = iter(ImageSequence.Iterator(img))
+            iterator = iter(self._reachable_frames(img, "the metadata reader"))
         except Exception as exc:
             self.failures.append(
                 f"frame sequence unreadable for metadata ({exc.__class__.__name__}) "
@@ -562,6 +707,13 @@ class ImageExtractor:
                     f"frame {index} could not be reached for metadata "
                     f"({exc.__class__.__name__}) — that frame and any after it were "
                     f"NOT inspected for metadata")
+                break
+            if isinstance(frame, FrameRefused):
+                self.failures.append(f"frame {frame.index}: {frame.message}")
+                left = self._left_after_refusal(
+                    frame.index, total, total_known, "the metadata reader")
+                if left:
+                    self.failures.append(left)
                 break
             try:
                 _collect(frame, index)
