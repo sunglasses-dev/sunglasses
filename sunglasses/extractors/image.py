@@ -46,6 +46,10 @@ def _check_deps():
         )
 
 
+class ImageOverPixelBudget(Exception):
+    """A file declares more pixels than the budget, and opening it would decode them."""
+
+
 class OCRUnavailable(RuntimeError):
     """OCR could not be performed. Not a result -- an absence of one.
 
@@ -105,13 +109,16 @@ class ImageExtractor:
 
     def extract_from_bytes(self, image_bytes: bytes, filename: str = "unknown") -> List[Tuple[str, str]]:
         """Extract text from image bytes (for in-memory processing)."""
-        from PIL import Image
-        import io
-
-        img = Image.open(io.BytesIO(image_bytes))
         results = []
 
         self.failures = []
+        try:
+            img = self._open_lazy(image_bytes)
+        except ImageOverPixelBudget as exc:
+            # A refusal is a result, not an exception: named, so the scan is
+            # incomplete, and nothing was opened.
+            self.failures.append(str(exc))
+            return results
 
         # OCR every frame, same contract as `extract()`.
         results.extend(self._ocr_frames_of(img, source=filename))
@@ -127,7 +134,9 @@ class ImageExtractor:
         # `_metadata_frames_of` handles its own seeking, so the parked position the
         # OCR walk left behind no longer decides what metadata is seen.
         try:
-            if getattr(img, "n_frames", 1) > 1:
+            # Not when the walk above stopped on a refused frame: rewinding is a
+            # seek, and the metadata walk below seeks to frame 0 on its own.
+            if getattr(img, "n_frames", 1) > 1 and not self._pixel_cap_failure(img):
                 img.seek(0)
         except Exception:
             # Not fatal and not silent: the walk below reports what it cannot reach.
@@ -155,15 +164,42 @@ class ImageExtractor:
     # NOT silently dropped -- they are named in `failures`, which costs coverage.
     MAX_OCR_FRAMES = 64
 
-    # A picture can be a few kilobytes on disk and gigabytes once decoded. PIL
-    # only warns between about 89 and 179 million pixels and raises above that,
-    # so a 12000 by 12000 one bit PNG (31 KB) was fully decoded, copied to RGB
-    # for OCR and again for the hidden text pass, at a cost near a gigabyte. The
-    # size is read from the header, which costs nothing, and an image over the
-    # budget is not decoded at all. It is named in `failures`, so the scan says
-    # it was not fully inspected instead of calling it clean. Metadata is read
-    # without decoding pixels and still is.
+    # A picture can be a few kilobytes on disk and gigabytes once decoded, and PIL
+    # only warns between about 89 and 179 million pixels and raises above that.
+    # The size is read from the header, and an image over the budget has no pixel
+    # decoded by this extractor: not for OCR, not for the hidden text pass, not
+    # for metadata and not by the QR reader. Three things make that hold.
+    #   * The file is opened only as one of the formats whose open reads a header
+    #     (`_open_lazy`). Some containers decode inside `open`, before any size
+    #     check could run.
+    #   * Metadata of a refused frame is read from the header alone. A PNG reads
+    #     its trailing chunks by decoding the pixels, so those are named as not
+    #     read instead.
+    #   * A GIF frame is built on the frame before it, so stepping past a refused
+    #     frame would decode it. The walk stops there and names what it left.
+    # Every refusal is named in `failures`, so the scan says it was not fully
+    # inspected instead of calling it clean.
     MAX_IMAGE_PIXELS = 25_000_000
+
+    # The first bytes of the containers `_open_lazy` opens, and the PIL format
+    # each one is opened as.
+    _LAZY_MAGIC = (
+        (b"\x89PNG\r\n\x1a\n", "PNG"),
+        (b"\xff\xd8\xff", "JPEG"),
+        (b"GIF87a", "GIF"),
+        (b"GIF89a", "GIF"),
+        (b"BM", "BMP"),
+        (b"II*\x00", "TIFF"),
+        (b"MM\x00*", "TIFF"),
+        (b"II+\x00", "TIFF"),
+        (b"MM\x00+", "TIFF"),
+    )
+    # Formats whose later frames are built on the frame before, so reading past a
+    # refused frame decodes it.
+    _FRAMES_BUILD_ON_EACH_OTHER = ("GIF", "PNG", "WEBP")
+    # Formats whose metadata sits in the header, so a refused frame's metadata is
+    # read without a pixel being decoded.
+    _METADATA_IN_HEADER = ("JPEG", "TIFF")
 
     @classmethod
     def _pixel_cap_failure(cls, img, reader="OCR"):
@@ -176,15 +212,99 @@ class ImageExtractor:
             width, height = img.size
         except Exception:
             return None
+        return cls._over_budget(width, height, f"decoded or read by {reader}")
+
+    @classmethod
+    def _over_budget(cls, width, height, what):
         if width * height > cls.MAX_IMAGE_PIXELS:
             return (f"{width}x{height} is {width * height:,} pixels, over the "
-                    f"{cls.MAX_IMAGE_PIXELS:,} pixel cap, so it was not decoded or read by {reader}")
+                    f"{cls.MAX_IMAGE_PIXELS:,} pixel cap, so it was not {what}")
         return None
 
+    @staticmethod
+    def _webp_size(head: bytes):
+        """The canvas size a WebP's first chunk declares, or None."""
+        kind = head[12:16]
+        if kind == b"VP8X" and len(head) >= 30:
+            return (int.from_bytes(head[24:27], "little") + 1,
+                    int.from_bytes(head[27:30], "little") + 1)
+        if kind == b"VP8 " and len(head) >= 30 and head[23:26] == b"\x9d\x01\x2a":
+            return (int.from_bytes(head[26:28], "little") & 0x3FFF,
+                    int.from_bytes(head[28:30], "little") & 0x3FFF)
+        if kind == b"VP8L" and len(head) >= 25 and head[20] == 0x2F:
+            bits = int.from_bytes(head[21:25], "little")
+            return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+        return None
+
+    @classmethod
+    def _sniff_format(cls, head: bytes):
+        """The PIL format name the first bytes of a file show, or None."""
+        if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+            return "WEBP"
+        for magic, name in cls._LAZY_MAGIC:
+            if head.startswith(magic):
+                return name
+        return None
+
+    @classmethod
+    def _open_lazy(cls, source):
+        """Open a path or bytes as an image whose open reads only a header.
+
+        The format comes from the bytes at the front of the file, not from its
+        name, and PIL is told to open it as that format and no other. Any other
+        container is refused instead of handed to a plugin that may decode inside
+        `open`: an ICO file holding a PNG did, and the PNG's own dimensions were
+        decoded before any size could be asked. A WebP is the one listed format
+        that decodes its first frame inside `open`, so its declared size is
+        checked first and an over budget WebP is not opened.
+        """
+        from PIL import Image, UnidentifiedImageError
+        import io
+
+        if isinstance(source, (bytes, bytearray)):
+            head, target, label = bytes(source[:32]), io.BytesIO(source), "image bytes"
+        else:
+            with open(source, "rb") as fh:
+                head = fh.read(32)
+            target, label = source, repr(os.path.basename(source))
+        fmt = cls._sniff_format(head)
+        if fmt is None:
+            raise UnidentifiedImageError(
+                f"cannot identify image file {label}: it is not a PNG, JPEG, GIF, "
+                f"BMP, TIFF or WebP, and no other container is opened because some "
+                f"decode inside open")
+        if fmt == "WEBP":
+            # A WebP decodes its first frame inside `open`, so its size is read
+            # from the first chunk and checked before PIL is involved.
+            size = cls._webp_size(head)
+            if size is None:
+                raise UnidentifiedImageError(
+                    f"cannot identify image file {label}: its WebP header does not "
+                    f"declare a size")
+            over = cls._over_budget(*size, "opened")
+            if over:
+                raise ImageOverPixelBudget(over)
+        return Image.open(target, formats=[fmt])
+
+    @classmethod
+    def _frames_depend(cls, img) -> bool:
+        return getattr(img, "format", None) in cls._FRAMES_BUILD_ON_EACH_OTHER
+
+    @staticmethod
+    def _left_after_refusal(index, total, total_known, reader) -> str:
+        """Name what a walk that stopped at a refused frame did not reach."""
+        if total_known and total is not None:
+            left = total - index - 1
+            if left <= 0:
+                return ""
+            return (f"{left} later frame{'s' if left != 1 else ''} build on frame "
+                    f"{index} and were not read by {reader}")
+        return (f"the frames after frame {index} build on it and were not read "
+                f"by {reader}")
+
     def _ocr_all_frames(self, image_path: str) -> List[Tuple[str, str]]:
-        from PIL import Image
         try:
-            img = Image.open(image_path)
+            img = self._open_lazy(image_path)
         except Exception as exc:
             self.failures.append(f"image could not be opened for OCR: {exc}")
             return []
@@ -302,8 +422,15 @@ class ImageExtractor:
                 break
             over = self._pixel_cap_failure(frame)
             if over:
-                # A per-FRAME refusal: the other pages of the file are still read.
                 self.failures.append(f"frame {index}: {over}")
+                if self._frames_depend(img):
+                    # The next seek builds the next frame on this one, which
+                    # decodes it. Stop here and say what was left.
+                    left = self._left_after_refusal(index, total, total_known, "OCR")
+                    if left:
+                        self.failures.append(left)
+                    break
+                # Pages of a TIFF stand alone: the others are still read.
                 index += 1
                 continue
             try:
@@ -349,10 +476,8 @@ class ImageExtractor:
 
     def _metadata_all_frames(self, image_path: str) -> List[Tuple[str, str]]:
         """EXIF and embedded text from every frame, not just the one PIL opens on."""
-        from PIL import Image, ImageSequence
-
         try:
-            img = Image.open(image_path)
+            img = self._open_lazy(image_path)
         except Exception as exc:
             self.failures.append(
                 f"image metadata not read ({exc.__class__.__name__}: {exc})")
@@ -444,6 +569,14 @@ class ImageExtractor:
                 self.failures.append(
                     f"frame {index} metadata not read "
                     f"({exc.__class__.__name__}: {exc})")
+            if self._pixel_cap_failure(frame) and self._frames_depend(img):
+                # The next seek builds the next frame on this refused one, which
+                # decodes it. Stop and say what was left.
+                left = self._left_after_refusal(
+                    index, total, total_known, "the metadata reader")
+                if left:
+                    self.failures.append(left)
+                break
             index += 1
 
         if total_known and total > self.MAX_OCR_FRAMES:
@@ -469,10 +602,8 @@ class ImageExtractor:
         never ran came back inspected and clean. That is the same false-success class
         the audio transcription path was repaired for.
         """
-        from PIL import Image
-
         try:
-            img = Image.open(image_path)
+            img = self._open_lazy(image_path)
         except Exception as e:
             raise OCRUnavailable(f"image could not be opened for OCR: {e}") from e
         return self._ocr_from_pil(img)
@@ -506,9 +637,8 @@ class ImageExtractor:
         metadata" and "we could not read this image's metadata" the same answer.
         The second one is a coverage loss and now says so.
         """
-        from PIL import Image
         try:
-            img = Image.open(image_path)
+            img = self._open_lazy(image_path)
         except Exception as exc:
             self.failures.append(
                 f"image metadata not read ({exc.__class__.__name__}: {exc})")
@@ -809,7 +939,7 @@ class ImageExtractor:
                                   f"block is {len(blob)}")
         return "populated", f"{count} entries"
 
-    def _exif_tags(self, img) -> dict:
+    def _exif_tags(self, img, header_only: bool = False) -> dict:
         """Every EXIF tag PIL can give us, for every format that carries EXIF.
 
         v0.5.6 round 5, second pass (T9). This used to be
@@ -838,9 +968,13 @@ class ImageExtractor:
         with _warnings.catch_warnings(record=True) as caught:
             _warnings.simplefilter("always")
             getexif = getattr(img, "getexif", None)
+            if header_only:
+                # `getexif()` on a PNG decodes the pixels to reach chunks stored
+                # after them. Read only the EXIF block the header already holds.
+                getexif = self._header_exif
             if getexif is not None:
                 try:
-                    base = getexif()
+                    base = getexif(img) if header_only else getexif()
                 except Exception as exc:
                     base = None
                     parser_errors.append(f"{exc.__class__.__name__}: {exc}")
@@ -856,7 +990,7 @@ class ImageExtractor:
                         self.failures.append(
                             f"EXIF sub-IFD not read ({exc.__class__.__name__}: {exc}) — "
                             f"UserComment and other sub-IFD text were NOT inspected")
-            if not tags and hasattr(img, "_getexif"):
+            if not tags and not header_only and hasattr(img, "_getexif"):
                 try:
                     tags = dict(img._getexif() or {})
                 except Exception as exc:
@@ -919,18 +1053,41 @@ class ImageExtractor:
                 f"metadata text may NOT have been inspected")
         return tags
 
+    @staticmethod
+    def _header_exif(img):
+        """The EXIF block PIL read while opening, without touching the pixels."""
+        from PIL import Image
+
+        exif = Image.Exif()
+        raw = (getattr(img, "info", None) or {}).get("exif")
+        if raw:
+            exif.load(raw)
+        return exif
+
     def _exif_from_pil(self, img) -> List[Tuple[str, str]]:
         """Extract text from EXIF data of a PIL Image."""
         from PIL.ExifTags import TAGS
 
         results = []
 
+        # A frame over the pixel budget is read from its header alone, unless its
+        # format keeps all its metadata there. What the format keeps after the
+        # pixels is named, not read, because reading it decodes them.
+        header_only = bool(
+            self._pixel_cap_failure(img)
+            and getattr(img, "format", None) not in self._METADATA_IN_HEADER)
+        if header_only:
+            self.failures.append(
+                f"{getattr(img, 'format', None) or 'image'} metadata stored after the "
+                f"pixel data was not read, because the image is over the pixel cap "
+                f"and reading it would decode it")
+
         # Standard EXIF. A format that simply has no EXIF block (PNG, most GIFs)
         # is NOT a failure -- it is an honest absence -- so that case is detected
         # by capability rather than by catching the AttributeError it used to
         # raise into a bare `pass`. Only a real read error is a coverage loss.
         try:
-            exif_data = self._exif_tags(img)
+            exif_data = self._exif_tags(img, header_only)
             if exif_data:
                 for tag_id, value in exif_data.items():
                     tag_name = TAGS.get(tag_id, str(tag_id))
@@ -1002,7 +1159,7 @@ class ImageExtractor:
         import pytesseract
 
         try:
-            img = Image.open(image_path)
+            img = self._open_lazy(image_path)
             width, height = img.size
 
             over = self._pixel_cap_failure(img)

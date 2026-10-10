@@ -165,8 +165,16 @@ class QRExtractor:
                 break
             over = ImageExtractor._pixel_cap_failure(frame, "QR decoding")
             if over:
-                # A per-FRAME refusal: the other pages of the file are still read.
                 self.failures.append(f"frame {index}: {over}")
+                if ImageExtractor._frames_depend(img):
+                    # The next seek builds the next frame on this one, which
+                    # decodes it. Stop here and say what was left.
+                    left = ImageExtractor._left_after_refusal(
+                        index, total, total_known, "QR decoding")
+                    if left:
+                        self.failures.append(left)
+                    break
+                # Pages of a TIFF stand alone: the others are still read.
                 index += 1
                 continue
             try:
@@ -203,7 +211,7 @@ class QRExtractor:
 
         Returns list of (source_label, decoded_text) tuples.
         """
-        from PIL import Image
+        from .image import ImageExtractor, ImageOverPixelBudget
 
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
@@ -214,7 +222,11 @@ class QRExtractor:
         # stranger's incomplete flag. The canonical wrappers build a fresh instance
         # each time, which is exactly why this hid.
         self.failures = []
-        img = Image.open(image_path)
+        try:
+            img = ImageExtractor._open_lazy(image_path)
+        except ImageOverPixelBudget as exc:
+            self.failures.append(str(exc))
+            return []
         return self._decode_frames(img, source=os.path.basename(image_path))
 
     def extract_from_bytes(self, image_bytes: bytes) -> List[Tuple[str, str]]:
@@ -225,11 +237,14 @@ class QRExtractor:
         of them is a quieter version of H1 (see `ImageExtractor.extract_from_bytes`
         and ASTRA H5).
         """
-        from PIL import Image
-        import io
+        from .image import ImageExtractor, ImageOverPixelBudget
 
         self.failures = []          # round 7 (I5b): same reset on the bytes entry point
-        img = Image.open(io.BytesIO(image_bytes))
+        try:
+            img = ImageExtractor._open_lazy(image_bytes)
+        except ImageOverPixelBudget as exc:
+            self.failures.append(str(exc))
+            return []
         return self._decode_frames(img, source="image bytes")
 
 
