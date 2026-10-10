@@ -75,7 +75,6 @@ KNOWN_SLOW = {
     # Measured on main ef825e92b273 (Oct 8 2026 06:34 PT) with the lab round-1 gate at 16,000
     # characters under a 0.5 s cap: exactly these five entries went over, 0.50 to 0.51 s each.
     # The six KNOWN_SHAPE sources did not, because the engine judges them on the twin.
-    ("GLS-AW-001", 0): "critical, read/fetch/crawl/scrape then a whitespace run; 6 probes over (plain)",
     ("GLS-SC-018", 0): "double quantifier under a bounded .{0,120}; 2 probes over (plain)",
     ("GLS-CF-251", 0): "decision then a run; 2 probes over (plain)",
     ("GLS-CICD-004", 0): "guarded predicate with a large per-byte constant; 9 probes over (guarded)",
