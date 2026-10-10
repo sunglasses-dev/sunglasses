@@ -32,7 +32,7 @@ from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import (ENRICH_MAX_LEN, HOMOGLYPHS, INVISIBLE_CHARS, LEET, VIEW_SEP,
-                           decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
+                           decode_base64_segments, decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_url_encoding, normalize_unicode, normalize_with_length,
                            replace_homoglyphs, strip_invisible)
 
@@ -238,6 +238,53 @@ def _folds_to_a_start(c: str) -> bool:
     return any(x in "&%\\" for x in replace_homoglyphs(normalize_unicode(strip_invisible(c))))
 
 
+# A stretch of text that is, or can become, part of a base64 blob. The pipeline's base64 step reads a
+# run of 20 or more characters of the alphabet (with up to two padding signs), after the entity,
+# percent and hex steps have written their results into the text and after the character steps have
+# folded and removed characters. A raw character can reach that run only by being in the alphabet,
+# by being a character an escape is spelled with (`&`, `#`, `;`, `%`, `\\`, and the letters and
+# digits that are already in the alphabet), or by being non-ASCII (it may fold into the alphabet, or
+# be removed from between two letters of it). Every other character ends a run in the raw text and
+# in the pipeline's text alike, so a run is decided on its own.
+_RUN_RX = re.compile("[A-Za-z0-9+/=&%\\\\#;\u0080-\U0010ffff]+")
+_BLOB_FLOOR = 20
+
+
+def _fold_of(text: str) -> str:
+    return replace_homoglyphs(normalize_unicode(strip_invisible(text)))
+
+
+@functools.lru_cache(maxsize=4096)
+def _short_run_is_decoded(run: str) -> bool:
+    return len(_fold_of(run)) >= _BLOB_FLOOR and _base64_decodes(run)
+
+
+def _base64_decodes(run: str) -> bool:
+    """True when the pipeline's base64 step replaces something in this run, in any of its passes.
+    The passes are the ones normalize() runs: entities, percent escapes and hex escapes, then
+    base64, repeated up to three times. The entity, percent and hex steps only shorten text and
+    the base64 step shortens it too, so the only step that can lengthen a run is the character
+    fold (a ligature or a Hebrew or Arabic presentation form folds to up to eighteen characters)."""
+    text = _fold_of(run)
+    for _ in range(3):
+        before = text
+        text = decode_hex_escapes(decode_url_encoding(decode_html_entities(text)))
+        decoded = decode_base64_segments(text)
+        if decoded != text:
+            return True
+        if text == before:
+            break
+    return False
+
+
+def _run_is_decoded_as_base64(run: str) -> bool:
+    if run.isascii():
+        return len(run) >= _BLOB_FLOOR and _base64_decodes(run)
+    if len(run) >= _BLOB_FLOOR:
+        return _base64_decodes(run)
+    return _short_run_is_decoded(run)
+
+
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
 
 
@@ -264,7 +311,7 @@ class _Walk:
     GUARD_CHECKS = 64
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor", "guards", "gcursor", "guarded")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor")
 
     def __init__(self, raw: str, low: str, view: str):
         self.raw = raw
@@ -283,6 +330,8 @@ class _Walk:
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
         self.gcursor = 0    # index into guards of the first offset not yet passed
         self.guarded = 0    # how many guards the gate has been asked about
+        self.stops = None   # raw offsets where a run begins that the base64 step decodes
+        self.scursor = 0    # index into stops of the first offset not yet passed
         self.leftover = None  # view offsets where an escape the pipeline decodes begins
         self.vcursor = 0      # index into leftover of the first offset not yet passed
 
@@ -500,12 +549,27 @@ class _Walk:
                            if self._candidate(raw[m.start()])
                            and (self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start()))]
             self.guards = self._find_guards()
+            self.stops = [m.start() for m in _RUN_RX.finditer(raw) if _run_is_decoded_as_base64(m.group())]
         active, k = self.active, self.cursor
         # The walk only moves forward, so the cursor does too.
         while k < len(active) and active[k] < j:
             k += 1
         self.cursor = k
         return active[k] if k < len(active) else len(self.raw)
+
+    def _next_stop(self, j: int) -> int:
+        """The first raw offset at or after j where a run begins that the pipeline's base64 step
+        decodes (len(raw) if none). What that step writes was made from the whole blob, so no
+        character from there on can be paired with a raw character, and nothing past the start of
+        the run is vouched for. The start of the run is the earliest point the blob can reach: a
+        start character in front of the blob is in the same run, since it is spelled with
+        characters the run holds."""
+        self._next_escape(0)
+        stops, k = self.stops, self.scursor
+        while k < len(stops) and stops[k] < j:
+            k += 1
+        self.scursor = k
+        return stops[k] if k < len(stops) else len(self.raw)
 
     def _next_leftover(self, i: int) -> int:
         """The first view offset at or after i where an escape the pipeline decodes begins
@@ -529,7 +593,7 @@ class _Walk:
         start of an escape, which is read as a decoding step instead (see advance)."""
         low, held, i, j = self.low, self.held, self.i, self.j
         cap = min(limit - i, len(low) - j, self._next_escape(j) - j, self._next_guard(j) - j,
-                  self._next_leftover(i) - i)
+                  self._next_leftover(i) - i, self._next_stop(j) - j)
         if cap <= 0 or low[j] != held[i]:
             return 0
         step = 64
@@ -561,6 +625,9 @@ class _Walk:
                 break
             i, j = self.i, self.j
             c = raw[j]
+            if self._next_stop(j) == j:
+                self.dead = True
+                break
             if self._next_guard(j) == j:
                 # A start character in front of an escape of its run. It may begin a reference
                 # that the escape completes, so the gate is asked before it is taken as unchanged.
