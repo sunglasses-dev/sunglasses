@@ -136,4 +136,3 @@ def test_every_vouch_matches_the_raw_text_the_pipeline_needs(seed):
                 walk = align._walks[id(view)]
                 got = _view_of(raw[:walk.j])
                 assert got.rstrip() == view[:walk.i].rstrip(), (raw, view, lo, hi, walk.i, walk.j, got)
-                break

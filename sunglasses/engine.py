@@ -368,8 +368,24 @@ class _Walk:
         if probe.isascii() and _ESCAPE_RX.search(probe) is None:
             return False
         unwrapped = self._unwrapped
-        return (unwrapped(reading) != reading
-                or unwrapped(probe) != reading + unwrapped(window))
+        whole = unwrapped(probe)
+        if unwrapped(reading) != reading or whole != reading + unwrapped(window):
+            return True
+        # The window is cut at 64 raw characters, and the pipeline removes invisible characters
+        # before it decodes, so a window of padding can end exactly where the reading's own
+        # escape is still unfinished: the rest of it is past the cut and the two readings above
+        # agree on a start. Whether that start is completed is not known, and an unknown start is
+        # treated as a completed one, as _folds_to_escape treats it: the reading is not vouched
+        # for. Only a start inside the reading counts, since one in the window belongs to the raw
+        # text after it, which is read on its own turn. The start has to be within 48 characters of
+        # the cut: the longest entity name with its & and ; is 32, and a numeric reference that
+        # has a digit already decodes without the ; and was caught by the comparison above.
+        if end + 64 < len(self.raw):
+            own = len(replace_homoglyphs(normalize_unicode(strip_invisible(reading))))
+            for k in range(max(0, len(whole) - 48), min(own, len(whole))):
+                if whole[k] in "&%\\" and _UNFINISHED_ESCAPE_RX.fullmatch(whole, k) is not None:
+                    return True
+        return False
 
     @staticmethod
     def _decodes(text: str, j: int) -> bool:
