@@ -109,10 +109,11 @@ class _Decoded:
     """The result of one bounded decode: the data (None when it was refused), the bytes
     produced by every stage, and why it was refused."""
 
-    __slots__ = ("data", "spent", "state", "detail", "notes")
+    __slots__ = ("data", "spent", "state", "detail", "notes", "made")
 
     def __init__(self, data=None, spent=0, state="ok", detail="", notes=()):
         self.data = data
+        self.made = 0         # what the stages produced; a cap on the output is measured against it
         self.spent = spent
         self.state = state    # ok | big | unsized | error
         self.detail = detail
@@ -428,6 +429,7 @@ def _decode_stages(stream, room, charge, left, commit, cap, committed) -> "_Deco
     if isinstance(data, str):
         data = data.encode('latin-1', 'replace')
     out.data = data
+    out.made = made
     if not names:
         out.spent = len(data)
     return out
@@ -496,6 +498,7 @@ class PDFExtractor:
         self._kid_arrays = set()
         self._files_seen = set()
         self._stream_cache = {}
+        self._decoded_size = 0
         self._text_cache = {}
         self._annots_seen = set()
         self._annot_arrays_seen = set()
@@ -702,8 +705,8 @@ class PDFExtractor:
 
     @contextlib.contextmanager
     def _bounded_object_streams(self, reader):
-        """Inflate a compressed object stream only if it fits the attachment
-        bound, once per stream. PyPDF2 decodes a whole object stream to read one
+        """Inflate a compressed object stream only if it fits what is left of the
+        document budget, once per stream. PyPDF2 decodes a whole object stream to read one
         object out of it, so a small file could otherwise force a large inflation
         through any dereference. Objects in a stream that does not fit are not
         resolved, and the stream is recorded as not inspected."""
@@ -799,10 +802,23 @@ class PDFExtractor:
         decode. A stream read before is not decoded again."""
         key = id(stream)
         if key in self._stream_cache:
-            data = self._stream_cache[key]
-            return data if data is not None and self._spend(len(data)) else None
+            data, size = self._stream_cache[key]
+            if data is None:
+                return None
+            # The stream was decoded for another caller, under that caller's cap. This caller's
+            # cap is applied to what the stages produced, and the refusal is recorded as a
+            # decode would record it, without decoding again.
+            limit = cap or self.MAX_ATTACHMENT_BYTES
+            if size > limit:
+                self.failures.append(f"{name} larger than {limit} bytes; not inspected")
+                return None
+            return data if self._spend(len(data)) else None
         data = self._decode_stream(stream, name, cap)
-        self._stream_cache[key] = data
+        # What the stages produced is set by the decode that returned the bytes (a decode
+        # nested inside it has set and finished with it before that). The bytes themselves
+        # are the least it can be.
+        size = max(self._decoded_size, len(data)) if data is not None else 0
+        self._stream_cache[key] = (data, size)
         return data
 
     def _decode_stream(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
@@ -820,6 +836,7 @@ class PDFExtractor:
             if len(raw) > cap:
                 self.failures.append(f"{name} larger than {cap} bytes; not inspected")
                 return None
+            self._decoded_size = len(raw)
             return raw if self._spend(len(raw)) else None
         room = self.budget.remaining()
         if room <= 0:
@@ -854,6 +871,7 @@ class PDFExtractor:
             return None
         if not charged:
             return None
+        self._decoded_size = result.made
         for note in result.notes:
             self.failures.append(f"{name} {note}")
         return result.data
