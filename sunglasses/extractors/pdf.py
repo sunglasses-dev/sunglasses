@@ -123,6 +123,39 @@ _ASCII85_SKIP = bytes(b for b in range(256) if not 33 <= b <= 117)
 _FLATE = ('/FlateDecode', '/Fl')
 _ASCII85 = ('/ASCII85Decode', '/A85')
 _LZW = ('/LZWDecode', '/LZW')
+# One inflate call is asked for no more than this. A call that fails returns nothing, so the
+# most it can have made is charged to the stream (see _decode_bounded).
+_INFLATE_STEP = 1 << 16
+# The longest filter chain, or list of decode parameters, that the decoder reads.
+_MAX_CHAIN = 16
+
+
+def _deref(obj):
+    return obj.get_object() if hasattr(obj, 'get_object') else obj
+
+
+def _entries_of(seq, charge):
+    """The entries of an array the decoder is about to read, one at a time. `charge` is called
+    before each is handed over, so no entry is resolved that was not paid for, and an array
+    longer than any real chain is refused before the first one. This is the one place the
+    decoder touches the entries of an array in its setup."""
+    if len(seq) > _MAX_CHAIN:
+        raise ValueError(f"more than {_MAX_CHAIN} entries")
+    for entry in seq:
+        charge()
+        yield entry
+
+
+def _filters_of(stream, charge):
+    """The filter names of a stream, in order, or None when it names more than _MAX_CHAIN."""
+    if '/Filter' not in stream:
+        return []
+    names = _deref(stream.get('/Filter'))
+    if isinstance(names, (list, tuple)):
+        if len(names) > _MAX_CHAIN:
+            return None
+        return [str(_deref(n)) for n in _entries_of(names, charge)]
+    return [] if names is None else [str(names)]
 
 
 def _inflate(data: bytes, room: int):
@@ -155,7 +188,7 @@ def _inflate(data: bytes, room: int):
                 break
             pending, pos = data[pos:pos + 65536], pos + 65536
         try:
-            out = inflater.decompress(pending, room + 1 - total)
+            out = inflater.decompress(pending, min(room + 1 - total, _INFLATE_STEP))
         except zlib.error:
             damaged = True
             break
@@ -167,7 +200,9 @@ def _inflate(data: bytes, room: int):
         total += len(out)
         if total > room or inflater.eof:
             break
-    after = (inflater.unused_data + pending + data[pos:])[trailer:] if inflater.eof else b""
+    # At the end of the stream the bytes the call did not use are in unused_data and also in
+    # unconsumed_tail, so `pending` is not added a second time.
+    after = (inflater.unused_data + data[pos:])[trailer:] if inflater.eof else b""
     return b"".join(chunks), inflater.eof, after, damaged
 
 
@@ -178,13 +213,13 @@ def _ascii85_length(data: bytes) -> int:
     return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
 
 
-def _predictor_of(params):
-    """(predictor, columns, bits per component) the way PyPDF2 reads them."""
-    def resolve(obj):
-        return obj.get_object() if hasattr(obj, 'get_object') else obj
+def _predictor_of(params, charge):
+    """(predictor, columns, bits per component) the way PyPDF2 reads them. A list of
+    parameters is charged entry by entry."""
+    resolve = _deref
     params = resolve(params)
     predictor, columns, bits = 1, 1, 8
-    entries = params if isinstance(params, (list, tuple)) else [params]
+    entries = _entries_of(params, charge) if isinstance(params, (list, tuple)) else [params]
     for entry in entries:
         entry = resolve(entry)
         if not hasattr(entry, 'get'):
@@ -195,7 +230,7 @@ def _predictor_of(params):
     return int(predictor), int(columns), int(bits)
 
 
-def _decode_bounded(stream, room: int) -> "_Decoded":
+def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
     """Decode a stream's filter chain one stage at a time, so that no stage runs past what
     is left of the budget and nothing is decoded twice. Every stage's output, the
     intermediate ones included, is added to `spent`, and the chain is refused (state
@@ -204,17 +239,14 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
     decoded. A predictor is applied to the bounded output. A chain with a filter that is
     not sized here (hex, run length, an image filter, /Crypt, LZW that is not the last
     filter) is refused with state "unsized", and a stage that fails with "error". The
-    reader's own get_data() is never called."""
+    reader's own get_data() is never called. `charge` is called before every entry of the
+    filter list and of the decode parameters is resolved, and raises _WalkBudget when the
+    document budget is gone; that exception is not caught here."""
     from PyPDF2 import filters as pdf_filters
 
-    def resolve(obj):
-        return obj.get_object() if hasattr(obj, 'get_object') else obj
-
-    names = resolve(stream.get('/Filter')) if '/Filter' in stream else None
-    if isinstance(names, (list, tuple)):
-        names = [str(resolve(n)) for n in names]
-    else:
-        names = [] if names is None else [str(names)]
+    names = _filters_of(stream, charge)
+    if names is None:
+        return _Decoded(state="unsized", detail=f"a chain of more than {_MAX_CHAIN} filters")
     data = getattr(stream, '_data', None) or b""
     out = _Decoded(data=data)
     if not data:
@@ -223,7 +255,7 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
         for i, name in enumerate(names):
             if name in _FLATE:
                 data, reached_end, after, damaged = _inflate(data, room - out.spent)
-                out.spent += len(data)
+                out.spent += len(data) + (_INFLATE_STEP if damaged else 0)
                 if out.spent > room:
                     return _Decoded(spent=room + 1, state="big")
                 if damaged or not reached_end:
@@ -232,7 +264,7 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
                 elif after.strip(b"\x00\t\n\x0c\r "):
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
-                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'))
+                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), charge)
                 if predictor != 1:
                     if not 10 <= predictor <= 15:
                         raise ValueError("unsupported predictor")
@@ -270,6 +302,8 @@ def _decode_bounded(stream, room: int) -> "_Decoded":
                     return _Decoded(spent=room + 1, state="big")
             else:
                 return _Decoded(spent=out.spent, state="unsized", detail=name)
+    except _WalkBudget:
+        raise
     except Exception as exc:
         return _Decoded(spent=out.spent, state="error", detail=exc.__class__.__name__)
     if isinstance(data, str):
@@ -344,6 +378,7 @@ class PDFExtractor:
         self._stream_cache = {}
         self._text_cache = {}
         self._annots_seen = set()
+        self._annot_arrays_seen = set()
         self._parents_seen = set()
         self._outline_items = 0
         self._attachments_read = 0
@@ -646,15 +681,16 @@ class PDFExtractor:
     def _decode_stream(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
         cap = cap or self.MAX_ATTACHMENT_BYTES
         raw = getattr(stream, '_data', None) or b''
-        filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
-        if isinstance(filters, (list, tuple)):
-            filters = [str(self._resolve(f)) for f in filters]
-        elif filters is not None:
-            filters = [str(filters)]
-        else:
-            filters = []
         if len(raw) > cap:
             self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+            return None
+        try:
+            filters = _filters_of(stream, self._charge_visit)
+        except _WalkBudget:
+            self._spend(1)  # records that the document limit stopped the read
+            return None
+        if filters is None:
+            self.failures.append(f"{name} names more than {_MAX_CHAIN} filters; not inspected")
             return None
         if not filters:
             return raw if self._spend(len(raw)) else None
@@ -665,7 +701,11 @@ class PDFExtractor:
         limit = min(cap, room)
         # The chain is decoded here, stage by stage, within the room left, and every
         # stage is charged as it is produced. The reader's own decode is never used.
-        result = _decode_bounded(stream, limit)
+        try:
+            result = _decode_bounded(stream, limit, self._charge_visit)
+        except _WalkBudget:
+            self._spend(1)  # records that the document limit stopped the read
+            return None
         # What was produced is charged whether or not it is kept, so a run of streams
         # that are each too large cannot decode without the bound.
         charged = self._spend(result.spent)
@@ -686,11 +726,9 @@ class PDFExtractor:
             self.failures.append(f"{name} {note}")
         return result.data
 
-    def _filter_names(self, stream) -> List[str]:
-        filters = self._resolve(stream.get('/Filter')) if '/Filter' in stream else None
-        if isinstance(filters, (list, tuple)):
-            return [str(self._resolve(f)) for f in filters]
-        return [] if filters is None else [str(filters)]
+    def _charge_visit(self) -> None:
+        """One visit charged to the document budget; raises _WalkBudget when it is gone."""
+        self.budget.spend(self.VISIT_COST)
 
     def _name_tree(self, node, what: str, cap: int) -> List[Tuple[str, object]]:
         """(key, value) pairs of a PDF name tree (/Names and /Kids), bounded."""
@@ -906,17 +944,22 @@ class PDFExtractor:
             self.failures.append(
                 f"page {index} actions not read ({exc.__class__.__name__}: {exc})")
             return out
+        if annots:
+            # An /Annots array that an earlier page listed is read once for the document.
+            if id(annots) in self._annot_arrays_seen:
+                return out
+            self._annot_arrays_seen.add(id(annots))
         for i, annot in enumerate(annots or []):
             try:
-                # An annotation that several pages share (one /Annots array, or one
-                # annotation listed twice) is read once for the document. Every one
-                # that is visited is charged, so the walk is bounded by the budget.
+                # Every entry that is iterated is charged before it is looked at, also one
+                # that is listed again, so the walk over a list of repeats is bounded by
+                # the budget. An annotation listed twice is read once for the document.
+                if not self._spend(self.VISIT_COST):
+                    break
                 ident = self._identity(annot)
                 if ident in self._annots_seen:
                     continue
                 self._annots_seen.add(ident)
-                if not self._spend(self.VISIT_COST):
-                    break
                 a = self._resolve(annot)
                 if not hasattr(a, 'get'):
                     continue  # recorded by _extract_annotations already
