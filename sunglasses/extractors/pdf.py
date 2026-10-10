@@ -444,7 +444,7 @@ class _ImageWalk:
             ref = appearance.raw_get('/N')
             normal = _resolve(ref)
             if hasattr(normal, 'get_data'):
-                states = [(ref, normal)]
+                states = [(ref, normal)]    # already read by the visit of the annotation
             elif hasattr(normal, 'raw_get'):
                 if len(normal) > self.MAX_APPEARANCES:
                     raise ValueError(
@@ -454,12 +454,14 @@ class _ImageWalk:
                 # viewer would pick is not known.
                 chosen = _resolve(annot.get('/AS'))
                 keys = [chosen] if isinstance(chosen, NameObject) else list(normal)
-                states = [(normal.raw_get(key), _resolve(normal.raw_get(key)))
-                          for key in keys if key in normal]
+                # Each state is resolved after it is charged, not before.
+                states = [(normal.raw_get(key), None) for key in keys if key in normal]
             else:
                 continue
             for state_ref, stream in states:
                 self.budget.spend(self.VISIT_COST)
+                if stream is None:
+                    stream = _resolve(state_ref)
                 if hasattr(stream, 'get_data'):
                     parts.append(self._form(stream, getattr(state_ref, 'idnum', None),
                                             scope, 1))
