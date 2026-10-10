@@ -90,9 +90,10 @@ def _charging(cost):
 def test_a_stage_is_sized_against_what_is_left_after_the_setup_charges():
     data = zlib.compress(bytes(100))
     stream = _Stream(data, **{"/Filter": ["/FlateDecode"]})
-    assert pdf_module._decode_bounded(stream, 100 + VISIT - 1, _charging(VISIT)).state == "big"
-    ok = pdf_module._decode_bounded(stream, 100 + VISIT, _charging(VISIT))
-    assert ok.state == "ok" and ok.spent == 100
+    n = len(stream._data)   # the stream's own input is on the ledger too
+    assert pdf_module._decode_bounded(stream, 100 + n + VISIT - 1, _charging(VISIT)).state == "big"
+    ok = pdf_module._decode_bounded(stream, 100 + n + VISIT, _charging(VISIT))
+    assert ok.state == "ok" and ok.spent == 100 + n
 
 
 def test_the_predictor_does_not_run_on_space_the_setup_already_spent(monkeypatch):
@@ -106,16 +107,18 @@ def test_the_predictor_does_not_run_on_space_the_setup_already_spent(monkeypatch
                      **{"/Filter": ["/FlateDecode"],
                         "/DecodeParms": [{"/Predictor": 12, "/Columns": 10}]})
     # 22 bytes inflated, 22 more reserved for the predictor, and two entries of setup at VISIT each
-    assert pdf_module._decode_bounded(stream, 2 * VISIT + 44 - 1, _charging(VISIT)).state == "big"
+    n = len(stream._data)
+    assert pdf_module._decode_bounded(stream, 2 * VISIT + 44 + n - 1, _charging(VISIT)).state == "big"
     assert ran == []
-    assert pdf_module._decode_bounded(stream, 2 * VISIT + 44, _charging(VISIT)).state == "ok"
+    assert pdf_module._decode_bounded(stream, 2 * VISIT + 44 + n, _charging(VISIT)).state == "ok"
     assert ran == [1]
 
 
 def test_a_decoder_with_no_setup_charge_sizes_stages_as_before():
     stream = _Stream(zlib.compress(bytes(100)), **{"/Filter": "/FlateDecode"})
-    assert pdf_module._decode_bounded(stream, 99).state == "big"
-    assert pdf_module._decode_bounded(stream, 100).state == "ok"
+    n = len(stream._data)
+    assert pdf_module._decode_bounded(stream, 99 + n).state == "big"
+    assert pdf_module._decode_bounded(stream, 100 + n).state == "ok"
 
 
 def test_the_walk_hands_the_decoder_what_is_left_after_its_own_setup(monkeypatch):
@@ -125,7 +128,7 @@ def test_the_walk_hands_the_decoder_what_is_left_after_its_own_setup(monkeypatch
     walk = _walk(left=VISIT + 150)
     stream = _Stream(zlib.compress(bytes(100)), **{"/Filter": ["/FlateDecode"]})
     walk._content(stream)
-    assert asked == [150], asked
+    assert asked == [150 - len(stream._data)], asked   # the input came off first
 
 
 # 2. Every resolution is paid for before it is made.

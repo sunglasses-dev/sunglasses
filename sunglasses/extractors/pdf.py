@@ -116,6 +116,8 @@ _LZW = ('/LZWDecode', '/LZW')
 _INFLATE_STEP = 1 << 16
 # The longest filter chain, or list of decode parameters, that the decoder reads.
 _MAX_CHAIN = 16
+# The longest filter name the decoder turns into text. The longest real one is /RunLengthDecode.
+_MAX_NAME = 64
 
 
 def _deref(obj):
@@ -134,6 +136,15 @@ def _entries_of(seq, charge):
         yield entry
 
 
+def _name_text(name):
+    """A filter name as text. Nothing longer than any real name is converted, and a value that
+    is not a name at all is not either; both come back as a name no filter has, so the chain
+    is refused as not sized."""
+    if isinstance(name, (str, bytes)) and len(name) <= _MAX_NAME:
+        return str(name)
+    return "/?"
+
+
 def _filters_of(stream, charge):
     """The filter names of a stream, in order, or None when it names more than _MAX_CHAIN."""
     if '/Filter' not in stream:
@@ -142,8 +153,8 @@ def _filters_of(stream, charge):
     if isinstance(names, (list, tuple)):
         if len(names) > _MAX_CHAIN:
             return None
-        return [str(_deref(n)) for n in _entries_of(names, charge)]
-    return [] if names is None else [str(names)]
+        return [_name_text(_deref(n)) for n in _entries_of(names, charge)]
+    return [] if names is None else [_name_text(names)]
 
 
 def _inflate(data: bytes, room: int):
@@ -218,7 +229,7 @@ def _predictor_of(params, charge):
     return int(predictor), int(columns), int(bits)
 
 
-def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
+def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded":
     """Decode a stream's filter chain one stage at a time, so that no stage runs past what
     is left of the budget and nothing is decoded twice. Every stage's output, the
     intermediate ones included, is added to `spent`, and the chain is refused (state
@@ -231,12 +242,21 @@ def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
     filter list and of the decode parameters is resolved, and raises _WalkBudget when the
     document budget is gone; that exception is not caught here. It returns the bytes it
     charged, and they come off `room` as soon as they are spent, so the stages are sized
-    against what is left and not against what was left when the call began."""
+    against what is left and not against what was left when the call began. A dereference in
+    the setup can spend the document budget directly (it can inflate an object stream), and
+    that is not in what `charge` returns; `left`, when given, returns what the budget has
+    left, and the allowance is brought down to it before each stage and after the decode
+    parameters are read."""
     from PyPDF2 import filters as pdf_filters
 
     def paid():
         nonlocal room
         room -= charge() or 0
+
+    def synced():
+        nonlocal room
+        if left is not None:
+            room = min(room, left())
 
     names = _filters_of(stream, paid)
     if names is None:
@@ -252,9 +272,18 @@ def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
         return out.spent >= room
     try:
         for i, name in enumerate(names):
+            synced()
             if over():
                 return _Decoded(spent=max(room, 0) + 1, state="big")
             if name in _FLATE:
+                # The stream's own input is read whole, so it is paid for before it is read (a
+                # later stage's input is the stage before's output, charged already).
+                # Nothing is left to inflate into when it is all gone: a zero limit means "no
+                # limit" to zlib.
+                if i == 0:
+                    out.spent += len(data)
+                    if out.spent >= room:
+                        return _Decoded(spent=max(room, 0) + 1, state="big")
                 data, reached_end, after, damaged = _inflate(data, room - out.spent)
                 out.spent += len(data) + (_INFLATE_STEP if damaged else 0)
                 if out.spent > room:
@@ -266,6 +295,7 @@ def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
                 predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), paid)
+                synced()
                 if out.spent > room:
                     return _Decoded(spent=max(room, 0) + 1, state="big")
                 if predictor != 1:
@@ -735,7 +765,7 @@ class _ImageWalk:
             stream = self._open(entry) if paid else _resolve(entry)
             if not hasattr(stream, 'get_data'):
                 continue
-            result = _decode_bounded(stream, self.budget.remaining(), self._visit)
+            result = _decode_bounded(stream, self.budget.remaining(), self._visit, self.budget.remaining)
             # What was decoded is charged whatever the chain's state, so a chain that is
             # refused after its first stages cannot be repeated for free on every page.
             self.budget.spend(result.spent)

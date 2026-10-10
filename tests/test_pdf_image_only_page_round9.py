@@ -70,10 +70,11 @@ def test_a_predictor_that_fails_cannot_be_repeated_for_free(failing_predictor):
 
 def test_the_charge_for_a_predictor_that_succeeds_is_what_it_made():
     rows = [b"\x01\x01\x01\x01\x01", b"\x01\x02\x02\x02\x02"]
-    result = pdf_module._decode_bounded(_predicted(b"".join(rows), 4), 1_000_000)
+    stream = _predicted(b"".join(rows), 4)
+    result = pdf_module._decode_bounded(stream, 1_000_000)
     assert result.state == "ok"
     assert result.data == bytes([1, 2, 3, 4, 2, 4, 6, 8])
-    assert result.spent == 10 + 8
+    assert result.spent == len(stream._data) + 10 + 8   # the input, the inflated stream, the rows
 
 
 # 2. A content array is paid for entry by entry.
@@ -131,10 +132,12 @@ def test_every_entry_of_a_content_array_is_charged_even_when_it_decodes_to_nothi
 
 def test_a_single_content_stream_is_not_charged_twice():
     walk = _walk()
-    walk._content({"/Contents": _empty()})
-    assert walk.budget.read == 0
-    walk._content(_empty())
-    assert walk.budget.read == 0
+    first = _empty()
+    walk._content({"/Contents": first})
+    assert walk.budget.read == len(first._data)   # its own input, once
+    second = _empty()
+    walk._content(second)
+    assert walk.budget.read == len(first._data) + len(second._data)
 
 
 def test_a_content_array_inside_the_allowance_is_still_read():
