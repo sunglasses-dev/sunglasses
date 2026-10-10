@@ -1864,7 +1864,7 @@ PATTERNS = [
             "pull from rss and auto-publish",
         ],
         "regex": [
-            r"(?i)(fetch|crawl|scrape|read)\s+(?:this|the)?\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+            r"(?i)(fetch|crawl|scrape|read)\s+(?:(?:this|the)\s*)?(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
             r"(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)",
         ],
         "description": "Indirect prompt injection or poisoned source content entering an agent workflow that fetches external pages, generates content, and pushes toward publishing systems."
