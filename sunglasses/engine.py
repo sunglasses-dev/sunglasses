@@ -31,7 +31,8 @@ from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import (ENRICH_MAX_LEN, HOMOGLYPHS, INVISIBLE_CHARS, LEET, VIEW_SEP,
-                           decode_rot13, decode_shadow_ascii, normalize_unicode, normalize_with_length,
+                           decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
+                           decode_url_encoding, normalize_unicode, normalize_with_length,
                            replace_homoglyphs, strip_invisible)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
@@ -242,7 +243,8 @@ class _Walk:
     other difference ends the walk, and nothing past that point is vouched for.
     """
 
-    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor")
+    __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
+                 "leftover", "vcursor")
 
     def __init__(self, raw: str, low: str, view: str):
         self.raw = raw
@@ -258,6 +260,8 @@ class _Walk:
         self.cuts = []     # view indexes where raw characters were deleted before it
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
+        self.leftover = None  # view offsets where an escape the pipeline decodes begins
+        self.vcursor = 0      # index into leftover of the first offset not yet passed
 
     @staticmethod
     def _variants(text: str):
@@ -317,8 +321,15 @@ class _Walk:
                     # invisible characters and folds compatibility letters before it decodes,
                     # so a terminator hidden behind a non-ASCII character is read as well
                     # and the pipeline uses more raw text than this match did. Only a
-                    # non-ASCII character can hide it; the walk ends rather than stand early.
-                    return 1, []
+                    # non-ASCII character can hide it. The reference is read again the way
+                    # the pipeline folds it: when the fold leaves it as it is, the next
+                    # character is ordinary text, and otherwise the walk ends rather than
+                    # stand early. A fold that reaches the end of a cut window is unknown.
+                    folded = replace_homoglyphs(normalize_unicode(strip_invisible(raw[j:j + 64])))
+                    again = _ENTITY_RX.match(folded)
+                    if (again is None or again.group() != m.group()
+                            or (len(raw) - j > 64 and again.end() == len(folded))):
+                        return 1, []
         elif c == "%":
             m = _PERCENT_RX.match(raw, j)
             if m:
@@ -330,6 +341,35 @@ class _Walk:
         elif "\U000e0020" <= c <= "\U000e007e":
             text = chr(ord(c) - 0xE0000)
         return used, self._variants(text)
+
+    @staticmethod
+    def _unwrapped(text: str) -> str:
+        """The text after the pipeline's character steps and its escape passes (entities,
+        percent escapes, hex escapes, repeated until nothing changes, as normalize() does)."""
+        text = replace_homoglyphs(normalize_unicode(strip_invisible(text)))
+        for _ in range(3):
+            before = text
+            text = decode_hex_escapes(decode_url_encoding(decode_html_entities(text)))
+            if text == before:
+                break
+        return text
+
+    def _layered(self, reading: str, end: int) -> bool:
+        """True when the pipeline decodes more than this reading shows. A reading is taken
+        only when it is a fixed point of the pipeline's decoding and the raw text after it
+        cannot change it: decoding the reading leaves it as it is, and decoding the reading
+        together with the next raw characters gives the reading followed by what those
+        characters decode to on their own. A reading that holds an escape, or that ends in the
+        start of one which the raw text after it completes (also through a percent or hex
+        escape, or characters the pipeline removes or folds), fails that, because what the
+        pipeline decodes then was made from raw characters this reading does not use."""
+        window = self.raw[end:end + 64]
+        probe = reading + window
+        if probe.isascii() and _ESCAPE_RX.search(probe) is None:
+            return False
+        unwrapped = self._unwrapped
+        return (unwrapped(reading) != reading
+                or unwrapped(probe) != reading + unwrapped(window))
 
     @staticmethod
     def _decodes(text: str, j: int) -> bool:
@@ -382,13 +422,28 @@ class _Walk:
         self.cursor = k
         return active[k] if k < len(active) else len(self.raw)
 
+    def _next_leftover(self, i: int) -> int:
+        """The first view offset at or after i where an escape the pipeline decodes begins
+        (len(view) if none). The pipeline decodes until nothing changes, up to a few passes, so
+        a view that still holds one was made by layers of decoding, and the raw characters
+        that stand for the text in front of it cannot be told from the ones the layers used."""
+        if self.leftover is None:
+            view = self.view
+            self.leftover = [m.start() for m in _ESCAPE_RX.finditer(view, 0, self.limit)
+                             if self._decodes(view, m.start())]
+        leftover, k = self.leftover, self.vcursor
+        while k < len(leftover) and leftover[k] < i:
+            k += 1
+        self.vcursor = k
+        return leftover[k] if k < len(leftover) else len(self.view)
+
     def _equal_run(self, limit: int) -> int:
         """Length of the identical run at the current positions, capped by limit. An
         identical character is the same character from the same place only when the
         pipeline did not decode anything in front of it: a run never reaches over the
         start of an escape, which is read as a decoding step instead (see advance)."""
         low, held, i, j = self.low, self.held, self.i, self.j
-        cap = min(limit - i, len(low) - j, self._next_escape(j) - j)
+        cap = min(limit - i, len(low) - j, self._next_escape(j) - j, self._next_leftover(i) - i)
         if cap <= 0 or low[j] != held[i]:
             return 0
         step = 64
@@ -435,11 +490,12 @@ class _Walk:
             used, readings = self._produced(j)
             for reading in readings:
                 if view.startswith(reading, i):
-                    if self._decodes(view, i):
+                    if self._decodes(view, i) or self._layered(reading, j + used):
                         # What the reading produced is itself an escape (a nested entity,
-                        # or a full-width or small ampersand that folds into one), so the
-                        # view holds layers of decoding and which raw character each view
-                        # character came from is no longer shown.
+                        # or a full-width or small ampersand that folds into one), or holds
+                        # one further in, or ends where the raw text after it completes one.
+                        # The view then holds layers of decoding and which raw character each
+                        # view character came from is no longer shown.
                         self.dead = True
                         break
                     if not (used == 1 and self._is_case_of(c, reading)):
