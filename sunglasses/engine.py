@@ -26,7 +26,7 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import (ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_unicode,
+from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_ascii, normalize_unicode,
                            normalize_with_length, replace_homoglyphs, strip_invisible)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
@@ -1230,10 +1230,11 @@ class SunglassesEngine:
         # these three folds: the decoding, leet, whitespace-collapse and ROT13 /
         # reversed steps change length and meaning, and on a long document
         # they re-create the spread-text false positives the co-occurrence
-        # window exists to prevent (see step 3.5). None of the three changes
-        # ASCII, so ASCII input (the common case) is never folded and never
-        # pays a second pass; non-ASCII input that folds to itself does not
-        # either. Bounded like the raw text: NFKC can expand (one code point
+        # window exists to prevent (see step 3.5). Only one of the three
+        # changes ASCII: deleting an ASCII control character (a NUL, a bell,
+        # a delete byte). Plain ASCII input (the common case) is therefore
+        # never folded and never pays a second pass, and neither is non-ASCII
+        # input that folds to itself. Bounded like the raw text: NFKC can expand (one code point
         # to as many as 18), so the folded view is cut at max_scan_bytes and
         # the cut is recorded as a truncated scan, the same way step 0 records
         # a cut of the raw text. Dropping NFKC instead would let expanding
@@ -1246,7 +1247,7 @@ class SunglassesEngine:
         folded_present = None
         compact = None
         compact_present = None
-        if not text.isascii():
+        if not text.isascii() or CONTROL_CHARS.search(text):
             stripped = strip_invisible(text)
             folded = replace_homoglyphs(normalize_unicode(stripped))
             if self.max_scan_bytes and len(folded) > self.max_scan_bytes:

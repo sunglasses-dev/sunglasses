@@ -60,6 +60,14 @@ LEET = {
     '7': 't', '@': 'a', '$': 's', '!': 'i',
 }
 
+# Control characters that are neither whitespace nor escape. A NUL between
+# letters (or after each ASCII letter of a UTF-16 file saved without a byte
+# order mark) split a phrase for every lane. Tab, newline, carriage return,
+# vertical tab, form feed, the four separators and next line stay because \s
+# reads them as spaces, and escape stays because a rule matches it raw.
+CONTROL_RANGES = '\x00-\x08\x0e-\x1a\x7f-\x84\x86-\x9f'
+CONTROL_CHARS = re.compile('[' + CONTROL_RANGES + ']')
+
 # Zero-width and invisible Unicode characters
 INVISIBLE_CHARS = re.compile(
     '[\u200b\u200c\u200d\u200e\u200f'   # zero-width spaces/joiners
@@ -70,6 +78,7 @@ INVISIBLE_CHARS = re.compile(
     '\u061c'                              # Arabic letter mark
     '\u2028\u2029'                        # line/paragraph separators
     '\U000e0001-\U000e007f'              # Unicode tag characters
+    + CONTROL_RANGES +
     ']'
 )
 
@@ -103,6 +112,12 @@ def normalize_with_length(text: str) -> tuple:
     # Read before strip_invisible removes them, so the plain view still loses
     # them (a split phrase keeps matching) and the shadow view sees the text.
     shadow = decode_shadow_ascii(text)
+    # Control characters are deleted below so a phrase they split reads whole.
+    # Deleting one also joins what it separated, and a base64 run that followed
+    # a NUL then merges with the word before it and no longer decodes. So the
+    # same text with each control read as a space is kept as a view of its own,
+    # behind the separator, and decoded on its original boundaries.
+    spaced = CONTROL_CHARS.sub(" ", text) if CONTROL_CHARS.search(text) else None
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
@@ -163,6 +178,8 @@ def normalize_with_length(text: str) -> tuple:
         if rot != text:
             text = text + " " + VIEW_SEP + " " + rot
         text = text.lower()
+    if spaced is not None:
+        text = text + " " + VIEW_SEP + " " + normalize(spaced)
     if shadow is not None:
         # Its own views, behind the separator, so an excerpt never joins it
         # to the plain text.
