@@ -147,3 +147,41 @@ def test_a_byte_string_is_charged_for_its_bytes_before_it_is_converted(monkeypat
     extractor = _tree_extractor(100)
     assert extractor._as_text(b"x" * 100000) == ""
     assert converted == []
+
+
+# --- a charge that comes after a stage can overdraw the allowance; the next stage must see it ---
+
+def test_a_late_setup_charge_cannot_leave_the_next_stage_without_a_limit(monkeypatch):
+    """The decode parameters are charged after each Flate stage. When that charge took more than was
+    left, the next stage was inflated with a limit of zero or less, and zlib reads a zero limit as
+    "no limit"."""
+    inner = zlib.compress(bytes(100000))
+    stream = _Stream(zlib.compress(inner),
+                     **{"/Filter": ["/FlateDecode", "/FlateDecode"], "/DecodeParms": [{}]})
+    asked = []
+    real = pdf_module._inflate
+
+    def spy(data, room):
+        asked.append(room)
+        return real(data, room)
+
+    monkeypatch.setattr(pdf_module, "_inflate", spy)
+    overdrawn = 0
+    for cap in range(2 * VISIT, 6 * VISIT + 2 * len(inner)):
+        asked.clear()
+        result = pdf_module._decode_bounded(stream, cap, _charging(VISIT))
+        assert all(room > 0 for room in asked), (cap, asked)
+        assert result.state != "ok" or result.spent <= cap, (cap, result.spent)
+        overdrawn += result.state == "big"
+    assert overdrawn > 0
+
+
+def test_a_stage_that_starts_with_nothing_left_is_refused_not_run(monkeypatch):
+    ran = []
+    real = pdf_module._inflate
+    monkeypatch.setattr(pdf_module, "_inflate", lambda *a: ran.append(1) or real(*a))
+    stream = _Stream(zlib.compress(bytes(100)), **{"/Filter": ["/FlateDecode"]})
+    for room in (0, -1, -VISIT):
+        result = pdf_module._decode_bounded(stream, room)
+        assert result.state == "big" and result.spent >= 1
+    assert ran == []

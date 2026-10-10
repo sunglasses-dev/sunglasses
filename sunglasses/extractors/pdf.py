@@ -257,8 +257,15 @@ def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
     out = _Decoded(data=data)
     if not data:
         return out
+    def over():
+        # A charge can come after a stage (the decode parameters are charged once the stage has run),
+        # so what is left is worked out again before each stage, and a stage is never started on
+        # nothing: a zero limit means "no limit" to zlib.
+        return out.spent >= room
     try:
         for i, name in enumerate(names):
+            if over():
+                return _Decoded(spent=max(room, 0) + 1, state="big")
             if name in _FLATE:
                 data, reached_end, after, damaged = _inflate(data, room - out.spent)
                 out.spent += len(data) + (_INFLATE_STEP if damaged else 0)
@@ -271,6 +278,8 @@ def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
                 predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), paid)
+                if out.spent > room:
+                    return _Decoded(spent=max(room, 0) + 1, state="big")
                 if predictor != 1:
                     if not 10 <= predictor <= 15:
                         raise ValueError("unsupported predictor")
