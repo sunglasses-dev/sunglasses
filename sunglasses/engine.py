@@ -311,6 +311,14 @@ class _Walk:
                     # int conversion. The pipeline leaves the text as it is, so no
                     # reading is shown here and the walk ends.
                     return 1, []
+                if (text != m.group() and not m.group().endswith(";")
+                        and raw[m.end():m.end() + 1] > "\x7f"):
+                    # The reference is read without its terminator. The pipeline removes
+                    # invisible characters and folds compatibility letters before it decodes,
+                    # so a terminator hidden behind a non-ASCII character is read as well
+                    # and the pipeline uses more raw text than this match did. Only a
+                    # non-ASCII character can hide it; the walk ends rather than stand early.
+                    return 1, []
         elif c == "%":
             m = _PERCENT_RX.match(raw, j)
             if m:
