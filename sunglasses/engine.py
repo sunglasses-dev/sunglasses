@@ -1445,9 +1445,21 @@ class SunglassesEngine:
     # A rule that matches more than once is judged on its worst occurrence. The
     # search for a later, un-negated one walks forward one match at a time and
     # stops at the first live one or when the matches run out, so input made
-    # only of negated copies stays negated. It is bounded by the input itself:
-    # each step starts past the previous match start, so there are at most as
-    # many steps as there are matches in a document that max_scan_bytes caps.
+    # only of negated copies stays negated. Each step starts past the previous
+    # match start, so there are at most as many steps as there are matches, but
+    # a step can consume the whole rest of the text, and matches that overlap
+    # each consume the same tail again. So the characters the steps consume are
+    # added up as well, and the search has a budget of them: a multiple of the
+    # text plus a floor. Repeated warnings stay under it (a step consumes at
+    # most the rule's gap, and the steps are at least a phrase apart, so a dense
+    # run costs the gap over the spacing times the text); a rule whose
+    # successive matches each reach to the end of the text does not. When the
+    # budget is spent the search stops and the occurrence is NOT treated as
+    # negated: the rest of the text was not judged, and unjudged text is never
+    # lent the benefit of a warning.
+    NEGATION_SEARCH_BUDGET_FACTOR = 64
+    NEGATION_SEARCH_BUDGET_FLOOR = 1 << 16
+
     def _resolve_negation(self, mode, rx, guards, text, first, source=None):
         """Pick the occurrence a regex rule is judged on. Returns (match, negated).
 
@@ -1488,6 +1500,8 @@ class SunglassesEngine:
         # what the anchored mode derives from the text is kept across the steps.
         memo = {}
         match = first
+        budget = (self.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
+                  + self.NEGATION_SEARCH_BUDGET_FLOOR)
         while True:
             # Resume one character past the START, not at the end: these rules
             # have wide gaps, so the negated match often spans the later one.
@@ -1501,6 +1515,9 @@ class SunglassesEngine:
             if match is None:
                 return first, True
             if not negated_at(match):
+                return match, False
+            budget -= max(match.end() - resume, 1)
+            if budget < 0:
                 return match, False
 
     @staticmethod
