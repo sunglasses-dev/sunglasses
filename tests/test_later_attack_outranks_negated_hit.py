@@ -1072,3 +1072,172 @@ def test_a_kept_span_follows_the_text_it_is_asked_about():
     _prefilter._SPANS.clear()
     fresh_long = _prefilter.max_read_extent(rx, long_, {})
     assert second > first and again == first and second == fresh_long
+
+
+# ── r13: every regex flag, in every derivation the walk's price rests on ─────────
+#
+# r11 dropped scoped flags in the extent, r12 dropped DOTALL in the start filter:
+# the same kind twice. So the flags are enumerated here, not the shapes: each flag
+# of `re` is either one the price derivations keep (and a test below feeds it) or
+# one that cannot change what they read (and the classification below says why).
+
+import re as _re  # noqa: E402
+
+_FLAG_SETS = [
+    0, _re.I, _re.S, _re.M, _re.X, _re.A, _re.U,
+    _re.I | _re.S, _re.I | _re.A, _re.S | _re.M, _re.I | _re.S | _re.M | _re.X,
+    _re.A | _re.S | _re.I | _re.M, _re.U | _re.I | _re.S,
+]
+
+
+def test_every_flag_of_re_is_classified_for_the_price_derivations():
+    kept = {"IGNORECASE", "ASCII", "DOTALL"}               # the start filter keeps these
+    no_effect = {"MULTILINE", "VERBOSE", "UNICODE", "NOFLAG", "DEBUG", "LOCALE", "TEMPLATE"}
+    assert {f.name for f in _re.RegexFlag} <= kept | no_effect, {f.name for f in _re.RegexFlag}
+    assert _prefilter._START_FLAGS == _re.I | _re.A | _re.S
+
+
+_FILTER_PATTERNS = [
+    r".x", r"(?:X|.)y", r".(?=[\s\S]*Z)", r"[^a]b", r"\wb", r"\Sb", r"\Db", r"\bk", r"k", r"s",
+    r"i", r"a b", r"[a-z ]b", r"^.b", r"^k", r"x$", r"[^\n]b", r"(?:ab|.c)d", r"(?:.|\n)x",
+]
+_FILTER_TEXT = ("ab\nAb\r\nxbXy KK ſ İ ı é_b 9b b\tb\nkk\nsS iI\nQb\n\nx\ny\nb\nbd\ncd\nZ\n")
+
+
+@pytest.mark.parametrize("flags", _FLAG_SETS)
+@pytest.mark.parametrize("pattern", _FILTER_PATTERNS)
+def test_an_offset_the_start_filter_leaves_out_cannot_start_a_match_under_any_flag(pattern, flags):
+    """Independent of the filter: every offset it omits must fail to match under the
+    rule's own flags, newline starts of a DOTALL rule included."""
+    try:
+        rx = _re.compile(pattern, flags)
+    except _re.error:
+        pytest.skip("flags do not combine")
+    starts, _miss = _prefilter.start_positions(rx, _FILTER_TEXT)
+    if starts is None:
+        return
+    listed = set(starts)
+    for at in range(len(_FILTER_TEXT) + 1):
+        if at not in listed:
+            assert rx.match(_FILTER_TEXT, at) is None, (pattern, flags, at)
+
+
+def test_a_newline_that_a_dotall_rule_can_start_on_is_priced_as_a_start():
+    text = "ab\n\nab"
+    for flags, listed in ((_re.S, [0, 1, 2, 3, 4, 5]), (0, [0, 1, 4, 5])):
+        rx = _re.compile(r"(?:X|.)y", flags)
+        assert _prefilter.start_positions(rx, text)[0] == listed, flags
+    on, off = _budget(r"(?s)(?:X|.)y", "\n" * 5000), _budget(r"(?:X|.)y", "\n" * 5000)
+    # 5000 newlines: each is a start under DOTALL and none is without it; the offset
+    # past the end has no character, so it is the one priced as a rejection.
+    assert on._cost(0, 5000) == 5000 * on.hit + on.miss
+    assert off._cost(0, 5000) == 5001 * off.miss
+
+
+def test_a_scoped_flag_in_the_first_node_declines_the_start_filter():
+    for pattern in (r"(?s:.)x", r"(?i:k)x", r"(?:(?s:.)|a)x"):
+        assert _prefilter.start_positions(_re.compile(pattern), "ab\nk")[0] is None, pattern
+
+
+_FLAG_SHAPES = [
+    (r"x.*y", _re.S, "xab\ncdy xq"), (r"x.*y", 0, "xab\ncdy xq"),
+    (r"x\w*y", _re.A, "xéy xy"), (r"x\w*y", 0, "xéy xy"),
+    (r"x[^a]*y", _re.I, "xBAby xay"), (r"x[^a]*y", 0, "xBAby xay"),
+    (r"^x\s*y$", _re.M, "q\nx \t y\nq"), (r"^x\s*y$", 0, "q\nx \t y\nq"),
+    (r"x .* y", _re.X | _re.S, "xab\ncdy xq"), (r"x .* y", _re.X, "xab\ncdy xq"),
+    (r"x[a-z]*y", _re.I | _re.A, "xABcyKy"), (r"x[a-z]*y", _re.I, "xABcyKy"),
+    (r"x(?=.*y)", _re.S, "xa\nb y"), (r"x(?=.*y)", 0, "xa\nb y"),
+    (r"(?<=a.)x", _re.S, "a\nx ab x"), (r"(?<=a.)x", 0, "a\nx ab x"),
+    (r"\bx\b", _re.A, "éx x"), (r"\bx\b", 0, "éx x"),
+]
+
+
+@pytest.mark.parametrize("pattern,flags,text", _FLAG_SHAPES)
+def test_the_span_keeps_the_flags_of_the_rule(pattern, flags, text):
+    """The cut-the-text oracle again, with the rule's own flags: a run of `.` under
+    DOTALL, of `\\w` under ASCII, of a negated class under IGNORECASE, and a
+    verbose source read the way the rule reads it."""
+    rx = _re.compile(pattern, flags)
+    span = _prefilter.max_read_extent(rx, text, {})
+    for at in range(len(text) + 1):
+        assert span >= _forward_need(rx, text, at), (pattern, flags, at)
+        assert span >= _backward_need(rx, text, at), (pattern, flags, at)
+
+
+_CLOSING = [
+    ("s", r"(?s)(?:X|.(?=[\s\S]*?Z))", "\n"),
+    ("i", r"(?i)(?:x|k(?=[\s\S]*?Z))", "K"),
+    ("sx", r"(?sx)(?: X | . (?= [\s\S]*? Z ) )", "\n"),
+    ("is", r"(?is)(?:x|k(?=.*?Z))", "K"),
+]
+
+
+@pytest.mark.parametrize("name,regex,filler", _CLOSING)
+def test_a_closing_search_whose_attempts_each_read_to_the_end_is_refused_under_every_flag(name, regex, filler):
+    """One negated hit, then a tail of characters the rule can start on, none of
+    which is followed by the Z it looks for: the closing search that proves there is
+    no later hit runs an attempt at every tail offset and each reads to the end, so
+    its reads are n(n+1)/2, counted from the construction and not from the code. A
+    search that does not fit is not run, and the occurrence is judged live."""
+    rule = _rule("TEST-CLOSE-" + name.upper(), regex)
+    sizes, live = (1000, 2000, 4000, 8000), []
+    for n in sizes:
+        text = "Never Xa" + filler * n
+        decision, found, steps = _walk(rule, text)
+        assert found is not None
+        ran = [(start, hit) for start, hit in _walk.steps if hit is None]
+        reads = sum((len(text) - start) * (len(text) - start + 1) // 2 for start, _hit in ran)
+        assert reads <= _budget_of(text), (name, n, reads)
+        live.append(found["severity"] == "high")
+        needed = n * (n + 1) // 2
+        if needed > _budget_of(text):
+            assert found["severity"] == "high", (name, n)
+    assert live[-1] and live[-2], (name, live)               # the two largest cannot fit and are not lent the warning
+
+
+def test_a_kept_span_is_kept_per_flags_as_well_as_per_pattern():
+    """The same source under two flag sets is two rules: `.*` runs over a newline
+    under DOTALL and stops at it without. A span kept under the pattern alone would
+    hand the second rule the first one's."""
+    text = "xab\ncdy " + "q" * 50 + "\n" + "z" * 400
+    spans = {}
+    for flags in (_re.S, 0, _re.S, 0):
+        rx = _re.compile(r"x.*y", flags)
+        got = _prefilter.max_read_extent(rx, text, {})
+        assert spans.setdefault(flags, got) == got
+    _prefilter._SPANS.clear()
+    for flags, got in spans.items():
+        assert _prefilter.max_read_extent(_re.compile(r"x.*y", flags), text, {}) == got
+    assert spans[_re.S] > spans[0]
+
+
+def _mode_budget(mode, regex, flags, text, twin=None, plan=None):
+    rx = _re.compile(regex, flags)
+    return _engine_module._ReadBudget(
+        mode, rx, twin, text, SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR,
+        SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR, plan)
+
+
+def test_every_mode_prices_a_rule_with_the_flags_of_its_own_compiled_regex():
+    """The four modes derive their price from different objects (the rule's regex, a
+    twin compiled with other flags, the windows of an anchor plan), and each of them
+    has to read the flags off the object it prices."""
+    text = "ab" + "q\n" * 200 + "cd" + "z" * 300
+    # plain and the anchored mode's whole-text plan: the start filter and the extent
+    for mode, plan in (("plain", None), ("anchored", ("whole", None, None))):
+        dot = _mode_budget(mode, r"(?:a|.)b.*cd", _re.S, text, plan=plan)
+        line = _mode_budget(mode, r"(?:a|.)b.*cd", 0, text, plan=plan)
+        assert dot.hit > line.hit and dot.starts is not None and 1 in dot.starts
+        assert "\n" not in {text[i] for i in line.starts}
+        assert text[3] == "\n" and 3 in dot.starts
+    # anchored windows: two spans an offset, each span the rule's own
+    plan = ("windows", [(0, 10)], [10])
+    dot = _mode_budget("anchored", r"ab.*cd", _re.S, text, plan=plan)
+    line = _mode_budget("anchored", r"ab.*cd", 0, text, plan=plan)
+    assert dot.hit == 2 * (_prefilter.max_read_extent(_re.compile(r"ab.*cd", _re.S), text, {}) + 1)
+    assert dot.hit > line.hit and dot._cost(0, 100) == 11 * dot.hit
+    # lead-in: the rule's span plus the twin's, each with its own flags
+    twin_dot, twin_line = _re.compile(r"ab.*cd", _re.S), _re.compile(r"ab.*cd")
+    both = _mode_budget("leadin", r"ab.*cd", 0, text, twin=twin_dot)
+    plain = _mode_budget("leadin", r"ab.*cd", 0, text, twin=twin_line)
+    assert both.hit > plain.hit

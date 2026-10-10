@@ -734,6 +734,18 @@ def _parsed(pattern: str, flags: int):
     return _sre_parse.parse(pattern, flags)
 
 
+# The flags that change which characters ONE node of a parse tree matches, and so
+# the ones the one-character start filter has to be compiled with: IGNORECASE (case),
+# ASCII (what `\w \d \s` and case folding cover) and DOTALL (whether `.` takes a
+# newline). Every other flag is read before it gets here or moves something the
+# filter steps over: MULTILINE only moves `^` and `$` (`_first_source` skips an
+# anchor; `_span` prices each as one character on either side), VERBOSE only changes
+# how the source is read and `_parsed` has read it with the rule's flags, and UNICODE
+# is what a str pattern is already. A flag of `re` that is in neither list is a
+# decision to make, and a test makes it.
+_START_FLAGS = re.IGNORECASE | re.ASCII | re.DOTALL
+
+
 @functools.lru_cache(maxsize=4096)
 def _start_plan(pattern: str, flags: int):
     """(compiled one-character start regex, node count) of a pattern, or None when
@@ -742,7 +754,7 @@ def _start_plan(pattern: str, flags: int):
     source = _first_source(tree)
     if source is None:
         return None
-    return re.compile(source, flags & (re.IGNORECASE | re.ASCII)), _count_nodes(tree)
+    return re.compile(source, flags & _START_FLAGS), _count_nodes(tree)
 
 
 def start_positions(rx, text: str):
