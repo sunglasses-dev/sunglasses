@@ -231,12 +231,23 @@ def _ascii85_length(data: bytes) -> int:
     return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
 
 
+def _decimal_fits(value) -> bool:
+    """True for anything that is not a decimal number object, and for one with no more digits
+    and no larger an exponent than any number written in a PDF."""
+    if not hasattr(value, "as_tuple"):
+        return True
+    _sign, digits, exponent = value.as_tuple()
+    return len(digits) <= _MAX_NUMBER and (not isinstance(exponent, int) or abs(exponent) <= _MAX_NUMBER)
+
+
 def _whole(value):
     """A decode parameter as a whole number. A text or byte value longer than any number is not
     converted; it is refused the way a value that is not a number is, so the stream is reported
-    as an error."""
+    as an error. A decimal number object is held to the same bound, in its digits and in its
+    exponent, because converting one is not linear in the digits it holds."""
     if not isinstance(value, (str, bytes)) or len(value) <= _MAX_NUMBER:
-        return int(value)
+        if _decimal_fits(value):
+            return int(value)
     raise ValueError("not a number")
 
 

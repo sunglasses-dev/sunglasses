@@ -27,7 +27,7 @@ _STEP = {"_decode_bounded", "_decode_stages", "_inflate", "_lzw_length", "_ascii
          "_decode_png_prediction", "get_data", "decode", "decompressobj", "decompress",
          "_charged_text"}
 
-_CONVERT = {"str", "int", "encode", "from_bytes", "join"}
+_CONVERT = {"str", "int", "encode", "from_bytes", "join", "sub", "bytes"}
 
 DEREF, STEP, CONVERT = "deref", "step", "convert"
 GATE, FIXED, PAID = "length gate", "fixed width", "pass over paid bytes"
@@ -36,9 +36,15 @@ A, E, C = "A", "E", "C"
 # (kind, function, expression): (trees it exists in, what pays for it)
 COVERED = {
     # --- the reader's own accessor, and the two helpers that wrap it
-    (DEREF, "_deref", "obj.get_object"): ("AEC", "the accessor itself"),
-    (DEREF, "_resolve", "obj.get_object"): ("EC", "the accessor itself"),
-    (DEREF, "PDFExtractor._resolve", "obj.get_object"): ("A", "the accessor itself"),
+    # The accessor looks an object up. When the object sits in a compressed object stream the reader
+    # inflates the whole stream, and that inflation is not the accessor's to charge: it is paid by
+    # PDFExtractor._object_stream_fits, which the extractor installs on the reader before any check
+    # runs (see _bounded_object_streams). The stream is decoded there once, charged, and handed to
+    # the reader, so the reader's own decode never runs. tests/test_pdf_image_only_page_round16.py
+    # checks this through extract(), with a spy on the reader's own Flate decode.
+    (DEREF, "_deref", "obj.get_object"): ("AEC", "the accessor itself; an object in a compressed object stream is inflated by the reader, which _object_stream_fits has already done once, charged"),
+    (DEREF, "_resolve", "obj.get_object"): ("EC", "the accessor itself; an object in a compressed object stream: see _deref"),
+    (DEREF, "PDFExtractor._resolve", "obj.get_object"): ("A", "the accessor itself; an object in a compressed object stream: see _deref"),
     # --- the decoder: filter list and decode parameters go through _entries_of, which charges first
     (DEREF, "_filters_of", "n"): ("AEC", "an entry yielded by _entries_of, charged before it is yielded"),
     (DEREF, "_filters_of", "stream.get('/Filter')"): ("AEC", "fixed key of the stream being decoded"),
@@ -127,6 +133,8 @@ CONVERTED = {
     (CONVERT, "_inflate", "b''.join"): ("AEC", PAID, "the pieces are the inflater's output, each asked for within the allowance"),
     (CONVERT, "_decode_stages", "data.encode"): ("AEC", PAID, "only when a stage returned text; its length is at most the output reserved for that stage"),
     (CONVERT, "_name", "int"): ("EC", FIXED, "the group is the two hex digits of one #xx escape"),
+    (CONVERT, "_name", "_NAME_ESCAPE.sub"): ("EC", PAID, "one pass over the name's raw bytes, which are bytes of a content stream already charged when it was decoded; the pattern matches a fixed three characters, so it does not backtrack"),
+    (CONVERT, "_name", "bytes"): ("EC", FIXED, "one byte, built from the two hex digits of one #xx escape"),
     (CONVERT, "_ImageWalk._content", "b'\\n'.join"): ("EC", PAID, "the pieces are decoded states of the page, each charged before it is handled"),
     (CONVERT, "PDFExtractor._as_text", "' '.join"): ("AC", PAID, "the parts were each charged by _spend before they were collected"),
     (CONVERT, "PDFExtractor._charged_text", "str"): ("AC", PAID, "after self._spend(len(raw))"),
@@ -187,8 +195,10 @@ def _conversions():
                         text = "int.from_bytes"
                     elif name == "join":
                         text = ast.unparse(func)
-                    elif name == "encode":
+                    elif name == "encode" or name == "sub":
                         text = ast.unparse(func)
+                    elif name == "bytes":
+                        text = "bytes"
                     gated = any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "len"
                                 for t in tests for n in ast.walk(t))
                     found[(CONVERT, where, text)] = gated
