@@ -89,7 +89,7 @@ permissions: read-all
 
 jobs:
   classify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 10
@@ -150,7 +150,7 @@ jobs:
           echo "quick=$quick" >> "$GITHUB_OUTPUT"
 
   fast:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     # A hang must fail, not wait. Set from the first hosted measurement, not
@@ -319,7 +319,7 @@ jobs:
   integrity:
     needs: classify
     if: needs.classify.outputs.full == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     # 180, and the reason is that 120 was measured on a quiet runner.
@@ -511,7 +511,7 @@ jobs:
     # failed upstream job still produces a verdict here instead of silence.
     needs: [classify, fast, integrity]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # No per-job permissions here, deliberately. `coverage` is THE gate and
     # its key set is an ASTRA reviewed contract (tests/test_ci_gate.py,
     # COVERAGE_JOB_KEYS, round 3 R3-2) that exists so an unreviewed shape
@@ -553,7 +553,7 @@ jobs:
     # skipped, been cancelled, or never run. A missing leg is not a pass.
     needs: [classify, fast, integrity, coverage]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 5

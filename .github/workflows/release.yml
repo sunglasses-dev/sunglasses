@@ -41,7 +41,7 @@ permissions: read-all
 jobs:
   gate:
     name: release certified on this exact commit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       actions: read
@@ -80,7 +80,7 @@ jobs:
   build:
     name: build sdist and wheel
     needs: gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -137,7 +137,7 @@ jobs:
   sbom:
     name: CycloneDX SBOM of the installed package
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -166,7 +166,7 @@ jobs:
   provenance:
     name: GitHub build provenance for the artifacts
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       id-token: write
@@ -184,7 +184,7 @@ jobs:
   pypi:
     name: upload to PyPI through Trusted Publishing, with attestations
     needs: [build, sbom, provenance]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # The `pypi` environment is what PyPI's trusted publisher is bound to
     # (owner sunglasses-dev, repo sunglasses, workflow release.yml, env pypi).
@@ -238,7 +238,7 @@ jobs:
     # deletes or rolls back. It is not a dependency of any other job, so the SBOM and the
     # checksums on the Release do not wait for it. Guarded by tests/test_release_workflow.py.
     needs: pypi
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -287,7 +287,7 @@ jobs:
     # because an unrelated step did not run. The provenance of a build is not
     # contingent on its distribution. Guarded by tests/test_release_workflow.py.
     needs: [build, sbom]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
