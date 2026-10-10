@@ -532,10 +532,14 @@ class _RawCopies:
         the opening does not matter."""
         flat = self._collapsed()
         want = self._BLANK.sub(" ", key)
-        found, at = [], flat.find(want)
+        found, at, k = [], flat.find(want), 0
+        starts, last = self._flat_at, len(self._flat_at) - 1
         while at != -1:
-            k = bisect.bisect_right(self._flat_at, at) - 1
-            found.append(self._raw_at[k] + at - self._flat_at[k])
+            # The offsets only grow, so the piece they fall in is found by moving
+            # a cursor forward, not by a lookup per copy.
+            while k < last and starts[k + 1] <= at:
+                k += 1
+            found.append(self._raw_at[k] + at - starts[k])
             at = flat.find(want, at + len(want))
         return found
 
@@ -1579,6 +1583,17 @@ class SunglassesEngine:
             return copies.negated(id(view), view, plain_end, opening, build)
         return origin, copied
 
+    def _first_bounded(self, normalized: str, keyword: str):
+        """Offset of the first word-bounded occurrence of `keyword`, or None.
+        Every occurrence is tried, so a hit that continues into a longer word
+        cannot hide a later one that stands alone."""
+        at = normalized.find(keyword)
+        while at != -1:
+            if self._word_bounded(normalized, at, keyword):
+                return at
+            at = normalized.find(keyword, at + 1)
+        return None
+
     def _live_occurrence(self, normalized: str, keyword: str, begin: int):
         """Offset of the first word-bounded occurrence of `keyword` at or after
         `begin` that is not negated, or None."""
@@ -1759,8 +1774,8 @@ class SunglassesEngine:
         else:
             # Fallback: pure Python string matching (no dependencies)
             for keyword, patterns in self._keyword_to_patterns.items():
-                if keyword in normalized and self._word_bounded(
-                        normalized, normalized.index(keyword), keyword):
+                first = self._first_bounded(normalized, keyword)
+                if first is not None:
                     for pattern in patterns:
                         if match_channels.isdisjoint(pattern.get("channel", ())):
                             continue
@@ -1777,7 +1792,7 @@ class SunglassesEngine:
                             candidates[pattern["id"]] = pattern
                             continue
                         seen_ids.add(pattern["id"])
-                        idx = normalized.index(keyword)
+                        idx = first
                         finding = {
                             **pattern,
                             "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
