@@ -536,6 +536,146 @@ def max_match_length(pattern_source: str):
         return None
 
 
+_CATEGORY_SETS = {
+    "CATEGORY_DIGIT": r"\d", "CATEGORY_NOT_DIGIT": r"\D",
+    "CATEGORY_SPACE": r"\s", "CATEGORY_NOT_SPACE": r"\S",
+    "CATEGORY_WORD": r"\w", "CATEGORY_NOT_WORD": r"\W",
+}
+
+
+def _char_source(code: int) -> str:
+    return "\\U%08x" % code
+
+
+def _one_char_source(node):
+    """A regex source that matches exactly the characters this one-character
+    parse node matches, or None when it cannot be rebuilt."""
+    op, av = node
+    name = getattr(op, "name", str(op))
+    if name == "ANY":
+        return "."
+    if name == "LITERAL":
+        return _char_source(av)
+    if name == "NOT_LITERAL":
+        return "[^" + _char_source(av) + "]"
+    if name == "IN":
+        parts, negate = [], False
+        for item_op, item_av in av:
+            item = getattr(item_op, "name", str(item_op))
+            if item == "NEGATE":
+                negate = True
+            elif item == "LITERAL":
+                parts.append(_char_source(item_av))
+            elif item == "RANGE":
+                parts.append(_char_source(item_av[0]) + "-" + _char_source(item_av[1]))
+            elif item == "CATEGORY":
+                category = _CATEGORY_SETS.get(getattr(item_av, "name", str(item_av)))
+                if category is None:
+                    return None
+                parts.append(category)
+            else:
+                return None
+        return "[" + ("^" if negate else "") + "".join(parts) + "]"
+    return None
+
+
+def _longest_run(source: str, flags: int, text: str, cache: dict):
+    """Longest stretch of `text` made of characters matching `source`."""
+    key = (source, flags)
+    if key not in cache:
+        longest = 0
+        for found in re.finditer("(?:" + source + ")+", text, flags):
+            longest = max(longest, found.end() - found.start())
+        cache[key] = longest
+    return cache[key]
+
+
+def _reach(seq, flags, text, cache):
+    """(consumed, read) for one attempt at a parse tree: the most characters it can
+    consume and the farthest forward it can read, or None when either cannot be
+    bounded from the tree and the text."""
+    off = reach = 0
+    for op, av in seq:
+        name = getattr(op, "name", str(op))
+        if name in _ONE_CHAR:
+            off += 1
+            reach = max(reach, off)
+        elif name == "NEGATE":
+            continue
+        elif name == "AT":
+            reach = max(reach, off + 1)          # \b, ^, $ look at a neighbour
+        elif name in ("ASSERT", "ASSERT_NOT"):
+            direction, sub = av
+            if direction > 0:
+                inner = _reach(sub, flags, text, cache)
+                if inner is None:
+                    return None
+                reach = max(reach, off + max(inner))
+            else:
+                reach = max(reach, off + 1)
+        elif name in ("SUBPATTERN", "ATOMIC_GROUP"):
+            inner = _reach(av[3] if name == "SUBPATTERN" else av, flags, text, cache)
+            if inner is None:
+                return None
+            reach = max(reach, off + inner[1])
+            off += inner[0]
+        elif name in ("MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"):
+            _, hi, sub = av
+            if len(sub) == 1 and getattr(sub[0][0], "name", str(sub[0][0])) in _ONE_CHAR:
+                if hi >= _sre_parse.MAXREPEAT:
+                    source = _one_char_source(sub[0])
+                    if source is None:
+                        return None
+                    hi = _longest_run(source, flags, text, cache)
+                count, extra = hi, 1
+                reach = max(reach, off + count + extra)
+                off += count
+            else:
+                if hi >= _sre_parse.MAXREPEAT:
+                    return None
+                inner = _reach(sub, flags, text, cache)
+                if inner is None:
+                    return None
+                reach = max(reach, off + (hi - 1) * inner[0] + inner[1])
+                off += hi * inner[0]
+        elif name == "BRANCH":
+            widest = wide_read = 0
+            for branch in av[1]:
+                inner = _reach(branch, flags, text, cache)
+                if inner is None:
+                    return None
+                widest, wide_read = max(widest, inner[0]), max(wide_read, inner[1])
+            reach = max(reach, off + wide_read)
+            off += widest
+        else:
+            return None                          # GROUPREF, GROUPREF_EXISTS, ...
+    return off, max(reach, off)
+
+
+def max_read_extent(rx, text: str, cache: dict) -> int:
+    """The farthest forward one attempt of this compiled regex can read in `text`.
+
+    Counts everything an attempt looks at, not only what a match consumes: the
+    match, lookaheads, anchors, the widest alternative and a repeat's bound. An
+    unbounded repeat of one character class counts the longest run of that
+    class in `text` plus the character that ends it. What cannot be read from the
+    tree (a backreference, a conditional, an unbounded repeat of more than one
+    character, a class that cannot be rebuilt) counts as the whole text, the
+    worst a read can be. Never more than the length of the text.
+
+    It bounds how far an attempt reads, not how much backtracking happens inside
+    one search, which every search has.
+    """
+    try:
+        tree = _sre_parse.parse(rx.pattern, rx.flags)
+        found = _reach(tree, rx.flags, text, cache)
+    except Exception:
+        found = None
+    if found is None:
+        return len(text)
+    return min(found[1], len(text))
+
+
 def can_skip(req, present) -> bool:
     """True when the regex provably cannot match.
 

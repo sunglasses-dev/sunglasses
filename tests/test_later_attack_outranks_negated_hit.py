@@ -749,84 +749,179 @@ def test_finding_the_copies_of_an_opening_does_no_lookup_per_copy(monkeypatch):
 
 
 # --------------------------------------------------------------------------
-# The search for a later occurrence has a work budget. Each step starts past the
-# previous match start, which bounds the number of steps; a rule whose matches
-# each reach to the end of the text makes every step consume the whole tail
-# again, which the step count does not bound.
-def _overlap_rule():
+# The search for a later occurrence has a budget of READS. Each step starts past
+# the previous match start, which bounds the number of steps, but a step is a
+# search: an attempt at every position it passes, and each attempt reads as far
+# forward as the pattern lets it -- past the match end for a lookahead, or for an
+# alternative that read on and failed. So a step costs (attempts) x (the farthest
+# one attempt of the rule can read in this text), and the walk has a budget of
+# those.
+from sunglasses import _prefilter  # noqa: E402
+
+
+def _rule(rule_id, regex):
     return {
-        "id": "TEST-OVERLAP-001", "name": "overlap", "category": "test", "severity": "high",
+        "id": rule_id, "name": rule_id, "category": "test", "severity": "high",
         "channel": ["message"], "keywords": [], "description": "test rule",
-        "regex": [r"(?i)(?:note never )*zorbit now"],
+        "regex": [regex],
     }
 
 
-def _overlap_work(text):
-    """(decision, finding, characters the occurrence search consumed)."""
-    eng = SunglassesEngine(patterns=[_overlap_rule()], mechanisms=False)
-    original = eng._eval_regex
-    work = {"span": 0}
+def _overlap_rule():
+    return _rule("TEST-OVERLAP-001", r"(?i)(?:note never )*zorbit now")
 
-    def counted(*args, **kwargs):
-        match = original(*args, **kwargs)
-        if match is not None:
-            work["span"] += match.end() - match.start()
+
+def _walk(rule, text):
+    """Scan `text` with one rule and meter the walk over later occurrences.
+
+    Returns (decision, finding, steps, reads, budget). `reads` is what the steps
+    before the last one cost, by the same formula the walk charges: attempts
+    (positions passed over to the match, plus one) x (read extent + 1)."""
+    eng = SunglassesEngine(patterns=[rule], mechanisms=False)
+    rx = eng._regex_patterns[0][1][0][1]
+    original = eng._eval_regex
+    calls = []
+
+    def counted(mode, rx_, guards, text_, start=0, memo=None):
+        match = original(mode, rx_, guards, text_, start, memo)
+        if start:
+            end = match.start() if match is not None else len(text_)
+            calls.append((end - start + 1, match is not None))
         return match
 
     eng._eval_regex = counted
     result = eng.scan(text, "message")
-    found = [f for f in result.findings if f["id"] == "TEST-OVERLAP-001"]
-    return result.decision, (found[0] if found else None), work["span"]
+    found = [f for f in result.findings if f["id"] == rule["id"]]
+    extent = _prefilter.max_read_extent(rx, text, {}) + 1
+    charged = [attempts * extent for attempts, _ in calls[:-1]]
+    budget = (SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
+              + SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR)
+    return result.decision, (found[0] if found else None), len(calls), sum(charged), budget
+
+
+@pytest.mark.parametrize("pattern,text,expected", [
+    (r"abc", "x" * 50, 3),
+    (r"a{2,5}b", "x" * 50, 6),
+    (r"\bfoo\b", "x" * 50, 4),
+    (r"foo(?=.{40}END)", "x" * 200, 46),                    # the lookahead is read
+    (r"foo(?!bar)", "x" * 50, 6),
+    (r"(?<=ab)foo", "x" * 50, 4),                           # a lookbehind reads backwards
+    (r"a|bcdef", "x" * 50, 5),                              # the widest alternative
+    (r"\s*x", "ab   cd" + " " * 20 + "e", 21 + 1),           # the longest run of blanks, plus the stop
+    (r"x[^q]*y", "ab" * 10, 20),                            # a run of the class
+    (r"(?s)x.*y", "ab" * 10, 21),                           # the whole text, as one run
+    (r"x.*y", "ab\ncd\nefgh\n", 6),                       # no DOTALL: the longest line
+])
+def test_the_read_extent_counts_every_way_an_attempt_reads(pattern, text, expected):
+    import re
+
+    assert _prefilter.max_read_extent(re.compile(pattern), text, {}) >= expected - 1
+    assert _prefilter.max_read_extent(re.compile(pattern), text, {}) <= expected + 1
+
+
+@pytest.mark.parametrize("pattern", [
+    r"(a)\1x",                                             # a backreference
+    r"(?:ab )*zorbit",                                      # an unbounded repeat of more than one character
+    r"(a)?(?(1)b|c)",                                       # a conditional
+])
+def test_a_shape_that_cannot_be_read_is_charged_as_the_whole_text(pattern):
+    import re
+
+    text = "x" * 777
+    assert _prefilter.max_read_extent(re.compile(pattern), text, {}) == len(text)
+
+
+def test_the_read_extent_never_exceeds_the_text_and_survives_an_unreadable_regex():
+    import re
+
+    assert _prefilter.max_read_extent(re.compile(r"a{0,100000}b"), "xyz", {}) == 3
+
+    class Broken:
+        pattern, flags = "(", 0
+
+    assert _prefilter.max_read_extent(Broken(), "xyz", {}) == 3
+
+
+def test_the_ordinary_rules_read_a_short_distance():
+    """The catalog keeps its repeated-warning behaviour because its extent is small."""
+    import re
+
+    text = "x" * 100_000
+    eng = SunglassesEngine(mechanisms=False)
+    extents = sorted(_prefilter.max_read_extent(rx, text, {})
+                     for _pattern, rxs in eng._regex_patterns for _mode, rx, _guards in rxs
+                     if _mode == "plain")
+    assert extents[len(extents) // 2] < 1500, extents[len(extents) // 2]
+
+
+def test_a_lookahead_that_reads_the_rest_of_the_text_is_charged_for_it():
+    """The assertion tail: each match is four characters, and each attempt reads to
+    the end of the text. Charging the match alone let the walk repeat that read at
+    every occurrence."""
+    rule = _rule("TEST-TAIL-001", r"(?is)warn(?=.*zzz)")
+    rows = []
+    for copies in (1000, 2000, 4000, 8000):
+        text = "never warn " * copies + "zzz"
+        decision, found, steps, reads, budget = _walk(rule, text)
+        rows.append((len(text), steps, reads))
+        assert reads <= budget, (len(text), reads, budget)
+        # The walk stopped: not every one of the copies was visited.
+        assert steps <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 8, steps
+        # Unjudged text is not lent the benefit of the warning.
+        assert decision == "block" and found["severity"] == "high"
+    assert rows[-1][1] <= rows[0][1] + 8, rows
+
+
+def test_an_alternative_that_reads_to_the_end_of_the_line_and_fails_is_charged():
+    rule = _rule("TEST-ALT-001", r"(?i)\bnever\b|a.*Z")
+    text = "never a " * 8000
+    decision, found, steps, reads, budget = _walk(rule, text)
+    assert reads <= budget
+    assert steps < 8000
+    assert decision == "block"
+
+
+def test_an_unreadable_shape_spends_the_budget_and_fails_closed():
+    rule = _rule("TEST-BACKREF-001", r"(?i)(w)arn \1")
+    text = "never warn w " * 6000
+    decision, found, steps, reads, budget = _walk(rule, text)
+    assert reads <= budget
+    assert steps < 6000
+    assert found["severity"] == "high"
 
 
 def test_overlapping_matches_that_each_reach_the_end_of_the_text_cost_a_bounded_search():
     rows = []
     for repeats in (1000, 2000, 4000):
         text = "Never " + "note never " * repeats + "zorbit now"
-        decision, found, span = _overlap_work(text)
-        rows.append((len(text), span))
-        budget = (SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
-                  + SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR)
-        # The budget, the first match, and the one step that crossed it (each at
-        # most the text), and one character a step for where it resumed.
-        assert span <= budget + 2 * len(text) + 4096, (len(text), span, budget)
+        decision, found, steps, reads, budget = _walk(_overlap_rule(), text)
+        rows.append((len(text), steps, reads))
+        assert reads <= budget, (len(text), reads, budget)
         # Unjudged text is not lent the benefit of the warning.
         assert decision == "block" and found is not None and found["severity"] == "high"
-    first, second, third = (span for _, span in rows)
-    assert second / first < 2.5 and third / second < 2.5, rows
+    assert all(steps <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR + 8 for _, steps, _ in rows), rows
 
 
 def test_a_few_overlapping_negated_matches_stay_downgraded():
     text = "Never " + "note never " * 6 + "zorbit now"
-    decision, found, span = _overlap_work(text)
+    decision, found, steps, reads, budget = _walk(_overlap_rule(), text)
     assert decision == "allow_redacted"
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert span < SunglassesEngine.NEGATION_SEARCH_BUDGET_FLOOR
+    assert reads < budget
 
 
 @pytest.mark.parametrize("copies", [100, 2000])
 def test_many_separate_negated_matches_of_the_same_rule_stay_downgraded(copies):
+    rule = _rule("TEST-SEPARATE-001", r"(?i)(?:note never ){0,3}zorbit now")
     text = ("Never zorbit now. " + FILLER) * copies
-    decision, found, span = _overlap_work(text)
+    decision, found, steps, reads, budget = _walk(rule, text)
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert span <= SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text)
+    assert reads <= budget and steps == copies
 
 
 def test_a_wide_gap_rule_over_dense_negated_repeats_stays_inside_the_budget():
-    rule = dict(_overlap_rule(), id="TEST-WIDE-001", regex=[r"(?i)zorbit.{0,300}now"])
-    eng = SunglassesEngine(patterns=[rule], mechanisms=False)
-    original = eng._eval_regex
-    work = {"span": 0}
-
-    def counted(*args, **kwargs):
-        match = original(*args, **kwargs)
-        if match is not None:
-            work["span"] += match.end() - match.start()
-        return match
-
-    eng._eval_regex = counted
+    rule = _rule("TEST-WIDE-001", r"(?i)zorbit.{0,300}now")
     text = "Never zorbit now, " * 3000
-    result = eng.scan(text, "message")
-    found = [f for f in result.findings if f["id"] == "TEST-WIDE-001"][0]
+    decision, found, steps, reads, budget = _walk(rule, text)
     assert found["severity"] == "review" and found["negation_context"] is True
-    assert work["span"] < SunglassesEngine.NEGATION_SEARCH_BUDGET_FACTOR * len(text) / 2
+    assert reads < budget / 2, (reads, budget)
