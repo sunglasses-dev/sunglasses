@@ -11,6 +11,7 @@ Usage:
 """
 
 import bisect
+import functools
 import html
 import re
 import unicodedata
@@ -220,6 +221,17 @@ _HEXESC_RX = re.compile(r"\\x[0-9A-Fa-f]{2}")
 _ESCAPE_RX = re.compile("[&%\\\\\U000e0020-\U000e007e]")
 # What an entity, a percent escape or a hex escape looks like before its last character.
 _UNFINISHED_ESCAPE_RX = re.compile(r"&(?:#[xX]?[0-9a-fA-F]*|[A-Za-z][A-Za-z0-9]*)?|%[0-9A-Fa-f]?|\\(?:x[0-9A-Fa-f]?)?")
+# Every character an escape can begin with, and every non-ASCII one that might fold into such a
+# character. A reference never holds a blank, so these only matter inside one run of non-blank text.
+_GUARD_RX = re.compile("[&%\\\\\u0080-\U0010ffff]")
+_BLANKS = " \t\n\r\x0b\x0c"
+
+
+@functools.lru_cache(maxsize=4096)
+def _folds_to_a_start(c: str) -> bool:
+    """True when the pipeline's character steps turn the non-ASCII character c into one that
+    begins with the start of an escape (a full-width or small ampersand, percent sign or backslash)."""
+    return replace_homoglyphs(normalize_unicode(strip_invisible(c)))[:1] in ("&", "%", "\\")
 
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
@@ -243,8 +255,12 @@ class _Walk:
     other difference ends the walk, and nothing past that point is vouched for.
     """
 
+    # How many times one walk asks the gate about a start character that precedes an escape; a
+    # walk that has asked this often stops vouching, which is the cautious answer.
+    GUARD_CHECKS = 64
+
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded")
 
     def __init__(self, raw: str, low: str, view: str):
         self.raw = raw
@@ -260,6 +276,9 @@ class _Walk:
         self.cuts = []     # view indexes where raw characters were deleted before it
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
+        self.guards = None  # raw offsets of a start character in front of an escape of the same run
+        self.gcursor = 0    # index into guards of the first offset not yet passed
+        self.guarded = 0    # how many guards the gate has been asked about
         self.leftover = None  # view offsets where an escape the pipeline decodes begins
         self.vcursor = 0      # index into leftover of the first offset not yet passed
 
@@ -425,12 +444,47 @@ class _Walk:
         # not known, and an unknown start is treated as one: nothing past it is vouched for.
         return j + 64 < len(text) and _UNFINISHED_ESCAPE_RX.fullmatch(folded) is not None
 
+    def _find_guards(self) -> list:
+        """The raw offsets where a character that could begin an escape stands in front of an
+        escape the pipeline decodes (self.active) in the same run of non-blank text.
+
+        An escape that holds another escape (`&a%6dp;`: the percent escape is decoded first and
+        the entity it completes second) begins with a start character that does not decode where
+        it stands, so it is not in self.active, and the identical run over it would take its
+        first characters as unchanged text. A reference holds no blank, and the pipeline only
+        replaces a reference by its value, so a reference that holds an escape starts in the same
+        blank-free run, before it. Every start character in front of an escape of its run is
+        therefore a guard: the identical run stops there and the gate decides."""
+        raw, guards, seen = self.raw, [], 0
+        for k in self.active:
+            low = seen
+            for blank in _BLANKS:
+                at = raw.rfind(blank, seen, k)
+                if at + 1 > low:
+                    low = at + 1
+            for m in _GUARD_RX.finditer(raw, low, k):
+                p = m.start()
+                if raw[p].isascii() or _folds_to_a_start(raw[p]):
+                    guards.append(p)
+            seen = k + 1
+        return guards
+
+    def _next_guard(self, j: int) -> int:
+        """The first raw offset at or after j that is a guard (len(raw) if none)."""
+        self._next_escape(0)
+        guards, k = self.guards, self.gcursor
+        while k < len(guards) and guards[k] < j:
+            k += 1
+        self.gcursor = k
+        return guards[k] if k < len(guards) else len(self.raw)
+
     def _next_escape(self, j: int) -> int:
         """The first raw offset at or after j where an escape begins (len(raw) if none)."""
         if self.active is None:
             raw = self.raw
             self.active = [m.start() for m in _ESCAPE_RX.finditer(raw)
                            if self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start())]
+            self.guards = self._find_guards()
         active, k = self.active, self.cursor
         # The walk only moves forward, so the cursor does too.
         while k < len(active) and active[k] < j:
@@ -459,7 +513,8 @@ class _Walk:
         pipeline did not decode anything in front of it: a run never reaches over the
         start of an escape, which is read as a decoding step instead (see advance)."""
         low, held, i, j = self.low, self.held, self.i, self.j
-        cap = min(limit - i, len(low) - j, self._next_escape(j) - j, self._next_leftover(i) - i)
+        cap = min(limit - i, len(low) - j, self._next_escape(j) - j, self._next_guard(j) - j,
+                  self._next_leftover(i) - i)
         if cap <= 0 or low[j] != held[i]:
             return 0
         step = 64
@@ -491,6 +546,20 @@ class _Walk:
                 break
             i, j = self.i, self.j
             c = raw[j]
+            if self._next_guard(j) == j:
+                # A start character in front of an escape of its run. It may begin a reference
+                # that the escape completes, so the gate is asked before it is taken as unchanged.
+                self.guarded += 1
+                if self.guarded > self.GUARD_CHECKS:
+                    self.dead = True
+                    break
+                if self.low[j] == self.held[i] and not self._layered(c, j + 1):
+                    self.i = i + 1
+                    self.j = j + 1
+                    continue
+                if self.low[j] == self.held[i]:
+                    self.dead = True
+                    break
             if INVISIBLE_CHARS.match(c):
                 self.cuts.append(i)
                 self.j = j + 1
