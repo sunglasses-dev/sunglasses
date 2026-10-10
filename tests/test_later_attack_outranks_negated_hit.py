@@ -31,6 +31,21 @@ def engine():
     return SunglassesEngine()
 
 
+# Building the default engine compiles every rule, which is the slow step on a slow
+# runner. A test that only scans with the default engine, or with the keyword fallback
+# switched on once and never changed afterwards, takes one of these instead of its own.
+_shared = {}
+
+
+def _engine(fallback=False):
+    if fallback not in _shared:
+        eng = SunglassesEngine()
+        if fallback:
+            eng._automaton = None
+        _shared[fallback] = eng
+    return _shared[fallback]
+
+
 def _find(result, rule_id):
     return next(f for f in result.findings if f["id"] == rule_id)
 
@@ -54,8 +69,7 @@ def test_keyword_site_later_attack_outranks_earlier_negation(engine):
 
 
 def test_keyword_fallback_site_later_attack_outranks_earlier_negation():
-    eng = SunglassesEngine()
-    eng._automaton = None
+    eng = _engine(fallback=True)
     _stays_as_alone(eng, "GLS-PI-001", KEYWORD)
 
 
@@ -204,8 +218,7 @@ def test_repeated_negated_warnings_do_not_hide_a_live_tail(engine, text, rule_id
 
 @pytest.mark.parametrize("copies", [17, 2000])
 def test_repeated_negated_warnings_stay_downgraded_on_the_keyword_fallback(copies):
-    eng = SunglassesEngine()
-    eng._automaton = None
+    eng = _engine(fallback=True)
     doc = (NEGATED.format(KEYWORD) + " " + FILLER) * copies
     result = eng.scan(doc, CHANNEL)
     got = _find(result, "GLS-PI-001")
@@ -248,7 +261,7 @@ def test_a_live_copy_after_many_negated_anchored_hits_still_blocks(engine):
 
 
 def test_walking_anchored_occurrences_finds_the_same_matches_as_a_fresh_search():
-    eng = SunglassesEngine()
+    eng = _engine()
     mode, rx, key = next(r for r in eng._compiled_by_id["GLS-PI-016-API"] if r[0] == "anchored")
     text = ANCHORED_WARNING * 40
     memo = {}
@@ -703,9 +716,7 @@ def test_copies_of_the_opening_scale_with_the_text_not_with_its_blank_runs():
 @pytest.mark.parametrize("fallback", [False, True])
 @pytest.mark.parametrize("glued", [KEYWORD + "x", KEYWORD + "s", KEYWORD + "9"])
 def test_a_first_occurrence_inside_a_longer_word_does_not_hide_a_later_standalone_one(fallback, glued):
-    eng = SunglassesEngine()
-    if fallback:
-        eng._automaton = None
+    eng = _engine(fallback)
     alone = eng.scan(KEYWORD + ".", CHANNEL)
     both = eng.scan(f"{glued}. {GAP}{KEYWORD}.", CHANNEL)
     assert _find(alone, "GLS-PI-001")["severity"] == "high"
@@ -716,9 +727,7 @@ def test_a_first_occurrence_inside_a_longer_word_does_not_hide_a_later_standalon
 
 @pytest.mark.parametrize("fallback", [False, True])
 def test_a_standalone_occurrence_after_a_glued_one_and_a_negated_one_still_blocks(fallback):
-    eng = SunglassesEngine()
-    if fallback:
-        eng._automaton = None
+    eng = _engine(fallback)
     text = f"{KEYWORD}x. Never {KEYWORD}. {GAP}{KEYWORD}."
     got = _find(eng.scan(text, CHANNEL), "GLS-PI-001")
     assert got["severity"] == "high" and "negation_context" not in got
@@ -726,9 +735,7 @@ def test_a_standalone_occurrence_after_a_glued_one_and_a_negated_one_still_block
 
 @pytest.mark.parametrize("fallback", [False, True])
 def test_only_occurrences_inside_longer_words_is_not_a_hit(fallback):
-    eng = SunglassesEngine()
-    if fallback:
-        eng._automaton = None
+    eng = _engine(fallback)
     result = eng.scan(f"{KEYWORD}x and {KEYWORD}s", CHANNEL)
     assert not [f for f in result.findings if f["id"] == "GLS-PI-001"]
 
