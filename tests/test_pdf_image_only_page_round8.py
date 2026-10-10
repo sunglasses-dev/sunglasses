@@ -102,16 +102,17 @@ def _walk():
     return pdf_module._ImageWalk(pdf_module._ReadBudget())
 
 
-@pytest.mark.parametrize("state,extra", [
-    ("unsized", {"/Filter": ["/FlateDecode", "/RunLengthDecode"]}),
-    ("error", {"/Filter": ["/FlateDecode"], "/DecodeParms": {"/Predictor": 99}}),
+@pytest.mark.parametrize("state,extra,entries", [
+    ("unsized", {"/Filter": ["/FlateDecode", "/RunLengthDecode"]}, 2),
+    ("error", {"/Filter": ["/FlateDecode"], "/DecodeParms": {"/Predictor": 99}}, 1),
 ])
-def test_a_refused_content_chain_is_charged_for_the_stages_it_decoded(state, extra):
+def test_a_refused_content_chain_is_charged_for_the_stages_it_decoded(state, extra, entries):
     walk = _walk()
     stream = _ContentStream(b"\x00" * 100_000, extra)
     with pytest.raises(ValueError):
         walk._content(stream)
-    assert walk.budget.read == 100_000, state
+    # The stages that were decoded, plus one visit for each entry of the filter list.
+    assert walk.budget.read == 100_000 + entries * walk.VISIT_COST, state
 
 
 @pytest.mark.parametrize("extra", [
