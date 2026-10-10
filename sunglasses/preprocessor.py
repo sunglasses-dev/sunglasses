@@ -94,11 +94,17 @@ def normalize(text: str) -> str:
     return normalize_with_length(text)[0]
 
 
-def normalize_with_length(text: str) -> tuple:
+def normalize_with_length(text: str, record=None) -> tuple:
     """normalize(), plus the length of the folded plain text that the
     enrichment gate measured. That length is taken after every fold and before
     any view is appended, so a caller gating on it agrees with this function
-    about what counts as a short input."""
+    about what counts as a short input.
+
+    record, when given, is a list: each base64 blob the pipeline replaced is
+    appended to it, in the plain view and in the shadow view's own pipeline, and
+    so is HTML_FALLBACK each time the entity step gave up on the whole input. It
+    changes nothing else; a caller that needs to know whether the pipeline
+    decoded anything asks the pipeline and does not run a second decoder."""
     text = text.replace(VIEW_SEP, " ")
     # Read before strip_invisible removes them, so the plain view still loses
     # them (a split phrase keeps matching) and the shadow view sees the text.
@@ -115,10 +121,10 @@ def normalize_with_length(text: str) -> tuple:
     DECODE_MAX_PASSES = 3
     for _ in range(DECODE_MAX_PASSES):
         before = text
-        text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
+        text = decode_html_entities(text, record)     # HTML entities (&#73; etc) → chars
         text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
         text = decode_hex_escapes(text)       # \x49 etc → chars
-        text = decode_base64_segments(text)   # base64 blobs → decoded text
+        text = decode_base64_segments(text, record)   # base64 blobs → decoded text
         if text == before:
             break
     text = decode_leetspeak(text)
@@ -166,7 +172,7 @@ def normalize_with_length(text: str) -> tuple:
     if shadow is not None:
         # Its own views, behind the separator, so an excerpt never joins it
         # to the plain text.
-        text = text + " " + VIEW_SEP + " " + normalize(shadow)
+        text = text + " " + VIEW_SEP + " " + normalize_with_length(shadow, record)[0]
     return text, folded_length
 
 
@@ -211,13 +217,23 @@ def collapse_whitespace(text: str) -> str:
     return text.strip()
 
 
-def decode_html_entities(text: str) -> str:
-    """Decode HTML entities (&#73; &amp; &lt; etc) to raw characters."""
+# Put in a record by decode_html_entities when it gave up on the whole input. It is the one step of
+# the pipeline whose result for a stretch of text depends on the text around it.
+HTML_FALLBACK = "\x00html-whole-input-fallback"
+
+
+def decode_html_entities(text: str, record=None) -> str:
+    """Decode HTML entities (&#73; &amp; &lt; etc) to raw characters.
+
+    record, when given, is a list that HTML_FALLBACK is appended to when the whole input is left
+    unchanged because one reference in it could not be read."""
     if '&' not in text:
         return text
     try:
         return html.unescape(text)
     except Exception:
+        if record is not None:
+            record.append(HTML_FALLBACK)
         return text
 
 
@@ -254,13 +270,17 @@ def decode_rot13(text: str) -> str:
         return text
 
 
-def decode_base64_segments(text: str) -> str:
-    """Find and inline-decode Base64 segments, REPLACING the encoded text with decoded."""
+def decode_base64_segments(text: str, record=None) -> str:
+    """Find and inline-decode Base64 segments, REPLACING the encoded text with decoded.
+
+    record, when given, is a list that each replaced segment is appended to."""
     def _try_decode(match):
         segment = match.group(0)
         try:
             decoded = base64.b64decode(segment).decode('utf-8', errors='ignore')
             if decoded.isprintable() and len(decoded) > 4:
+                if record is not None:
+                    record.append(segment)
                 return decoded  # Replace encoded with decoded for pattern matching
         except Exception:
             pass
