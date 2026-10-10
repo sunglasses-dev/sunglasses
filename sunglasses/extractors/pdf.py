@@ -45,6 +45,11 @@ class _WalkBudget(Exception):
     """The document holds more decoded content than the checks will read."""
 
 
+# The bytes of the document budget that one visit of an annotation, a state, a stream or an
+# entry costs besides the content it reads. Both walks of this module charge it.
+_VISIT_COST = 32
+
+
 class _ReadBudget:
     """Decoded bytes read from one document. Every check that decodes a stream
     spends from the same budget, so the cost of a document is bounded once and
@@ -65,7 +70,6 @@ class _ReadBudget:
             self.read = self.MAX_BYTES
             raise _WalkBudget()
         self.read += size
-
 
 
 def _lzw_length(data: bytes, limit: int) -> Optional[int]:
@@ -227,12 +231,23 @@ def _ascii85_length(data: bytes) -> int:
     return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
 
 
+def _decimal_fits(value) -> bool:
+    """True for anything that is not a decimal number object, and for one with no more digits
+    and no larger an exponent than any number written in a PDF."""
+    if not hasattr(value, "as_tuple"):
+        return True
+    _sign, digits, exponent = value.as_tuple()
+    return len(digits) <= _MAX_NUMBER and (not isinstance(exponent, int) or abs(exponent) <= _MAX_NUMBER)
+
+
 def _whole(value):
     """A decode parameter as a whole number. A text or byte value longer than any number is not
     converted; it is refused the way a value that is not a number is, so the stream is reported
-    as an error."""
+    as an error. A decimal number object is held to the same bound, in its digits and in its
+    exponent, because converting one is not linear in the digits it holds."""
     if not isinstance(value, (str, bytes)) or len(value) <= _MAX_NUMBER:
-        return int(value)
+        if _decimal_fits(value):
+            return int(value)
     raise ValueError("not a number")
 
 
@@ -459,6 +474,431 @@ _FORMAT_MAGIC = (
     (b'\xff\xd8\xff', 'JPEG'),
 )
 
+# A bounded lexer over decoded content. Comments, literal strings, hex strings and the
+# binary data of an inline image are skipped, so only an operator that the content really
+# carries is read. Each step moves forward, so a document costs one pass over its bytes.
+_REG = rb"[^\s\x00/\[\]()<>{}%]"
+_TOKEN = re.compile(
+    rb"(?P<comment>%[^\r\n]*)"
+    rb"|(?P<string>\()"
+    rb"|(?P<punct><<|>>|[\[\]{}])"
+    rb"|(?P<hex><[^>]*>?)"
+    rb"|(?P<name>/" + _REG + rb"*)"
+    rb"|(?P<op>(?:Do|BI|ID|Tf|gs)(?!" + _REG + rb"))"
+    rb"|(?P<other>" + _REG + rb"+)")
+_STRING_EDGE = re.compile(rb"[()\\]")
+_END_IMAGE = re.compile(rb"[\s\x00]EI(?!" + _REG + rb")")
+_NAME_ESCAPE = re.compile(rb"#([0-9A-Fa-f]{2})")
+
+
+def _name(raw: bytes) -> str:
+    """A name operand read the way PyPDF2 reads the keys of a resource dictionary:
+    the #xx escapes are undone first, then the bytes are read as UTF-8, then as GBK,
+    and what neither reads is mapped one byte to one character. The slash is kept."""
+    data = _NAME_ESCAPE.sub(lambda m: bytes([int(m.group(1), 16)]), raw)
+    for encoding in ("utf-8", "gbk"):
+        try:
+            return "/" + data.decode(encoding)
+        except UnicodeDecodeError:
+            pass
+    return "/" + data.decode("latin-1")
+
+
+def _skip_string(data: bytes, pos: int) -> int:
+    depth = 1
+    while depth:
+        edge = _STRING_EDGE.search(data, pos)
+        if not edge:
+            return len(data)
+        char = edge.group(0)
+        if char == b"\\":
+            pos = edge.end() + 1
+        else:
+            depth += 1 if char == b"(" else -1
+            pos = edge.end()
+    return pos
+
+
+def _drawn_operations(data: bytes):
+    """Return the number of inline images, the names a Do operator draws, the
+    names a Tf operator selects as the font and the names a gs operator selects as
+    the graphics state."""
+    if b"Do" not in data and b"BI" not in data and b"Tf" not in data and b"gs" not in data:
+        return 0, [], [], []
+    inline, names, fonts, states = 0, [], [], []
+    last, font, pos, in_dict = None, None, 0, False
+    while pos < len(data):
+        match = _TOKEN.search(data, pos)
+        if not match:
+            break
+        kind, pos = match.lastgroup, match.end()
+        if kind == "comment":
+            continue
+        if kind == "name":
+            last = font = match.group(0)[1:]
+            continue
+        if kind == "string":
+            pos = _skip_string(data, pos)
+        elif kind == "op":
+            token = match.group(0)
+            if token == b"Do" and not in_dict and last is not None:
+                names.append(last)
+            elif token == b"gs" and not in_dict and last is not None:
+                states.append(last)
+            elif token == b"Tf" and not in_dict and font is not None:
+                fonts.append(font)
+                font = None
+            elif token == b"BI" and not in_dict:
+                inline += 1
+                in_dict = True
+            elif token == b"ID" and in_dict:
+                end = _END_IMAGE.search(data, pos)
+                pos = end.end() if end else len(data)
+                in_dict = False
+        last = None
+    return inline, names, fonts, states
+
+
+_FAR = 1 << 30
+
+
+class _ImageWalk:
+    """One bounded visit of a document's painted pictures. A picture counts only
+    where a Do operator draws it (or an inline image sits in the content), so an
+    unused resource entry does not. A form is read once and its count is kept, so
+    pages that share forms or resources cost one visit, and the decoded content
+    read over the whole document is capped. Content is decoded stage by stage by
+    `_decode_bounded`, which charges every stage (the intermediate output of a chain
+    too) and refuses a chain it cannot size; the reader's own decode is not used. A
+    Type3 font held as a direct dictionary is keyed by the identity of that dictionary,
+    and every stream visit is charged `VISIT_COST` besides its content. An annotation
+    with the Hidden or NoView flag draws nothing and is not visited.
+
+    A name is looked up in the resources of the form or group that draws it and then
+    in the resources of whatever encloses it, the way a renderer does, so a form with
+    resources of its own can still draw a name that only the page holds.
+
+    Every count is a triple: pictures drawn, Type3 fonts in use whose glyph
+    procedures paint pictures, and drawing operators whose resource name could not
+    be matched (a name that is not plain ASCII). The last two are not pictures this check
+    counted, so they are reported as content that was not inspected."""
+
+    MAX_FORM_DEPTH = 8
+    MAX_GLYPHS = 512
+    MAX_APPEARANCES = 64
+    VISIT_COST = _VISIT_COST   # bytes of the document budget for each annotation, state and stream visited
+
+    def __init__(self, budget):
+        self.budget = budget
+        self.stopped = False
+        self.notes = []      # what the decoder said about streams it read only in part
+        self.cache = {}
+        self.appearances = {}
+        self.open = []       # keys of the forms and fonts being read, outermost first
+        self.low = _FAR      # the lowest place in `open` that a revisit cut, below the node read now
+        self.reach = _FAR    # the lowest level of resources consulted below the node read now
+
+    @staticmethod
+    def _sum(*parts):
+        return tuple(sum(p[i] for p in parts) for i in range(3))
+
+    def _visit(self) -> int:
+        """Charge one visit to the document budget and return what was charged."""
+        self.budget.spend(self.VISIT_COST)
+        return self.VISIT_COST
+
+    def _open(self, ref):
+        """The object a reference stands for, resolved after its visit is charged. Every
+        object the walk reaches by iterating something the document supplies (the entries
+        of an array, the names a content stream draws, the keys of a dictionary) comes
+        through here, so no resolution is made that was not paid for."""
+        self._visit()
+        return _resolve(ref)
+
+    def painted_images(self, holder, depth):
+        self._visit()   # the page; its own resources and content are looked up under this visit
+        resources = _resolve(holder.get('/Resources')) if hasattr(holder, 'get') else None
+        scope = (resources,) if resources else ()
+        return self._sum(self._count(holder, scope, depth),
+                         self._appearances(holder, scope))
+
+    def _find(self, scope, kind, name):
+        """The entry `name` of the resource table `kind`, looked up in the innermost
+        resources first and then outward. None when no resources hold it."""
+        for i, resources in enumerate(scope):
+            level = len(scope) - 1 - i
+            if level < self.reach:
+                self.reach = level
+            table = _resolve(resources.get(kind)) if hasattr(resources, 'get') else None
+            if hasattr(table, 'raw_get') and name in table:
+                return table.raw_get(name)
+        return None
+
+    @staticmethod
+    def _not_shown(annot) -> bool:
+        """An annotation whose flags set Hidden (bit 2) or NoView (bit 6) is not drawn. A flag
+        field that is not a number is not read as a flag."""
+        flags = _resolve(annot.get('/F')) if hasattr(annot, 'get') else None
+        return isinstance(flags, int) and not isinstance(flags, bool) and bool(flags & 0b100010)
+
+    def _appearances(self, page, scope):
+        """Pictures drawn by the normal appearance of each annotation on the page.
+        Pages that share an annotation list under the same resources share one visit,
+        and every annotation and state that is visited is charged."""
+        annots = _resolve(page.get('/Annots')) if hasattr(page, 'get') else None
+        if not isinstance(annots, list):
+            return (0, 0, 0)
+        key = (id(annots), tuple(id(r) for r in scope))
+        if key in self.appearances:
+            return self.appearances[key][0]
+        from PyPDF2.generic import NameObject
+        parts = []
+        for annot in annots:
+            annot = self._open(annot)
+            if self._not_shown(annot):
+                continue
+            appearance = _resolve(annot.get('/AP')) if hasattr(annot, 'get') else None
+            if not hasattr(appearance, 'raw_get') or '/N' not in appearance:
+                continue
+            ref = appearance.raw_get('/N')
+            normal = _resolve(ref)
+            if hasattr(normal, 'get_data'):
+                states = [(ref, normal)]    # already read by the visit of the annotation
+            elif hasattr(normal, 'raw_get'):
+                if len(normal) > self.MAX_APPEARANCES:
+                    raise ValueError(
+                        f"more than {self.MAX_APPEARANCES} appearance states on one annotation")
+                # The selected state is the one the annotation's /AS names. With no
+                # /AS (or one that is not a name) every state is read, as the state a
+                # viewer would pick is not known.
+                chosen = _resolve(annot.get('/AS'))
+                keys = [chosen] if isinstance(chosen, NameObject) else list(normal)
+                # Each state is resolved after it is charged, not before (see _open).
+                states = [(normal.raw_get(key), None) for key in keys if key in normal]
+            else:
+                continue
+            for state_ref, stream in states:
+                if stream is None:
+                    stream = self._open(state_ref)
+                else:
+                    self._visit()
+                if hasattr(stream, 'get_data'):
+                    parts.append(self._form(stream, getattr(state_ref, 'idnum', None),
+                                            scope, 1))
+        found = self._sum((0, 0, 0), *parts)
+        self.appearances[key] = (found, annots, scope)
+        return found
+
+    def _count(self, holder, scope, depth):
+        data = self._content(holder)
+        if not data:
+            return (0, 0, 0)
+        total, names, selected, states = _drawn_operations(data)
+        glyphs = unmatched = 0
+        seen = set()
+        for raw in names:
+            name = _name(raw)
+            if name in seen:
+                continue
+            seen.add(name)
+            ref = self._find(scope, '/XObject', name)
+            if ref is None:
+                # A plain name no resources hold draws nothing. A name that is not
+                # plain ASCII is the case where two readings of the same bytes can
+                # disagree, so a miss there is reported and not taken as nothing drawn.
+                if not name.isascii():
+                    unmatched += 1
+                continue
+            ident = getattr(ref, 'idnum', None)
+            obj = self._open(ref)
+            kind = obj.get('/Subtype') if hasattr(obj, 'get') else None
+            if kind == '/Image':
+                total += 1
+            elif kind == '/Form':
+                found = self._form(obj, ident, scope, depth + 1)
+                total += found[0]
+                glyphs += found[1]
+                unmatched += found[2]
+        for raw in states:
+            name = _name(raw)
+            if ("state", name) in seen:
+                continue
+            seen.add(("state", name))
+            ref = self._find(scope, '/ExtGState', name)
+            if ref is None:
+                unmatched += 0 if name.isascii() else 1
+                continue
+            found = self._state(ref, scope, depth)
+            total += found[0]
+            glyphs += found[1]
+            unmatched += found[2]
+        for raw in selected:
+            name = _name(raw)
+            if ("font", name) in seen:
+                continue
+            seen.add(("font", name))
+            ref = self._find(scope, '/Font', name)
+            if ref is None:
+                continue
+            found = self._font(ref, scope, depth)
+            glyphs += found[1]
+            unmatched += found[2]
+        return (total, glyphs, unmatched)
+
+    def _font(self, ref, scope, depth):
+        """A font in use: a Type3 font counts when any of its glyph procedures paints
+        a picture. Which glyphs a page shows is not read."""
+        font = self._open(ref)
+        if not (hasattr(font, 'get') and font.get('/Subtype') == '/Type3'):
+            return (0, 0, 0)
+        found = self._type3(font, getattr(ref, 'idnum', None), scope, depth + 1)
+        return (0, found[1] + (1 if found[0] else 0), found[2])
+
+    def _state(self, ref, scope, depth):
+        """What a graphics state selected with gs paints: the pictures of its soft-mask
+        group (a form, read under the same walk and budget as any other form) and the
+        glyph procedures of the Type3 font it sets in /Font. A state without a mask or
+        a font, and a mask set to None, paint nothing. A mask whose group cannot be read
+        is reported as content that was not inspected."""
+        state = self._open(ref)
+        if not hasattr(state, 'get'):
+            return (0, 0, 0)
+        parts = []
+        mask = _resolve(state.get('/SMask'))
+        if hasattr(mask, 'raw_get'):
+            group_ref = mask.raw_get('/G') if '/G' in mask else None
+            group = self._open(group_ref) if group_ref is not None else None
+            if hasattr(group, 'get_data'):
+                parts.append(self._form(group, getattr(group_ref, 'idnum', None), scope, depth + 1))
+            else:
+                parts.append((0, 0, 1))
+        font = _resolve(state.get('/Font'))
+        if isinstance(font, list) and font:
+            parts.append(self._font(font[0], scope, depth))
+        return self._sum((0, 0, 0), *parts)
+
+    def _run(self, open_key, floor, own_key, scoped_key, scope, compute):
+        """Read one form or font once. A node that is already being read ends the walk
+        there (a cycle). A result is kept under `own_key` when nothing outside the node's
+        own resources was consulted, under `scoped_key` (the exact chain of resources)
+        otherwise, and not at all when a cycle through a node above it was cut inside it,
+        because that result lacks what the cut part would have added."""
+        if open_key is None:
+            return compute()
+        if open_key in self.open:
+            self.low = min(self.low, self.open.index(open_key))
+            return (0, 0, 0)
+        for key in (own_key, scoped_key):
+            if key is not None and key in self.cache:
+                return self.cache[key][0]
+        index = len(self.open)
+        self.open.append(open_key)
+        saved = (self.low, self.reach)
+        self.low = self.reach = _FAR
+        try:
+            found = compute()
+            low, reach = self.low, self.reach
+        finally:
+            self.open.pop()
+            self.low, self.reach = saved
+        if low < index:
+            self.low = min(self.low, low)
+        self.reach = min(self.reach, reach)
+        if low < index:
+            return found
+        key = own_key if own_key is not None and reach >= floor else scoped_key
+        if key is not None:
+            self.cache[key] = (found, scope)
+        return found
+
+    def _type3(self, font, ident, parent_scope, depth):
+        """The pictures the glyph procedures of a Type3 font paint. Which glyphs a
+        page shows is not read, so a font in use counts as painting pictures when
+        any of its procedures does."""
+        if depth > self.MAX_FORM_DEPTH:
+            raise ValueError(f"form nesting deeper than {self.MAX_FORM_DEPTH}")
+        own = _resolve(font.get('/Resources'))
+        scope = (own,) + parent_scope if own else parent_scope
+
+        def compute():
+            procs = _resolve(font.get('/CharProcs'))
+            if not hasattr(procs, 'raw_get'):
+                return (0, 0, 0)
+            if len(procs) > self.MAX_GLYPHS:
+                raise ValueError(f"more than {self.MAX_GLYPHS} glyph procedures in one font")
+            parts = []
+            for glyph in procs:
+                stream = self._open(procs.raw_get(glyph))
+                if hasattr(stream, 'get_data'):
+                    parts.append(self._count(stream, scope, depth))
+            return self._sum((0, 0, 0), *parts)
+
+        # A font held as a direct dictionary has no object number. It is keyed by the
+        # identity of the parsed dictionary, which the reader keeps for the whole walk.
+        if ident is None:
+            ident = ("direct", id(font))
+        return self._run(*self._keys("type3", ident, own, parent_scope, scope), scope, compute)
+
+    def _form(self, form, ident, parent_scope, depth):
+        if depth > self.MAX_FORM_DEPTH:
+            raise ValueError(f"form nesting deeper than {self.MAX_FORM_DEPTH}")
+        own = _resolve(form.get('/Resources'))
+        scope = (own,) + parent_scope if own else parent_scope
+        return self._run(*self._keys("form", ident, own, parent_scope, scope), scope,
+                         lambda: self._count(form, scope, depth))
+
+    @staticmethod
+    def _keys(kind, ident, own, parent_scope, scope):
+        """(open key, level of the node's own resources, key when it reads the same
+        under every page, key for this exact chain of resources)."""
+        if ident is None:
+            return None, _FAR, None, None
+        return ((kind, ident), len(parent_scope) if own else _FAR,
+                (kind, ident, "own") if own else None,
+                (kind, ident, tuple(id(r) for r in scope)))
+
+    def _content(self, holder) -> bytes:
+        """The decoded content of a page (one stream or an array) or a form. Each stream
+        goes through the bounded decoder: every stage is charged to the budget, the reader's
+        own decode is never used, and a stream whose filters cannot be sized is not decoded."""
+        paid = False   # a single stream is paid for by the visit that brought us here
+        if hasattr(holder, 'get_data'):
+            entries = [holder]
+        else:
+            contents = _resolve(holder.get('/Contents'))
+            if contents is None:
+                return b""
+            if isinstance(contents, list):
+                entries, paid = contents, True
+            else:
+                entries = [contents]
+        out = []
+        for entry in entries:
+            # An entry of an array is paid for before it is resolved or decoded, so an
+            # array of streams that decode to nothing costs the budget and stops at it.
+            stream = self._open(entry) if paid else _resolve(entry)
+            if not hasattr(stream, 'get_data'):
+                continue
+            # The decoder puts what it has spent on the budget before it resolves a decode
+            # parameter (a dereference can decode too), and returns only the rest.
+            result = _decode_bounded(stream, self.budget.remaining(), self._visit,
+                                     self.budget.remaining, self.budget.spend)
+            # What was decoded is charged whatever the chain's state, so a chain that is
+            # refused after its first stages cannot be repeated for free on every page.
+            self.budget.spend(result.spent)
+            if result.state == "unsized":
+                raise ValueError(f"a content stream with the filter {result.detail} cannot be sized, "
+                                 f"so it was not decoded")
+            if result.state != "ok":
+                raise ValueError(f"a content stream could not be decoded ({result.detail})")
+            self.notes.extend(result.notes)
+            out.append(result.data)
+        return b"\n".join(out)
+
+
+def _resolve(obj):
+    return obj.get_object() if hasattr(obj, 'get_object') else obj
+
 
 class PDFExtractor:
     """Extract text from PDFs for SUNGLASSES scanning."""
@@ -480,7 +920,7 @@ class PDFExtractor:
     MAX_PARENT_DEPTH = 32
     # Charged to the document budget for every member, annotation or outline item
     # that is visited, whatever it holds, so walk work is bounded by the budget.
-    VISIT_COST = 32
+    VISIT_COST = _VISIT_COST
     _FIELD_TEXT_KEYS = ('/V', '/DV', '/RV', '/TU', '/Opt')
     _EF_KEYS = ('/UF', '/F', '/DOS', '/Mac', '/Unix')
 
@@ -587,13 +1027,21 @@ class PDFExtractor:
                     if text.strip():
                         results.append((label, text))
 
+                # 7. Pictures. Judged apart from the text: a page that paints a picture has
+                # words this extractor does not read (no OCR runs by default), whatever else
+                # the page holds, so the page is named as not inspected even when some text
+                # was found. The walk runs after every other check, so the decoded content
+                # it charges to the shared budget cannot keep a page tree, an annotation or
+                # an attachment from being read.
+                walk = _ImageWalk(self.budget)
+                for i, page in enumerate(pages):
+                    self._note_unread_images(page, i + 1, walk)
+
         return results
 
     # ----- A3 helpers: form values, scripts, attachments ------------------
 
-    @staticmethod
-    def _resolve(obj):
-        return obj.get_object() if hasattr(obj, 'get_object') else obj
+    _resolve = staticmethod(_resolve)
 
     @staticmethod
     def _identity(obj):
@@ -1338,6 +1786,44 @@ class PDFExtractor:
         for key, spec in tree:
             out.extend(self._read_filespec(spec, key))
         return out
+
+    def _flush_notes(self, walk, number: int) -> None:
+        """Report what the decoder said about streams of this page that it read only in part."""
+        for note in dict.fromkeys(walk.notes):
+            self.failures.append(f"page {number}: content stream {note}")
+        walk.notes.clear()
+
+    def _note_unread_images(self, page, number: int, walk) -> None:
+        """Record a page that paints pictures this extractor did not read."""
+        if walk.stopped:
+            return
+        try:
+            count, glyph_fonts, unmatched = walk.painted_images(page, 0)
+            self._flush_notes(walk, number)
+        except _WalkBudget:
+            self._flush_notes(walk, number)
+            walk.stopped = True
+            self.failures.append(
+                f"page {number} and later pages not checked for images, the page "
+                f"content passed the {_ReadBudget.MAX_BYTES >> 20} MiB limit")
+            return
+        except Exception as exc:
+            self._flush_notes(walk, number)
+            self.failures.append(
+                f"page {number} images not checked ({exc.__class__.__name__}: {exc})")
+            return
+        if count:
+            self.failures.append(
+                f"page {number}: {count} image(s) not read, no OCR ran so "
+                f"image content was not inspected")
+        if glyph_fonts:
+            self.failures.append(
+                f"page {number}: {glyph_fonts} font(s) paint pictures through glyph "
+                f"procedures, so image content was not inspected")
+        if unmatched:
+            self.failures.append(
+                f"page {number}: {unmatched} drawing operator(s) name a resource that "
+                f"could not be matched, so image content was not inspected")
 
     def _extract_metadata(self, reader) -> List[Tuple[str, str]]:
         """Extract text from PDF metadata fields."""

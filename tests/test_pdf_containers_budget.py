@@ -218,4 +218,7 @@ def test_a_second_document_starts_with_a_fresh_budget(tmp_path):
     first = extractor.budget.read
     _extract(tmp_path, "two.pdf", Doc().build(), extractor)
     assert first > 0
-    assert extractor.budget.read == 0
+    # What the second document costs is what it costs a fresh extractor (the picture walk
+    # charges a visit to each page); nothing of the first document is carried over.
+    fresh, _ = _extract(tmp_path, "three.pdf", Doc().build())
+    assert extractor.budget.read == fresh.budget.read < first
