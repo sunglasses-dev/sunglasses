@@ -8,10 +8,12 @@ the blob as the same characters from the same place. The walk modelled entities,
 hex escapes, shadow tags and the character folds, and did not model the fourth decoder of the
 pipeline's pass.
 
-The walk now finds every run of text that the pipeline's base64 step would change, and stops
-vouching at the start of it. A run is a stretch of characters that can be, or can become, part of a
-blob: the base64 alphabet, the characters an escape is spelled with, and every non-ASCII
-character (which can fold into the alphabet or be removed from between two letters of it).
+The walk stops vouching at a base64 blob. The first version of that stop carried its own copy of
+the pipeline's decoders; the nineteenth round replaced the copy with the pipeline's own record of
+what it decoded (see test_negation_later_hits_round19.py), and these tests are the same statement
+checked against it. A run is a stretch of characters that can be, or can become, part of a blob:
+the base64 alphabet, the characters an escape is spelled with, and every non-ASCII character
+(which can fold into the alphabet or be removed from between two letters of it).
 
 The independent statement used throughout: when the walk vouches for a span it stands at view
 offset i and raw offset j and claims that view[:i] was made from raw[:j] alone and view[i:] from
@@ -111,8 +113,8 @@ def test_a_blob_in_the_middle_of_prose_stops_the_walk_there_and_not_before():
 
 
 def test_a_blob_made_of_characters_that_expand_when_folded_is_found():
-    # U+FDFD folds to an eighteen character phrase, so two of them are longer than any blob floor.
-    raw = "&" + "﷽﷽" + _b64("amp;yw " + TAIL)
+    # U+FDFA folds to an eighteen character phrase, so two of them are longer than any blob floor.
+    raw = "&" + "ﷺﷺ" + _b64("amp;yw " + TAIL)
     assert _bad_spans(raw) == 0
 
 
@@ -204,7 +206,7 @@ PRODUCERS = {
     "decode_url_encoding": _percent,      # active index
     "decode_hex_escapes": _hexescape,     # active index
     "decode_shadow_ascii": _tags,         # active index (tag characters are escapes)
-    "decode_base64_segments": lambda s: _b64(s + "yw " + TAIL),   # stops: round 18
+    "decode_base64_segments": lambda s: _b64(s + "yw " + TAIL),   # stops: round 19
 }
 
 
@@ -238,19 +240,17 @@ def test_the_views_behind_the_separator_are_never_vouched_for():
     assert not walk.holds(start, start + 4)
 
 
-def test_a_separator_character_in_the_input_ends_the_walk_there():
+def test_a_separator_character_in_the_input_is_a_recorded_blank_and_the_text_after_it_is_still_vouched():
+    # The pipeline reads the separator character as a blank before anything else, so the view has a
+    # blank where the raw text has the character: the walk records that as a blank change, and a
+    # neutral span after it is vouched for at its own raw offset.
     raw = "first words " + VIEW_SEP + " yw " + TAIL
     assert _bad_spans(raw, (1, 4, 16)) == 0
+    view = _plain(raw)
+    walk = _Walk(raw, _ascii_lower(raw), view)
+    assert walk.holds(view.index("yw"), view.index("yw") + 8)
+    assert walk.j == raw.index("yw") + 8
 
 
-def test_every_step_of_the_pipeline_has_a_row():
-    import inspect
-    from sunglasses import preprocessor
-    source = inspect.getsource(preprocessor.normalize_with_length)
-    called = set()
-    for name in dir(preprocessor):
-        if name.startswith(("decode_", "strip_", "replace_", "normalize_", "collapse_")) and name + "(" in source:
-            called.add(name)
-    covered = set(PRODUCERS) | {"decode_leetspeak", "strip_delimiter_padding", "collapse_whitespace",
-                                "decode_rot13", "normalize_with_length"}
-    assert called <= covered, sorted(called - covered)
+# The test that every step of the pipeline has a row reads the syntax tree and lives in
+# test_negation_later_hits_round19.py.

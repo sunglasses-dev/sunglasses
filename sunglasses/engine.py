@@ -11,6 +11,7 @@ Usage:
 """
 
 import bisect
+import collections
 import functools
 import html
 import re
@@ -31,8 +32,8 @@ except ImportError:
 from . import policy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
-from .preprocessor import (ENRICH_MAX_LEN, HOMOGLYPHS, INVISIBLE_CHARS, LEET, VIEW_SEP,
-                           decode_base64_segments, decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
+from .preprocessor import (ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
+                           decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_url_encoding, normalize_unicode, normalize_with_length,
                            replace_homoglyphs, strip_invisible)
 
@@ -238,14 +239,23 @@ def _folds_to_a_start(c: str) -> bool:
     return any(x in "&%\\" for x in replace_homoglyphs(normalize_unicode(strip_invisible(c))))
 
 
-# A stretch of text that is, or can become, part of a base64 blob. The pipeline's base64 step reads a
-# run of 20 or more characters of the alphabet (with up to two padding signs), after the entity,
-# percent and hex steps have written their results into the text and after the character steps have
-# folded and removed characters. A raw character can reach that run only by being in the alphabet,
-# by being a character an escape is spelled with (`&`, `#`, `;`, `%`, `\\`, and the letters and
-# digits that are already in the alphabet), or by being non-ASCII (it may fold into the alphabet, or
-# be removed from between two letters of it). Every other character ends a run in the raw text and
-# in the pipeline's text alike, so a run is decided on its own.
+# A stretch of text that can become part of a base64 blob. The pipeline's base64 step reads a run of
+# 20 or more characters of the alphabet (with up to two padding signs), after the entity, percent and
+# hex steps have written their results into the text and after the character steps have folded and
+# removed characters. A raw character can reach that run only by being in the alphabet, by being a
+# character an escape is spelled with (`&`, `#`, `;`, `%`, `\\`, and the letters and digits that are
+# already in the alphabet), or by being non-ASCII (it may fold into the alphabet, or be removed from
+# between two letters of it). Every other character ends a run in the raw text and in the pipeline's
+# text alike, and a decode only shortens the text it replaces, so a blob the pipeline decodes lies
+# inside one raw run that holds at least as many characters once folded.
+#
+# Whether the pipeline decoded anything, and where, is not worked out here with a decoder of the walk's
+# own: the scan hands the walk the record that normalize_with_length made, and the places are found by
+# asking the pipeline itself about each run. The steps in front of the base64 step work inside a run
+# except two: the HTML step's fallback for the whole input, which the pipeline reports (HTML_FALLBACK
+# in the record), and the shadow view, where a tag in one run makes blobs in other runs be recorded
+# again. When the fallback happened, or when the runs do not account
+# for exactly the blobs in the record, every run with room for a blob is a stop.
 _RUN_RX = re.compile("[A-Za-z0-9+/=&%\\\\#;\u0080-\U0010ffff]+")
 _BLOB_FLOOR = 20
 
@@ -255,34 +265,37 @@ def _fold_of(text: str) -> str:
 
 
 @functools.lru_cache(maxsize=4096)
-def _short_run_is_decoded(run: str) -> bool:
-    return len(_fold_of(run)) >= _BLOB_FLOOR and _base64_decodes(run)
+def _record_of(run: str) -> tuple:
+    """What the pipeline reports when it is given this run alone."""
+    record = []
+    normalize_with_length(run, record)
+    return tuple(record)
 
 
-def _base64_decodes(run: str) -> bool:
-    """True when the pipeline's base64 step replaces something in this run, in any of its passes.
-    The passes are the ones normalize() runs: entities, percent escapes and hex escapes, then
-    base64, repeated up to three times. The entity, percent and hex steps only shorten text and
-    the base64 step shortens it too, so the only step that can lengthen a run is the character
-    fold (a ligature or a Hebrew or Arabic presentation form folds to up to eighteen characters)."""
-    text = _fold_of(run)
-    for _ in range(3):
-        before = text
-        text = decode_hex_escapes(decode_url_encoding(decode_html_entities(text)))
-        decoded = decode_base64_segments(text)
-        if decoded != text:
-            return True
-        if text == before:
-            break
-    return False
+def _stops_of(raw: str, record: list) -> list:
+    """Raw offsets where a run begins that the walk must not vouch past, given the record the
+    pipeline made for the whole input."""
+    if not record:
+        return []
+    runs = [(m.start(), m.group()) for m in _RUN_RX.finditer(raw) if _run_could_hold_a_blob(m.group())]
+    every = [start for start, _ in runs]
+    if HTML_FALLBACK in record:
+        return every
+    found, blobs = [], []
+    for start, run in runs:
+        reported = _record_of(run)
+        if reported:
+            found.append(start)
+            blobs.extend(reported)
+    return found if collections.Counter(blobs) == collections.Counter(record) else every
 
 
-def _run_is_decoded_as_base64(run: str) -> bool:
-    if run.isascii():
-        return len(run) >= _BLOB_FLOOR and _base64_decodes(run)
-    if len(run) >= _BLOB_FLOOR:
-        return _base64_decodes(run)
-    return _short_run_is_decoded(run)
+def _run_could_hold_a_blob(run: str) -> bool:
+    """True when the run, folded, has room for a blob. Shadow tags count as the ASCII they shadow,
+    since the shadow view's own pipeline reads them so."""
+    if run.isascii() and len(run) < _BLOB_FLOOR:
+        return False
+    return len(_fold_of(decode_shadow_ascii(run) or run)) >= _BLOB_FLOOR
 
 
 _ASCII_LOWER = {c: c + 32 for c in range(ord("A"), ord("Z") + 1)}
@@ -311,12 +324,14 @@ class _Walk:
     GUARD_CHECKS = 64
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record")
 
-    def __init__(self, raw: str, low: str, view: str):
+    def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
         self.low = low
         self.view = view
+        # What normalize_with_length reported for this input; None to ask the pipeline.
+        self.record = record
         self.held = _ascii_lower(view)
         end = view.find(" " + VIEW_SEP + " ")
         self.limit = len(view) if end == -1 else end
@@ -330,7 +345,7 @@ class _Walk:
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
         self.gcursor = 0    # index into guards of the first offset not yet passed
         self.guarded = 0    # how many guards the gate has been asked about
-        self.stops = None   # raw offsets where a run begins that the base64 step decodes
+        self.stops = None   # raw offsets where a run begins that could hold a blob the pipeline decoded
         self.scursor = 0    # index into stops of the first offset not yet passed
         self.leftover = None  # view offsets where an escape the pipeline decodes begins
         self.vcursor = 0      # index into leftover of the first offset not yet passed
@@ -549,7 +564,10 @@ class _Walk:
                            if self._candidate(raw[m.start()])
                            and (self._decodes(raw, m.start()) or self._folds_to_escape(raw, m.start()))]
             self.guards = self._find_guards()
-            self.stops = [m.start() for m in _RUN_RX.finditer(raw) if _run_is_decoded_as_base64(m.group())]
+            if self.record is None:
+                self.record = []
+                normalize_with_length(raw, self.record)
+            self.stops = _stops_of(raw, self.record)
         active, k = self.active, self.cursor
         # The walk only moves forward, so the cursor does too.
         while k < len(active) and active[k] < j:
@@ -558,12 +576,13 @@ class _Walk:
         return active[k] if k < len(active) else len(self.raw)
 
     def _next_stop(self, j: int) -> int:
-        """The first raw offset at or after j where a run begins that the pipeline's base64 step
-        decodes (len(raw) if none). What that step writes was made from the whole blob, so no
-        character from there on can be paired with a raw character, and nothing past the start of
-        the run is vouched for. The start of the run is the earliest point the blob can reach: a
-        start character in front of the blob is in the same run, since it is spelled with
-        characters the run holds."""
+        """The first raw offset at or after j where a run begins that could hold a blob the
+        pipeline decoded (len(raw) if none, and always none when the pipeline decoded nothing).
+        What the base64 step writes was made from the whole blob, so no character from there on
+        can be paired with a raw character, and nothing past the start of the run is vouched for.
+        The record has no offsets, so the walk stops at the first run with room for a blob and not
+        at the blob itself; the start of the run is the earliest point the blob can reach, since a
+        start character in front of the blob is in the same run."""
         self._next_escape(0)
         stops, k = self.stops, self.scursor
         while k < len(stops) and stops[k] < j:
@@ -703,17 +722,19 @@ class _RawAlign:
 
     HIT = 16  # characters of the match that must read the same in the raw input
 
-    def __init__(self, raw: str):
+    def __init__(self, raw: str, record=None):
         self._raw = raw
         self._low = None
         self._walks = {}
+        # What normalize_with_length reported for this input; None to ask the pipeline.
+        self._record = record
 
     def holds(self, view: str, lo: int, hi: int) -> bool:
         walk = self._walks.get(id(view))
         if walk is None or walk.view is not view:
             if self._low is None:
                 self._low = _ascii_lower(self._raw)
-            walk = self._walks[id(view)] = _Walk(self._raw, self._low, view)
+            walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
         return walk.holds(lo, hi)
 
     @staticmethod
@@ -1996,8 +2017,9 @@ class SunglassesEngine:
             text = text[: self.max_scan_bytes]
 
         # Step 1: Normalize (strip tricks, decode evasion)
-        normalized, folded_length = normalize_with_length(text)
-        align = _RawAlign(text)
+        record = []
+        normalized, folded_length = normalize_with_length(text, record)
+        align = _RawAlign(text, record)
 
         # Step 2: Multi-pattern match
         findings = []
