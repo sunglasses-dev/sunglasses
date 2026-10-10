@@ -218,21 +218,27 @@ def _predictor_of(params, charge):
     return int(predictor), int(columns), int(bits)
 
 
-def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
+def _decode_bounded(stream, room: int, charge=lambda: 0) -> "_Decoded":
     """Decode a stream's filter chain one stage at a time, so that no stage runs past what
     is left of the budget and nothing is decoded twice. Every stage's output, the
     intermediate ones included, is added to `spent`, and the chain is refused (state
     "big") as soon as that sum passes `room`. A Flate stage is inflated no further than
     `room` and gzip is read as well as zlib. ASCII85 and LZW are counted before they are
-    decoded. A predictor is applied to the bounded output. A chain with a filter that is
+    decoded, and the input they read to count is charged first when it is the stream's own. A predictor is applied to the bounded output. A chain with a filter that is
     not sized here (hex, run length, an image filter, /Crypt, LZW that is not the last
     filter) is refused with state "unsized", and a stage that fails with "error". The
     reader's own get_data() is never called. `charge` is called before every entry of the
     filter list and of the decode parameters is resolved, and raises _WalkBudget when the
-    document budget is gone; that exception is not caught here."""
+    document budget is gone; that exception is not caught here. It returns the bytes it
+    charged, and they come off `room` as soon as they are spent, so the stages are sized
+    against what is left and not against what was left when the call began."""
     from PyPDF2 import filters as pdf_filters
 
-    names = _filters_of(stream, charge)
+    def paid():
+        nonlocal room
+        room -= charge() or 0
+
+    names = _filters_of(stream, paid)
     if names is None:
         return _Decoded(state="unsized", detail=f"a chain of more than {_MAX_CHAIN} filters")
     data = getattr(stream, '_data', None) or b""
@@ -252,7 +258,7 @@ def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
                 elif after.strip(b"\x00\t\n\x0c\r "):
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
-                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), charge)
+                predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), paid)
                 if predictor != 1:
                     if not 10 <= predictor <= 15:
                         raise ValueError("unsupported predictor")
@@ -273,12 +279,24 @@ def _decode_bounded(stream, room: int, charge=lambda: None) -> "_Decoded":
                         data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
                         out.spent += len(data) - reserved
             elif name in _ASCII85:
+                # Sizing reads every input byte, so the input is paid for before it is read
+                # (a later stage's input is the stage before's output, charged already).
+                if i == 0:
+                    out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
                 size = _ascii85_length(data)
                 out.spent += size
                 if out.spent > room:
                     return _Decoded(spent=room + 1, state="big")
                 data = pdf_filters.ASCII85Decode.decode(data)
             elif name in _LZW and i == len(names) - 1:
+                # The same for the code stream: it is charged before it is scanned, and the
+                # charge stays on the "unsized" return below.
+                if i == 0:
+                    out.spent += len(data)
+                if out.spent > room:
+                    return _Decoded(spent=room + 1, state="big")
                 size = _lzw_length(data, room - out.spent)
                 if size is None:
                     return _Decoded(spent=out.spent, state="unsized", detail=name)
@@ -430,7 +448,21 @@ class _ImageWalk:
     def _sum(*parts):
         return tuple(sum(p[i] for p in parts) for i in range(3))
 
+    def _visit(self) -> int:
+        """Charge one visit to the document budget and return what was charged."""
+        self.budget.spend(self.VISIT_COST)
+        return self.VISIT_COST
+
+    def _open(self, ref):
+        """The object a reference stands for, resolved after its visit is charged. Every
+        object the walk reaches by iterating something the document supplies (the entries
+        of an array, the names a content stream draws, the keys of a dictionary) comes
+        through here, so no resolution is made that was not paid for."""
+        self._visit()
+        return _resolve(ref)
+
     def painted_images(self, holder, depth):
+        self._visit()   # the page; its own resources and content are looked up under this visit
         resources = _resolve(holder.get('/Resources')) if hasattr(holder, 'get') else None
         scope = (resources,) if resources else ()
         return self._sum(self._count(holder, scope, depth),
@@ -468,8 +500,7 @@ class _ImageWalk:
         from PyPDF2.generic import NameObject
         parts = []
         for annot in annots:
-            self.budget.spend(self.VISIT_COST)
-            annot = _resolve(annot)
+            annot = self._open(annot)
             if self._not_shown(annot):
                 continue
             appearance = _resolve(annot.get('/AP')) if hasattr(annot, 'get') else None
@@ -488,14 +519,15 @@ class _ImageWalk:
                 # viewer would pick is not known.
                 chosen = _resolve(annot.get('/AS'))
                 keys = [chosen] if isinstance(chosen, NameObject) else list(normal)
-                # Each state is resolved after it is charged, not before.
+                # Each state is resolved after it is charged, not before (see _open).
                 states = [(normal.raw_get(key), None) for key in keys if key in normal]
             else:
                 continue
             for state_ref, stream in states:
-                self.budget.spend(self.VISIT_COST)
                 if stream is None:
-                    stream = _resolve(state_ref)
+                    stream = self._open(state_ref)
+                else:
+                    self._visit()
                 if hasattr(stream, 'get_data'):
                     parts.append(self._form(stream, getattr(state_ref, 'idnum', None),
                                             scope, 1))
@@ -504,7 +536,6 @@ class _ImageWalk:
         return found
 
     def _count(self, holder, scope, depth):
-        self.budget.spend(self.VISIT_COST)
         data = self._content(holder)
         if not data:
             return (0, 0, 0)
@@ -525,7 +556,7 @@ class _ImageWalk:
                     unmatched += 1
                 continue
             ident = getattr(ref, 'idnum', None)
-            obj = _resolve(ref)
+            obj = self._open(ref)
             kind = obj.get('/Subtype') if hasattr(obj, 'get') else None
             if kind == '/Image':
                 total += 1
@@ -563,7 +594,7 @@ class _ImageWalk:
     def _font(self, ref, scope, depth):
         """A font in use: a Type3 font counts when any of its glyph procedures paints
         a picture. Which glyphs a page shows is not read."""
-        font = _resolve(ref)
+        font = self._open(ref)
         if not (hasattr(font, 'get') and font.get('/Subtype') == '/Type3'):
             return (0, 0, 0)
         found = self._type3(font, getattr(ref, 'idnum', None), scope, depth + 1)
@@ -575,14 +606,14 @@ class _ImageWalk:
         glyph procedures of the Type3 font it sets in /Font. A state without a mask or
         a font, and a mask set to None, paint nothing. A mask whose group cannot be read
         is reported as content that was not inspected."""
-        state = _resolve(ref)
+        state = self._open(ref)
         if not hasattr(state, 'get'):
             return (0, 0, 0)
         parts = []
         mask = _resolve(state.get('/SMask'))
         if hasattr(mask, 'raw_get'):
             group_ref = mask.raw_get('/G') if '/G' in mask else None
-            group = _resolve(group_ref)
+            group = self._open(group_ref) if group_ref is not None else None
             if hasattr(group, 'get_data'):
                 parts.append(self._form(group, getattr(group_ref, 'idnum', None), scope, depth + 1))
             else:
@@ -643,7 +674,7 @@ class _ImageWalk:
                 raise ValueError(f"more than {self.MAX_GLYPHS} glyph procedures in one font")
             parts = []
             for glyph in procs:
-                stream = _resolve(procs.raw_get(glyph))
+                stream = self._open(procs.raw_get(glyph))
                 if hasattr(stream, 'get_data'):
                     parts.append(self._count(stream, scope, depth))
             return self._sum((0, 0, 0), *parts)
@@ -692,13 +723,10 @@ class _ImageWalk:
             # An entry of an array is paid for before it is resolved or decoded, so an array
             # of any length is bounded by the budget whatever its streams decode to. The charge
             # also covers the separator the join adds between two entries.
-            if paid:
-                self.budget.spend(self.VISIT_COST)
-            stream = _resolve(entry)
+            stream = self._open(entry) if paid else _resolve(entry)
             if not hasattr(stream, 'get_data'):
                 continue
-            result = _decode_bounded(stream, self.budget.remaining(),
-                                     lambda: self.budget.spend(self.VISIT_COST))
+            result = _decode_bounded(stream, self.budget.remaining(), self._visit)
             # What was decoded is charged whatever the chain's state, so a chain that is
             # refused after its first stages cannot be repeated for free on every page.
             self.budget.spend(result.spent)
