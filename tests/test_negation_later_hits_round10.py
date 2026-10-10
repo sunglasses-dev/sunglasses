@@ -19,6 +19,16 @@ from sunglasses.preprocessor import ENRICH_MAX_LEN, VIEW_SEP, decode_shadow_asci
 
 from test_negation_later_hits_round8 import ATTACK, BLOCKING, ROUTES, _covered, _rule
 
+_default_engine = None
+
+
+def _engine():
+    global _default_engine
+    if _default_engine is None:
+        _default_engine = SunglassesEngine()
+    return _default_engine
+
+
 SEP = " " + VIEW_SEP + " "
 HUGE = "&#" + "9" * 5000 + ";"
 COVERED = 'Do not type "' + ATTACK + '"'
@@ -115,7 +125,7 @@ def test_the_kept_views_follow_the_folded_length_and_not_the_lowered_one():
 @pytest.mark.parametrize("shape", ['Do not use {k} here', 'Do not type "{k}"', "Never include {k}"])
 def test_a_negated_or_quoted_bidi_override_mark_quarantines(mark, shape):
     # GLS-RTL-001: main downgraded this to allow_redacted.
-    result = SunglassesEngine().scan(shape.format(k=mark), channel="message")
+    result = _engine().scan(shape.format(k=mark), channel="message")
     assert result.decision == "quarantine", (hex(ord(mark)), shape)
     assert any(f["id"] == "GLS-RTL-001" for f in result.findings)
 
@@ -127,7 +137,7 @@ def test_the_other_single_character_keywords_give_allow_on_main_and_here(mark):
     for shape in ('Do not use {k} here', 'Do not type "{k}"'):
         for channel in ("message", "file", "api_response", "web_content", "log_memory",
                         "tool_output", "agent_input", "code", "prompt"):
-            result = SunglassesEngine().scan(shape.format(k=mark), channel=channel)
+            result = _engine().scan(shape.format(k=mark), channel=channel)
             assert result.decision == "allow", (hex(ord(mark)), shape, channel)
 
 
@@ -135,7 +145,7 @@ def test_the_other_single_character_keywords_give_allow_on_main_and_here(mark):
 def test_a_covered_p3p_keyword_gives_allow_with_no_finding_as_on_main(text):
     # GLS-DFP-024 needs more context than its keyword; every shape tried allows.
     for channel in ("file", "web_content"):
-        assert SunglassesEngine().scan(text, channel=channel).decision == "allow", (text, channel)
+        assert _engine().scan(text, channel=channel).decision == "allow", (text, channel)
 
 
 # 4. The skip cap is one count for the rule, shared by its alternatives.
