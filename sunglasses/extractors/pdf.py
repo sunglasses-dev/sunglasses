@@ -130,6 +130,8 @@ _INFLATE_STEP = 1 << 16
 _MAX_CHAIN = 16
 # The longest filter name the decoder turns into text. The longest real one is /RunLengthDecode.
 _MAX_NAME = 64
+# The longest text or byte value read as a number: no number written in a PDF has more digits.
+_MAX_NUMBER = 32
 
 
 def _deref(obj):
@@ -224,6 +226,15 @@ def _ascii85_length(data: bytes) -> int:
     return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
 
 
+def _whole(value):
+    """A decode parameter as a whole number. A text or byte value longer than any number is not
+    converted; it is refused the way a value that is not a number is, so the stream is reported
+    as an error."""
+    if not isinstance(value, (str, bytes)) or len(value) <= _MAX_NUMBER:
+        return int(value)
+    raise ValueError("not a number")
+
+
 def _predictor_of(params, charge):
     """(predictor, columns, bits per component) the way PyPDF2 reads them. A list of
     parameters is charged entry by entry."""
@@ -238,10 +249,10 @@ def _predictor_of(params, charge):
         predictor = resolve(entry.get('/Predictor', predictor))
         columns = resolve(entry.get('/Columns', columns))
         bits = resolve(entry.get('/BitsPerComponent', bits))
-    return int(predictor), int(columns), int(bits)
+    return _whole(predictor), _whole(columns), _whole(bits)
 
 
-def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded":
+def _decode_bounded(stream, room: int, charge=lambda: 0, left=None, commit=None, cap=None) -> "_Decoded":
     """Decode a stream's filter chain one stage at a time, so that no stage runs past what
     is left of the budget and nothing is decoded twice. Every stage's output, the
     intermediate ones included, is added to `spent`, and the chain is refused (state
@@ -258,17 +269,61 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
     the setup can spend the document budget directly (it can inflate an object stream), and
     that is not in what `charge` returns; `left`, when given, returns what the budget has
     left, and the allowance is brought down to it before each stage and after the decode
-    parameters are read."""
+    parameters are read.
+
+    A dereference can also decode, and the decode it starts is sized against the document
+    budget. `commit`, when given, puts what this decoder has spent so far on that budget
+    (and raises _WalkBudget if it does not fit) before the decode parameters are resolved, so
+    the nested decode sees it. What is returned in `spent` is then only the part not yet
+    committed, and a caller that charges it has charged the whole once.
+
+    `cap`, when given, limits what the stages produce, apart from the allowance: the stream's
+    own input counts toward the allowance and not toward the cap. A chain refused for the cap
+    comes back with state "big" and detail "cap"."""
+    committed = [0]
+    result = _decode_stages(stream, room, charge, left, commit, cap, committed)
+    result.spent = max(0, result.spent - committed[0])
+    return result
+
+
+def _decode_stages(stream, room, charge, left, commit, cap, committed) -> "_Decoded":
     from PyPDF2 import filters as pdf_filters
+
+    made = 0   # what the stages have produced; the stream's own input is not in it
 
     def paid():
         nonlocal room
         room -= charge() or 0
 
     def synced():
+        # The allowance is what the budget has left, and what this decode has already put on
+        # the budget is part of what it may use.
         nonlocal room
         if left is not None:
-            room = min(room, left())
+            room = min(room, left() + committed[0])
+
+    def settle():
+        if commit is not None and out.spent > committed[0]:
+            commit(out.spent - committed[0])
+            committed[0] = out.spent
+
+    def produce(size, extra=0):
+        nonlocal made
+        made += size
+        out.spent += size + extra
+
+    def over_cap():
+        return cap is not None and made > cap
+
+    def refuse():
+        # Past the allowance: charged as everything that is left, so the budget is gone.
+        # Past the cap alone: charged what was read and made.
+        if out.spent > room:
+            return _Decoded(spent=max(room, 0) + 1, state="big")
+        return _Decoded(spent=out.spent, state="big", detail="cap")
+
+    def stage_room():
+        return room - out.spent if cap is None else min(room - out.spent, cap - made)
 
     names = _filters_of(stream, paid)
     if names is None:
@@ -281,12 +336,14 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
         # A charge can come after a stage (the decode parameters are charged once the stage has run),
         # so what is left is worked out again before each stage, and a stage is never started on
         # nothing: a zero limit means "no limit" to zlib.
-        return out.spent >= room
+        return out.spent >= room or (cap is not None and made >= cap)
     try:
         for i, name in enumerate(names):
             synced()
-            if over():
+            if out.spent >= room:
                 return _Decoded(spent=max(room, 0) + 1, state="big")
+            if over():
+                return _Decoded(spent=out.spent, state="big", detail="cap")
             if name in _FLATE:
                 # The stream's own input is read whole, so it is paid for before it is read (a
                 # later stage's input is the stage before's output, charged already).
@@ -296,16 +353,19 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
                     out.spent += len(data)
                     if out.spent >= room:
                         return _Decoded(spent=max(room, 0) + 1, state="big")
-                data, reached_end, after, damaged = _inflate(data, room - out.spent)
-                out.spent += len(data) + (_INFLATE_STEP if damaged else 0)
-                if out.spent > room:
-                    return _Decoded(spent=room + 1, state="big")
+                data, reached_end, after, damaged = _inflate(data, stage_room())
+                produce(len(data), _INFLATE_STEP if damaged else 0)
+                if out.spent > room or over_cap():
+                    return refuse()
                 if damaged or not reached_end:
                     out.notes.append("compressed data ends before its stream does; "
                                      "the rest was not inspected")
                 elif after.strip(b"\x00\t\n\x0c\r "):
                     out.notes.append("holds data after the end of its compressed stream; "
                                      "that data was not inspected")
+                # Resolving the decode parameters can decode again, so what has been spent so
+                # far is on the budget before it is resolved.
+                settle()
                 predictor, columns, bits = _predictor_of(stream.get('/DecodeParms'), paid)
                 synced()
                 if out.spent > room:
@@ -322,13 +382,15 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
                     if data:
                         if rowlength > room - out.spent or out.spent + len(data) > room:
                             return _Decoded(spent=room + 1, state="big")
+                        if cap is not None and made + len(data) > cap:
+                            return _Decoded(spent=out.spent, state="big", detail="cap")
                         # The output is at most as long as the input. It is reserved before the
                         # reader runs, so a predictor that fails after it has made rows is still
                         # charged for them, and the charge is trued up when it succeeds.
                         reserved = len(data)
-                        out.spent += reserved
+                        produce(reserved)
                         data = pdf_filters.FlateDecode._decode_png_prediction(data, columns, rowlength)
-                        out.spent += len(data) - reserved
+                        produce(len(data) - reserved)
             elif name in _ASCII85:
                 # Sizing reads every input byte, so the input is paid for before it is read
                 # (a later stage's input is the stage before's output, charged already).
@@ -337,9 +399,9 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
                 if out.spent > room:
                     return _Decoded(spent=room + 1, state="big")
                 size = _ascii85_length(data)
-                out.spent += size
-                if out.spent > room:
-                    return _Decoded(spent=room + 1, state="big")
+                produce(size)
+                if out.spent > room or over_cap():
+                    return refuse()
                 data = pdf_filters.ASCII85Decode.decode(data)
             elif name in _LZW and i == len(names) - 1:
                 # The same for the code stream: it is charged before it is scanned, and the
@@ -348,12 +410,12 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
                     out.spent += len(data)
                 if out.spent > room:
                     return _Decoded(spent=room + 1, state="big")
-                size = _lzw_length(data, room - out.spent)
+                size = _lzw_length(data, stage_room())
                 if size is None:
                     return _Decoded(spent=out.spent, state="unsized", detail=name)
-                out.spent += size
-                if out.spent > room:
-                    return _Decoded(spent=room + 1, state="big")
+                produce(size)
+                if out.spent > room or over_cap():
+                    return refuse()
                 data = pdf_filters.LZWDecode.decode(data)
                 if len(data) > size:
                     return _Decoded(spent=room + 1, state="big")
@@ -369,6 +431,7 @@ def _decode_bounded(stream, room: int, charge=lambda: 0, left=None) -> "_Decoded
     if not names:
         out.spent = len(data)
     return out
+
 
 
 # The tail the PDF reader needs to find the cross reference table. The reader searches the
@@ -745,9 +808,6 @@ class PDFExtractor:
     def _decode_stream(self, stream, name: str, cap: Optional[int] = None) -> Optional[bytes]:
         cap = cap or self.MAX_ATTACHMENT_BYTES
         raw = getattr(stream, '_data', None) or b''
-        if len(raw) > cap:
-            self.failures.append(f"{name} larger than {cap} bytes; not inspected")
-            return None
         try:
             filters = _filters_of(stream, self._charge_visit)
         except _WalkBudget:
@@ -757,16 +817,24 @@ class PDFExtractor:
             self.failures.append(f"{name} names more than {_MAX_CHAIN} filters; not inspected")
             return None
         if not filters:
+            if len(raw) > cap:
+                self.failures.append(f"{name} larger than {cap} bytes; not inspected")
+                return None
             return raw if self._spend(len(raw)) else None
         room = self.budget.remaining()
         if room <= 0:
             self._spend(1)  # records that the document limit stopped the read
             return None
-        limit = min(cap, room)
-        # The chain is decoded here, stage by stage, within the room left, and every
-        # stage is charged as it is produced. The reader's own decode is never used.
+        # The chain is decoded here, stage by stage, within the room the document has left,
+        # and every stage is charged as it is produced. The document budget bounds the work,
+        # the encoded input included; the cap bounds only what the stages produce, so an
+        # attachment is not refused because its input and its output together pass it. What
+        # the decoder has spent is put on the shared budget before any decode parameter is
+        # resolved (a dereference can decode too), and `spent` is the part not yet put there.
+        # The reader's own decode is never used.
         try:
-            result = _decode_bounded(stream, limit, self._charge_visit, self.budget.remaining)
+            result = _decode_bounded(stream, room, self._charge_visit, self.budget.remaining,
+                                     self.budget.spend, cap)
         except _WalkBudget:
             self._spend(1)  # records that the document limit stopped the read
             return None
@@ -774,7 +842,7 @@ class PDFExtractor:
         # that are each too large cannot decode without the bound.
         charged = self._spend(result.spent)
         if result.state == "big":
-            if limit >= cap and charged:
+            if result.detail == "cap" and charged:
                 self.failures.append(f"{name} larger than {cap} bytes; not inspected")
             return None
         if result.state == "unsized":

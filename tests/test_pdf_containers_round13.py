@@ -131,9 +131,9 @@ def test_the_extractor_gives_the_decoder_the_budget(monkeypatch):
     seen = {}
     real = pdf_module._decode_bounded
 
-    def spy(stream, room, charge=lambda: 0, left=None):
+    def spy(stream, room, charge=lambda: 0, left=None, *rest):
         seen["left"] = left
-        return real(stream, room, charge, left)
+        return real(stream, room, charge, left, *rest)
 
     monkeypatch.setattr(pdf_module, "_decode_bounded", spy)
     extractor = PDFExtractor()
