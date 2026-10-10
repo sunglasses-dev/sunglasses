@@ -27,7 +27,7 @@ _STEP = {"_decode_bounded", "_decode_stages", "_inflate", "_lzw_length", "_ascii
          "_decode_png_prediction", "get_data", "decode", "decompressobj", "decompress",
          "_charged_text"}
 
-_CONVERT = {"str", "int", "encode", "from_bytes", "join", "sub", "bytes"}
+_CONVERT = {"str", "int", "encode", "from_bytes", "join", "sub", "bytes", "as_tuple"}
 
 DEREF, STEP, CONVERT = "deref", "step", "convert"
 GATE, FIXED, PAID = "length gate", "fixed width", "pass over paid bytes"
@@ -38,11 +38,17 @@ COVERED = {
     # --- the reader's own accessor, and the two helpers that wrap it
     # The accessor looks an object up. When the object sits in a compressed object stream the reader
     # inflates the whole stream, and that inflation is not the accessor's to charge: it is paid by
-    # PDFExtractor._object_stream_fits, which the extractor installs on the reader before any check
-    # runs (see _bounded_object_streams). The stream is decoded there once, charged, and handed to
-    # the reader, so the reader's own decode never runs. tests/test_pdf_image_only_page_round16.py
-    # checks this through extract(), with a spy on the reader's own Flate decode.
-    (DEREF, "_deref", "obj.get_object"): ("AEC", "the accessor itself; an object in a compressed object stream is inflated by the reader, which _object_stream_fits has already done once, charged"),
+    # PDFExtractor._object_stream_fits, which the extractor installs on the reader for the whole of
+    # extract() (see _bounded_object_streams). The decode is lazy: it happens at the first lookup
+    # into a stream, which can be inside the decoder of a stream the walk is reading, after the
+    # outer spend has been put on the document budget. The stream is decoded there once, charged,
+    # and handed to the reader, so the reader's own decode does not run. The reader is called only
+    # for a stream the guard decoded, and only while it hands back that same stream object; a lookup
+    # that fails, a stream that does not fit and a reader that hands back another object are all
+    # refused, so the page is reported as not checked. tests/test_pdf_image_only_page_round16.py and
+    # tests/test_pdf_object_stream_guard_round17.py check this through extract(), with a spy on the
+    # reader's own Flate decode.
+    (DEREF, "_deref", "obj.get_object"): ("AEC", "the accessor itself; an object in a compressed object stream is inflated by the reader, which _object_stream_fits has already done once, charged, at the first lookup into that stream"),
     (DEREF, "_resolve", "obj.get_object"): ("EC", "the accessor itself; an object in a compressed object stream: see _deref"),
     (DEREF, "PDFExtractor._resolve", "obj.get_object"): ("A", "the accessor itself; an object in a compressed object stream: see _deref"),
     # --- the decoder: filter list and decode parameters go through _entries_of, which charges first
@@ -118,7 +124,8 @@ COVERED = {
     (DEREF, "PDFExtractor._read_filespec", "ef[k]"): ("AC", "one of the fixed alternatives of /EF, each distinct stream once, under the attachment cap"),
     (DEREF, "PDFExtractor._extract_attachments", "reader.trailer['/Root']"): ("AC", "once per document"),
     (DEREF, "PDFExtractor._extract_attachments", "root.get('/Names')"): ("AC", "fixed key of the root"),
-    (DEREF, "PDFExtractor._object_stream_fits", "IndirectObject(stmnum, 0, reader).get_object"): ("AC", "the reader's own lookup of an object stream, which is then decoded once by _bounded_stream_bytes within the budget"),
+    (DEREF, "PDFExtractor._object_stream_fits", "IndirectObject(stmnum, 0, reader).get_object"): ("AC", "the reader's own lookup of an object stream, which is then decoded once by _bounded_stream_bytes within the budget; a lookup that raises gives no stream, and the reader is not called for it"),
+    (DEREF, "PDFExtractor._bounded_object_streams.guarded", "IndirectObject(stmnum, 0, reader).get_object"): ("AC", "the same lookup again, a cache hit for a stream already resolved, to see that the reader would use the stream the guard decoded; the reader's own lookup runs only after this"),
     # --- outside the budget: not changed here, and said so
     (DEREF, "PDFExtractor._extract_annotations", "annot.get_object"): ("AEC", "legacy annotation text, unchanged from main: no visit charge and no array dedup (disclosed)"),
 }
@@ -127,7 +134,8 @@ COVERED = {
 # (CONVERT, function, expression): (trees it exists in, kind, what bounds or pays for it)
 CONVERTED = {
     (CONVERT, "_name_text", "str(name)"): ("AEC", GATE, "only inside `len(name) <= _MAX_NAME` and an instance test; a longer value, or one that is not a name, is never converted"),
-    (CONVERT, "_whole", "int(value)"): ("AEC", GATE, "only after a text or byte value longer than _MAX_NUMBER has been refused; a number object is converted as it stands"),
+    (CONVERT, "_whole", "int(value)"): ("AEC", GATE, "only after a text or byte value longer than _MAX_NUMBER has been refused, and a decimal number object has been held to _decimal_fits (its size, then its digits and exponent)"),
+    (CONVERT, "_decimal_fits", "value.as_tuple"): ("AEC", FIXED, "only after the size of the object was held to _DECIMAL_SIZE bytes, which is a few hundred digits at most; the tuple is built from those"),
     (CONVERT, "_lzw_length", "int.from_bytes"): ("AEC", FIXED, "three bytes at a code position, inside the sizing pass whose input was charged before it"),
     (CONVERT, "_inflate", "int.from_bytes"): ("AEC", FIXED, "two bytes of the gzip header extra length"),
     (CONVERT, "_inflate", "b''.join"): ("AEC", PAID, "the pieces are the inflater's output, each asked for within the allowance"),
@@ -195,12 +203,16 @@ def _conversions():
                         text = "int.from_bytes"
                     elif name == "join":
                         text = ast.unparse(func)
-                    elif name == "encode" or name == "sub":
+                    elif name in ("encode", "sub", "as_tuple"):
                         text = ast.unparse(func)
                     elif name == "bytes":
                         text = "bytes"
                     gated = any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "len"
                                 for t in tests for n in ast.walk(t))
+                    if where == "_whole":
+                        # the length of a text value is not the bound of a number object
+                        gated = gated and any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+                                              and n.func.id == "_decimal_fits" for t in tests for n in ast.walk(t))
                     found[(CONVERT, where, text)] = gated
         for child in ast.iter_child_nodes(node):
             visit(child, stack, tests)

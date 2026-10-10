@@ -26,6 +26,7 @@ Install: pip install sunglasses[pdf]  (requires PyPDF2)
 import contextlib
 import os
 import re
+import sys
 import zlib
 from typing import List, Optional, Tuple
 
@@ -231,11 +232,19 @@ def _ascii85_length(data: bytes) -> int:
     return (digits // 5) * 4 + max(0, digits % 5 - 1) + 4 * body.count(b"z")
 
 
+# The memory a decimal number object takes follows the digits it holds, about nineteen to every
+# eight bytes, and 200 bytes is a few hundred digits at most: far over any number written in a PDF.
+_DECIMAL_SIZE = 200
+
+
 def _decimal_fits(value) -> bool:
     """True for anything that is not a decimal number object, and for one with no more digits
-    and no larger an exponent than any number written in a PDF."""
+    and no larger an exponent than any number written in a PDF. The size is read first, because
+    as_tuple() builds a tuple of every digit and so costs what the bound is there to prevent."""
     if not hasattr(value, "as_tuple"):
         return True
+    if sys.getsizeof(value) > _DECIMAL_SIZE:
+        return False
     _sign, digits, exponent = value.as_tuple()
     return len(digits) <= _MAX_NUMBER and (not isinstance(exponent, int) or abs(exponent) <= _MAX_NUMBER)
 
@@ -1158,14 +1167,19 @@ class PDFExtractor:
         object out of it, so a small file could otherwise force a large inflation
         through any dereference. Objects in a stream that does not fit are not
         resolved, and the stream is recorded as not inspected."""
+        from PyPDF2.generic import IndirectObject
         original = reader._get_object_from_stream
-        verdicts = {}
+        decoded = {}
 
         def guarded(indirect_reference):
             stmnum = reader.xref_objStm[indirect_reference.idnum][0]
-            if stmnum not in verdicts:
-                verdicts[stmnum] = self._object_stream_fits(reader, stmnum)
-            if not verdicts[stmnum]:
+            if stmnum not in decoded:
+                decoded[stmnum] = self._object_stream_fits(reader, stmnum)
+            stream = decoded[stmnum]
+            # The reader is called only for a stream this guard has decoded and charged, and
+            # only while the reader hands back that same stream object, because the decoded
+            # bytes are held by it. Anything else is refused, a failed lookup included.
+            if stream is None or IndirectObject(stmnum, 0, reader).get_object() is not stream:
                 raise ValueError(f"object stream {stmnum} was not inflated")
             return original(indirect_reference)
 
@@ -1175,14 +1189,19 @@ class PDFExtractor:
         finally:
             del reader._get_object_from_stream
 
-    def _object_stream_fits(self, reader, stmnum: int) -> bool:
+    def _object_stream_fits(self, reader, stmnum: int):
+        """The object stream, decoded once within the budget with its bytes held by it, or None
+        when it was not decoded: it does not fit, it could not be looked up, or it is not a
+        stream. A lookup can fail for a reason that depends on how deep the caller is, so a
+        failure is not read as the reader raising the same error later: the reader would then
+        inflate the stream itself, and nothing would have been charged for it."""
         from PyPDF2.generic import IndirectObject
         try:
             stream = IndirectObject(stmnum, 0, reader).get_object()
         except Exception:
-            return True  # PyPDF2 raises the same error itself
+            return None
         if not hasattr(stream, 'get_data'):
-            return True
+            return None
         # An object stream is bounded by what is left of the document budget and not
         # by the attachment bound, because it can hold the page tree and the page
         # text. It is inflated here once, charged, and handed to the reader, so the
@@ -1190,13 +1209,15 @@ class PDFExtractor:
         data = self._bounded_stream_bytes(stream, f"object stream {stmnum}",
                                           cap=self.budget.MAX_BYTES)
         if data is None:
-            return False
+            return None
         if getattr(stream, 'decoded_self', 0) is None:
             from PyPDF2.generic import DecodedStreamObject
             decoded = DecodedStreamObject()
             decoded._data = data
             stream.decoded_self = decoded
-        return True
+        if getattr(stream, 'decoded_self', 0) is None:
+            return None
+        return stream
 
     @staticmethod
     def _container_kind(data: bytes) -> Optional[str]:
