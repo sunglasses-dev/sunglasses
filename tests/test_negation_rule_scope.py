@@ -4,7 +4,7 @@ Review of the previous round found five ways a downgraded first hit still hid a 
 nothing covers: a hit in another subject of the same input (a decoded, folded or tag
 encoded copy), a hit of another alternative of the same rule, a hit that begins inside the
 covered one, a closing mark that starts inside or straddles the end of the hit, and a
-keyword rule that repeats past the cap on the pure Python path.
+keyword rule that repeats many times on the pure Python path.
 """
 import pytest
 
@@ -123,9 +123,9 @@ def test_a_fence_that_closes_after_the_hit_is_still_a_quoted_example():
     assert result.decision == "allow_redacted" and _covered(result)
 
 
-# 5. The cap on later hits is the same on every path and fails closed past it.
+# 5. A repeated warning stays covered on every path, and a bare copy after it is read.
 @pytest.mark.parametrize("path", ["aho", "pure_python", "regex"])
-def test_the_later_hit_cap_is_the_same_on_every_path(path):
+def test_a_repeated_warning_stays_covered_on_every_path(path):
     if path == "regex":
         rule = _rule(regex=[r"(?i)\bzorbit now\b"])
     else:
@@ -133,7 +133,8 @@ def test_the_later_hit_cap_is_the_same_on_every_path(path):
         if path == "pure_python":
             rule._automaton = None
     one = "Do not zorbit now. "
-    at_cap = rule.scan(one * (1 + SunglassesEngine.LATER_HITS), channel="message")
-    assert at_cap.decision == "allow_redacted" and _covered(at_cap)
-    past_cap = rule.scan(one * (2 + SunglassesEngine.LATER_HITS), channel="message")
-    assert past_cap.decision in BLOCKING and not _covered(past_cap)
+    for times in (33, 34, 200):
+        repeated = rule.scan(one * times, channel="message")
+        assert repeated.decision == "allow_redacted" and _covered(repeated), times
+    bare = rule.scan(one * 200 + "zorbit now", channel="message")
+    assert bare.decision in BLOCKING and not _covered(bare)

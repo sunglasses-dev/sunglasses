@@ -188,7 +188,7 @@ def test_walking_a_lead_in_rule_forward_visits_each_start_once():
         assert starts == sorted(set(starts)), starts
 
 
-# 4. One count of later hits for the whole rule.
+# 4. Later hits are judged one by one, whatever their number and whichever alternative they match.
 def _two_alternatives():
     return _rule(regex=[r"(?i)\bzorbit now\b", r"(?i)\bvault later\b"])
 
@@ -197,37 +197,37 @@ def _text(first, second):
     return "Do not zorbit now. " * first + "Do not vault later. " * second
 
 
-@pytest.mark.parametrize("first,second,blocked", [
-    (16, 17, False),    # 33 hits, the first not counted: 32 later hits, at the cap
-    (17, 16, False),
-    (17, 17, True),     # 34 hits: one past the cap
-    (16, 18, True),
-    (40, 1, True),      # one alternative alone is past the cap
-])
-def test_the_cap_counts_later_hits_across_the_alternatives_of_a_rule(first, second, blocked):
+@pytest.mark.parametrize("first,second", [(16, 17), (17, 16), (17, 17), (16, 18), (40, 1)])
+def test_negated_later_hits_across_the_alternatives_of_a_rule_stay_covered(first, second):
+    # No count of negated copies turns a rule live: each occurrence is judged, inside a budget.
     result = _two_alternatives().scan(_text(first, second), channel="message")
-    if blocked:
-        assert result.decision in BLOCKING and not _covered(result)
-    else:
-        assert result.decision == "allow_redacted" and _covered(result)
+    assert result.decision == "allow_redacted" and _covered(result)
+
+
+@pytest.mark.parametrize("tail", ["zorbit now", "vault later"])
+def test_a_bare_hit_after_many_negated_ones_of_either_alternative_is_read(tail):
+    result = _two_alternatives().scan(_text(17, 17) + tail, channel="message")
+    assert result.decision in BLOCKING and not _covered(result), tail
 
 
 def test_the_distributed_text_gives_the_same_answer_on_the_keyword_path():
     rule = _rule(keywords=["zorbit now", "vault later"])
-    assert rule.scan(_text(17, 17), channel="message").decision in BLOCKING
-    assert rule.scan(_text(16, 17), channel="message").decision == "allow_redacted"
-    rule._automaton = None
-    assert rule.scan(_text(17, 17), channel="message").decision in BLOCKING
-    assert rule.scan(_text(16, 17), channel="message").decision == "allow_redacted"
+    for path in ("aho", "python"):
+        if path == "python":
+            rule._automaton = None
+        assert rule.scan(_text(17, 17), channel="message").decision == "allow_redacted", path
+        assert rule.scan(_text(16, 17), channel="message").decision == "allow_redacted", path
+        assert rule.scan(_text(17, 17) + "zorbit now", channel="message").decision in BLOCKING, path
 
 
-def test_the_cap_counts_across_the_subjects_a_rule_is_read_in():
-    # The raw text and the folded text are two subjects of one rule, and the cap is one count.
+def test_the_raw_and_folded_subjects_of_a_rule_are_both_covered_however_often_it_repeats():
     rule = _rule(regex=[r"(?i)\bzorbit now\b"])
     plain = "Do not zorbit now. " * 20
     assert rule.scan(plain, channel="message").decision == "allow_redacted"
     folded = rule.scan(plain + "\u200b", channel="message")
-    assert folded.decision in BLOCKING and not _covered(folded)
+    assert folded.decision == "allow_redacted" and _covered(folded)
+    live = rule.scan(plain + "\u200b" + "zorbit now", channel="message")
+    assert live.decision in BLOCKING and not _covered(live)
 
 
 # 5. A blank run behind a covered hit is the same words once, however long it is.
