@@ -84,15 +84,20 @@ def test_joint_first_and_later_hits(name, channel):
         assert result.decision == "allow_redacted", (name, channel)
 
 
-# The search for a later hit has a cap (LATER_HITS = 32 hits read after the first). A
-# document of framed descriptions of one mechanism keeps its downgrade up to the cap and
-# blocks past it: an exhausted search is a rejection, and this is the benign cost of it.
+# Every later hit is read inside a reading budget, not a count: a document of framed
+# descriptions of one mechanism keeps its downgrade however often it repeats (the cap
+# of 32 used to turn the 34th copy into a block), and a bare copy after them is read.
 @pytest.mark.parametrize("channel", CHANNELS)
-@pytest.mark.parametrize("copies,live", [(33, False), (34, True)])
-def test_framed_descriptions_at_the_later_hit_cap(copies, live, channel):
+@pytest.mark.parametrize("copies", [33, 34, 200])
+def test_framed_descriptions_stay_covered_however_often_they_repeat(copies, channel):
     text = "\n\n".join(_framed_description(COVERT) for _ in range(copies))
     result = SunglassesEngine().scan(text, channel=channel)
-    if live:
-        assert result.decision in BLOCKING, (copies, channel)
-    else:
-        assert result.decision == "allow_redacted", (copies, channel)
+    assert result.decision == "allow_redacted", (copies, channel)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("copies", [33, 34, 200])
+def test_a_bare_copy_after_many_framed_descriptions_is_read(copies, channel):
+    text = "\n\n".join(_framed_description(COVERT) for _ in range(copies)) + "\n\n" + COVERT
+    result = SunglassesEngine().scan(text, channel=channel)
+    assert result.decision in BLOCKING, (copies, channel)

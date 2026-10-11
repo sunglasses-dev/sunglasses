@@ -148,7 +148,7 @@ def test_a_covered_p3p_keyword_gives_allow_with_no_finding_as_on_main(text):
         assert _engine().scan(text, channel=channel).decision == "allow", (text, channel)
 
 
-# 4. The skip cap is one count for the rule, shared by its alternatives.
+# 4. The reading budget is one for the rule, whatever the number of its alternatives.
 ALTERNATIVES = [r"(?i)!*\s*zorbit now", r"(?i)!*\s*zorbit now\b",
                 r"(?i)!*\s*zorbit now(?=$|\W)", r"(?i)!*[ ]*zorbit now"]
 
@@ -158,13 +158,9 @@ def _decision(alternatives, run):
     return "covered" if _covered(result) else result.decision
 
 
-@pytest.mark.parametrize("alternatives,run,expected", [
-    (1, 31, "covered"), (1, 32, "block"),
-    (2, 15, "covered"), (2, 16, "block"),
-    (3, 5, "covered"), (3, 9, "covered"), (3, 10, "block"),
-    (4, 5, "covered"), (4, 7, "covered"), (4, 8, "block"), (4, 10, "block"),
-])
-def test_the_skip_cap_threshold_falls_as_the_alternatives_of_a_rule_grow(alternatives, run, expected):
+@pytest.mark.parametrize("alternatives", [1, 2, 3, 4])
+@pytest.mark.parametrize("run,expected", [(5, "covered"), (32, "covered"), (400, "covered"), (1600, "block")])
+def test_the_budget_does_not_fall_as_the_alternatives_of_a_rule_grow(alternatives, run, expected):
     assert _decision(alternatives, run) == expected, (alternatives, run)
 
 

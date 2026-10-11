@@ -106,7 +106,7 @@ def test_an_ordinary_folded_ampersand_leaves_the_text_behind_it_vouched_for():
     assert align.holds(view, 0, 3) is True
 
 
-# 3. The cap on the lead-in starts that are stepped over is one count for the whole rule.
+# 3. The alternatives of a rule share one budget, and none of them is cut short by a count.
 def _alternatives(count):
     words = ["zorbit now", "vault later", "quartz first", "ember last"][:count]
     return _rule(regex=[r"(?i)!*\s*" + w for w in words]), words
@@ -123,19 +123,21 @@ def test_each_alternative_alone_under_the_cap_stays_covered(count):
     assert result.decision == "allow_redacted" and _covered(result), count
 
 
-@pytest.mark.parametrize("run", [20, 31])
-def test_the_skip_cap_counts_across_the_alternatives_of_a_rule(run):
+@pytest.mark.parametrize("run", [20, 31, 100])
+def test_the_alternatives_of_a_rule_stay_covered_together(run):
     rule, words = _alternatives(2)
     one = _rule(regex=[r"(?i)!*\s*zorbit now"]).scan(_text(words[:1], run), channel="message")
     assert one.decision == "allow_redacted" and _covered(one), run
     both = rule.scan(_text(words, run), channel="message")
-    assert both.decision in BLOCKING and not _covered(both), run
+    assert both.decision == "allow_redacted" and _covered(both), run
 
 
-def test_the_skip_count_is_one_per_rule_and_not_per_alternative():
+def test_four_alternatives_stay_covered_together_and_a_bare_hit_after_them_is_read():
     rule, words = _alternatives(4)
     result = rule.scan(_text(words, 20), channel="message")
-    assert result.decision in BLOCKING
+    assert result.decision == "allow_redacted" and _covered(result)
+    live = rule.scan(_text(words, 20) + " Then: ember last", channel="message")
+    assert live.decision in BLOCKING and not _covered(live)
 
 
 # 4. A character whose lowercase is longer does not turn copies into new hits.
