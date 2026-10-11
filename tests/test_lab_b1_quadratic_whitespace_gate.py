@@ -31,7 +31,8 @@ own id.
    a shape that is quadratic from a single start is reached), under a 0.5 s
    alarm per probe. A run that follows an opening bracket is probed too
    (`seed(` then the run): a blank run split between `\\(\\s*` and a lazy class
-   after it, as GLS-SQLFS-001 had, is only reached when a bracket comes first.
+   after it, as GLS-SQLFS-001 had, is only reached when a bracket comes first. The same
+   goes for a run after a keyword inside the bracket (`seed(BULK` then the run).
    Linear entries take milliseconds at this size.
 
 KNOWN_SHAPE and KNOWN_SLOW list the entries that are red today, each a strict
@@ -83,7 +84,7 @@ KNOWN_SLOW = {
     ("GLS-CICD-004", 0): "guarded predicate with a large per-byte constant; 9 probes over (guarded)",
     ("GLS-AW-713", 0): "guarded predicate, own design needed; 2 probes over (guarded)",
     # Found by the bracket probe row (a run of blanks right after an opening bracket): over the cap
-    # at 16,000 characters, growing with the square of the run. `\(\s*['"]?[^)]*\b` splits
+    # at the probe size, growing with the square of the run. `\(\s*['"]?[^)]*\b` splits
     # the run between `\s*` and `[^)]*`, the same shape GLS-SQLFS-001 had. Fix like SQLFS-001.
     ("GLS-SSRF-008", 0): "blank run after the bracket split between \\s* and [^)]*; 3 probes over (plain)",
 }
@@ -184,6 +185,7 @@ def _probe_texts(seeds):
         texts[f"{seed!r}+newline run"] = seed + "\n" * PROBE_LEN
         texts[f"{seed!r}+space run"] = seed + " " * PROBE_LEN
         texts[f"{seed!r}+bracket then space run"] = seed + "(" + " " * PROBE_LEN
+        texts[f"{seed!r}+bulk then space run"] = seed + "(BULK" + " " * PROBE_LEN
     return texts
 
 

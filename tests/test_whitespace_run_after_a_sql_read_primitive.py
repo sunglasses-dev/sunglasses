@@ -1,19 +1,22 @@
 """GLS-SQLFS-001 stays linear on a long run of blank space around its bracket.
 
-The first regex of the rule had two places where two unbounded whitespace
+The first regex of the rule had three places where two unbounded whitespace
 quantifiers could split one run of blanks between them:
 
 1. `\\s*(?:/\\*.*?\\*/)?\\s*\\(` after the primitive, with only an optional comment between
-   the two. After a primitive and N blanks with no bracket the engine tried every
-   split before it gave up: about N^2 steps. The lab B1 timed probe (16,000
-   characters, 0.5 s cap) is there to catch exactly that.
+   the two. After a primitive and a long run of blanks with no bracket the engine tried
+   every split before it gave up, so the cost grew with the square of the run. The lab B1
+   timed probe is there to catch exactly that.
 2. `\\(\\s*(?:BULK\\s+)?['\"]?[^'\")]*?(path)` after the bracket. `[^'\")]` takes blanks too,
-   so a run after the bracket was split between `\\s*` and the lazy class the same way:
-   about N^2 steps whenever no sensitive path followed. The lab gate does not put a
-   bracket in its probe, so it never reached this one.
+   so a run after the bracket was split between `\\s*` and the lazy class the same way,
+   and the cost grew with the square of the run whenever no sensitive path followed. The
+   lab gate did not put a bracket in its probe at the time, so it never reached this one.
+3. `BULK\\s+` followed by an optional quote group and the lazy class. The required blank
+   after BULK, the blanks in front of the quote and the class all competed for one run.
 
 The fix gives each run to one quantifier: the comment brings its own trailing blanks,
-and the blanks before BULK or before a quote belong to those two optional groups.
+the blanks before BULK or before a quote belong to those two optional groups, and BULK
+only checks that a blank follows while the quote group or the class takes the run itself.
 The new pattern accepts exactly the strings the old pattern accepted, with the same
 span and groups.
 """
@@ -78,15 +81,22 @@ def _shared_engine():
 
 
 def test_the_first_regex_is_the_one_under_test():
-    assert "(?:/\\*.*?\\*/\\s*)?\\((?:\\s*BULK\\s+)?(?:\\s*['\\\"])?" in NEW
+    assert "(?:/\\*.*?\\*/\\s*)?\\((?:\\s*BULK(?=\\s))?(?:\\s*['\\\"])?" in NEW
 
 
 @pytest.mark.parametrize("primitive", PRIMITIVES)
 @pytest.mark.parametrize("blank", [" ", "\n", "\t", "\r\n"])
-@pytest.mark.parametrize("shape", ["bare", "comment", "bracket"])
+@pytest.mark.parametrize("shape", ["bare", "comment", "bracket", "bulk", "bulk_quote", "comment_bulk"])
 def test_a_long_run_of_blank_space_after_the_primitive_stays_under_the_cap(primitive, blank, shape):
     rx = re.compile(NEW)
-    tail = {"bare": "", "comment": "/* x */" + blank * PROBE_LEN, "bracket": "(" + blank * PROBE_LEN}[shape]
+    tail = {
+        "bare": "",
+        "comment": "/* x */" + blank * PROBE_LEN,
+        "bracket": "(" + blank * PROBE_LEN,
+        "bulk": "(BULK" + blank * PROBE_LEN,
+        "bulk_quote": "(BULK" + blank * PROBE_LEN + "'",
+        "comment_bulk": "/* x */(" + blank + "BULK" + blank * PROBE_LEN + '"',
+    }[shape]
     text = primitive + blank * PROBE_LEN + tail
     assert _seconds(lambda: rx.search(text), CAP_S) < CAP_S
 
@@ -95,7 +105,17 @@ def test_a_long_run_of_blank_space_after_the_primitive_stays_under_the_cap(primi
 def test_the_cost_does_not_grow_with_the_square_of_the_run(n):
     rx = re.compile(NEW)
     text = "pg_read_file" + " " * n
-    # A linear pattern is far under the limit at 64,000 characters, a quadratic one is over it.
+    # A linear pattern stays far under the limit at the largest run, a quadratic one goes over it.
+    assert _seconds(lambda: rx.search(text), 0.25) < 0.25
+
+
+@pytest.mark.parametrize("n", [16_000, 32_000, 64_000])
+@pytest.mark.parametrize("quote", ["", "'", '"'])
+@pytest.mark.parametrize("comment", ["", "/* x */"])
+def test_the_cost_after_bulk_does_not_grow_with_the_square_of_the_run(n, quote, comment):
+    rx = re.compile(NEW)
+    text = "OPENROWSET" + comment + "(BULK" + " " * n + quote
+    # BULK needs a blank after it, but the run itself belongs to the quote group or the class.
     assert _seconds(lambda: rx.search(text), 0.25) < 0.25
 
 
@@ -134,6 +154,18 @@ FIXTURES = [
     "pg_read_file(  'a' /etc/passwd",
     "pg_read_file(   )/etc/passwd",
     "pg_read_file(/* c */ '/etc/passwd')",
+    "OPENROWSET(BULK   \"/etc/passwd\"",
+    "OPENROWSET(BULK\t\t'/root/x'",
+    "OPENROWSET( BULK   x   '/etc/shadow'",
+    "OPENROWSET(BULK   /etc/shadow",
+    "OPENROWSET(BULK   )   /etc/shadow",
+    "OPENROWSET(bulk\n\n\"id_rsa\"",
+    "OPENROWSET(BULK'/etc/shadow'",
+    "OPENROWSET(BULK",
+    "OPENROWSET(BULK ",
+    "OPENROWSET(BULK   '   /etc/shadow'",
+    "OPENROWSET(BULK   ' x ' /root/",
+    "OPENROWSET /**/ (  BULK  \"  .env\"",
 ]
 
 
@@ -148,7 +180,7 @@ def test_the_new_pattern_matches_exactly_what_the_old_one_matched(text):
 def test_a_seeded_fuzz_agrees_with_the_old_pattern():
     rng = random.Random(1)
     vocab = ["pg_read_file", "LOAD_FILE", "OPENROWSET", "pg_stat_file", "(", "(", ")", "'", '"', "BULK", "bulk ",
-             "/*", "*/", "/**/", "/* x */", " ", " ", "  ", "\n", "\t", "/etc/passwd", "/etc/ssh/", "id_rsa",
+             "/*", "*/", "/**/", "/* x */", " ", " ", "  ", "\n", "\t", "BULK  ", "BULK\n", "/etc/passwd", "/etc/ssh/", "id_rsa",
              ".env", "private_key", "x", "/", "*", "a.pem"]
     old, new, hits = re.compile(OLD), re.compile(NEW), 0
     for _ in range(30_000):
