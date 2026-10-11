@@ -26,14 +26,14 @@ own id.
 
 2. Timed probe (`slow` marker, needs SIGALRM, main thread). Each entry is
    evaluated the way the engine evaluates it (`_eval_regex` with the entry's
-   mode) on whitespace runs of 16,000 characters, seeded with the literals
+   mode) on whitespace runs of PROBE_LEN characters, seeded with the literals
    the prefilter requires (joined, and each one alone right before the run, so
-   a shape that is quadratic from a single start is reached), under a 0.5 s
+   a shape that is quadratic from a single start is reached), under a CAP_S
    alarm per probe. A run that follows an opening bracket is probed too
    (`seed(` then the run): a blank run split between `\\(\\s*` and a lazy class
    after it, as GLS-SQLFS-001 had, is only reached when a bracket comes first. The same
    goes for a run after a keyword inside the bracket (`seed(BULK` then the run).
-   Linear entries take milliseconds at this size.
+   A linear entry finishes far inside the cap.
 
 KNOWN_SHAPE and KNOWN_SLOW list the entries that are red today, each a strict
 xfail: fixing one without removing it from the list fails the suite, which is
@@ -73,11 +73,11 @@ KNOWN_SHAPE = {
     ("GLS-DFP-069", 0): r"channels\s*:\s*\n\s*-\s -> channels\s*:[^\S\n]*\n\s*-\s",
 }
 
-# Entries over the 0.5 s cap at 16,000 characters on this machine today, the
+# Entries over the cap at the probe length on this machine today, the
 # way the engine runs them. Measured list, see the PR for the receipt.
 KNOWN_SLOW = {
-    # Measured on main ef825e92b273 (Oct 8 2026 06:34 PT) with the lab round-1 gate at 16,000
-    # characters under a 0.5 s cap: exactly these five entries went over, 0.50 to 0.51 s each.
+    # Measured on main ef825e92b273 (Oct 8 2026) with the lab round-1 gate: exactly these five
+    # entries went over the cap.
     # The six KNOWN_SHAPE sources did not, because the engine judges them on the twin.
     ("GLS-SC-018", 0): "double quantifier under a bounded .{0,120}; 2 probes over (plain)",
     ("GLS-CF-251", 0): "decision then a run; 2 probes over (plain)",
