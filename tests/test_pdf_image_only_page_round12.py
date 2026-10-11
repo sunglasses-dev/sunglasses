@@ -106,7 +106,7 @@ def test_the_predictor_does_not_run_on_space_the_setup_already_spent(monkeypatch
     stream = _Stream(zlib.compress(bytes(22)),
                      **{"/Filter": ["/FlateDecode"],
                         "/DecodeParms": [{"/Predictor": 12, "/Columns": 10}]})
-    # 22 bytes inflated, 22 more reserved for the predictor, and two entries of setup at VISIT each
+    # the inflated bytes, the same again reserved for the predictor, and two entries of setup at the cost of a visit each
     n = len(stream._data)
     assert pdf_module._decode_bounded(stream, 2 * VISIT + 44 + n - 1, _charging(VISIT)).state == "big"
     assert ran == []

@@ -61,14 +61,14 @@ def test_a_row_longer_than_what_is_left_of_the_budget_is_refused_before_the_pred
 
 @pytest.mark.parametrize("bits", [16, 64])
 def test_the_row_is_measured_in_bytes_not_columns(predictor_calls, bits):
-    # 1000 columns of 16 or 64 bits are 2000 or 8000 bytes a row, more than a budget of 1500.
+    # A row of that many columns at 16 or 64 bits is wider than the whole budget.
     result = pdf_module._decode_bounded(_stream(b"\x00" * 10, 1000, bits=bits), 1500)
     assert predictor_calls == []
     assert result.state == "big"
 
 
 def test_the_output_is_reserved_before_the_predictor_runs(predictor_calls):
-    # Nine rows of nine columns inflate to 90 bytes; the predictor would add 90 more.
+    # The rows inflate to a small output; the predictor would add as much again.
     result = pdf_module._decode_bounded(_stream(b"\x00" * 90, 9), 100)
     assert predictor_calls == []
     assert result.state == "big"

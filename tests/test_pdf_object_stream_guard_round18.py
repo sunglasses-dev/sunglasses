@@ -24,6 +24,9 @@ from PyPDF2 import filters as pdf_filters
 from sunglasses.extractors import pdf as pdf_module
 from sunglasses.extractors.pdf import PDFExtractor
 
+# The ledger is held to whole-stream bands, not to an exact figure: a stream decoded and charged once
+# puts at least its own size on the budget and less than twice it, and a stream nothing looked into
+# puts nothing there. SMALL is the size of the padding of a small stream and LARGE of a large one.
 SMALL = 4096
 LARGE = 1 << 16
 

@@ -64,7 +64,7 @@ def test_a_predictor_that_fails_cannot_be_repeated_for_free(failing_predictor):
         except pdf_module._WalkBudget:
             stopped = page
             break
-    # 64 MiB at two MiB a page is 32 pages; without the reservation it is 64.
+    # With the reservation the walk stops at about half the pages it would reach without it.
     assert stopped is not None and stopped <= 34, stopped
 
 

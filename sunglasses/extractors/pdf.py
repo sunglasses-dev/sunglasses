@@ -1873,7 +1873,7 @@ class PDFExtractor:
     def _extract_annotations(self, page) -> List[Tuple[str, str]]:
         """Extract text from page annotations.
 
-        v0.5.6 round 4 (ASTRA F4). This was one `try` around the WHOLE loop with
+        This was one `try` around the WHOLE loop with
         `except Exception: pass`. A structurally valid PDF whose annotation array
         starts with a string instead of a dictionary raised on element 0, the
         `except` swallowed it, and the loop was abandoned -- so the instruction

@@ -3,7 +3,7 @@
 The fourteenth round refused a text or byte value longer than any number before `int()` was called
 on it, and left a number object as it stood. A decimal number object (the reader's FloatObject)
 holds every digit that was written in the file, and `int()` on it is not linear in the digits, so
-a parameter with a hundred thousand digits was converted at a cost nothing had charged. A number
+a parameter with a very long run of digits was converted at a cost nothing had charged. A number
 object with more digits than any number written in a PDF, or an exponent that large, is now refused
 the way a long text value is, and the stream is reported as an error.
 """

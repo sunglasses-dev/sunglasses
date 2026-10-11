@@ -129,10 +129,10 @@ def test_the_intermediate_output_of_a_chain_is_charged(tmp_path, monkeypatch):
     from sunglasses.extractors import pdf as pdf_module
 
     final = IM + b" " * 600_000
-    middle = base64.a85encode(final) + b"~>"   # about 750 KB of text before the last stage
+    middle = base64.a85encode(final) + b"~>"   # a long run of text before the last stage
     body = zlib.compress(middle, 9)
     path = group_pdf(tmp_path / "c.pdf", body, b" /Filter [/FlateDecode /ASCII85Decode]")
-    # The final output fits in a megabyte; the stage in front of it does not leave room.
+    # The final output fits the cap; the stage in front of it does not leave room.
     monkeypatch.setattr(pdf_module._ReadBudget, "MAX_BYTES", 1 << 20)
     result = _extract(path)
     assert result.complete is False and _warned(result), result.warnings
