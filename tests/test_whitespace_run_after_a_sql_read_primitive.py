@@ -5,8 +5,8 @@ quantifiers could split one run of blanks between them:
 
 1. `\\s*(?:/\\*.*?\\*/)?\\s*\\(` after the primitive, with only an optional comment between
    the two. After a primitive and N blanks with no bracket the engine tried every
-   split before it gave up: about N^2 steps. At 16,000 characters that sat on the
-   0.5 s cap of the lab B1 timed probe and tipped over it on a slow runner.
+   split before it gave up: about N^2 steps. The lab B1 timed probe (16,000
+   characters, 0.5 s cap) is there to catch exactly that.
 2. `\\(\\s*(?:BULK\\s+)?['\"]?[^'\")]*?(path)` after the bracket. `[^'\")]` takes blanks too,
    so a run after the bracket was split between `\\s*` and the lazy class the same way:
    about N^2 steps whenever no sensitive path followed. The lab gate does not put a
@@ -95,7 +95,7 @@ def test_a_long_run_of_blank_space_after_the_primitive_stays_under_the_cap(primi
 def test_the_cost_does_not_grow_with_the_square_of_the_run(n):
     rx = re.compile(NEW)
     text = "pg_read_file" + " " * n
-    # 64,000 characters took 5 s on the old pattern; linear is a few milliseconds.
+    # A linear pattern is far under the limit at 64,000 characters, a quadratic one is over it.
     assert _seconds(lambda: rx.search(text), 0.25) < 0.25
 
 
