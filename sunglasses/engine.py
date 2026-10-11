@@ -322,9 +322,13 @@ class _Walk:
     # How many times one walk asks the gate about a start character that precedes an escape; a
     # walk that has asked this often stops vouching, which is the cautious answer.
     GUARD_CHECKS = 64
+    # The longest run of spaces that collapses to one space without the walk counting the
+    # collapse as an edit; a longer run hides how far apart the words are. Tabs and line
+    # breaks are always counted.
+    BLANK_RUN = 8
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "blanks")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -340,6 +344,7 @@ class _Walk:
         self.dead = False
         self.changed = []  # view indexes whose character is not the raw character
         self.cuts = []     # view indexes where raw characters were deleted before it
+        self.blanks = []   # view indexes of a blank that is the one space left of a run of blanks
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
@@ -668,9 +673,14 @@ class _Walk:
             if c.isspace():
                 if view[i] == " ":
                     self.changed.append(i)
+                    self.blanks.append(i)  # another kind of blank, read as the one space
                     self.i = i + 1
                 else:
-                    self.cuts.append(i)
+                    run = i > 0 and view[i - 1] == " " and raw[j - 1].isspace()
+                    if not (run and self._short_run(j)):
+                        self.cuts.append(i)
+                    if run:
+                        self.blanks.append(i)  # the rest of a run of blanks, collapsed to one
                 self.j = j + 1
                 continue
             used, readings = self._produced(j)
@@ -704,6 +714,30 @@ class _Walk:
         k = bisect.bisect_right(self.cuts, lo)
         return not (k < len(self.cuts) and self.cuts[k] < hi)
 
+    def _short_run(self, j: int) -> bool:
+        """True if raw[j] is a space in a run of spaces of at most BLANK_RUN."""
+        raw = self.raw
+        if raw[j] != " ":
+            return False
+        lo = j
+        while lo > 0 and raw[lo - 1] == " " and j - lo < self.BLANK_RUN:
+            lo -= 1
+        hi = j + 1
+        while hi < len(raw) and raw[hi] == " " and hi - lo <= self.BLANK_RUN:
+            hi += 1
+        return hi - lo <= self.BLANK_RUN
+
+    def hit_end(self, start: int, stop: int) -> int:
+        """Where the opening of a match, view[start:stop], ends for the check that it reads the
+        same in the raw input: at the first blank inside it that the view collapsed from a run
+        or mapped from another blank, since the words on both sides of that blank are what the
+        check is about and the blank itself is read as the one space it became."""
+        self.advance(stop)
+        k = bisect.bisect_right(self.blanks, start)
+        if k < len(self.blanks) and self.blanks[k] < stop:
+            return self.blanks[k]
+        return stop
+
 
 class _RawAlign:
     """Whether view[lo:hi] reads as the same characters in the raw input.
@@ -729,13 +763,19 @@ class _RawAlign:
         # What normalize_with_length reported for this input; None to ask the pipeline.
         self._record = record
 
-    def holds(self, view: str, lo: int, hi: int) -> bool:
+    def _walk(self, view: str) -> "_Walk":
         walk = self._walks.get(id(view))
         if walk is None or walk.view is not view:
             if self._low is None:
                 self._low = _ascii_lower(self._raw)
             walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
-        return walk.holds(lo, hi)
+        return walk
+
+    def holds(self, view: str, lo: int, hi: int) -> bool:
+        return self._walk(view).holds(lo, hi)
+
+    def hit_end(self, view: str, start: int, stop: int) -> int:
+        return self._walk(view).hit_end(start, stop)
 
     @staticmethod
     def view_end(view: str, pos: int) -> int:
@@ -984,7 +1024,8 @@ class SunglassesEngine:
     # phrase is matched at word boundaries ("do nothing" is not "do not"), and
     # the gap between the phrase and the match is judged by an allowlist, not by
     # a list of bad characters. It must be plain ASCII words (letters, digits and
-    # hyphens) joined by single spaces, at most NEGATION_GAP_WORDS of them, with no
+    # hyphens) joined by single spaces (a run of up to _Walk.BLANK_RUN spaces counts as one),
+    # at most NEGATION_GAP_WORDS of them, with no
     # clause word and no verb of omission first ("fail to run X" after a
     # negation means run X). Any other character in the gap, a comma, a line
     # break or a look-alike, means the negation does not govern. A quoted
@@ -994,11 +1035,15 @@ class SunglassesEngine:
     # raw input (see _RawAlign), so nothing was decoded, erased or folded inside
     # them. A framing label downgrades only a quoted payload, with the same
     # closing-quote rule as a negation (_quoted_gap_holds).
-    NEGATION_GAP_WORDS = 2
-    _NEGATION_CLAUSE_WORDS = frozenset(("then", "now", "but", "so", "instead", "and", "or"))
+    NEGATION_GAP_WORDS = 4
+    _NEGATION_CLAUSE_WORDS = frozenset(("then", "now", "but", "so", "instead", "or"))
     _NEGATION_FLIP_WORDS = frozenset(("hesitate", "fail", "forget", "refuse", "neglect", "omit", "skip", "miss"))
     _NEGATION_RX = re.compile(
         r"(?<![\w'’])(?:" + "|".join(re.escape(p) for p in TRUE_NEGATIONS) + r")(?![\w'’])")
+    # A run of spaces between two words of the gap reads as the one space it would be
+    # in a view that collapses blanks; a longer run (more than _Walk.BLANK_RUN) is kept as is
+    # and fails the allowlist.
+    _GAP_BLANKS_RX = re.compile(" {1,%d}" % _Walk.BLANK_RUN)
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
     # A framing label asks for a quoted payload, so the gap after a label is one
@@ -1830,7 +1875,8 @@ class SunglassesEngine:
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
         if align is not None:
-            hit_end = min(match_start + _RawAlign.HIT, _RawAlign.view_end(text, match_start))
+            hit_end = align.hit_end(text, match_start,
+                                    min(match_start + _RawAlign.HIT, _RawAlign.view_end(text, match_start)))
         for m in self._NEGATION_RX.finditer(before_text):
             # A window that starts inside a word would read a word fragment as a cue.
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
@@ -1920,9 +1966,11 @@ class SunglassesEngine:
     def _negation_governs(self, gap: str) -> bool:
         """True if the text between a TRUE_NEGATION and the match keeps the
         match inside the negated clause. The gap is accepted only when it is
-        plain ASCII words (letters, digits, hyphens) joined by single spaces,
-        within NEGATION_GAP_WORDS, with no clause word and no leading verb of
+        plain ASCII words (letters, digits, hyphens) joined by single spaces
+        (a run of up to _Walk.BLANK_RUN spaces counts as one), within
+        NEGATION_GAP_WORDS, with no clause word and no leading verb of
         omission. Anything else in the gap means it does not govern."""
+        gap = self._GAP_BLANKS_RX.sub(" ", gap)
         if not self._NEGATION_GAP_RX.fullmatch(gap):
             return False
         words = gap.split()
