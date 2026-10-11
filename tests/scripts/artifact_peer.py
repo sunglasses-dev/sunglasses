@@ -2,7 +2,8 @@ from pathlib import Path
 import sys,os,json,time,threading
 from sunglasses.proxy.echo_server import handle,TOOLS
 plan=json.loads(Path(sys.argv[1]).read_text());root=Path(plan['root']);root.mkdir(exist_ok=True,parents=True)
-(root/'child.json').write_text(json.dumps({'pid':os.getpid(),'pgid':os.getpgid(0)}))
+# written whole under another name and moved into place, so a reader sees no file or the whole file
+(root/'child.json.tmp').write_text(json.dumps({'pid':os.getpid(),'pgid':os.getpgid(0)}));os.replace(root/'child.json.tmp',root/'child.json')
 lock=threading.Lock()
 def emit(m):
  raw=(json.dumps(m,separators=(',',':'))+'\n').encode()
