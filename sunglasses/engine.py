@@ -307,6 +307,21 @@ def _ascii_lower(text: str) -> str:
     return text.translate(_ASCII_LOWER)
 
 
+def _fold_text(text: str) -> str:
+    """The folded view, built the way scan() builds it."""
+    return replace_homoglyphs(normalize_unicode(strip_invisible(text)))
+
+
+def _compact_text(text: str) -> str:
+    """The view that only deletes and maps, built the way scan() builds it."""
+    return replace_homoglyphs(strip_invisible(text))
+
+
+def _normal_text(text: str) -> str:
+    """The normalized view, built the way scan() builds it."""
+    return normalize_with_length(text)[0]
+
+
 class _Walk:
     """One view of the input walked in step with the raw input.
 
@@ -327,7 +342,8 @@ class _Walk:
     BLANK_RUN = 8
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard",
+                 "mark_i", "mark_j")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -345,6 +361,8 @@ class _Walk:
         self.cuts = []     # view indexes where raw characters were deleted before it
         self.soft = set()  # view indexes with a cut that only collapses a run of plain spaces
         self.hard = set()  # view indexes with any other cut; one of these ends the tolerance there
+        self.mark_i = [0]  # view index where an identical run starts ...
+        self.mark_j = [0]  # ... and the raw index it starts at
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
@@ -670,6 +688,7 @@ class _Walk:
                 self.cuts.append(i)
                 self.hard.add(i)
                 self.j = j + 1
+                self._mark()
                 continue
             if c.isspace():
                 if view[i] == " ":
@@ -682,6 +701,7 @@ class _Walk:
                     else:
                         self.hard.add(i)
                 self.j = j + 1
+                self._mark()
                 continue
             used, readings = self._produced(j)
             for reading in readings:
@@ -698,6 +718,7 @@ class _Walk:
                         self.changed.extend(range(i, i + len(reading)))
                     self.i = i + len(reading)
                     self.j = j + used
+                    self._mark()
                     break
             else:
                 self.dead = True
@@ -716,6 +737,25 @@ class _Walk:
         while hi < len(raw) and raw[hi].isspace() and hi - lo <= self.BLANK_RUN:
             hi += 1
         return lo < j and hi - lo <= self.BLANK_RUN and raw.count(" ", lo, hi) == hi - lo
+
+    def _mark(self) -> None:
+        self.mark_i.append(self.i)
+        self.mark_j.append(self.j)
+
+    def origin(self, pos: int):
+        """Raw index of the character at view[pos], or None. Only a character that
+        is identical in both and sits before the first unexplained difference has
+        one: a mapped, expanded or decoded character has no single raw index."""
+        if pos < 0 or pos >= self.limit:
+            return None
+        self.advance(pos + 1)
+        if self.i <= pos:
+            return None
+        k = bisect.bisect_left(self.changed, pos)
+        if k < len(self.changed) and self.changed[k] == pos:
+            return None
+        k = bisect.bisect_right(self.mark_i, pos) - 1
+        return self.mark_j[k] + (pos - self.mark_i[k])
 
     def holds(self, lo: int, hi: int, spaced=None) -> bool:
         """True if view[lo:hi] reads as the same characters in the raw input. ``spaced`` is a
@@ -762,6 +802,29 @@ class _RawAlign:
         self._walks = {}
         # What normalize_with_length reported for this input; None to ask the pipeline.
         self._record = record
+        self._moved = {}
+        self._seps = {}
+
+    def moved(self, view: str, pos: int) -> bool:
+        """Whether view[pos] stands in a reversed view: a view behind the plain one that
+        holds everything before it written backwards, where the character at an offset
+        is not the character the input has there. What such a view says about its hit
+        is not what the input says at that place, so a negation read in it never
+        downgrades."""
+        cached = self._moved.get(id(view))
+        if cached is None or cached[0] is not view:
+            sep = " " + VIEW_SEP + " "
+            spans = []
+            at = view.find(sep)
+            while at != -1:
+                lo = at + len(sep)
+                # The reversed view is the whole text before it, written backwards, so
+                # it holds the separators of that text too.
+                if lo + at <= len(view) and view[lo:lo + at] == view[:at][::-1]:
+                    spans.append((lo, lo + at))
+                at = view.find(sep, at + 1)
+            cached = self._moved[id(view)] = (view, spans)
+        return any(lo <= pos < hi for lo, hi in cached[1])
 
     def holds(self, view: str, lo: int, hi: int, spaced=None) -> bool:
         walk = self._walks.get(id(view))
@@ -771,11 +834,249 @@ class _RawAlign:
             walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
         return walk.holds(lo, hi, spaced)
 
+    def origin(self, view: str, pos: int):
+        """Raw index of view[pos] (see _Walk.origin), or None."""
+        walk = self._walks.get(id(view))
+        if walk is None or walk.view is not view:
+            if self._low is None:
+                self._low = _ascii_lower(self._raw)
+            walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
+        return walk.origin(pos)
+
+    def covers(self, view: str, pos: int) -> bool:
+        """Whether the walk of `view` got past view[pos] before it ended. False
+        means the raw text does not say where that character came from."""
+        walk = self._walks.get(id(view))
+        if walk is None or walk.view is not view:
+            if self._low is None:
+                self._low = _ascii_lower(self._raw)
+            walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
+        walk.advance(pos + 1)
+        return walk.i > pos
+
     @staticmethod
     def view_end(view: str, pos: int) -> int:
         """End of the view that holds pos: the next view separator, or the end."""
         end = view.find(" " + VIEW_SEP + " ", pos)
         return len(view) if end == -1 else end
+
+    def end_of_view(self, view: str, pos: int) -> int:
+        """Same as view_end, with the separators of `view` found once, so that each of
+        many hits in one view costs a bisection and not a search to the end of the text."""
+        kept = self._seps.get(id(view))
+        if kept is None or kept[0] is not view:
+            sep = " " + VIEW_SEP + " "
+            found, at = [], view.find(sep)
+            while at != -1:
+                found.append(at)
+                at = view.find(sep, at + 1)
+            kept = self._seps[id(view)] = (view, found)
+        k = bisect.bisect_left(kept[1], pos)
+        return kept[1][k] if k < len(kept[1]) else len(view)
+
+
+class _RawCopies:
+    """Whether the raw text negates every copy of the opening of a match.
+
+    Used for a match in a folded view that the raw text cannot place, because
+    the walk of that view ended before it (an unexplained difference earlier in
+    the text). The view's own lookback may fall short of a negator that the fold
+    pushed out of range, and the raw text cannot say which occurrence the match
+    is. It can still count: the opening of the match, read as it stands, is
+    looked up in the raw text and in the view. The match is a copy of a raw
+    occurrence, and is negated, only when every occurrence in the raw text is
+    negated there and the view holds no more occurrences than the raw text has
+    that the view still shows. Whether a raw copy is still shown is read off the
+    view itself: a mark that sits in front of each copy and passes through every
+    step of the pipeline unchanged says which words in the view came from that
+    place, and the view built from the marked text must be the view of the
+    unmarked text with the marks taken out, or no copy is counted. A copy that
+    the fold changes (a mark that merges into its last letter, however far
+    behind it, or invisible characters between) is not shown, so the same words
+    written in an encoding fill no slot that a vanished copy left. Spaces in the
+    opening match any run of blank space in the raw text, because the pipeline
+    collapses a run to one. A view with an extra occurrence, one live raw copy,
+    or no raw copy at all (the words exist only after decoding) leaves the match
+    to the view's own judgement. The number of distinct openings looked up is
+    bounded, past it the view's own judgement stands, the stricter side."""
+
+    OPEN = 48      # characters of the match that are looked up
+    DISTINCT = 8   # distinct openings looked up per scan
+    MARK = "\ue000"  # a private use character that no pipeline step changes
+
+    def __init__(self, raw: str, negated):
+        self._raw = raw
+        self._low = None
+        self._flat = None
+        self._flat_at = self._raw_at = None
+        self._seen = {}
+        self._negated = negated
+
+    @staticmethod
+    def _count(low: str, key: str) -> int:
+        n, at = 0, low.find(key)
+        while at != -1:
+            n += 1
+            at = low.find(key, at + 1)
+        return n
+
+    _BLANK = re.compile(r"\s+")
+
+    def _collapsed(self):
+        """The lowered raw text with every run of blank space read as one space,
+        and where each piece of it starts in the flat text and in the raw text."""
+        if self._flat is None:
+            low = self._low
+            pieces, flat_at, raw_at, size, last = [], [], [], 0, 0
+            for run in self._BLANK.finditer(low):
+                if run.start() > last:
+                    pieces.append(low[last:run.start()])
+                    flat_at.append(size)
+                    raw_at.append(last)
+                    size += run.start() - last
+                pieces.append(" ")
+                flat_at.append(size)
+                raw_at.append(run.start())
+                size += 1
+                last = run.end()
+            if last < len(low):
+                pieces.append(low[last:])
+                flat_at.append(size)
+                raw_at.append(last)
+            self._flat, self._flat_at, self._raw_at = "".join(pieces), flat_at, raw_at
+        return self._flat
+
+    def _copies(self, key: str):
+        """Where the opening starts in the raw text, a space in it standing for
+        any run of blank space. One pass over the text read with its blank runs
+        collapsed, so a long run costs what it is long and the number of spaces in
+        the opening does not matter."""
+        flat = self._collapsed()
+        want = self._BLANK.sub(" ", key)
+        found, at, k = [], flat.find(want), 0
+        starts, last = self._flat_at, len(self._flat_at) - 1
+        while at != -1:
+            # The offsets only grow, so the piece they fall in is found by moving
+            # a cursor forward, not by a lookup per copy.
+            while k < last and starts[k + 1] <= at:
+                k += 1
+            found.append(self._raw_at[k] + at - starts[k])
+            at = flat.find(want, at + len(want))
+        return found
+
+    def negated(self, view_id: int, view: str, plain_end: int, opening: str, build) -> bool:
+        """`view` is the view `view_id`, its plain text ends at `plain_end`, and
+        `build(text)` is the function that built it from the raw text."""
+        key = _ascii_lower(opening)
+        token = (view_id, key)
+        known = self._seen.get(token)
+        if known is not None:
+            return known
+        if not key or len(self._seen) >= self.DISTINCT:
+            return False
+        if self._low is None:
+            self._low = _ascii_lower(self._raw)
+        verdict = False
+        copies = self._copies(key)
+        if copies and self.MARK not in self._raw:
+            verdict = all(self._negated(self._raw, at) for at in copies)
+            if verdict:
+                wanted = self._count(_ascii_lower(view[:plain_end]), key)
+                verdict = wanted <= self._shown(build, view, plain_end, copies, key)
+        self._seen[token] = verdict
+        return verdict
+
+    def _shown(self, build, view: str, plain_end: int, copies, key: str) -> int:
+        """How many of the raw copies the view still shows as `key`, or 0 when
+        the marks changed anything else in the view."""
+        mark, raw = self.MARK, self._raw
+        parts, last = [], 0
+        for at in copies:
+            parts.append(raw[last:at])
+            parts.append(mark)
+            last = at
+        parts.append(raw[last:])
+        marked = build("".join(parts))
+        if marked.replace(mark, "") != view:
+            return 0
+        low = _ascii_lower(marked)
+        shown, seen, at = 0, 0, low.find(mark)
+        while at != -1:
+            # The mark's place in the unmarked view is its place here less the marks before it.
+            if at - seen < plain_end and low.startswith(key, at + 1):
+                shown += 1
+            seen += 1
+            at = low.find(mark, at + 1)
+        return shown
+
+
+class _ReadBudget:
+    """The reads one walk over later occurrences of ONE regex in ONE text may make.
+
+    `reserve(resume)` is asked before every search and says whether the budget
+    holds the worst case of a search that starts at `resume`; `charge` takes what
+    the search really cost. What a search costs depends on the mode, and each mode
+    is priced from what it really does:
+
+    * plain (and the anchored mode's "whole" plan): an attempt at every offset. An
+      offset whose character cannot start a match fails at its first node and
+      costs at most the nodes of the tree; any other offset costs the span an
+      attempt can look at, plus one.
+    * anchored with windows: attempts at the offsets inside the windows at or
+      after `resume` AND at the offsets after each window's last allowed start up
+      to its search wall (`hi + span + 1`): the search is bounded by an end, not by
+      a last start, so it also tries every start in that reach and only afterwards
+      sees that the match it found starts past the window. Each candidate is
+      re-run unbounded, so an offset costs two spans.
+    * lead-in: the twin searches from every offset and each candidate is matched by
+      the rule's own regex, so an offset costs both spans."""
+
+    __slots__ = ("size", "left", "starts", "miss", "hit", "windows", "ends", "idle", "reach")
+
+    def __init__(self, mode: str, rx, twin, text: str, factor: int, floor: int, plan=None, reach: int = 0):
+        self.size = len(text)
+        self.reach = reach                           # starts the anchored search tries past a window's last one
+        self.left = factor * self.size + floor
+        self.starts, self.miss, self.windows, self.ends, self.idle = None, 0, None, None, False
+        span = _prefilter.max_read_extent(rx, text, {}) + 1
+        self.hit = span
+        if mode == "anchored" and plan is not None and plan[0] != "whole":
+            if plan[0] == "none":
+                self.idle = True                     # the rule cannot match this text
+            else:
+                self.windows, self.ends = plan[1], plan[2]
+                self.hit = 2 * span
+        elif mode == "leadin":
+            self.hit = span + _prefilter.max_read_extent(twin, text, {}) + 1
+        elif mode in ("plain", "anchored"):
+            self.starts, self.miss = _prefilter.start_positions(rx, text)
+
+    def _cost(self, lo: int, hi: int) -> int:
+        """Worst case of attempts at offsets lo .. hi inclusive."""
+        if self.idle or hi < lo:
+            return 0
+        if self.windows is not None:
+            offsets = 0
+            for index in range(bisect.bisect_left(self.ends, lo), len(self.windows)):
+                begin, end = self.windows[index]
+                if begin > hi:
+                    break
+                # A window the search finished is paid up to its wall, a window
+                # the search stopped inside only up to where it stopped.
+                top = end + self.reach if end < hi else hi
+                offsets += min(top, self.size) - max(begin, lo) + 1
+            return offsets * self.hit
+        count = hi - lo + 1
+        if self.starts is None:
+            return count * self.hit
+        near = bisect.bisect_right(self.starts, hi) - bisect.bisect_left(self.starts, lo)
+        return near * self.hit + (count - near) * self.miss
+
+    def reserve(self, resume: int) -> bool:
+        return self._cost(resume, self.size) <= self.left
+
+    def charge(self, resume: int, found_at) -> None:
+        self.left -= self._cost(resume, self.size if found_at is None else found_at)
 
 
 class SunglassesEngine:
@@ -1374,14 +1675,17 @@ class SunglassesEngine:
     # used: whitespace collapse shrinks the text and NFKC can grow it.
     CORROBORATE_NORM_MAX = ENRICH_MAX_LEN
 
-    def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0):
+    def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0, memo=None):
         """Evaluate one compiled pattern regex against `text` per its mode
         (see the compile step in __init__). Returns a re.Match or None.
 
-        `start` asks for the first match that begins at or after that offset, in
-        the modes whose offsets are offsets into `text` (anchored, leadin, search).
-        The windowed modes report offsets inside a window, never downgrade on
-        negation, and are not asked."""
+        `start` asks for the next match at or after that offset. Only the plain,
+        anchored and leadin modes can have one: a windowed match is `rx.match` on a
+        slice, so it has no later occurrence to find and `start` ends it.
+
+        `memo` is a dict the caller keeps for ONE text while it walks successive
+        occurrences. The anchored mode stores its folded subject and window plan
+        there, so each step costs its own window and not the whole document."""
         if start and mode in ("guarded", "windowed"):
             return None
         if mode == "guarded":
@@ -1396,10 +1700,10 @@ class SunglassesEngine:
         if mode == "windowed":
             return self._match_windowed(rx, text)
         if mode == "anchored":
-            return self._match_anchored(rx, guards, text, start)
+            return self._match_anchored(rx, guards, text, start, memo)
         if mode == "leadin":
             return self._match_leadin(rx, guards, text, start)
-        return rx.search(text, start) if start else rx.search(text)
+        return rx.search(text, start)
 
     LEADIN_OLD = _LEADIN_OLD
     LEADIN_FAST = _LEADIN_FAST
@@ -1515,7 +1819,53 @@ class SunglassesEngine:
                         f"in a view it cannot appear in")
         return None
 
-    def _match_anchored(self, rx, key, text: str, start: int = 0):
+    def _anchor_plan(self, anchors, span, text: str):
+        """The part of `_match_anchored` that depends only on the text and the
+        rule. Returns (kind, windows, ends): kind "whole" means search everything,
+        "none" means the rule cannot match, "windows" carries the merged start
+        windows and the end of each, for bisection."""
+        folded = _prefilter.fold(text)
+        # `fold` translates before lowering precisely so it stays one char to one
+        # char, but a future table entry could break that, and a position found
+        # in a differently-sized string points somewhere else in the document.
+        # If the lengths ever disagree, search everything: slower, correct.
+        if len(folded) != len(text):
+            return "whole", None, None
+        # A document can be MADE of the anchor. `disable redaction show ...`
+        # repeated puts a declared term every few dozen bytes, so the windows
+        # merge into the whole document and every one of the tens of thousands
+        # of hits is collected and merged in Python to prove it. So stop as soon
+        # as the answer is known: bail once the hits EXCEED `length // span + 1`,
+        # one more than the number of non-overlapping windows of width `span`
+        # that fit in the document. At that count the merged windows cover it and
+        # anchoring can save nothing. The cost of finding that out is capped at
+        # `budget` finds instead of all of them.
+        length = len(text)
+        budget = length // max(span, 1) + 1
+        spots = []
+        for term in anchors:
+            at = folded.find(term)
+            while at != -1:
+                spots.append(at)
+                if len(spots) > budget:
+                    return "whole", None, None
+                at = folded.find(term, at + 1)
+        if not spots:
+            return "none", None, None
+        # A match that contains the anchor at `p` must START in [p - span, p].
+        # Windows are ranges of START positions, merged where they touch.
+        spots.sort()
+        windows, lo, hi = [], max(0, spots[0] - span), spots[0]
+        for at in spots[1:]:
+            if at - span <= hi:              # overlapping: merge rather than repeat
+                hi = at
+            else:
+                windows.append((lo, hi))
+                lo, hi = max(0, at - span), at
+        windows.append((lo, hi))
+        return "windows", windows, [w[1] for w in windows]
+
+    def _match_anchored(self, rx, key, text: str, start: int = 0, memo=None):
         """Search only the text AROUND the rule's rare token.
 
         A rule like the api_response siblings begins with a marker that is cheap
@@ -1539,62 +1889,32 @@ class SunglassesEngine:
         offsets. A candidate is still re-run unbounded with `.match()` before it
         counts, because `endpos` is itself an invented end.
         """
+        # The folded subject and the windows depend on the text and the rule,
+        # not on `start`. A caller walking successive occurrences passes `memo`
+        # so they are built once; without it every step would fold and scan the
+        # whole document again, and a document of N negated copies cost N times
+        # the document.
         anchors, span = self._anchor_spec[key]
-        folded = _prefilter.fold(text)
-        # `fold` translates before lowering precisely so it stays one char to one
-        # char, but a future table entry could break that, and a position found
-        # in a differently-sized string points somewhere else in the document.
-        # If the lengths ever disagree, search everything: slower, correct.
-        if len(folded) != len(text):
-            return rx.search(text, start, len(text))
-
-        # A document can be MADE of the anchor. `disable redaction show ...`
-        # repeated puts a declared term every few dozen bytes, so the windows
-        # merge into the whole document and every one of the tens of thousands
-        # of hits is collected and merged in Python to prove it. That is pure
-        # overhead on top of the plain search that then has to happen anyway,
-        # and it is what made that document 1.076x SLOWER than not anchoring.
-        #
-        # So stop as soon as the answer is known. The reviewer read the comment
-        # as `hits x span >= length` and the code as `hits > length // span + 1`,
-        # which is the same threshold plus a two-hit allowance, and the comment
-        # is the one that was wrong. Written as the code actually is: bail once
-        # the hits EXCEED `length // span + 1`, one more than the number of
-        # non-overlapping windows of width `span` that fit in the document. At
-        # that count the merged windows cover it and anchoring can save nothing.
-        # The cost of finding that out is capped at `budget` finds instead of
-        # all of them. Not a widened gate: the gate stays where it was and this
-        # is the mechanism meeting it.
+        plan = memo.get(key) if memo is not None else None
+        if plan is None:
+            plan = self._anchor_plan(anchors, span, text)
+            if memo is not None:
+                memo[key] = plan
+        kind, windows, ends = plan
         length = len(text)
-        budget = length // max(span, 1) + 1
-        spots = []
-        for term in anchors:
-            at = folded.find(term)
-            while at != -1:
-                spots.append(at)
-                if len(spots) > budget:
-                    # One search over the whole document. Spelled with explicit
-                    # bounds, not as `search(text)`, so every search this method
-                    # makes has the same three-argument shape and an
-                    # instrumented object counting them sees all of them.
-                    return rx.search(text, start, length)
-                at = folded.find(term, at + 1)
-        if not spots:
+        if kind == "whole":
+            # One search over the whole document. Spelled with explicit bounds,
+            # not as `search(text)`, so every search this method makes has the
+            # same three-argument shape and an instrumented object counting
+            # them sees all of them.
+            return rx.search(text, start, length)
+        if kind == "none":
             return None                      # the rule cannot match this document
-
-        # A match that contains the anchor at `p` must START in [p - span, p].
-        # Windows are ranges of START positions, merged where they touch.
-        spots.sort()
-        windows, lo, hi = [], max(0, spots[0] - span), spots[0]
-        for at in spots[1:]:
-            if at - span <= hi:              # overlapping: merge rather than repeat
-                hi = at
-            else:
-                windows.append((lo, hi))
-                lo, hi = max(0, at - span), at
-        windows.append((lo, hi))
-
-        for lo, hi in windows:
+        # Windows are sorted and disjoint, so those that end before `start` are
+        # skipped by bisection, not by walking them.
+        first = bisect.bisect_left(ends, start)
+        for index in range(first, len(windows)):
+            lo, hi = windows[index]
             # `+ 1`: a word-boundary operator is answered from the character on
             # EACH side, and `endpos` is a wall the regex reads as end of string.
             # `secrets\B` on `secretsX` derives a span of exactly 7, so the
@@ -1635,14 +1955,6 @@ class SunglassesEngine:
             if i + self.COOCCUR_WINDOW >= len(text):
                 break
         return None
-
-    # A rule reports its first hit. When that hit sits under a negation, later hits of
-    # the same rule are judged on their own, so a quoted first copy cannot hide a
-    # bare second one. At most this many later hits are read per rule, counted over
-    # all its alternatives, all its subjects and the corroboration pass together;
-    # past it the rule keeps its severity, which costs only a text that repeats one
-    # warning dozens of times and keeps the work bounded on a text built to waste it.
-    LATER_HITS = 32
 
     @staticmethod
     def _enrichment_spans(text: str, plain_end: int, stop: int, folded_length: int = None):
@@ -1709,144 +2021,9 @@ class SunglassesEngine:
             flags.append(pieces[index] == want)
         return flags
 
-    @staticmethod
-    def _same_place(view: str, a: int, b: int, lo: int, hi: int, base) -> bool:
-        """True when view[a:b], inside the appended view view[lo:hi], is the copy of the
-        same characters at the same place in the plain view `base`, and so is an
-        occurrence the plain view has already shown. The copies the normalizer appends
-        keep the length of the plain view. The characters on both sides are compared
-        too, because a copy that differs there is not the same word-bounded hit."""
-        blo, bhi = base
-        if hi - lo != bhi - blo:
-            return False
-        src = blo + (a - lo)
-        n = b - a
-        if src < blo or src + n > bhi:
-            return False
-        left = 1 if a > lo else 0
-        right = 1 if b < hi else 0
-        return view[a - left:b + right] == view[src - left:src + n + right]
-
-    def _copy_of_judged_hit(self, mode, rx, guards, view, m, lo, hi, base) -> bool:
-        """The regex form of _same_place: the same characters stand at the same place
-        in the plain view and the same regex matches there with the same extent, so
-        that hit was read there already."""
-        if not self._same_place(view, m.start(), m.end(), lo, hi, base):
-            return False
-        src = base[0] + (m.start() - lo)
-        n = m.end() - m.start()
-        there = self._eval_regex(mode, rx, guards, view, src)
-        return there is not None and there.start() == src and there.end() == src + n
-
-    def _resume_after(self, mode, view: str, m) -> int:
-        """Where the search for the next hit begins: one character after the start of
-        this one. A lead-in rule that began at a boundary character skips the blanks
-        behind it too, because a start inside them reads the same words again."""
-        pos = m.start() + 1
-        if mode == "leadin" and (view[m.start():m.start() + 1] == "\n"
-                                 or view[m.start():m.start() + 1] in self._LEADIN_PUNCT):
-            while pos < len(view) and view[pos].isspace():
-                pos += 1
-        return pos
-
     def _lead_in_only(self, view: str, a: int, b: int) -> bool:
         """True when view[a:b] holds only blanks and boundary characters."""
         return all(c.isspace() or c in self._LEADIN_PUNCT for c in view[a:b])
-
-    def _later_live(self, mode, rx, guards, subject, first, align=None, limit=None,
-                    tail=None, spans=None, spent=None, pid=None) -> bool:
-        """True when a later hit of the same regex is NOT covered by a negation.
-        `limit` ends the part of the text that is read: the normalized text repeats
-        itself after a view separator. `spans` are the views behind the plain one; a
-        hit in one of them is read, unless the view keeps the offsets of the plain view
-        and the hit is the copy of a hit the plain view has already shown. `tail` is the input with its invisible shadow characters read as
-        ASCII, behind the separators: (text, end of its plain part, its own appended
-        views). Its hits are read against the raw input like those of any other view.
-        `spent` counts the hits read per rule, across every alternative and subject."""
-        if mode in ("guarded", "windowed"):
-            return False
-        if spent is None:
-            spent = {}
-        # The first hit of the rule is the one that is judged; this hit is a later hit
-        # of the rule when another alternative or another subject had one before it.
-        if (pid, "first") in spent:
-            spent[pid] = spent.get(pid, 0) + 1
-            if spent[pid] > self.LATER_HITS:
-                return True
-        else:
-            spent[(pid, "first")] = True
-        # Resume one character after the start of the previous hit, not at its end,
-        # so a hit that begins inside a covered one is judged on its own.
-        regions = [(subject, self._resume_after(mode, subject, first), limit, None, None)]
-        if spans:
-            plain = (0, _RawAlign.view_end(subject, 0))
-            regions.extend((subject, lo, hi, lo, plain if kept else ())
-                           for lo, hi, kept in spans if limit is not None and lo > limit)
-        if tail is not None:
-            regions.append((tail[0], 0, tail[1], None, None))
-            plain = (0, tail[1])
-            regions.extend((tail[0], lo, hi, lo, plain if kept else ())
-                           for lo, hi, kept in tail[2])
-        # A regex with a variable lead-in reaches the same words from several starts in a
-        # row (the blanks and boundary marks in front of them). A start that ends where the
-        # previous one did, with only blanks and boundary marks between them, is the same
-        # occurrence and is stepped over; at most LATER_HITS of these are passed over per
-        # rule (one count across every alternative and subject), so the work stays bounded, and every other hit is a hit read and counted.
-        for index, (view, pos, stop, copy_lo, base) in enumerate(regions):
-            prev = first if index == 0 else None
-            while True:
-                m = self._eval_regex(mode, rx, guards, view, pos)
-                if m is None or (stop is not None and m.start() >= stop):
-                    break
-                pos = self._resume_after(mode, view, m)
-                if prev is not None and m.end() == prev.end() and \
-                        spent.get((pid, "skip"), 0) < self.LATER_HITS and \
-                        self._lead_in_only(view, prev.start(), m.start()):
-                    spent[(pid, "skip")] = spent.get((pid, "skip"), 0) + 1
-                    prev = m
-                    continue  # the same words; only how much of the lead-in is counted differs
-                prev = m
-                if base and self._copy_of_judged_hit(
-                        mode, rx, guards, view, m, copy_lo, stop, base):
-                    continue
-                spent[pid] = spent.get(pid, 0) + 1
-                if spent[pid] > self.LATER_HITS:
-                    return True  # the cap is spent and a further hit remains
-                if base is not None or not self._check_negation(view, m.start(), align, m.end()):
-                    return True
-        return False
-
-    def _regex_covered(self, pattern, mode, rx, guards, subject, match, align, limit,
-                       tail=None, spans=None, spent=None) -> bool:
-        """True when this hit and every later hit of its regex sit under a negation
-        or inside a quote. A rule with negation_immune never is."""
-        if pattern.get("negation_immune"):
-            return False
-        return self._check_negation(subject, match.start(), align, match.end()) and not \
-            self._later_live(mode, rx, guards, subject, match, align, limit, tail, spans,
-                             spent, pattern["id"])
-
-    def _later_keyword_live(self, regions, keyword, skip, align, spent, pid) -> bool:
-        """The pure Python keyword path: True when another hit of `keyword` in a
-        region that is read, other than the hit `skip` that was already judged, is
-        not under a negation, or when the rule has used up its cap of later hits.
-        Matches the Aho path hit for hit, including the cap, so both give one answer.
-        `regions` are (view, offset of the view in the normalized text, start and end
-        in the view, the plain view it is a copy of or None)."""
-        for view, shift, lo, hi, base in regions:
-            at = view.find(keyword, lo, hi)
-            while at != -1:
-                if (keyword, at + shift) != skip and self._word_bounded(view, at, keyword) \
-                        and not self._keyword_copy(view, at, keyword, lo, hi, base):
-                    spent[pid] = spent.get(pid, 0) + 1
-                    if spent[pid] > self.LATER_HITS or base is not None or not \
-                            self._check_negation(view, at, align, at + len(keyword)):
-                        return True
-                at = view.find(keyword, at + 1, hi)
-        return False
-
-    def _keyword_copy(self, view, at, keyword, lo, hi, base) -> bool:
-        return bool(base) and self._same_place(view, at, at + len(keyword), lo, hi, base)
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
         """
@@ -1870,7 +2047,7 @@ class SunglassesEngine:
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
         if align is not None:
-            hit_end = min(match_start + _RawAlign.HIT, _RawAlign.view_end(text, match_start))
+            hit_end = min(match_start + _RawAlign.HIT, align.end_of_view(text, match_start))
         for m in self._NEGATION_RX.finditer(before_text):
             # A window that starts inside a word would read a word fragment as a cue.
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
@@ -1909,6 +2086,243 @@ class SunglassesEngine:
                 return False
             return (cue_end < at - 1 and at + 1 < match_start - 1) or match_start <= at - 1
         return spaced
+
+    # A rule that matches more than once is judged on its worst occurrence. The
+    # search for a later, un-negated one walks forward one match at a time and
+    # stops at the first live one or when the matches run out, so input made
+    # only of negated copies stays negated. Each step starts past the previous
+    # match start, so there are at most as many steps as there are matches, but
+    # a step is a search: an attempt at every position it passes, and each
+    # attempt looks at a stretch of text around its position (a lookahead, a
+    # lookbehind, an alternative that read on and failed), so steps that overlap
+    # look at the same text again. Every search the walk makes is therefore
+    # RESERVED before it runs, in `_ReadBudget`, the one place that decides:
+    # the search may start at most at every remaining position, and an attempt
+    # looks at most `_prefilter.max_read_extent` characters, so the search costs
+    # at most (remaining positions) x (that span), and it runs only when the
+    # budget still holds that much. After it runs, what it really cost (the
+    # positions it passed to its match, or to the end of the text when it found
+    # none) is charged. A reservation that does not fit ends the walk with the
+    # occurrence judged live, not negated: the rest of the text was not judged,
+    # and unjudged text is never lent the benefit of a warning. What is bounded
+    # is the text one attempt looks at, summed over the attempts; backtracking
+    # inside one attempt is not, and a single search has it on main too.
+    NEGATION_SEARCH_BUDGET_FACTOR = 1024
+    NEGATION_SEARCH_BUDGET_FLOOR = 1 << 18
+
+    def _resolve_negation(self, mode, rx, guards, text, first, source=None, align=None):
+        """Pick the occurrence a regex rule is judged on. Returns (match, negated).
+
+        `negated` is True only when every occurrence is negated. Otherwise the
+        first occurrence that is not negated is returned, so a warning that
+        comes before the real attack cannot hide it.
+
+        `source` is (raw_text, origin, copied) for a view built from the raw
+        text. `origin(offset)` is the raw index a match starting at `offset`
+        came from, or None unless the opening of the match reads as the same
+        characters at the same place in the raw text (see `_raw_frame`). A fold
+        can lengthen the text between a negator and its target, so the view's
+        fixed lookback may no longer reach a negator that the raw text has in
+        range. For a match that is a copy of the raw text the occurrence is
+        judged in both frames and is negated if either one negates it. A match
+        the raw text cannot place because the walk of the view ended earlier is
+        asked of `copied(offset, end)`: True only when the words of the match are in
+        the raw text and every occurrence of them is negated there. For any
+        other match only the view's own text speaks, as it did before, so a
+        negator is never lent to a match whose position in the raw text is not
+        known and that has no copy there, and a fold cannot turn a hostile
+        match into a negated one.
+
+        `align` is passed when `text` is a view and not the input itself (see
+        `_check_negation`): the cue, the gap and the start of the match must then
+        be the same characters in the raw input, at the place the view got them
+        from. The end of the match is handed on, so a quote that is to cover the
+        whole match is checked against it; in the raw frame the end is known only
+        when the last character of the match is also placed in the raw text."""
+        def negated_at(match):
+            position = match.start()
+            if self._negated_here(text, position, align, match.end()):
+                return True
+            if source is not None:
+                raw, origin, copied = source
+                at = origin(position)
+                if at is not None:
+                    last = origin(match.end() - 1)
+                    stop = None
+                    if last is not None and last - at == match.end() - 1 - position:
+                        stop = last + 1
+                    return self._check_negation(raw, at, None, stop)
+                return copied(position, match.end())
+            return False
+
+        if not negated_at(first):
+            return first, False
+        # The walk asks for each next occurrence of ONE regex in ONE text, so
+        # what the anchored mode derives from the text is kept across the steps.
+        memo = {}
+        match = first
+        plan = None
+        if mode == "anchored":
+            anchors, window = self._anchor_spec[guards]
+            plan = memo.get(guards)
+            if plan is None:
+                plan = memo[guards] = self._anchor_plan(anchors, window, text)
+        budget = _ReadBudget(mode, rx, guards, text, self.NEGATION_SEARCH_BUDGET_FACTOR,
+                             self.NEGATION_SEARCH_BUDGET_FLOOR, plan,
+                             window + 1 if mode == "anchored" else 0)
+        while True:
+            # Resume one character past the START, not at the end: these rules
+            # have wide gaps, so the negated match often spans the later one.
+            # Skip blank space too: a lead-in can start the match on any of a
+            # run of blank characters, and each of those would repeat the same
+            # order while sitting closer to the warning than it is.
+            resume = match.start() + 1
+            while resume < len(text) and text[resume].isspace():
+                resume += 1
+            if not budget.reserve(resume):
+                return match, False
+            found = self._eval_regex(mode, rx, guards, text, resume, memo)
+            budget.charge(resume, None if found is None else found.start())
+            if found is None:
+                return first, True
+            # A regex with a variable lead-in reaches the same words from several
+            # starts in a row (the blanks and boundary marks in front of them). A
+            # start that ends where the previous one did, with only blanks and
+            # boundary marks between the two starts, is the same occurrence, and it
+            # was judged at the start before it.
+            same = found.end() == match.end() and self._lead_in_only(text, match.start(), found.start())
+            match = found
+            if same:
+                continue
+            if not negated_at(match):
+                return match, False
+
+    @staticmethod
+    def _raw_frame(align, copies, view: str, build, shape: bool = False, cut: bool = False):
+        """(origin, copied) for one view built from the raw text.
+
+        `origin(offset)` is the raw index of the character a match starting at
+        `offset` is, or None. Only when the opening of the match, HIT characters
+        of it, reads as the same characters at the same place in the raw text.
+        A match made of mapped, expanded, decoded or deleted characters is not a
+        copy of anything the raw text says there, so the raw text does not speak
+        for it: a negator near its raw position says nothing about it.
+
+        `copied(offset, end)` is for a match with no origin whose place the walk
+        of the view never reached, so the raw text cannot say what it is: True
+        when its words, up to `end`, are in the raw text and every occurrence of
+        them is negated there (see `_RawCopies`; `build` is the function that
+        made the view from the raw text). A match the walk did reach, or one
+        behind the first view separator, is left to the view alone, and so is
+        every match of a view that was cut short, because the raw text is not.
+
+        The separators of the normalized view are found once, so each match
+        costs a lookup in a sorted list, not a scan of the rest of the view. The
+        folded and compact views have none of their own, and one planted in the
+        text is just a character there.
+
+        With `shape`, the view is the normalized one: behind its first separator
+        the pipeline appends ROT13, reversed and shadow views, which the raw text
+        does not contain and which have no origin, and the shape-confusion view,
+        which is the whole text again with some `l` written as `i`. Its first
+        stretch is the plain text, so a character there is the plain character at
+        the same place and takes that place's origin, but only after the view is
+        found to hold exactly that rewrite of the plain text at that point, and
+        never for a character the rewrite changed."""
+        sep = " " + VIEW_SEP + " "
+        seps = []
+        at = view.find(sep) if shape else -1
+        while at != -1:
+            seps.append(at)
+            at = view.find(sep, at + 1)
+
+        def end_of(pos: int) -> int:
+            k = bisect.bisect_left(seps, pos)
+            return seps[k] if k < len(seps) else len(view)
+
+        plain_end = end_of(0)
+        shape_at = -1
+        if shape and plain_end < len(view):
+            rewrite = re.sub(r"\bl(?=[a-z])", "i", view[:plain_end])
+            for at in seps:
+                if view.startswith(rewrite, at + len(sep)):
+                    shape_at = at + len(sep)
+                    break
+
+        def place_of(offset: int):
+            """The plain place a character stands for, or None."""
+            if offset < plain_end:
+                return offset
+            if shape_at >= 0 and shape_at <= offset < shape_at + plain_end:
+                place = offset - shape_at
+                end = min(place + _RawAlign.HIT, plain_end)
+                if view[offset:offset + end - place] == view[place:end]:
+                    return place
+            return None
+
+        def origin(offset: int):
+            place = place_of(offset)
+            if place is None:
+                return None
+            end = min(place + _RawAlign.HIT, end_of(place))
+            if align.holds(view, place, end):
+                return align.origin(view, place)
+            return None
+
+        def copied(offset: int, stop: int) -> bool:
+            place = place_of(offset)
+            if cut or place is None or align.covers(view, place):
+                return False
+            opening = view[offset:min(offset + _RawCopies.OPEN, stop, end_of(offset))]
+            return copies.negated(id(view), view, plain_end, opening, build)
+        return origin, copied
+
+    def _first_bounded(self, normalized: str, keyword: str):
+        """Offset of the first word-bounded occurrence of `keyword`, or None.
+        Every occurrence is tried, so a hit that continues into a longer word
+        cannot hide a later one that stands alone."""
+        at = normalized.find(keyword)
+        while at != -1:
+            if self._word_bounded(normalized, at, keyword):
+                return at
+            at = normalized.find(keyword, at + 1)
+        return None
+
+    def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None):
+        """Offset of the first word-bounded occurrence of `keyword` at or after
+        `begin` that is not negated, or None. `align` is the walk of the views
+        against the raw input (see _check_negation)."""
+        at = normalized.find(keyword, begin)
+        while at != -1:
+            if self._word_bounded(normalized, at, keyword) and \
+                    not self._negated_here(normalized, at, align, at + len(keyword)):
+                return at
+            at = normalized.find(keyword, at + 1)
+        return None
+
+    def _negated_here(self, view: str, pos: int, align, end: int) -> bool:
+        """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
+        one that does not keep the offsets never is."""
+        if align is not None and align.moved(view, pos):
+            return False
+        return self._check_negation(view, pos, self._align_at(view, pos, align), end)
+
+    @staticmethod
+    def _align_at(view: str, pos: int, align):
+        """`align` for a hit that stands in the plain stretch of `view`, the only part
+        of it the raw input can vouch for. A hit behind the first view separator is
+        an occurrence in a view built from the plain one (ROT13, reversed, the
+        shape-confusion copy), and a later hit there is judged in its own view."""
+        if align is None or pos >= align.end_of_view(view, 0):
+            return None
+        return align
+
+    @staticmethod
+    def _restore_live(finding: dict, excerpt: str) -> None:
+        """Undo a negation downgrade: a later occurrence was not negated."""
+        finding["severity"] = finding.pop("original_severity")
+        finding.pop("negation_context", None)
+        finding["matched_text"] = excerpt
 
     def _is_defensively_framed(self, text: str, match_start: int) -> bool:
         """True if a MECHANISM match sits inside a clause that is describing the
@@ -1958,7 +2372,8 @@ class SunglassesEngine:
         # The first complete closing mark from the start of the hit is the one that
         # closes this quote: if it starts inside the hit, or straddles its end, the
         # quote closed too early and a later mark does not rescue it.
-        at = self._find_close(text, close, match_start, _RawAlign.view_end(text, match_start))
+        stop = _RawAlign.view_end(text, match_start) if align is None else align.end_of_view(text, match_start)
+        at = self._find_close(text, close, match_start, stop)
         if at == -1 or at < match_end:
             return False
         return align is None or align.holds(text, at, at + len(close))
@@ -2087,46 +2502,10 @@ class SunglassesEngine:
         # Regex-bearing patterns whose keyword matched: candidates awaiting
         # regex corroboration (step 3 on raw text, step 3.5 on normalized).
         candidates = {}
-        # Keyword findings that a negation downgraded, until a later hit of the
-        # same rule that no negation covers puts the severity back.
-        downgraded = {}
-        # Later hits read per rule, against the same cap on both keyword paths.
-        later_spent = {}
-        # Regex findings that a negation downgraded; step 3.5 may still restore them.
-        held_regex = {}
-        plain_end = _RawAlign.view_end(normalized, 0)
-        # The input with its invisible shadow characters read as ASCII. The
-        # normalizer appends it as a view of its own, behind the separators, and a
-        # hit there is a real occurrence in the input, not a copy: it is read as a
-        # later hit like one in the plain view, against the raw input.
-        shadow = decode_shadow_ascii(text)
-        # Where the views behind the plain one are: ROT13, reversed and l-for-I copies.
-        # A hit that only one of them holds is another occurrence in the input, and is
-        # read like a later hit in the plain view. Only a view that keeps every offset
-        # of the plain one (ROT13, l-for-I) can hold the copy of a hit the plain view
-        # already showed; a reversed view is never a copy. (view, offset of the view,
-        # start, end, the plain view it can be a copy of, () when it cannot, None for
-        # the plain view itself); positions are inside the view.
-        tail = None
-        tail_start = len(normalized)
-        if shadow is not None:
-            tail_text, tail_folded = normalize_with_length(shadow)
-            if normalized.endswith(tail_text):
-                tail_start = len(normalized) - len(tail_text)
-                tail_plain = _RawAlign.view_end(tail_text, 0)
-                tail = (tail_text, tail_plain,
-                        self._enrichment_spans(tail_text, tail_plain, len(tail_text), tail_folded))
-        sep = " " + VIEW_SEP + " "
-        main_stop = tail_start - len(sep) if normalized.startswith(sep, tail_start - len(sep)) \
-            and tail is not None else tail_start
-        spans = self._enrichment_spans(normalized, plain_end, main_stop, folded_length)
-        regions = [(normalized, 0, 0, plain_end, None)]
-        regions.extend((normalized, 0, lo, hi, (0, plain_end) if kept else ())
-                       for lo, hi, kept in spans)
-        if tail is not None:
-            regions.append((tail[0], tail_start, 0, tail[1], None))
-            regions.extend((tail[0], tail_start, lo, hi, (0, tail[1]) if kept else ())
-                           for lo, hi, kept in tail[2])
+        # Keyword findings stamped on a negated first hit, by rule id. A later
+        # un-negated hit of the same rule takes the finding back to full severity.
+        negated_kw = {}
+        negated_regex = {}
 
         if self._automaton:
             # Fast path: Aho-Corasick (all keywords at once)
@@ -2136,27 +2515,14 @@ class SunglassesEngine:
                 for pattern in self._keyword_to_patterns.get(keyword, []):
                     if match_channels.isdisjoint(pattern.get("channel", ())):
                         continue
+                    held = negated_kw.get(pattern["id"])
+                    if held is not None:
+                        here = end_idx - len(keyword) + 1
+                        if not self._negated_here(normalized, here, align, end_idx + 1):
+                            self._restore_live(held, self._excerpt(normalized, here, end_idx + 1))
+                            del negated_kw[pattern["id"]]
+                        continue
                     if pattern["id"] in seen_ids or pattern["id"] in candidates:
-                        held = downgraded.get(pattern["id"])
-                        kw_at = end_idx - len(keyword) + 1
-                        region = next((r for r in regions
-                                       if held is not None and r[1] + r[2] <= kw_at
-                                       and end_idx < r[1] + r[3]), None)
-                        if region is not None:
-                            view, offset, lo, hi, base = region
-                            local = kw_at - offset
-                            if base and self._same_place(
-                                    view, local, end_idx + 1 - offset, lo, hi, base):
-                                continue  # the copy of a hit the plain view already showed
-                            spent = later_spent[pattern["id"]] = later_spent.get(pattern["id"], 0) + 1
-                            if spent > self.LATER_HITS or base is not None or not self._check_negation(
-                                    view, local, align, end_idx + 1 - offset):
-                                # A later hit that no negation covers, or past the
-                                # cap on hits read: the rule keeps the severity it
-                                # has when the text says it plainly.
-                                held["severity"] = held.pop("original_severity")
-                                held.pop("negation_context", None)
-                                del downgraded[pattern["id"]]
                         continue
                     if pattern["id"] in self._regex_bearing_ids:
                         # Corroborate, don't stamp: keyword is a hint, the
@@ -2176,37 +2542,30 @@ class SunglassesEngine:
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
-                        downgraded[pattern["id"]] = finding
+                        negated_kw[pattern["id"]] = finding
                     findings.append(finding)
         else:
             # Fallback: pure Python string matching (no dependencies)
-            first_hit = {}
             for keyword, patterns in self._keyword_to_patterns.items():
-                # The first occurrence that stands as a word, as the Aho path reads every
-                # occurrence: an unbounded one in front does not hide a bounded one.
-                at = normalized.find(keyword)
-                while at != -1 and not self._word_bounded(normalized, at, keyword):
-                    at = normalized.find(keyword, at + 1)
-                if at != -1:
+                first = self._first_bounded(normalized, keyword)
+                if first is not None:
                     for pattern in patterns:
                         if match_channels.isdisjoint(pattern.get("channel", ())):
                             continue
-                        pid = pattern["id"]
-                        if pid in seen_ids or pid in candidates:
-                            held = downgraded.get(pid)
-                            if held is not None and self._later_keyword_live(
-                                    regions, keyword, first_hit[pid], align, later_spent, pid):
-                                # Same outcome as the Aho path: any later hit of the
-                                # rule that no negation covers puts the severity back.
-                                held["severity"] = held.pop("original_severity")
-                                held.pop("negation_context", None)
-                                del downgraded[pid]
+                        held = negated_kw.get(pattern["id"])
+                        if held is not None:
+                            live = self._live_occurrence(normalized, keyword, 0, align)
+                            if live is not None:
+                                self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
+                                del negated_kw[pattern["id"]]
                             continue
-                        if pid in self._regex_bearing_ids:
-                            candidates[pid] = pattern
+                        if pattern["id"] in seen_ids or pattern["id"] in candidates:
                             continue
-                        seen_ids.add(pid)
-                        idx = at
+                        if pattern["id"] in self._regex_bearing_ids:
+                            candidates[pattern["id"]] = pattern
+                            continue
+                        seen_ids.add(pattern["id"])
+                        idx = first
                         finding = {
                             **pattern,
                             "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
@@ -2215,13 +2574,11 @@ class SunglassesEngine:
                             finding["severity"] = "review"
                             finding["negation_context"] = True
                             finding["original_severity"] = pattern["severity"]
-                            downgraded[pid] = finding
-                            first_hit[pid] = (keyword, idx)
-                            if self._later_keyword_live(regions, keyword, (keyword, idx),
-                                                        align, later_spent, pid):
-                                finding["severity"] = finding.pop("original_severity")
-                                finding.pop("negation_context", None)
-                                del downgraded[pid]
+                            live = self._live_occurrence(normalized, keyword, idx + 1, align)
+                            if live is not None:
+                                self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
+                            else:
+                                negated_kw[pattern["id"]] = finding
                         findings.append(finding)
 
         # Step 3: Regex patterns (for things like API keys)
@@ -2238,6 +2595,7 @@ class SunglassesEngine:
         prefilter_present = self._literal_index.present(_prefilter.fold(text))
         # The raw text read with one more invisible encoding decoded, for rules
         # that match raw text. None for ordinary text, which costs nothing.
+        shadow = decode_shadow_ascii(text)
         shadow_present = None
         if shadow is not None:
             shadow_present = self._literal_index.present(_prefilter.fold(shadow))
@@ -2264,6 +2622,7 @@ class SunglassesEngine:
         # also kept as a subject of their own, in full, so padding cannot push
         # a payload hidden with invisible characters past the cut either.
         folded = None
+        folded_cut = False
         folded_present = None
         compact = None
         compact_present = None
@@ -2279,6 +2638,7 @@ class SunglassesEngine:
                     # loop below only reads it.
                     compact_present = self._literal_index.present(_prefilter.fold(compact))
                 folded = folded[: self.max_scan_bytes]
+                folded_cut = True
                 truncated = True
             if folded == text:
                 folded = None
@@ -2293,6 +2653,9 @@ class SunglassesEngine:
         # unreachable by design rather than by oversight. Those rules ask for the
         # normalized view directly here instead.
         normalized_present = None
+        folded_frame = compact_frame = None
+        copies = _RawCopies(text, self._check_negation)
+        norm_frame = self._raw_frame(align, copies, normalized, _normal_text, shape=True)
         for pattern, regexes in self._regex_patterns:
             if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
@@ -2303,27 +2666,33 @@ class SunglassesEngine:
             # detections whose filler was U+2028 / U+2029: the raw text matched
             # and the folded text did not, so a flag meant to ADD reach removed
             # some. Raw stays first and decides; normalized is a second look.
-            subjects = [(text, prefilter_present, text)]
+            subjects = [(text, prefilter_present, text, None)]
             if shadow is not None:
-                subjects.append((shadow, shadow_present, shadow))
+                subjects.append((shadow, shadow_present, shadow, None))
             if folded is not None:
                 # Raw decided first; this is the second look. The frame is the
-                # folded view itself: the match offsets are offsets into it.
-                subjects.append((folded, folded_present, folded))
+                # folded view itself: the match offsets are offsets into it. The
+                # fold can lengthen the text between a negator and its target,
+                # so the view's negation check also reads the raw text at the
+                # offset the match came from (see _resolve_negation).
+                if folded_frame is None:
+                    folded_frame = self._raw_frame(align, copies, folded, _fold_text, cut=folded_cut)
+                subjects.append((folded, folded_present, folded, folded_frame))
             if compact is not None:
-                subjects.append((compact, compact_present, compact))
+                if compact_frame is None:
+                    compact_frame = self._raw_frame(align, copies, compact, _compact_text)
+                subjects.append((compact, compact_present, compact, compact_frame))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
-                subjects.append((normalized, normalized_present, text))
-            # A hit that a negation covers does not settle the rule: the other
-            # subjects and the other regexes of the rule are read too, and any hit
-            # in them that nothing covers gives the rule its plain severity. The
-            # covered finding is kept only when every hit is covered.
-            held = None
+                subjects.append((normalized, normalized_present, text, norm_frame))
+            # A negated hit is provisional: another regex of the rule, or another
+            # view of the text, may hold an occurrence that is not negated, and
+            # the rule must be judged on that one.
+            provisional = None
             decided = False
-            for subject, present, frame in subjects:
+            for subject, present, frame, raw_frame in subjects:
               for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
                                        present):
@@ -2336,47 +2705,42 @@ class SunglassesEngine:
                 # predicates additionally keep their negation guards at
                 # document scope — see _eval_regex and _split_caret_predicate.
                 match = self._eval_regex(mode, rx, guards, subject)
-                if not match:
-                    continue
-                view_align = None if subject is text else align
-                if self._regex_covered(
-                        pattern, mode, rx, guards, subject, match, view_align,
-                        _RawAlign.view_end(subject, match.start())
-                        if subject is normalized else None,
-                        tail if subject is normalized else None,
-                        spans if subject is normalized else None, later_spent):
-                    if held is None:
-                        held = {
-                            **pattern,
-                            "matched_text": match.group(0)[:50],
-                            "severity": "review",
-                            "negation_context": True,
-                            "original_severity": pattern["severity"],
-                        }
-                    continue
-                finding = {
-                    **pattern,
-                    "matched_text": match.group(0)[:50],
-                }
-                if pattern["id"].startswith("GLS-MECH-") and \
-                        self._is_defensively_framed(frame, match.start()):
-                    # Shape rules also match prose that DESCRIBES the shape.
-                    # Downgrade, don't discard — see DEFENSIVE_FRAMING.
-                    finding["severity"] = "review"
-                    finding["defensive_context"] = True
-                    finding["original_severity"] = pattern["severity"]
-                findings.append(finding)
-                held = None
-                decided = True
-                break   # raw decided first; later subjects are only read while covered
+                if match:
+                    seen_ids.add(pattern["id"])
+                    negated = False
+                    if not pattern.get("negation_immune"):
+                        source = None
+                        if raw_frame is not None:
+                            source = (text, *raw_frame)
+                        match, negated = self._resolve_negation(
+                            mode, rx, guards, subject, match, source,
+                            None if subject is text else align)
+                    finding = {
+                        **pattern,
+                        "matched_text": match.group(0)[:50],
+                    }
+                    if negated:
+                        finding["severity"] = "review"
+                        finding["negation_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                        if provisional is None:
+                            provisional = finding
+                        continue
+                    elif pattern["id"].startswith("GLS-MECH-") and \
+                            self._is_defensively_framed(frame, match.start()):
+                        # Shape rules also match prose that DESCRIBES the shape.
+                        # Downgrade, don't discard — see DEFENSIVE_FRAMING.
+                        finding["severity"] = "review"
+                        finding["defensive_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                    findings.append(finding)
+                    decided = True
+                    break
               if decided:
-                  break
-            if decided:
-                seen_ids.add(pattern["id"])
-            elif held is not None:
-                seen_ids.add(pattern["id"])
-                held_regex[pattern["id"]] = held
-                findings.append(held)
+                  break   # raw decided; do not look at the normalized view
+            if not decided and provisional is not None:
+                findings.append(provisional)
+                negated_regex[pattern["id"]] = provisional
 
         # Step 3.5: Corroboration pass for keyword candidates (see
         # _regex_bearing_ids). Step 3 already ran these patterns' regexes on
@@ -2398,42 +2762,45 @@ class SunglassesEngine:
         # keep raw-view regex (step 3) as their corroboration lane.
         if folded_length > self.CORROBORATE_NORM_MAX:
             candidates = {}
+        norm_source = None
         for pid, pattern in candidates.items():
-            held = held_regex.get(pid)
-            if pid in seen_ids and held is None:
+            if pid in seen_ids and pid not in negated_regex:
                 continue  # regex already confirmed on raw text in step 3
-            # A finding that step 3 downgraded is read again here: the normalized
-            # view holds hits the raw text does not, and one that nothing covers
-            # gives the rule its plain severity.
-            pending = None
+            # A rule that only matched negated in step 3 gets this view too: the
+            # occurrence that is not negated may be the one written in an
+            # encoding.
+            held = negated_regex.get(pid)
+            provisional = None
             for mode, rx, guards in self._compiled_by_id.get(pid, ()):
                 match = self._eval_regex(mode, rx, guards, normalized)
-                if not match:
-                    continue
-                if self._regex_covered(pattern, mode, rx, guards, normalized, match, align,
-                                       _RawAlign.view_end(normalized, match.start()), tail,
-                                       spans, later_spent):
-                    if held is None and pending is None:
-                        pending = {
-                            **pattern,
-                            "matched_text": match.group(0)[:50],
-                            "severity": "review",
-                            "negation_context": True,
-                            "original_severity": pattern["severity"],
-                        }
-                    continue
-                if held is not None:
-                    held["severity"] = held.pop("original_severity")
-                    held.pop("negation_context", None)
-                    held["matched_text"] = match.group(0)[:50]
-                else:
+                if match:
                     seen_ids.add(pid)
-                    findings.append({**pattern, "matched_text": match.group(0)[:50]})
-                    pending = None
-                break
-            if pending is not None:
-                seen_ids.add(pid)
-                findings.append(pending)
+                    negated = False
+                    if not pattern.get("negation_immune"):
+                        if norm_source is None:
+                            norm_source = (text, *norm_frame)
+                        match, negated = self._resolve_negation(
+                            mode, rx, guards, normalized, match, norm_source, align)
+                    if negated:
+                        if provisional is None:
+                            provisional = match
+                        continue
+                    if held is not None:
+                        self._restore_live(held, match.group(0)[:50])
+                    else:
+                        findings.append({**pattern, "matched_text": match.group(0)[:50]})
+                    provisional = None
+                    held = None
+                    break
+            if provisional is not None and held is None:
+                # Every occurrence in this view is negated too.
+                findings.append({
+                    **pattern,
+                    "matched_text": provisional.group(0)[:50],
+                    "severity": "review",
+                    "negation_context": True,
+                    "original_severity": pattern["severity"],
+                })
 
         # Step 3b: Mechanisms are a FALLBACK layer, not a second opinion.
         # A mechanism rule earns its keep by catching what the carrier list
