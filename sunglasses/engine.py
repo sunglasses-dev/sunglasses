@@ -327,7 +327,7 @@ class _Walk:
     BLANK_RUN = 8
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
-                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft")
+                 "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -343,7 +343,8 @@ class _Walk:
         self.dead = False
         self.changed = []  # view indexes whose character is not the raw character
         self.cuts = []     # view indexes where raw characters were deleted before it
-        self.soft = set()  # the cuts that only collapse a run of plain spaces to the one space kept
+        self.soft = set()  # view indexes with a cut that only collapses a run of plain spaces
+        self.hard = set()  # view indexes with any other cut; one of these ends the tolerance there
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
@@ -667,6 +668,7 @@ class _Walk:
                     break
             if INVISIBLE_CHARS.match(c):
                 self.cuts.append(i)
+                self.hard.add(i)
                 self.j = j + 1
                 continue
             if c.isspace():
@@ -677,6 +679,8 @@ class _Walk:
                     self.cuts.append(i)
                     if i > 0 and view[i - 1] == " " and self._plain_run(j):
                         self.soft.add(i)
+                    else:
+                        self.hard.add(i)
                 self.j = j + 1
                 continue
             used, readings = self._produced(j)
@@ -729,7 +733,7 @@ class _Walk:
         k = bisect.bisect_right(self.cuts, lo)
         while k < len(self.cuts) and self.cuts[k] < hi:
             at = self.cuts[k]
-            if spaced is None or at not in self.soft or not spaced(at - 1):
+            if spaced is None or at not in self.soft or at in self.hard or not spaced(at - 1):
                 return False
             k += 1
         return True
