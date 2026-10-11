@@ -1089,6 +1089,56 @@ class SunglassesEngine:
     ]
     DEFENSIVE_WINDOW = 120  # wider than negation: the framing verb leads the clause
 
+    # A framing word defuses a mechanism hit only when it GOVERNS the clause the
+    # hit sits in, the way a negation has to (see _negation_governs). The scanned
+    # text picks its own framing, so a security word anywhere in the sentence
+    # cannot be enough: "Exploit step 3: <payload>" and "Threat actors prefer that
+    # you <payload>" are payloads with a prefix, not descriptions. The phrase is
+    # matched at word boundaries ("blockchain" is not "block"). The gap to the
+    # match may hold only ASCII letters, digits and hyphens joined by single
+    # spaces, so a comma, a colon, a quote, a line break or any invisible or
+    # look-alike character ends the clause. It also holds no clause word, no second
+    # person word ("you" turns a description into an order) and at most
+    # DEFENSIVE_GAP_WORDS words. In every view of the input but the raw text, the
+    # phrase, the gap and the start of the match must be the same characters at the
+    # same place in the raw input (see _RawAlign), so a gap made by decoding,
+    # erasing or folding characters never governs.
+    DEFENSIVE_GAP_WORDS = 6
+    _DEFENSIVE_BREAK_WORDS = frozenset((
+        "then", "now", "but", "so", "instead", "however",
+        "you", "your", "yours", "yourself"))
+    _DEFENSIVE_RX = re.compile(
+        r"(?<!\w)(?:" + "|".join(
+            re.escape(p) + ("" if p.endswith("-") else r"(?!\w)")
+            for p in sorted(DEFENSIVE_FRAMING, key=len, reverse=True)) + r")")
+    _DEFENSIVE_GAP_RX = re.compile(
+        r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
+    # Two plain prose shapes keep the clause: an example lead-in with its colon ("flags
+    # text such as: <description>", one colon directly after "such as", "for example" or
+    # "for instance", then plain words), and one comma parenthetical of one to three
+    # words ("detects, in documentation, pages that ..."), which is an aside and is not
+    # counted against DEFENSIVE_GAP_WORDS. Any other colon or comma ends the clause. The
+    # words are checked like any other gap: no clause word, no second person word.
+    _DEFENSIVE_EXAMPLE_RX = re.compile(
+        r"(?P<lead>[a-z0-9 -]*(?<![a-z0-9])(?:such as|for example|for instance)): ?"
+        r"(?P<rest>[a-z0-9 -]*)")
+    _DEFENSIVE_PAREN_RX = re.compile(
+        r" ?(?P<pre>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)?, ?"
+        r"(?P<par>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*){0,2}), ?"
+        r"(?P<post>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)? ?")
+    # A framing word may also lead into a QUOTED description: plain words, one colon
+    # only when the opening quote or fence follows it, then exactly one opener. It
+    # governs a match inside that quote, only while the quote is still open where the
+    # match starts, closes after the whole match, in the view the match is in, on a
+    # closing mark that the raw input holds at that place (_framing_quote_holds). A
+    # bare colon in front of the payload is still not a quote.
+    DEFENSIVE_QUOTED_GAP_WORDS = 3
+    _DEFENSIVE_QUOTED_GAP_RX = re.compile(
+        r" ?(?:(?P<words>[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)*)(?::[ ]?| ))?"
+        "(?P<open>```|[\"“«‘'`「『])[ ]?")
+    _DEFENSIVE_QUOTE_CLOSERS = {"```": "```", '"': '"', "“": "”", "«": "»", "‘": "’",
+                                "'": "'", "`": "`", "「": "」", "『": "』"}
+
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
                  mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES):
         # 0 disables the cap. Configurable because a batch job scanning archives has
@@ -1754,8 +1804,10 @@ class SunglassesEngine:
         return all(c.isspace() or c in self._LEADIN_PUNCT for c in view[a:b])
 
     def _later_live(self, mode, rx, guards, subject, first, align=None, limit=None,
-                    tail=None, spans=None, spent=None, pid=None) -> bool:
-        """True when a later hit of the same regex is NOT covered by a negation.
+                    tail=None, spans=None, spent=None, pid=None, framed=False,
+                    negation=True) -> bool:
+        """True when a later hit of the same regex is NOT covered by a negation or, for a
+        mechanism rule (`framed`), by a clause that describes the attack.
         `limit` ends the part of the text that is read: the normalized text repeats
         itself after a view separator. `spans` are the views behind the plain one; a
         hit in one of them is read, unless the view keeps the offsets of the plain view
@@ -1812,19 +1864,37 @@ class SunglassesEngine:
                 spent[pid] = spent.get(pid, 0) + 1
                 if spent[pid] > self.LATER_HITS:
                     return True  # the cap is spent and a further hit remains
-                if base is not None or not self._check_negation(view, m.start(), align, m.end()):
+                if base is not None or not self._hit_covered(
+                        view, m.start(), align, m.end(), framed, negation):
                     return True
         return False
 
+    def _hit_covered(self, view, start, align, end, framed, negation=True) -> bool:
+        """True when this hit sits under a negation or, for a mechanism rule (`framed`),
+        inside a clause that describes the attack. `negation` is False for a rule with
+        negation_immune, where only the framing can cover a hit."""
+        return (negation and self._check_negation(view, start, align, end)) or \
+            (framed and self._is_defensively_framed(view, start, align, end))
+
     def _regex_covered(self, pattern, mode, rx, guards, subject, match, align, limit,
-                       tail=None, spans=None, spent=None) -> bool:
-        """True when this hit and every later hit of its regex sit under a negation
-        or inside a quote. A rule with negation_immune never is."""
-        if pattern.get("negation_immune"):
-            return False
-        return self._check_negation(subject, match.start(), align, match.end()) and not \
-            self._later_live(mode, rx, guards, subject, match, align, limit, tail, spans,
-                             spent, pattern["id"])
+                       tail=None, spans=None, spent=None, framed=False):
+        """How this hit and every later hit of its regex are covered: "negation" when the
+        first sits under a negation or inside a quote, "framing" when it sits in a clause
+        that describes the attack (`framed`, mechanism rules only), None when it is not
+        covered or any later hit is live. A later hit is covered by the same two ways, so
+        a framed or negated first hit never hides a live one. A rule with negation_immune
+        is never covered by a negation."""
+        negation = not pattern.get("negation_immune")
+        if negation and self._check_negation(subject, match.start(), align, match.end()):
+            how = "negation"
+        elif framed and self._is_defensively_framed(subject, match.start(), align, match.end()):
+            how = "framing"
+        else:
+            return None
+        if self._later_live(mode, rx, guards, subject, match, align, limit, tail, spans,
+                            spent, pattern["id"], framed, negation):
+            return None
+        return how
 
     def _later_keyword_live(self, regions, keyword, skip, align, spent, pid) -> bool:
         """The pure Python keyword path: True when another hit of `keyword` in a
@@ -1910,23 +1980,102 @@ class SunglassesEngine:
             return (cue_end < at - 1 and at + 1 < match_start - 1) or match_start <= at - 1
         return spaced
 
-    def _is_defensively_framed(self, text: str, match_start: int) -> bool:
+    def _is_defensively_framed(self, text: str, match_start: int, align=None,
+                               match_end: Optional[int] = None) -> bool:
         """True if a MECHANISM match sits inside a clause that is describing the
         attack rather than performing it ("this scanner detects attempts to ...").
 
-        Scoped to the CURRENT SENTENCE: the framing must lead the same clause the
-        payload sits in. Without that bound, one "detects" in an intro paragraph
-        would defuse every payload in the rest of the document, which is an
-        evasion, not a guard.
+        The framing must lead the same clause the payload sits in, which the plain
+        gap rule (_framing_governs) decides. Without that bound, one "detects" in
+        an intro paragraph would defuse every payload in the rest of the document,
+        which is an evasion, not a guard.
+
+        ``align`` (a _RawAlign) is passed when ``text`` is not the raw input but a
+        view of it (folded, compact, decoded or normalized). The phrase, the gap
+        and the start of the match must then be the same characters at the same
+        place in the raw input. The text is lowercased for ASCII letters only, so
+        a letter that only becomes ASCII when folded does not read as a plain word.
         """
         window_start = max(0, match_start - self.DEFENSIVE_WINDOW)
-        before = text[window_start:match_start].lower()
-        # Cut at the last sentence boundary — only same-sentence framing counts.
-        for stop in (". ", "! ", "? ", "\n"):
-            idx = before.rfind(stop)
-            if idx != -1:
-                before = before[idx + len(stop):]
-        return any(p in before for p in self.DEFENSIVE_FRAMING)
+        # One character left of the window is read as well, so a phrase that begins on
+        # the first character of the window is judged against the text in front of it
+        # and not against the edge of the window.
+        context = 1 if window_start > 0 else 0
+        start = window_start - context
+        before = _ascii_lower(text[start:match_start])
+        hit_end = match_start
+        if align is not None:
+            hit_end = min(match_start + _RawAlign.HIT, _RawAlign.view_end(text, match_start))
+        for m in self._DEFENSIVE_RX.finditer(before, context):
+            # A combining mark in front of the phrase joins it to the word before.
+            if m.start() > 0 and unicodedata.category(before[m.start() - 1]).startswith("M"):
+                continue
+            gap = before[m.end():]
+            if not (self._framing_governs(gap)
+                    or self._framing_quote_holds(gap, text, match_start, match_end, align)):
+                continue
+            if align is None or align.holds(text, start + max(0, m.start() - 1), hit_end):
+                return True
+        return False
+
+    def _framing_governs(self, gap: str) -> bool:
+        """True if the text between a framing phrase and the match keeps the match
+        inside the described clause: plain ASCII words only, no clause word, no
+        second person word and at most DEFENSIVE_GAP_WORDS words. An example lead-in
+        colon or one short comma parenthetical is read as plain words (see
+        _DEFENSIVE_EXAMPLE_RX)."""
+        aside = 0
+        if ":" in gap:
+            m = self._DEFENSIVE_EXAMPLE_RX.fullmatch(gap)
+            if m is None:
+                return False
+            gap = m.group("lead") + " " + m.group("rest")
+        elif "," in gap:
+            m = self._DEFENSIVE_PAREN_RX.fullmatch(gap)
+            if m is None:
+                return False
+            aside = len(m.group("par").split())
+            gap = " ".join(part for part in (m.group("pre"), m.group("par"), m.group("post")) if part) + \
+                (" " if gap.endswith(" ") else "")
+        if not self._DEFENSIVE_GAP_RX.fullmatch(gap):
+            return False
+        words = gap.split()
+        if len(words) - aside > self.DEFENSIVE_GAP_WORDS:
+            return False
+        return not any(part in self._DEFENSIVE_BREAK_WORDS
+                       for w in words for part in w.split("-"))
+
+    def _framing_quote_holds(self, gap: str, text: str, match_start: int,
+                             match_end: Optional[int], align=None) -> bool:
+        """A framing phrase followed by plain words, an optional colon and ONE opening
+        quote or fence governs a match inside that quote, only while the quote closes
+        after the whole match, in the view the match is in, and the closing mark is the
+        character the raw input holds there."""
+        if match_end is None:
+            return False
+        m = self._DEFENSIVE_QUOTED_GAP_RX.match(gap)
+        if m is None:
+            return False
+        words = (m.group("words") or "").split()
+        if len(words) > self.DEFENSIVE_QUOTED_GAP_WORDS:
+            return False
+        if any(part in self._DEFENSIVE_BREAK_WORDS for w in words for part in w.split("-")):
+            return False
+        close = self._DEFENSIVE_QUOTE_CLOSERS[m.group("open")]
+        # What the quote holds in front of the match may be any text, but not the mark
+        # that closes it: the quote has to still be open where the match starts.
+        quoted_from = match_start - (len(gap) - m.end())
+        if self._find_close(text, close, quoted_from, match_start) != -1:
+            return False
+        # The first complete closing mark from the start of the match closes this quote.
+        # If it starts inside the match or straddles its end, the quote closed too early
+        # and a later mark does not rescue it. The views the normalizer appends after the
+        # view separator are copies and are never searched.
+        at = self._find_close(text, close, match_start,
+                                 _RawAlign.view_end(text, match_start))
+        if at == -1 or at < match_end:
+            return False
+        return align is None or align.holds(text, at, at + len(close))
 
     def _quoted_gap_holds(self, gap: str, text: str, match_start: int, match_end: Optional[int],
                           align=None, label: bool = False) -> bool:
@@ -2303,27 +2452,26 @@ class SunglassesEngine:
             # detections whose filler was U+2028 / U+2029: the raw text matched
             # and the folded text did not, so a flag meant to ADD reach removed
             # some. Raw stays first and decides; normalized is a second look.
-            subjects = [(text, prefilter_present, text)]
+            subjects = [(text, prefilter_present)]
             if shadow is not None:
-                subjects.append((shadow, shadow_present, shadow))
+                subjects.append((shadow, shadow_present))
             if folded is not None:
-                # Raw decided first; this is the second look. The frame is the
-                # folded view itself: the match offsets are offsets into it.
-                subjects.append((folded, folded_present, folded))
+                # Raw decided first; this is the second look.
+                subjects.append((folded, folded_present))
             if compact is not None:
-                subjects.append((compact, compact_present, compact))
+                subjects.append((compact, compact_present))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
                         _prefilter.fold(normalized))
-                subjects.append((normalized, normalized_present, text))
+                subjects.append((normalized, normalized_present))
             # A hit that a negation covers does not settle the rule: the other
             # subjects and the other regexes of the rule are read too, and any hit
             # in them that nothing covers gives the rule its plain severity. The
             # covered finding is kept only when every hit is covered.
             held = None
             decided = False
-            for subject, present, frame in subjects:
+            for subject, present in subjects:
               for mode, rx, guards in regexes:
                 if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
                                        present):
@@ -2339,18 +2487,25 @@ class SunglassesEngine:
                 if not match:
                     continue
                 view_align = None if subject is text else align
-                if self._regex_covered(
-                        pattern, mode, rx, guards, subject, match, view_align,
-                        _RawAlign.view_end(subject, match.start())
-                        if subject is normalized else None,
-                        tail if subject is normalized else None,
-                        spans if subject is normalized else None, later_spent):
+                cover = self._regex_covered(
+                    pattern, mode, rx, guards, subject, match, view_align,
+                    _RawAlign.view_end(subject, match.start())
+                    if subject is normalized else None,
+                    tail if subject is normalized else None,
+                    spans if subject is normalized else None, later_spent,
+                    pattern["id"].startswith("GLS-MECH-"))
+                if cover is not None:
+                    # Shape rules also match prose that DESCRIBES the shape: a
+                    # framed hit is downgraded, not discarded — see DEFENSIVE_FRAMING.
+                    # Like a negation cover it is held, not decided: the other
+                    # subjects and alternatives are read before it stands.
                     if held is None:
                         held = {
                             **pattern,
                             "matched_text": match.group(0)[:50],
                             "severity": "review",
-                            "negation_context": True,
+                            ("negation_context" if cover == "negation"
+                             else "defensive_context"): True,
                             "original_severity": pattern["severity"],
                         }
                     continue
@@ -2358,13 +2513,6 @@ class SunglassesEngine:
                     **pattern,
                     "matched_text": match.group(0)[:50],
                 }
-                if pattern["id"].startswith("GLS-MECH-") and \
-                        self._is_defensively_framed(frame, match.start()):
-                    # Shape rules also match prose that DESCRIBES the shape.
-                    # Downgrade, don't discard — see DEFENSIVE_FRAMING.
-                    finding["severity"] = "review"
-                    finding["defensive_context"] = True
-                    finding["original_severity"] = pattern["severity"]
                 findings.append(finding)
                 held = None
                 decided = True
@@ -2410,21 +2558,24 @@ class SunglassesEngine:
                 match = self._eval_regex(mode, rx, guards, normalized)
                 if not match:
                     continue
-                if self._regex_covered(pattern, mode, rx, guards, normalized, match, align,
-                                       _RawAlign.view_end(normalized, match.start()), tail,
-                                       spans, later_spent):
+                cover = self._regex_covered(pattern, mode, rx, guards, normalized, match, align,
+                                            _RawAlign.view_end(normalized, match.start()), tail,
+                                            spans, later_spent, pid.startswith("GLS-MECH-"))
+                if cover is not None:
                     if held is None and pending is None:
                         pending = {
                             **pattern,
                             "matched_text": match.group(0)[:50],
                             "severity": "review",
-                            "negation_context": True,
+                            ("negation_context" if cover == "negation"
+                             else "defensive_context"): True,
                             "original_severity": pattern["severity"],
                         }
                     continue
                 if held is not None:
                     held["severity"] = held.pop("original_severity")
                     held.pop("negation_context", None)
+                    held.pop("defensive_context", None)
                     held["matched_text"] = match.group(0)[:50]
                 else:
                     seen_ids.add(pid)
