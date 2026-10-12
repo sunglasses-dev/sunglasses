@@ -27759,8 +27759,11 @@ PATTERNS = [
     # removes files under ~/.sunglasses/proxy (approvals, captures, installs,
     # locks, receipts), runs `sunglasses proxy approve` or `sunglasses uninstall`
     # itself to spare the human the prompt, pipes an answer into approve, or starts
-    # the server outside the proxy. Every branch names our
-    # own state or command. A generic rm -rf is left to GLS-CI-001.
+    # the server outside the proxy. The later branches read the same intent in the
+    # client's config file: unwrapping our entry from .mcp.json, killing the
+    # running proxy, uninstalling it with a reason that hides it from the human, or
+    # a sed or jq line that rewrites the config around our wrapper. Every branch
+    # names our own state or command. A generic rm -rf is left to GLS-CI-001.
     {
         "id": "GLS-PE-111",
         "name": "Agent told to tamper with the proxy's own state",
@@ -27774,8 +27777,14 @@ PATTERNS = [
             r"""\b(?:skip|avoid|bypass|suppress)\s+(?:the\s+|a\s+|any\s+)?(?:approval|confirmation)\b[^\n]{0,160}?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
             r"""(?:\|\s*|\bscript\s+-q\S*\s+\S+\s+|\bexpect\b[^\n]{0,60}?)(?:python3?\s+-m\s+)?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
             r"""\b(?:runs?|running|launch(?:es)?|starts?|calls?|invoke|points?)\b[^\n]{0,80}?\bdirectly\b[^\n]{0,40}?\b(?:instead\s+of|rather\s+than|without)\b[^\n]{0,30}?\b(?:(?:going|passing|routing)\s+)?(?:through|via)\s+(?:the\s+)?sunglasses\b""",
+            r"""(?:^|[.!?;:,\n][^\S\n]*|\b(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:remove|delete|drop|strip|unwrap|take\s+out|get\s+rid\s+of|bypass|disable|turn\s+off|switch\s+off|replace)\b[^\n]{0,60}?\bsunglasses(?:\.proxy)?[\"'`]?\s+(?:proxy|wrapper|entry|command|launcher|shim|layer)\b[^\n]{0,120}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)""",
+            r"""(?:^|[.!?;:,\n][^\S\n]*|\b(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:edit|change|modify|rewrite|patch|update|open)\b[^\n]{0,100}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)[^\n]{0,140}?\b(?:remov(?:e|ing)|delet(?:e|ing)|dropp?(?:ing)?|strip(?:ping)?|unwrap(?:ping)?|taking\s+out|getting\s+rid\s+of|bypass(?:ing)?|disabl(?:e|ing)|turn(?:ing)?\s+off|switch(?:ing)?\s+off|replac(?:e|ing))\b[^\n]{0,60}?\bsunglasses(?:\.proxy)?[\"'`]?\s+(?:proxy|wrapper|entry|command|launcher|shim|layer)\b""",
+            r"""(?:^|[.!?;:,\n][^\S\n]*|\b(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:kill|pkill|killall)\b[^\n]{0,40}?\bsunglasses(?:\.proxy|\s+proxy)\b""",
+            r"""(?:^|[.!?;:,\n][^\S\n]*|\b(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:run|execute|invoke|call)\b[^\n]{0,60}?(?:\bsunglasses|\bsunglasses\.proxy)\s+uninstall\b[^\n]{0,160}?\b(?:(?:the\s+)?(?:proxy|sunglasses)\s+(?:is\s+)?(?:blocks?|blocking|slowing|breaking|causing|in\s+the\s+way)|(?:user|human|they)\s+(?:will\s+not|won't|does\s+not|doesn't)\s+(?:mind|need|care)|to\s+(?:remove|disable|get\s+rid\s+of)\s+(?:the\s+)?proxy|so\s+(?:that\s+)?(?:the|this)\s+(?:tool|server|call|request)\s+)""",
+            r"""(?:^|[;&|\n][^\S\n]*)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)""",
+            r"""(?:^|[;&|\n][^\S\n]*)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b""",
         ],
-        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, or to start the server outside the proxy. Each one removes the human check the proxy exists to keep."
+        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep."
     },
     {
         "id": "GLS-DKS-002",
