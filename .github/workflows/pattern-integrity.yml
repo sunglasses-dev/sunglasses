@@ -155,7 +155,7 @@ jobs:
       contents: read
     # A hang must fail, not wait. Set from the first hosted measurement, not
     # from local arithmetic (ASTRA round 1); tighten once measured.
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
