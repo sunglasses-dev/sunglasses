@@ -171,6 +171,11 @@ def _custom_plain_rule():
     return _rule(regex=[r"(?i)!*\s*zorbit now"])
 
 
+# The limits that stood here were 80 evaluations and 320 prefix reads for 100 to 6400 starts, with a
+# block as the verdict: they described the count cap (32 later hits, then live). With no count cap a
+# run of starts that the budget can read is read once per start and stays covered, so the limit is one
+# evaluation and one prefix read per start plus a constant. This replaces the old numbers; it is not
+# the same assertion.
 @pytest.mark.parametrize("run", [100, 400])
 def test_a_custom_regex_with_a_variable_lead_in_reads_each_start_once(run):
     engine = _custom_plain_rule()
