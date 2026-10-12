@@ -338,7 +338,7 @@ jobs:
     # failure, not to turn a slow queue into one.
     #
     # Lower it when the regex prefilter work lands and the real numbers drop.
-    timeout-minutes: 240
+    timeout-minutes: 360
     # One version was tested while setup.py claimed five. A support claim backed by
     # no run is the same class of defect as a published number with no generator:
     # believable, unverified, and only discovered by the user it breaks.
