@@ -15,6 +15,7 @@ import collections
 import functools
 import html
 import re
+import threading
 import unicodedata
 
 from . import _prefilter
@@ -779,7 +780,57 @@ class _Walk:
         return True
 
 
-class _RawAlign:
+# The view ends of the raw text of the scan that is running on this thread (see
+# SunglassesEngine.scan): a hit on the raw text has no _RawAlign to ask.
+_SCAN_LOCAL = threading.local()
+
+
+class _ViewEnds:
+    """Where each view of a normalized text ends, found once.
+
+    A text holds several views joined by VIEW_SEP, and a hit belongs to the view it
+    stands in. The separators of one text are searched for once and kept, so that each
+    of many hits in it costs a bisection and not a search to the end of the text. The
+    entry holds the text itself and is used only while the same object is asked about.
+    """
+
+    def __init__(self):
+        self._seps = {}
+        self._closes = {}
+
+    def first_close(self, text: str, close: str, start: int, stop: int, find) -> int:
+        """`find(text, close, start, stop)` for the walk of one text, which asks for
+        closing marks at later and later starts. The answer is kept as a stretch of the
+        text with no complete mark in it and the mark that ends it (or the stop the
+        search reached), so the next hit that starts inside the stretch is answered from
+        it and a far closing mark is searched for once, not once per hit."""
+        key = (id(text), close)
+        kept = self._closes.get(key)
+        if kept is not None and kept[0] is text and kept[1] <= start:
+            hit, reached = kept[2], kept[3]
+            if hit != -1 and start <= hit:
+                return hit if hit + len(close) <= stop else -1
+            if hit == -1 and stop <= reached:
+                return -1
+        found = find(text, close, start, stop)
+        self._closes[key] = (text, start, found, stop)
+        return found
+
+    def end_of_view(self, view: str, pos: int) -> int:
+        """End of the view that holds pos: the next view separator, or the end."""
+        kept = self._seps.get(id(view))
+        if kept is None or kept[0] is not view:
+            sep = " " + VIEW_SEP + " "
+            found, at = [], view.find(sep)
+            while at != -1:
+                found.append(at)
+                at = view.find(sep, at + 1)
+            kept = self._seps[id(view)] = (view, found)
+        k = bisect.bisect_left(kept[1], pos)
+        return kept[1][k] if k < len(kept[1]) else len(view)
+
+
+class _RawAlign(_ViewEnds):
     """Whether view[lo:hi] reads as the same characters in the raw input.
 
     The normalizer decodes, erases and folds characters, and a gap built that way
@@ -803,7 +854,7 @@ class _RawAlign:
         # What normalize_with_length reported for this input; None to ask the pipeline.
         self._record = record
         self._moved = {}
-        self._seps = {}
+        _ViewEnds.__init__(self)
 
     def moved(self, view: str, pos: int) -> bool:
         """Whether view[pos] stands in a reversed view: a view behind the plain one that
@@ -859,20 +910,6 @@ class _RawAlign:
         """End of the view that holds pos: the next view separator, or the end."""
         end = view.find(" " + VIEW_SEP + " ", pos)
         return len(view) if end == -1 else end
-
-    def end_of_view(self, view: str, pos: int) -> int:
-        """Same as view_end, with the separators of `view` found once, so that each of
-        many hits in one view costs a bisection and not a search to the end of the text."""
-        kept = self._seps.get(id(view))
-        if kept is None or kept[0] is not view:
-            sep = " " + VIEW_SEP + " "
-            found, at = [], view.find(sep)
-            while at != -1:
-                found.append(at)
-                at = view.find(sep, at + 1)
-            kept = self._seps[id(view)] = (view, found)
-        k = bisect.bisect_left(kept[1], pos)
-        return kept[1][k] if k < len(kept[1]) else len(view)
 
 
 class _RawCopies:
@@ -2490,11 +2527,20 @@ class SunglassesEngine:
         # and a later mark does not rescue it. The views the normalizer appends after the
         # view separator are copies and are never searched.
         at = self._find_close(text, close, match_start,
-                              _RawAlign.view_end(text, match_start) if align is None
-                              else align.end_of_view(text, match_start))
+                              self._view_end(text, match_start, align), True)
         if at == -1 or at < match_end:
             return False
         return align is None or align.holds(text, at, at + len(close))
+
+    @staticmethod
+    def _view_end(text: str, pos: int, align=None) -> int:
+        """End of the view of `text` that holds pos. A view of the input asks its
+        alignment; the raw text asks the separators the running scan found in it once,
+        so that many quoted hits in one text do not each search the rest of it."""
+        if align is not None:
+            return align.end_of_view(text, pos)
+        ends = getattr(_SCAN_LOCAL, "ends", None)
+        return _RawAlign.view_end(text, pos) if ends is None else ends.end_of_view(text, pos)
 
     def _quoted_gap_holds(self, gap: str, text: str, match_start: int, match_end: Optional[int],
                           align=None, label: bool = False) -> bool:
@@ -2526,16 +2572,25 @@ class SunglassesEngine:
         # The first complete closing mark from the start of the hit is the one that
         # closes this quote: if it starts inside the hit, or straddles its end, the
         # quote closed too early and a later mark does not rescue it.
-        stop = _RawAlign.view_end(text, match_start) if align is None else align.end_of_view(text, match_start)
-        at = self._find_close(text, close, match_start, stop)
+        stop = self._view_end(text, match_start, align)
+        at = self._find_close(text, close, match_start, stop, True)
         if at == -1 or at < match_end:
             return False
         return align is None or align.holds(text, at, at + len(close))
 
     @staticmethod
-    def _find_close(text: str, close: str, start: int, stop: int) -> int:
+    def _find_close(text: str, close: str, start: int, stop: int, forward: bool = False) -> int:
         """Index of the first closing mark in text[start:stop]. A straight single
-        quote between two letters is an apostrophe, not a closing mark."""
+        quote between two letters is an apostrophe, not a closing mark. `forward` is
+        for the walk over the hits of one text, which asks from later and later starts:
+        the running scan keeps what it found (see _ViewEnds.first_close)."""
+        ends = getattr(_SCAN_LOCAL, "ends", None) if forward else None
+        if ends is None:
+            return SunglassesEngine._scan_close(text, close, start, stop)
+        return ends.first_close(text, close, start, stop, SunglassesEngine._scan_close)
+
+    @staticmethod
+    def _scan_close(text: str, close: str, start: int, stop: int) -> int:
         pos = text.find(close, start, stop)
         while pos != -1:
             if close != "'" or not (pos > 0 and text[pos - 1].isalnum()
@@ -2628,6 +2683,15 @@ class SunglassesEngine:
                 fail CLOSED (error) instead of silently scanning against
                 nothing and returning a clean allow.
         """
+        previous = getattr(_SCAN_LOCAL, "ends", None)
+        _SCAN_LOCAL.ends = _ViewEnds()
+        try:
+            return self._scan(text, channel)
+        finally:
+            _SCAN_LOCAL.ends = previous
+
+    def _scan(self, text: str, channel: str) -> ScanResult:
+        """The scan itself (see scan)."""
         if channel not in self.valid_channels:
             raise ValueError(
                 f"Unknown channel '{channel}'. Valid channels: "
