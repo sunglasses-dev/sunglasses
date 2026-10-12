@@ -2657,6 +2657,21 @@ def main():
              "snapshot (sunglasses proxy approve <server_id> --snapshot <sha>)",
         add_help=False)
 
+    # Listed so `sunglasses --help` shows it. Like `proxy`, the word never
+    # reaches this parser; see the interception below.
+    subparsers.add_parser(
+        "mcp",
+        help="Run the SUNGLASSES MCP server on stdio (same as python -m sunglasses.mcp)",
+        add_help=False)
+
+    # `sunglasses mcp …` hands everything after the word to the MCP server's own
+    # main(), whole, for the same reason as `proxy`: the server answers --help and
+    # --version itself and must see argv exactly as `python -m sunglasses.mcp` does.
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        from .mcp import main as mcp_main
+        mcp_main(sys.argv[2:])
+        sys.exit(0)
+
     # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
     # 0.6.0 beta's product surface is this command, and everything it does
     # lives in sunglasses.proxy.commands. It is intercepted rather than made a
