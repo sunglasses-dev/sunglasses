@@ -2133,7 +2133,8 @@ class SunglassesEngine:
         """True when view[a:b] holds only blanks and boundary characters."""
         return all(c.isspace() or c in self._LEADIN_PUNCT for c in view[a:b])
 
-    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
+    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
+                        closes: Optional[list] = None) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -2150,6 +2151,10 @@ class SunglassesEngine:
         then be the same characters in the raw input, at the place the view got
         them from, so a negation built by decoding, erasing or folding characters
         never downgrades. The text is lowercased for ASCII letters only.
+
+        ``closes`` is a list the caller may pass to learn where a quote that a cue opened
+        closed INSIDE the hit (see _resolve_cover, which looks for a shorter hit that ends
+        there). Nothing in the answer depends on it.
         """
         window_start = max(0, match_start - self.NEGATION_WINDOW)
         before_text = _ascii_lower(text[window_start:match_start])
@@ -2162,7 +2167,8 @@ class SunglassesEngine:
                 continue
             gap = before_text[m.end():]
             if not (self._negation_governs(gap)
-                    or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
+                    or self._quoted_gap_holds(gap, text, match_start, match_end, align,
+                                              closes=closes)):
                 continue
             if align is None or align.holds(
                     text, max(0, window_start + m.start() - 1), hit_end,
@@ -2173,7 +2179,7 @@ class SunglassesEngine:
             if pos == -1:
                 continue
             if not self._quoted_gap_holds(before_text[pos + len(phrase):], text, match_start,
-                                          match_end, align, label=True):
+                                          match_end, align, label=True, closes=closes):
                 continue
             if align is None or align.holds(text, window_start + pos, hit_end):
                 return True
@@ -2276,13 +2282,34 @@ class SunglassesEngine:
                 return "framing"
             return None
 
-        how = covered_at(first)
+        def covered_or_narrowed(match):
+            """(how, match). A plain-mode match can run on past the quote its cue opened:
+            a wide gap reaches from one quoted copy of the words to the next, so the quote
+            closes inside the hit and the hit is not covered. The same rule is then matched
+            again from the same start, bounded at that closing mark, so the shorter hit is
+            judged on what the quote holds. It must start where the first one did; when
+            the rule needs text past the mark there is no shorter hit and the occurrence
+            stays live. What follows the mark is judged by the walk, as its own match."""
+            how = covered_at(match)
+            if how is not None or mode != "plain" or not negation:
+                return how, match
+            closes = []
+            self._negated_here(text, match.start(), align, match.end(), closes)
+            for at in sorted(set(closes)):
+                short = rx.match(text, match.start(), at)
+                if short is None or not short.end() > short.start():
+                    continue
+                how = covered_at(short)
+                if how is not None:
+                    return how, short
+            return None, match
+
+        how, match = covered_or_narrowed(first)
         if how is None:
             return first, None
         # The walk asks for each next occurrence of ONE regex in ONE text, so
         # what the anchored mode derives from the text is kept across the steps.
         memo = {}
-        match = first
         plan = None
         if mode == "anchored":
             anchors, window = self._anchor_spec[guards]
@@ -2316,7 +2343,8 @@ class SunglassesEngine:
             match = found
             if same:
                 continue
-            if covered_at(match) is None:
+            covered, match = covered_or_narrowed(match)
+            if covered is None:
                 return match, None
 
     @staticmethod
@@ -2422,12 +2450,13 @@ class SunglassesEngine:
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _negated_here(self, view: str, pos: int, align, end: int) -> bool:
+    def _negated_here(self, view: str, pos: int, align, end: int,
+                      closes: Optional[list] = None) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
         one that does not keep the offsets never is."""
         if align is not None and align.moved(view, pos):
             return False
-        return self._check_negation(view, pos, self._align_at(view, pos, align), end)
+        return self._check_negation(view, pos, self._align_at(view, pos, align), end, closes)
 
     def _framed_here(self, view: str, pos: int, align, end: int) -> bool:
         """Whether the hit at view[pos:end] sits in a clause that describes the attack.
@@ -2564,7 +2593,7 @@ class SunglassesEngine:
         return _RawAlign.view_end(text, pos) if ends is None else ends.end_of_view(text, pos)
 
     def _quoted_gap_holds(self, gap: str, text: str, match_start: int, match_end: Optional[int],
-                          align=None, label: bool = False) -> bool:
+                          align=None, label: bool = False, closes: Optional[list] = None) -> bool:
         """A cue followed by plain words, an optional colon and ONE opening quote
         or fence governs a hit inside that quote, only while the quote closes after
         the whole hit, in the view the hit is in, and the closing mark is the
@@ -2596,6 +2625,9 @@ class SunglassesEngine:
         stop = self._view_end(text, match_start, align)
         at = self._find_close(text, close, match_start, stop, True)
         if at == -1 or at < match_end:
+            if closes is not None and at != -1 and (
+                    align is None or align.holds(text, at, at + len(close))):
+                closes.append(at)
             return False
         return align is None or align.holds(text, at, at + len(close))
 

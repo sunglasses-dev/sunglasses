@@ -51,6 +51,11 @@ SANCTIONED_SUBSETS = [
     # coverage, which is the only thing it exists to separate. The result
     # direction is asserted on its own, a few lines above.
     {"file", "log_memory", "message", "web_content", "code"},   # the SD parents' own
+    # The quoted-copy rule is bound to these three channels only. Its tests walk
+    # exactly those three: the question they ask is whether two quoted copies
+    # are judged one at a time where the rule applies, and the other channels
+    # never carried it.
+    {"web_content", "agent_input", "tool_output"},
 ]
 
 
