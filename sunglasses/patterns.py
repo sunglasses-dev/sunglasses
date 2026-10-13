@@ -27784,7 +27784,7 @@ PATTERNS = [
             r"""(?:^|[;&|][^\S\n]*|[.!?]\s+|:[^\S\n]+|\$[^\S\n]+)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)""",
             r"""(?:^|[;&|][^\S\n]*|[.!?]\s+|:[^\S\n]+|\$[^\S\n]+)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b""",
         ],
-        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep."
+        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep. Quoted or fenced examples of these commands are also flagged."
     },
     {
         "id": "GLS-DKS-002",

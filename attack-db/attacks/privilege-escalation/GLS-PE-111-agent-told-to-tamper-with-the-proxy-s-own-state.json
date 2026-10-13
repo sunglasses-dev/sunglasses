@@ -10,7 +10,7 @@
     "api_response",
     "web_content"
   ],
-  "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep.",
+  "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep. Quoted or fenced examples of these commands are also flagged.",
   "keywords": [],
   "regex": [
     "\\b(?:cp|mv|rm|tee|ln|touch|rsync|truncate|shred|unlink|write|overwrite|edit|modify|delete|remove|replace|wipe)\\b[^\\n]{0,120}?(?:~|\\$HOME|\\$\\{HOME\\}|%USERPROFILE%|/(?:Users|home)/[^/\\s]+|/root)[/\\\\]\\.sunglasses[/\\\\]proxy(?:[/\\\\](?:approvals|captures|installs|locks|receipts)\\b|(?![\\w/\\\\-]))",
