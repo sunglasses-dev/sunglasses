@@ -3520,7 +3520,7 @@ PATTERNS = [
             "disabled tools",
         ],
         "regex": [
-            r"(?i)(?:--allowed-tools\s*[\"']?\s*[\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)",
+            r"(?i)(?:--allowed-tools\s*(?:[\"']\s*)?[\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)",
         ],
         "description": "Detects mismatches where sandbox/restriction claims in config do not match actual tool execution."
     },
@@ -11408,7 +11408,7 @@ PATTERNS = [
             "silent integrity loss bifurcation",
         ],
         "regex": [
-            r"""(?i)(?:(?:primary[- ]?key\s+starvation|alias\s+precedence\s+inversion|null[- ]?coalescing\s+laundering|row[- ]?field\s+polymorphism)|(?:omits?|drops?|nulls?)\s+(?:canonical|primary)\s+(?:keys?|fields?)\s+(?:to\s+)?(?:force|steer|coerce)\s+(?:parser\s+)?(?:fallback|alias)|(?:tool\s+(?:result|output))\s+(?:schema)?\s*(?:bifurcation|variants?|polymorphism)\s+(?:steers?|promotes?|elevates?)\s+(?:weaker|stale|attacker[- ]controlled))""",
+            r"""(?i)(?:(?:primary[- ]?key\s+starvation|alias\s+precedence\s+inversion|null[- ]?coalescing\s+laundering|row[- ]?field\s+polymorphism)|(?:omits?|drops?|nulls?)\s+(?:canonical|primary)\s+(?:keys?|fields?)\s+(?:to\s+)?(?:force|steer|coerce)\s+(?:parser\s+)?(?:fallback|alias)|(?:tool\s+(?:result|output))\s+(?:schema\s*)?(?:bifurcation|variants?|polymorphism)\s+(?:steers?|promotes?|elevates?)\s+(?:weaker|stale|attacker[- ]controlled))""",
         ],
         "description": "Attacker steers tool-result parsing toward weaker fallback schemas by omitting canonical keys or polymorphing row fields, promoting false READY verdicts or stale states while the payload remains superficially valid."
     },
@@ -16612,7 +16612,7 @@ PATTERNS = [
             "board-level decision spoof",
         ],
         "regex": [
-            r"""(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\s+(?:policy|governance|compliance|authority|board[- ]level)\s+(?:tag|preamble|directive|decision|override)|(?:compliance\s+update|policy\s+(?:update|supersede)|decision\s*:?\s*must[_ ]run)\s+.{0,80}?(?:supersede|override|outrank|inverts?)\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\s+(?:content|chunk|payload|context)\s+(?:outranks?|overrides?|beats?|exceeds?)\s+(?:canonical|board|system|mission)\s+(?:policy|priority|directive))""",
+            r"""(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\s+(?:policy|governance|compliance|authority|board[- ]level)\s+(?:tag|preamble|directive|decision|override)|(?:compliance\s+update|policy\s+(?:update|supersede)|decision\s*(?::\s*)?must[_ ]run)\s+.{0,80}?(?:supersede|override|outrank|inverts?)\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\s+(?:content|chunk|payload|context)\s+(?:outranks?|overrides?|beats?|exceeds?)\s+(?:canonical|board|system|mission)\s+(?:policy|priority|directive))""",
         ],
         "description": "Attacker floods the context window with high-priority-looking pseudo-policy text and forged governance tags, tricking the planner into treating untrusted content as board-level decisions and silently inverting mission priorities."
     },
@@ -17057,7 +17057,7 @@ PATTERNS = [
         "regex": [
             r"""(?i)(?:(?:patch[- ]note|hotfix|vnext|latest[- ]version|newer\s+prompt)\s+(?:authority|directive|update)\s+(?:flip|overrides?|deprecates?|replaces?)\s+(?:previous|canonical|true)\s+(?:constraints?|prompt|spec|contract))""",
             r"""(?i)(?:reply[- ]?template|cycle[- ]update|runbook)\s+(?:shadow|overwrite|graft)\s+(?:contains?|plants?|injects?)\s+(?:fake|mandatory|new)\s+(?:rules?|policy|directives?)""",
-            r"""(?i)(?:production\s+emergency|urgent\s+hotfix|critical\s+bypass)\s*[,:.]?\s+(?:bypass|skip|merge|override)\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\s+(?:rule|gate|constraint)""",
+            r"""(?i)(?:production\s+emergency|urgent\s+hotfix|critical\s+bypass)(?:\s*[,:.])?\s+(?:bypass|skip|merge|override)\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\s+(?:rule|gate|constraint)""",
         ],
         "description": "Attacker plants directives that masquerade as a newer prompt version, hotfix, or emergency override and pushes the agent to treat the inline text as stronger than canonical mission and policy artifacts. Urgency framing or fake patch-note language collapses precedence and silently rewrites the operating contract."
     },
@@ -28929,7 +28929,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:unit\s+test|security\s+(?:guide|training|documentation)|defensive|blocked\s+payload|negative\s+fixture|verified\s+edit|conflict[_ -]?check\s*["']?\s*[:=]\s*["']?passed)\b)(?=.*\bknowledge[_ -]?edit\b)(?=.*\bedit[_ -]?status\b.{0,80}\bapplied\b)(?=.*\bprovenance\b.{0,100}\b(?:missing|unverified|external)\b)(?=.*\b(?:downstream[_ -]?reasoning|reasoning)\b.{0,140}\b(?:conclusion|decision)\b.{0,100}\b(?:allow|approve|safe)\b)(?=.*\bconflict[_ -]?check\b.{0,60}\b(?:not\s+run|skipped|absent)\b).*$""",
+            r"""(?is)^(?!.*\b(?:unit\s+test|security\s+(?:guide|training|documentation)|defensive|blocked\s+payload|negative\s+fixture|verified\s+edit|conflict[_ -]?check\s*(?:["']\s*)?[:=]\s*["']?passed)\b)(?=.*\bknowledge[_ -]?edit\b)(?=.*\bedit[_ -]?status\b.{0,80}\bapplied\b)(?=.*\bprovenance\b.{0,100}\b(?:missing|unverified|external)\b)(?=.*\b(?:downstream[_ -]?reasoning|reasoning)\b.{0,140}\b(?:conclusion|decision)\b.{0,100}\b(?:allow|approve|safe)\b)(?=.*\bconflict[_ -]?check\b.{0,60}\b(?:not\s+run|skipped|absent)\b).*$""",
         ],
         "description": "A malicious knowledge edit silently replaces a factual premise, and downstream reasoning accepts it to produce an unsafe security conclusion without an instruction-shaped payload."
     },

@@ -19,7 +19,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 GAPS = (ROOT / "KNOWN_VERSION_GAPS.md").read_text(encoding="utf-8")
 
-SLOW_ENTRIES = ("GLS-AW-001", "GLS-SC-018", "GLS-CF-251", "GLS-CICD-004", "GLS-AW-713")
+SLOW_ENTRIES = ("GLS-CICD-004",)
 
 
 @pytest.mark.parametrize("rule_id", SLOW_ENTRIES)

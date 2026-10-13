@@ -12,7 +12,7 @@
   "description": "A malicious knowledge edit silently replaces a factual premise, and downstream reasoning accepts it to produce an unsafe security conclusion without an instruction-shaped payload.",
   "keywords": [],
   "regex": [
-    "(?is)^(?!.*\\b(?:unit\\s+test|security\\s+(?:guide|training|documentation)|defensive|blocked\\s+payload|negative\\s+fixture|verified\\s+edit|conflict[_ -]?check\\s*[\"']?\\s*[:=]\\s*[\"']?passed)\\b)(?=.*\\bknowledge[_ -]?edit\\b)(?=.*\\bedit[_ -]?status\\b.{0,80}\\bapplied\\b)(?=.*\\bprovenance\\b.{0,100}\\b(?:missing|unverified|external)\\b)(?=.*\\b(?:downstream[_ -]?reasoning|reasoning)\\b.{0,140}\\b(?:conclusion|decision)\\b.{0,100}\\b(?:allow|approve|safe)\\b)(?=.*\\bconflict[_ -]?check\\b.{0,60}\\b(?:not\\s+run|skipped|absent)\\b).*$"
+    "(?is)^(?!.*\\b(?:unit\\s+test|security\\s+(?:guide|training|documentation)|defensive|blocked\\s+payload|negative\\s+fixture|verified\\s+edit|conflict[_ -]?check\\s*(?:[\"']\\s*)?[:=]\\s*[\"']?passed)\\b)(?=.*\\bknowledge[_ -]?edit\\b)(?=.*\\bedit[_ -]?status\\b.{0,80}\\bapplied\\b)(?=.*\\bprovenance\\b.{0,100}\\b(?:missing|unverified|external)\\b)(?=.*\\b(?:downstream[_ -]?reasoning|reasoning)\\b.{0,140}\\b(?:conclusion|decision)\\b.{0,100}\\b(?:allow|approve|safe)\\b)(?=.*\\bconflict[_ -]?check\\b.{0,60}\\b(?:not\\s+run|skipped|absent)\\b).*$"
   ],
   "examples": {
     "malicious": [],
