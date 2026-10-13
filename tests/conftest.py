@@ -127,3 +127,6 @@ def pytest_collection_modifyitems(config, items):
         raise pytest.UsageError(str(e))
     config.hook.pytest_deselected(items=dropped)
     items[:] = kept
+    # The part belongs to this run only. A test that starts its own pytest
+    # (collection checks, mutation runs) must see the whole suite, not part i.
+    _os.environ.pop("CI_SHARD", None)

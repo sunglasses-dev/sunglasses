@@ -5,7 +5,10 @@ CI_SHARD is set. These tests pin the properties the release gate relies on: no
 test is lost, none runs twice, the same files always land in the same part,
 a malformed setting fails loudly, and the cost table names real files.
 """
+import os
 import pathlib
+import subprocess
+import sys
 import types
 
 import pytest
@@ -69,3 +72,18 @@ def test_the_two_parts_are_within_ten_percent_by_cost():
 def test_a_malformed_setting_is_an_error_not_a_full_run(bad):
     with pytest.raises(ValueError):
         ci_shard.parse(bad)
+
+
+def test_the_part_is_not_inherited_by_a_test():
+    # On a CI leg CI_SHARD is set when the run starts; once the part is chosen
+    # it is removed, so a pytest a test starts collects the whole suite.
+    assert "CI_SHARD" not in os.environ
+
+
+def test_a_sharded_run_removes_the_part_before_tests_run():
+    node = "tests/test_ci_shard.py::test_the_part_is_not_inherited_by_a_test"
+    env = dict(os.environ, CI_SHARD="1/2")
+    out = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", node],
+        cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=300)
+    assert out.returncode == 0 and "1 passed" in out.stdout, out.stdout[-2000:]
