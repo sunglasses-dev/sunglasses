@@ -255,6 +255,8 @@ METHODS_ON_THE_TEXT = {
     "text.replace": "the separator character is read as a blank (recorded as a blank change)",
     "text.lower": "lower-casing after the passes",
     "re.sub": "the l-for-I view, behind the separator",
+    "CONTROL_CHARS.search": "whether a control character is present; no control, no extra view",
+    "CONTROL_CHARS.sub": "the control view: each control read as a blank, a copy behind the separator",
 }
 SLICES = {"text[::-1]": "the reversed view, behind the separator"}
 
@@ -263,6 +265,9 @@ STATEMENTS = {
     # normalize_with_length, in order
     "normalize_with_length: text = text.replace(VIEW_SEP, ' ')": "separator read as a blank",
     "normalize_with_length: shadow = decode_shadow_ascii(text)": "producer: shadow view",
+    "normalize_with_length: spaced = CONTROL_CHARS.sub(' ', text) if CONTROL_CHARS.search(text) else None":
+        "control view: a copy of the input with each control read as a blank, taken before the plain view "
+        "deletes them; the plain view and the raw offsets are not touched",
     "normalize_with_length: text = strip_invisible(text)": "producer",
     "normalize_with_length: text = normalize_unicode(text)": "producer",
     "normalize_with_length: text = replace_homoglyphs(text)": "producer",
@@ -283,6 +288,8 @@ STATEMENTS = {
     "normalize_with_length: text = text.lower()": "lower-casing after the passes",
     "normalize_with_length: shape_variant = re.sub('\\\\bl(?=[a-z])', 'i', text)": "l-for-I view",
     "normalize_with_length: text = text + " + _SEP + " + shape_variant": "l-for-I view, behind the separator",
+    "normalize_with_length: text = text + " + _SEP + " + normalize(spaced)":
+        "control view's own pipeline, behind the separator, so no phrase is read across it",
     "normalize_with_length: text = text + " + _SEP + " + normalize_with_length(shadow, record)[0]":
         "shadow view's own pipeline, behind the separator",
     "normalize_with_length: return (text, folded_length)": "the result",
@@ -323,6 +330,7 @@ STATEMENTS = {
     "collapse_whitespace: return text.strip()": "after the passes",
     "decode_rot13: return codecs.decode(text, 'rot_13')": "rot13 view",
     "decode_rot13: return text": "rot13 view",
+    "normalize: return normalize_with_length(text)[0]": "the control view's own pipeline returns the text only",
 }
 
 # The producer rows are exercised by the table in test_negation_later_hits_round18.py.
