@@ -14,6 +14,22 @@ import unicodedata
 from urllib.parse import unquote
 
 
+# Punctuation that looks like an ASCII sign and that NFKC does not map. Part of
+# HOMOGLYPHS below, so both lanes and the raw-offset alignment read one table;
+# every entry is one code point to one code point. Kept small on purpose: only
+# signs drawn like the ASCII one. The en dash, em dash and box-drawing lines are
+# not here: they are drawn visibly longer or heavier and are everywhere in
+# ordinary prose and directory trees, so mapping them would fold almost every
+# document for no reach.
+PUNCT_LOOKALIKES = {
+    '\u2010': '-', '\u2011': '-', '\u2012': '-',   # hyphen, non-breaking hyphen, figure dash
+    '\u2043': '-', '\u2212': '-', '\u02d7': '-',   # hyphen bullet, minus sign, modifier minus
+    '\u00a6': '|', '\u2758': '|', '\u2223': '|',   # broken bar, light vertical bar, divides
+    '\u01c0': '|', '\u23d0': '|',                  # dental click, vertical line extension
+    '\u2215': '/', '\u2044': '/', '\u29f8': '/',   # division slash, fraction slash, big solidus
+    '\ua789': ':', '\u02f8': ':', '\u2236': ':',   # modifier letter colons, ratio
+}
+
 # Homoglyph map: visually similar Unicode chars → ASCII equivalents
 # Attackers use Cyrillic/Greek lookalikes to bypass keyword filters
 HOMOGLYPHS = {
@@ -52,6 +68,7 @@ HOMOGLYPHS = {
     '\uff51': 'q', '\uff52': 'r', '\uff53': 's', '\uff54': 't',
     '\uff55': 'u', '\uff56': 'v', '\uff57': 'w', '\uff58': 'x',
     '\uff59': 'y', '\uff5a': 'z',
+    **PUNCT_LOOKALIKES,
 }
 
 # Leetspeak map
@@ -237,6 +254,111 @@ def normalize_unicode(text: str) -> str:
 def replace_homoglyphs(text: str) -> str:
     """Replace visually similar Unicode chars with ASCII equivalents."""
     return ''.join(HOMOGLYPHS.get(c, c) for c in text)
+
+
+# ── The regex lane's folded view ────────────────────────────────────────────
+# The engine's regex lane reads the raw text first and, for non-ASCII input,
+# a folded copy of it (engine scan, step 3). The helpers below build that copy.
+# They do not feed normalize(): the keyword lane's view still deletes only
+# INVISIBLE_CHARS. It shares the look-alike table (PUNCT_LOOKALIKES is part of
+# HOMOGLYPHS, one code point to one code point, so the raw-offset alignment
+# built on strip_invisible / replace_homoglyphs keeps its lengths).
+
+# Every code point that renders as nothing, written out as ranges so the set is
+# the same on every Python the package supports (unicodedata's tables differ
+# between interpreter versions). It is the Unicode Default_Ignorable_Code_Point
+# property (DerivedCoreProperties.txt), which includes every format character
+# (category Cf) that has no visible glyph, plus the three Cf characters it
+# leaves out but that renderers do not draw either (interlinear annotation
+# U+FFF9-FFFB, Egyptian hieroglyph format controls U+13430-1343F), plus
+# INVISIBLE_CHARS above. Left out on purpose: the Cf characters that DO render
+# (Arabic number signs U+0600-0605, U+06DD, U+070F, U+0890-0891, U+08E2,
+# U+110BD, U+110CD), and unassigned code points outside the ranges the standard
+# reserves as ignorable: those render as a visible box, and which code points
+# are unassigned depends on the interpreter's Unicode version.
+IGNORABLE_RANGES = (
+    (0x0000, 0x0008),    # C0 controls, CONTROL_RANGES (INVISIBLE_CHARS)
+    (0x000E, 0x001A),
+    (0x007F, 0x0084),    # delete, C1 controls (next line U+0085 stays)
+    (0x0086, 0x009F),
+    (0x00AD, 0x00AD),    # soft hyphen
+    (0x034F, 0x034F),    # combining grapheme joiner
+    (0x061C, 0x061C),    # Arabic letter mark
+    (0x115F, 0x1160),    # Hangul choseong / jungseong fillers
+    (0x17B4, 0x17B5),    # Khmer inherent vowels
+    (0x180B, 0x180F),    # Mongolian variation selectors, vowel separator
+    (0x200B, 0x200F),    # zero-width space / joiners, LRM / RLM
+    (0x2028, 0x2029),    # line / paragraph separator (INVISIBLE_CHARS)
+    (0x202A, 0x202E),    # bidi embeddings and overrides
+    (0x2060, 0x206F),    # word joiner, invisible operators, bidi isolates, deprecated
+    (0x3164, 0x3164),    # Hangul filler
+    (0xFE00, 0xFE0F),    # variation selectors
+    (0xFEFF, 0xFEFF),    # BOM / zero-width no-break space
+    (0xFFA0, 0xFFA0),    # halfwidth Hangul filler
+    (0xFFF0, 0xFFFB),    # reserved ignorable, interlinear annotation
+    (0x13430, 0x1343F),  # Egyptian hieroglyph format controls
+    (0x1BCA0, 0x1BCA3),  # shorthand format controls
+    (0x1D173, 0x1D17A),  # musical symbol format controls
+    (0xE0000, 0xE0FFF),  # tag characters, variation selectors supplement, reserved
+)
+
+_IGNORABLE_CLASS = "".join(
+    re.escape(chr(lo)) if lo == hi else f"{re.escape(chr(lo))}-{re.escape(chr(hi))}"
+    for lo, hi in IGNORABLE_RANGES)
+IGNORABLE_CHARS = re.compile(f"[{_IGNORABLE_CLASS}]+")
+
+# Characters that are not whitespace to a regex but are drawn as a blank.
+BLANKS = {'\u2800': ' '}   # Braille pattern blank
+
+# One translation table: HOMOGLYPHS (look-alike letters and punctuation) and
+# the blanks. Every entry maps one code point to one code point, so the fold
+# never grows.
+_LOOKALIKE_TABLE = str.maketrans({**HOMOGLYPHS, **BLANKS})
+
+# An ignorable run with a letter or digit on both sides: where the fold that
+# deletes it would glue two words ("ignore" + U+200B + "all" -> "ignoreall").
+# A letter is ASCII or one the homoglyph table maps to ASCII.
+_WORD_CHAR = "A-Za-z0-9" + "".join(re.escape(c) for c, a in HOMOGLYPHS.items() if a.isalnum())
+_IGNORABLE_BETWEEN_WORDS = re.compile(
+    f"(?<=[{_WORD_CHAR}])[{_IGNORABLE_CLASS}]+(?=[{_WORD_CHAR}])")
+
+# A numeric character reference that spells an ASCII letter or digit. Markup
+# escapes (&lt; &#60; &#39; ...) are left alone on purpose: decoding them would
+# turn every escaped code sample in a web page into live markup.
+_LETTER_REFERENCE = re.compile(r"&#(?:[xX]0*([0-9A-Fa-f]{1,6})|0*([0-9]{1,7}));?")
+
+
+def _letter_reference(match):
+    value = int(match.group(1), 16) if match.group(1) else int(match.group(2))
+    if value < 128 and chr(value).isalnum():
+        return chr(value)
+    return match.group(0)
+
+
+def decode_letter_references(text: str) -> str:
+    """Decode the numeric character references that spell ASCII letters or digits
+    (&#105; &#x69; -> i). Anything else, markup escapes included, is kept."""
+    if "&#" not in text:
+        return text
+    return _LETTER_REFERENCE.sub(_letter_reference, text)
+
+
+def strip_ignorable(text: str) -> str:
+    """Delete every code point that renders as nothing (IGNORABLE_RANGES)."""
+    return IGNORABLE_CHARS.sub("", text)
+
+
+def space_ignorable_between_words(text: str):
+    """The text with each ignorable run that sits between two letters or digits
+    read as one space. None when there is no such run."""
+    spaced, count = _IGNORABLE_BETWEEN_WORDS.subn(" ", text)
+    return spaced if count else None
+
+
+def replace_lookalikes(text: str) -> str:
+    """Homoglyph letters, punctuation look-alikes and blanks to their ASCII
+    character; one code point to one code point."""
+    return text.translate(_LOOKALIKE_TABLE)
 
 
 def decode_leetspeak(text: str) -> str:
