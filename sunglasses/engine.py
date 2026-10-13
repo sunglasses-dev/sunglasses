@@ -1066,15 +1066,22 @@ class _ReadBudget:
       sees that the match it found starts past the window. Each candidate is
       re-run unbounded, so an offset costs two spans.
     * lead-in: the twin searches from every offset and each candidate is matched by
-      the rule's own regex, so an offset costs both spans."""
+      the rule's own regex, so an offset costs both spans.
 
-    __slots__ = ("size", "left", "starts", "miss", "hit", "windows", "ends", "idle", "reach")
+    Asking a price is cheap: the anchored mode answers from a running sum of its whole
+    windows and prices only the two windows a stretch can cut, by bisection, so a walk
+    over many hits asks in time that does not grow with the number of windows. Setting
+    the sum up is one pass over the windows per walk."""
+
+    __slots__ = ("size", "left", "starts", "miss", "hit", "windows", "ends", "idle", "reach",
+                 "begins", "paid")
 
     def __init__(self, mode: str, rx, twin, text: str, factor: int, floor: int, plan=None, reach: int = 0):
         self.size = len(text)
         self.reach = reach                           # starts the anchored search tries past a window's last one
         self.left = factor * self.size + floor
         self.starts, self.miss, self.windows, self.ends, self.idle = None, 0, None, None, False
+        self.begins = self.paid = None
         span = _prefilter.max_read_extent(rx, text, {}) + 1
         self.hit = span
         if mode == "anchored" and plan is not None and plan[0] != "whole":
@@ -1083,6 +1090,12 @@ class _ReadBudget:
             else:
                 self.windows, self.ends = plan[1], plan[2]
                 self.hit = 2 * span
+                # The windows are disjoint and sorted, so a price over a stretch of them
+                # is two edge windows plus a sum of whole ones, answered from these.
+                self.begins = [w[0] for w in self.windows]
+                self.paid = [0]
+                for begin, end in self.windows:
+                    self.paid.append(self.paid[-1] + min(end + reach, self.size) - begin + 1)
         elif mode == "leadin":
             self.hit = span + _prefilter.max_read_extent(twin, text, {}) + 1
         elif mode in ("plain", "anchored"):
@@ -1093,21 +1106,29 @@ class _ReadBudget:
         if self.idle or hi < lo:
             return 0
         if self.windows is not None:
-            offsets = 0
-            for index in range(bisect.bisect_left(self.ends, lo), len(self.windows)):
-                begin, end = self.windows[index]
-                if begin > hi:
-                    break
-                # A window the search finished is paid up to its wall, a window
-                # the search stopped inside only up to where it stopped.
-                top = end + self.reach if end < hi else hi
-                offsets += min(top, self.size) - max(begin, lo) + 1
+            first = bisect.bisect_left(self.ends, lo)
+            last = bisect.bisect_right(self.begins, hi) - 1
+            if last < first:
+                return 0
+            # A window the search finished is paid up to its wall, a window
+            # the search stopped inside only up to where it stopped. Only the
+            # first and the last window of the stretch can be cut by lo or hi;
+            # the ones between are whole and come from the running sum.
+            offsets = self._offsets(first, lo, hi)
+            if last > first:
+                offsets += self._offsets(last, lo, hi) + self.paid[last] - self.paid[first + 1]
             return offsets * self.hit
         count = hi - lo + 1
         if self.starts is None:
             return count * self.hit
         near = bisect.bisect_right(self.starts, hi) - bisect.bisect_left(self.starts, lo)
         return near * self.hit + (count - near) * self.miss
+
+    def _offsets(self, index: int, lo: int, hi: int) -> int:
+        """Offsets the search tries in one window, cut by lo and hi."""
+        begin, end = self.windows[index]
+        top = end + self.reach if end < hi else hi
+        return min(top, self.size) - max(begin, lo) + 1
 
     def reserve(self, resume: int) -> bool:
         return self._cost(resume, self.size) <= self.left
