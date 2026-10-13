@@ -55,7 +55,7 @@ def _is_success_reply(msg):
 
 
 def _messages(stdout):
-    """Every stdout line must be a success reply to one of the requests sent: anything else on the wire breaks a client."""
+    """Every stdout line must have the success-reply shape: anything else on the wire breaks a client."""
     out = []
     for line in stdout.splitlines():
         try:
@@ -67,11 +67,16 @@ def _messages(stdout):
     return out
 
 
+def _replies(stdout):
+    """The stimulus sends two requests, ids 1 and 2: stdout holds exactly one success reply for each, in any order."""
+    msgs = _messages(stdout)
+    ids = sorted(repr(m["id"]) for m in msgs)
+    assert ids == ["1", "2"], "expected one reply each for ids 1 and 2, got ids %s" % ids
+    return {m["id"]: m for m in msgs}
+
+
 def _tool_names(stdout):
-    by_id = {m.get("id"): m for m in _messages(stdout) if "id" in m}
-    assert "result" in by_id.get(1, {}), "no initialize reply: %r" % stdout[:600]
-    reply = by_id.get(2)
-    return {t["name"] for t in reply["result"]["tools"]} if reply and "result" in reply else None
+    return {t["name"] for t in _replies(stdout)[2]["result"].get("tools", [])}
 
 
 def _console_script_target(name):
@@ -154,6 +159,30 @@ def test_the_stdout_check_rejects_everything_but_a_success_reply(line):
 ])
 def test_the_stdout_check_accepts_a_success_reply(line):
     assert len(_messages(line + "\n")) == 1
+
+
+_INIT = '{"jsonrpc": "2.0", "id": 1, "result": {}}'
+_LIST = '{"jsonrpc": "2.0", "id": 2, "result": {"tools": [{"name": "scan_text"}]}}'
+
+
+@pytest.mark.parametrize("lines", [
+    [_INIT],
+    [_LIST],
+    [_INIT, _INIT, _LIST],
+    [_INIT, _LIST, '{"jsonrpc": "2.0", "id": 99, "result": {}}'],
+    ['{"jsonrpc": "2.0", "id": 99, "result": {}}', _INIT, _LIST],
+    [_INIT, '{"jsonrpc": "2.0", "id": 1, "result": {"tools": []}}'],
+    [_INIT, '{"jsonrpc": "2.0", "id": "2", "result": {"tools": []}}'],
+    [],
+])
+def test_the_reply_check_wants_exactly_one_reply_for_each_request_sent(lines):
+    with pytest.raises(AssertionError):
+        _replies("".join(l + "\n" for l in lines))
+
+
+@pytest.mark.parametrize("lines", [[_INIT, _LIST], [_LIST, _INIT]])
+def test_the_reply_check_accepts_one_reply_for_each_request_in_either_order(lines):
+    assert set(_replies("".join(l + "\n" for l in lines))) == {1, 2}
 
 
 @pytest.mark.parametrize("flag", ["--help", "-h"])
