@@ -2554,7 +2554,7 @@ def _create_policy_file(path, data: bytes) -> bool:
     finished file the name policy.yaml, which fails when something already has the name, and the
     private file is removed. So policy.yaml is not seen part written, and a policy someone saved
     there is not replaced or removed. When a call fails with an exception, only the private file is
-    removed. A process that dies mid write (killed, power lost) cannot run that cleanup, so it can
+    removed, as best effort. A process that dies mid write (killed, power lost) cannot run that cleanup, so it can
     leave one private file named `.policy.yaml.<hex>.tmp` in the folder. It does not leave a partial
     policy.yaml.
     """
@@ -2584,7 +2584,8 @@ def _replace_policy_file_if_unchanged(path, expected: bytes, identity, data: byt
     must be the same file as before (same device, inode, size and modification time) holding the same
     bytes, with the path still naming the file that was read. If not, nothing is replaced, which keeps a
     policy saved in the meantime, including one saved over the path while it was being read. A call that
-    fails with an exception leaves the old file in place and removes the staging file. A process that
+    fails with an exception before the rename leaves the old file in place and tries to remove the
+    staging file, which is best effort. A process that
     dies in the middle (killed, power lost) can leave the staging file behind and does not leave a half
     written policy.
 

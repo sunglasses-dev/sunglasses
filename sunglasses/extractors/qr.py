@@ -73,7 +73,15 @@ class QRExtractor:
         walk it or name what it skipped.
         """
         from pyzbar.pyzbar import decode
-        from PIL import ImageSequence
+        from .image import FrameRefused, ImageExtractor
+
+        # The same pixel budget OCR uses, read from the header before any decode.
+        # An image over it is not converted or handed to the decoder, and the
+        # refusal is named so the scan does not call it clean.
+        over = ImageExtractor._pixel_cap_failure(img, "QR decoding")
+        if over:
+            self.failures.append(over)
+            return []
 
         # v0.5.6 round 7 (ASTRA I1). `n_frames` is a PROPERTY THAT PARSES, so on a
         # file whose later frame header is damaged it RAISES -- and `getattr(img,
@@ -123,7 +131,7 @@ class QRExtractor:
         index = 0
         iterator = None
         try:
-            iterator = iter(ImageSequence.Iterator(img))
+            iterator = iter(ImageExtractor._reachable_frames(img, "QR decoding"))
         except Exception as exc:
             self.failures.append(
                 f"frame sequence unreadable for QR ({exc.__class__.__name__}) — "
@@ -154,6 +162,29 @@ class QRExtractor:
                     f"({exc.__class__.__name__}) — that frame and any after it "
                     f"were NOT inspected for QR codes")
                 break
+            if isinstance(frame, FrameRefused):
+                # Refused from the plan of the file before the seek: nothing was
+                # allocated for it, and the frames after it build on it.
+                self.failures.append(f"frame {frame.index}: {frame.message}")
+                left = ImageExtractor._left_after_refusal(
+                    frame.index, total, total_known, "QR decoding")
+                if left:
+                    self.failures.append(left)
+                break
+            over = ImageExtractor._pixel_cap_failure(frame, "QR decoding")
+            if over:
+                self.failures.append(f"frame {index}: {over}")
+                if ImageExtractor._frames_depend(img):
+                    # The next seek builds the next frame on this one, which
+                    # decodes it. Stop here and say what was left.
+                    left = ImageExtractor._left_after_refusal(
+                        index, total, total_known, "QR decoding")
+                    if left:
+                        self.failures.append(left)
+                    break
+                # Pages of a TIFF stand alone: the others are still read.
+                index += 1
+                continue
             try:
                 # pyzbar wants a concrete image; an animated frame can be P-mode
                 # with a palette, which it decodes poorly or not at all.
@@ -188,7 +219,7 @@ class QRExtractor:
 
         Returns list of (source_label, decoded_text) tuples.
         """
-        from PIL import Image
+        from .image import ImageExtractor, ImageRefused
 
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
@@ -199,7 +230,11 @@ class QRExtractor:
         # stranger's incomplete flag. The canonical wrappers build a fresh instance
         # each time, which is exactly why this hid.
         self.failures = []
-        img = Image.open(image_path)
+        try:
+            img = ImageExtractor._open_lazy(image_path)
+        except ImageRefused as exc:
+            self.failures.append(str(exc))
+            return []
         return self._decode_frames(img, source=os.path.basename(image_path))
 
     def extract_from_bytes(self, image_bytes: bytes) -> List[Tuple[str, str]]:
@@ -210,11 +245,14 @@ class QRExtractor:
         of them is a quieter version of H1 (see `ImageExtractor.extract_from_bytes`
         and ASTRA H5).
         """
-        from PIL import Image
-        import io
+        from .image import ImageExtractor, ImageRefused
 
         self.failures = []          # round 7 (I5b): same reset on the bytes entry point
-        img = Image.open(io.BytesIO(image_bytes))
+        try:
+            img = ImageExtractor._open_lazy(image_bytes)
+        except ImageRefused as exc:
+            self.failures.append(str(exc))
+            return []
         return self._decode_frames(img, source="image bytes")
 
 
