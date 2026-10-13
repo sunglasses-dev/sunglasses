@@ -198,3 +198,20 @@ DECODED_CARRIERS = {
 @pytest.mark.xfail(strict=True, reason="open: the strip runs before the decoders")
 def test_a_control_character_that_only_exists_after_decoding_still_blocks(name):
     assert _decision(DECODED_CARRIERS[name](PHRASE), "message") == "block"
+
+
+# Open survivor, scoped. The control view lets a base64 run that follows a control
+# decode on its original boundary, on every channel but tool_output: that channel
+# keeps the short-input corroboration gate, so an encoded payload is not read there
+# whatever its length. This change does not lift that gate.
+ENCODED_AFTER_A_CONTROL = "notes. " * 400 + "abcd\x00" + base64.b64encode(PHRASE.encode()).decode()
+
+
+@pytest.mark.parametrize("channel", ["message", "file", "web_content"])
+def test_a_long_encoded_payload_after_a_control_blocks_where_the_gate_allows_it(channel):
+    assert _decision(ENCODED_AFTER_A_CONTROL, channel) == "block"
+
+
+@pytest.mark.xfail(strict=True, reason="open: tool_output keeps the short-input corroboration gate")
+def test_a_long_encoded_payload_after_a_control_is_read_on_tool_output():
+    assert _decision(ENCODED_AFTER_A_CONTROL, "tool_output") == "block"
