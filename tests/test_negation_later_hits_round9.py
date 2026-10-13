@@ -109,11 +109,11 @@ def test_an_ordinary_folded_ampersand_leaves_the_text_behind_it_vouched_for():
 # 3. The alternatives of a rule share one budget, and none of them is cut short by a count.
 def _alternatives(count):
     words = ["zorbit now", "vault later", "quartz first", "ember last"][:count]
-    return _rule(regex=[r"(?i)!*\s*" + w for w in words]), words
+    return _rule(regex=[r"(?i)'*\s*" + w for w in words]), words
 
 
 def _text(words, run):
-    return " ".join("Never " + "!" * run + " " + w + "." for w in words)
+    return " ".join("Never " + "'" * run + " " + w + "." for w in words)
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 4])
@@ -126,7 +126,7 @@ def test_each_alternative_alone_under_the_cap_stays_covered(count):
 @pytest.mark.parametrize("run", [20, 31, 100])
 def test_the_alternatives_of_a_rule_stay_covered_together(run):
     rule, words = _alternatives(2)
-    one = _rule(regex=[r"(?i)!*\s*zorbit now"]).scan(_text(words[:1], run), channel="message")
+    one = _rule(regex=[r"(?i)'*\s*zorbit now"]).scan(_text(words[:1], run), channel="message")
     assert one.decision == "allow_redacted" and _covered(one), run
     both = rule.scan(_text(words, run), channel="message")
     assert both.decision == "allow_redacted" and _covered(both), run

@@ -239,7 +239,9 @@ def test_a_blank_run_after_a_covered_hit_does_not_count_each_newline_as_a_hit(pa
     engine = _engine()
     result = engine.scan("Never. " + "\n" * pad + ORDER, channel="web_content")
     mine = [f for f in result.findings if f["id"] == "GLS-EX-030"]
-    assert mine and mine[0]["severity"] == "review" and mine[0].get("negation_context")
+    # A full stop ends the negated sentence, so the order after the blank run is a live finding;
+    # the blank run is still read once (one finding), not once per newline.
+    assert len(mine) == 1 and mine[0]["severity"] == "high" and not mine[0].get("negation_context")
 
 
 @pytest.mark.parametrize("pad", [2, 64, 5000])
