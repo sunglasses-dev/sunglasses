@@ -3,6 +3,131 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.8] — 2026-10-12
+
+### Added
+
+- The PDF reader now reads form field values and the alternate and tooltip text of a field, JavaScript
+  actions and text attachments. Each piece is labelled by where it came from, so a finding names the
+  field, the action or the attachment. Script actions on outline items, files listed as associated
+  files and a field value held on its parent are read as well. What is not read is now named in the
+  result instead of passing as clean. That covers XFA form data, an attachment that is itself a PDF
+  or a PostScript or archive or binary file, anything past a cap, a tree nested too deep, a stream
+  that does not end where it should and text that does not decode. The decision stays allow when
+  nothing is found, the result is marked incomplete, a warning is printed and the command line
+  exits 3. A threat finding still comes first. (#349)
+
+### Changed
+
+- A PDF page that paints a picture and holds no readable text, such as a scanned page or a
+  screenshot printed to PDF, is now named as not inspected. Before, the scan found nothing, raised
+  nothing and returned allow with the inspection marked complete. Now the decision stays allow when
+  nothing is found, the result is marked incomplete and not clean, a warning names the page and the
+  picture count, and the command line exits 3. A picture is looked for through the routes a page
+  draws one by, which are an image, a form, an inline image, a soft mask, a Type3 font and the
+  appearance of a shown annotation. A resource entry that nothing draws does not count, so a blank
+  page with an unused picture stays complete. A page with one stray character and a picture is
+  named too. The search is bounded, so PDF visual coverage remains partial. A threat finding still
+  comes first. (#348)
+
+- An image over a pixel budget is refused before it is decoded. A small file can hold a very large
+  picture, and the text reader, the hidden text pass, the metadata reader and the QR reader used to
+  decode it in full before the scan knew whether any reader could run. The size is now read from the
+  file first, in one place, and an image over the budget is not decoded by any reader. The refusal
+  is named in the failures, so the scan reports the file as not fully inspected and not clean. A
+  file is opened only as PNG and JPEG and GIF and BMP and TIFF and WebP, judged by its first bytes
+  and not by its name. Any other container is named and not opened, even under the budget, because
+  those readers cannot be bounded from outside. A GIF is planned from its own block structure so
+  that no frame over the budget is ever allocated. (#346)
+
+- A negation now downgrades a match to review only when it governs the clause the match sits in. The
+  old test was a plain substring search for a negation word within a short distance, and review maps
+  to allow_redacted, so a live instruction placed after a short negation was let through. The check
+  is now a bounded clause check made by position in the raw text, so a copy of the same words
+  elsewhere cannot vouch for a match, and a rule keeps the downgrade only when every one of its hits
+  is covered. Misleading context around a negation now blocks more often. This narrows the
+  downgrade and does not close the finding, and known limits are tracked. (#345)
+
+- A doubled space between two words of a negated clause is read as the one space it
+  collapses to, within bounds. A sentence that was downgraded with one space and blocked with two
+  is now decided the same way with both. The normalization is bounded and the stricter clause checks
+  still apply around the cue and the match. (#361)
+
+- A framing word that describes an attack now downgrades a match to review only when it leads the
+  clause the match sits in. The old test was a plain substring search anywhere in a window before
+  the match. The check reuses the bounded clause walk of the negation rule. Misleading framing now
+  blocks more often, and some legitimate descriptions of an attack now block as well. The finding is
+  narrowed and not closed, and known limits are tracked. (#347)
+
+### Fixed
+
+- The regex lane now reads a folded view, so rules that live on a regex catch more text hidden with
+  invisible characters, soft hyphens or look alike letters. The lane read the raw text and two other
+  views but never a view with these folds, so one zero width space per word, or one Cyrillic look
+  alike letter, blinded every mechanism rule and every carrier without a usable keyword. The lane
+  now reads one more view, the raw text with invisible characters deleted, NFKC applied and look
+  alike letters mapped to ASCII. Raw text is checked first. A raw match that a negation or framing
+  clause covers stays provisional while the other views and alternatives are checked, the folded
+  view is read for a rule the raw text has not settled, and it is capped like the rest. ASCII text
+  never pays a second pass. Folding coverage remains incomplete and the limits are tracked. (#342)
+
+- GLS-IP-006 and GLS-EX-030 no longer take time that grows with the square of a long run of blank
+  lines. Six regexes opened with a lead in that let a sentence end be followed by any whitespace, so
+  each newline in a run started an attempt that read the rest of the run. They now run in a mode
+  that finds the same match with the same start and end in linear time. A regex gets the mode only
+  when its whole source equals one of the six, so a custom rule keeps its previous behaviour. (#340)
+
+- GLS-AW-001 no longer takes time that grows with the square of a long run of blank space after its
+  verb. The first regex split the run between two open ended quantifiers before the noun failed to
+  appear. The second quantifier now belongs to the optional word. The regex accepts exactly the
+  same strings with the same span and groups. (#354)
+
+- GLS-SQLFS-001 no longer takes time that grows with the square, or the cube when blanks sit on
+  both sides of the bracket, of a long run of blank space around its bracket. Each run now belongs
+  to one quantifier in the three places it was split, after the primitive, after the bracket and
+  after BULK, and the required blank after BULK is still required. The rule still reads one regex
+  and the mirror file is regenerated for this rule only. (#357)
+
+### Continuous integration
+
+- Every workflow job is pinned to ubuntu-24.04 in place of ubuntu-latest, so a runner image change
+  lands in its own reviewed commit and not during a release. The check in the CI gate test now
+  names the pinned image. (#353)
+
+- The integrity job cap is raised twice because the growing suite let the slower legs be cancelled
+  by the cap while every test was passing, which shows as a cancelled job and not as a result. (#358
+  and #362)
+
+### Tests
+
+- A per entry whitespace cost gate now checks every regex entry the engine loads, with a static part
+  that finds a newline admitting atom followed by an unbounded quantifier and a timed part, and two
+  more test files pin the newline run budget and the lead in shapes that must keep detecting. The
+  gate prose points at its constants instead of stating sizes. (#351 and #360)
+
+- The teardown of the proxy artifact fixture reads the peer's process group file whole or not at
+  all, so a stop that lands while the peer is still writing no longer turns a passing leg red. Test
+  code only. (#359)
+
+- The group teardown test waits for the marker file to hold content before it reads the
+  pid, so a slow runner no longer fails it with an empty read. Test code only. (#356)
+
+### Documentation
+
+- The stats file now carries the day 0.6.7 was published. The counts, the code, the rules and the
+  tests do not change. (#339)
+
+- README, the PDF docstring and one advisory summary no longer promise more than the scanner does.
+  Obfuscation coverage is described as tested per technique and not complete, and PDF scanning is
+  described by what it reads. No count changes. (#352)
+
+- The known gaps file records the cost and folding limits known when it was written, and some of
+  them are repaired by entries in this release. Further cost and folding limitations remain and are
+  tracked. A test keeps the recorded rows honest. (#355)
+
+- Comments and docstrings in three files now match how the starter file write cleans up its staging
+  file and how the credential prefilter derives its literals. No code moves. (#341)
+
 ## [0.6.7] — 2026-10-07
 
 ### Added
