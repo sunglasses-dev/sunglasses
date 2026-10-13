@@ -2460,8 +2460,9 @@ def main():
     # main(), whole, for the same reason as `proxy`: the server answers --help and
     # --version itself and must see argv exactly as `python -m sunglasses.mcp` does.
     # It runs first, before the colour policy and the parsers, and this module no
-    # longer imports the mailer at load time, so a client speaking JSON-RPC on stdout
-    # meets nothing but the server. Its exit status is the server's own.
+    # longer imports the mailer (and its optional `resend` import) at load time.
+    # Imports the server shares with the CLI, such as the scanner engine's, still
+    # run before this point. Its exit status is the server's own.
     if len(sys.argv) > 1 and sys.argv[1] == "mcp":
         from .mcp import main as mcp_main
         sys.exit(mcp_main(sys.argv[2:]))

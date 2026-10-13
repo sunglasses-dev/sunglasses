@@ -41,6 +41,15 @@ def _run(argv, stdin=STIMULUS, extra_path=None):
                           cwd=REPO_ROOT, env=_env(extra_path), timeout=60)
 
 
+def _is_message(msg):
+    """A JSON-RPC 2.0 request, notification or response, and nothing looser."""
+    if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0":
+        return False
+    if "method" in msg:
+        return isinstance(msg["method"], str) and ("id" not in msg or isinstance(msg["id"], (int, str)))
+    return isinstance(msg.get("id"), (int, str)) and ("result" in msg) != ("error" in msg)
+
+
 def _messages(stdout):
     """Every stdout line must be a JSON-RPC message: anything else on the wire breaks a client."""
     out = []
@@ -49,7 +58,7 @@ def _messages(stdout):
             msg = json.loads(line)
         except ValueError:
             raise AssertionError("stdout line is not JSON: %r" % line[:200])
-        assert isinstance(msg, dict) and msg.get("jsonrpc") == "2.0", line[:200]
+        assert _is_message(msg), "stdout line is not a JSON-RPC message: %r" % line[:200]
         out.append(msg)
     return out
 
@@ -96,17 +105,42 @@ def test_both_routes_run_the_same_function_as_python_dash_m():
     assert _tool_names(via_m.stdout) == _tool_names(via_cli.stdout) == TOOLS
 
 
-def test_an_optional_import_that_prints_never_reaches_the_wire(tmp_path):
-    """The CLI route starts the server before it loads anything else the CLI uses.
+def test_a_noisy_mailer_dependency_is_not_imported_on_the_mcp_route(tmp_path):
+    """The `sunglasses mcp` route skips the mailer import.
 
-    `resend` is the optional mailer dependency; a copy that prints on import must
-    leave stdout holding nothing but the server's replies on the `sunglasses mcp` route.
+    `resend` is the mailer's optional dependency; a copy that prints on import must
+    leave stdout holding nothing but the server's replies on this route. Other optional
+    imports the server shares with the CLI (the scanner engine's) are not covered here.
     """
     (tmp_path / "resend.py").write_text("print('NOISE ON STDOUT')\n", encoding="utf-8")
     proc = _run(CLI_ROUTE, extra_path=str(tmp_path))
     assert proc.returncode == 0, (proc.returncode, proc.stderr[-600:])
     assert "NOISE" not in proc.stdout, proc.stdout[:600]
     assert _tool_names(proc.stdout) == TOOLS, proc.stdout[:600]
+
+
+@pytest.mark.parametrize("line", [
+    '{"jsonrpc": "2.0"}',
+    '{"jsonrpc": "2.0", "id": 99}',
+    '{"jsonrpc": "2.0", "id": 1, "result": {}, "error": {}}',
+    '{"jsonrpc": "2.0", "method": 5}',
+    '{"id": 1, "result": {}}',
+    '[]',
+    'NOISE',
+])
+def test_the_stdout_check_rejects_what_is_not_a_json_rpc_message(line):
+    with pytest.raises(AssertionError):
+        _messages(line + "\n")
+
+
+@pytest.mark.parametrize("line", [
+    '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}',
+    '{"jsonrpc": "2.0", "method": "notifications/initialized"}',
+    '{"jsonrpc": "2.0", "id": 1, "result": {}}',
+    '{"jsonrpc": "2.0", "id": 2, "error": {"code": -32601, "message": "x"}}',
+])
+def test_the_stdout_check_accepts_a_request_notification_or_response(line):
+    assert len(_messages(line + "\n")) == 1
 
 
 @pytest.mark.parametrize("flag", ["--help", "-h"])
