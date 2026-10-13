@@ -35,7 +35,7 @@ WORKFLOW = "pattern-integrity"
 # `integrity` is a matrix, so its legs are matched by prefix.
 REQUIRED_EXACT = {"classify", "fast", "coverage", "certify"}
 REQUIRED_MATRIX_PREFIX = "integrity"
-REQUIRED_MATRIX_LEGS = 6          # 3.9 through 3.14
+REQUIRED_MATRIX_LEGS = 12         # 3.9 through 3.14, two shards each
 
 
 def refuse(reason: str) -> None:
