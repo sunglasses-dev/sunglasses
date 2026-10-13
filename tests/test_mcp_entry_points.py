@@ -7,7 +7,7 @@ unknown command.
 
 Every row sends the same stimulus: initialize, the initialized notification, then
 tools/list, then EOF. A real server answers both requests on stdout with the three
-tool names. The `--help` / `--version` rows prove the flags are answered, not forwarded
+tool names, and every stdout line must be a JSON-RPC message. The `--help` / `--version` rows prove the flags are answered, not forwarded
 into a running server.
 """
 import json
@@ -32,24 +32,33 @@ STIMULUS = "".join(json.dumps(m) + "\n" for m in (
 STARTED = "Starting SUNGLASSES MCP server"
 
 
-def _env():
-    return dict(os.environ, PYTHONPATH=REPO_ROOT)
+def _env(extra_path=None):
+    return dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in (REPO_ROOT, extra_path) if p))
 
 
-def _run(argv, stdin=STIMULUS):
+def _run(argv, stdin=STIMULUS, extra_path=None):
     return subprocess.run(argv, input=stdin, capture_output=True, text=True,
-                          cwd=REPO_ROOT, env=_env(), timeout=60)
+                          cwd=REPO_ROOT, env=_env(extra_path), timeout=60)
 
 
-def _tool_names(stdout):
+def _messages(stdout):
+    """Every stdout line must be a JSON-RPC message: anything else on the wire breaks a client."""
+    out = []
     for line in stdout.splitlines():
         try:
             msg = json.loads(line)
         except ValueError:
-            continue
-        if isinstance(msg, dict) and msg.get("id") == 2 and "result" in msg:
-            return {t["name"] for t in msg["result"]["tools"]}
-    return None
+            raise AssertionError("stdout line is not JSON: %r" % line[:200])
+        assert isinstance(msg, dict) and msg.get("jsonrpc") == "2.0", line[:200]
+        out.append(msg)
+    return out
+
+
+def _tool_names(stdout):
+    by_id = {m.get("id"): m for m in _messages(stdout) if "id" in m}
+    assert "result" in by_id.get(1, {}), "no initialize reply: %r" % stdout[:600]
+    reply = by_id.get(2)
+    return {t["name"] for t in reply["result"]["tools"]} if reply and "result" in reply else None
 
 
 def _console_script_target(name):
@@ -83,7 +92,21 @@ def test_both_routes_run_the_same_function_as_python_dash_m():
     assert (module, func) == ("sunglasses.mcp", "main")
     via_m = _run([sys.executable, "-m", "sunglasses.mcp"])
     via_cli = _run(CLI_ROUTE)
+    assert via_m.returncode == via_cli.returncode == 0, (via_m.returncode, via_cli.returncode)
     assert _tool_names(via_m.stdout) == _tool_names(via_cli.stdout) == TOOLS
+
+
+def test_an_optional_import_that_prints_never_reaches_the_wire(tmp_path):
+    """The CLI route starts the server before it loads anything else the CLI uses.
+
+    `resend` is the optional mailer dependency; a copy that prints on import must
+    leave stdout holding nothing but the server's replies on the `sunglasses mcp` route.
+    """
+    (tmp_path / "resend.py").write_text("print('NOISE ON STDOUT')\n", encoding="utf-8")
+    proc = _run(CLI_ROUTE, extra_path=str(tmp_path))
+    assert proc.returncode == 0, (proc.returncode, proc.stderr[-600:])
+    assert "NOISE" not in proc.stdout, proc.stdout[:600]
+    assert _tool_names(proc.stdout) == TOOLS, proc.stdout[:600]
 
 
 @pytest.mark.parametrize("flag", ["--help", "-h"])
@@ -92,7 +115,7 @@ def test_subcommand_help_prints_usage_and_starts_no_server(flag):
     assert proc.returncode == 0, (proc.returncode, proc.stderr[-600:])
     assert "usage:" in proc.stdout, proc.stdout[:600]
     assert STARTED not in proc.stderr, proc.stderr[:600]
-    assert _tool_names(proc.stdout) is None, proc.stdout[:600]
+    assert "jsonrpc" not in proc.stdout, proc.stdout[:600]
 
 
 def test_subcommand_version_prints_the_version_and_starts_no_server():
