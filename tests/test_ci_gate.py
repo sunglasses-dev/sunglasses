@@ -296,8 +296,13 @@ def check_workflow(doc) -> list[str]:
     strat = integrity.get("strategy") or {}
     if set(strat.keys()) - {"fail-fast", "matrix"} or strat.get("fail-fast") is not False:
         p.append(f"integrity strategy keys/fail-fast changed: {strat}")
-    if set((strat.get("matrix") or {}).keys()) != {"python-version"}:
+    if set((strat.get("matrix") or {}).keys()) != {"python-version", "shard"}:
         p.append(f"integrity matrix has extra keys (include/exclude?): {sorted((strat.get('matrix') or {}).keys())}")
+    if (strat.get("matrix") or {}).get("shard") != ["1", "2"]:
+        p.append(f"integrity shard axis changed: {(strat.get('matrix') or {}).get('shard')}")
+    suite_steps = [s for s in integrity.get("steps", []) if s.get("run", "").strip() == INTEGRITY_SUITE_CMD]
+    if len(suite_steps) != 1 or suite_steps[0].get("env") != {"CI_SHARD": "${{ matrix.shard }}/2"}:
+        p.append("the integrity full-suite step must carry exactly env CI_SHARD: ${{ matrix.shard }}/2 (the two parts together are the suite)")
     # Exact fast-suite command shape: every token allowed, nothing positional.
     if len(suite) == 1:
         toks = shlex.split(suite[0].replace("\\\n", " "))
