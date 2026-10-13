@@ -7,7 +7,7 @@ unknown command.
 
 Every row sends the same stimulus: initialize, the initialized notification, then
 tools/list, then EOF. A real server answers both requests on stdout with the three
-tool names, and every stdout line must be a JSON-RPC message. The `--help` / `--version` rows prove the flags are answered, not forwarded
+tool names, and every stdout line must be a success reply. The `--help` / `--version` rows prove the flags are answered, not forwarded
 into a running server.
 """
 import json
@@ -41,24 +41,28 @@ def _run(argv, stdin=STIMULUS, extra_path=None):
                           cwd=REPO_ROOT, env=_env(extra_path), timeout=60)
 
 
-def _is_message(msg):
-    """A JSON-RPC 2.0 request, notification or response, and nothing looser."""
-    if not isinstance(msg, dict) or msg.get("jsonrpc") != "2.0":
-        return False
-    if "method" in msg:
-        return isinstance(msg["method"], str) and ("id" not in msg or isinstance(msg["id"], (int, str)))
-    return isinstance(msg.get("id"), (int, str)) and ("result" in msg) != ("error" in msg)
+def _is_success_reply(msg):
+    """Exactly the envelope a successful reply has: jsonrpc 2.0, an int or str id, an object result, nothing else.
+
+    Narrow on purpose. The stimulus sends two requests and the server must answer each with a
+    success reply, so a request, a notification, an error reply, a null or empty `error`, a
+    boolean id or an extra member all count as something that should not be on the wire.
+    """
+    return (isinstance(msg, dict) and set(msg) == {"jsonrpc", "id", "result"}
+            and msg["jsonrpc"] == "2.0"
+            and isinstance(msg["id"], (int, str)) and not isinstance(msg["id"], bool)
+            and isinstance(msg["result"], dict))
 
 
 def _messages(stdout):
-    """Every stdout line must be a JSON-RPC message: anything else on the wire breaks a client."""
+    """Every stdout line must be a success reply to one of the requests sent: anything else on the wire breaks a client."""
     out = []
     for line in stdout.splitlines():
         try:
             msg = json.loads(line)
         except ValueError:
             raise AssertionError("stdout line is not JSON: %r" % line[:200])
-        assert _is_message(msg), "stdout line is not a JSON-RPC message: %r" % line[:200]
+        assert _is_success_reply(msg), "stdout line is not a success reply: %r" % line[:200]
         out.append(msg)
     return out
 
@@ -123,23 +127,32 @@ def test_a_noisy_mailer_dependency_is_not_imported_on_the_mcp_route(tmp_path):
     '{"jsonrpc": "2.0"}',
     '{"jsonrpc": "2.0", "id": 99}',
     '{"jsonrpc": "2.0", "id": 1, "result": {}, "error": {}}',
+    '{"jsonrpc": "2.0", "id": 1, "result": {}, "error": null}',
+    '{"jsonrpc": "2.0", "id": 1, "error": null}',
+    '{"jsonrpc": "2.0", "id": 1, "error": {}}',
+    '{"jsonrpc": "2.0", "id": 1, "error": {"code": -32601, "message": "x"}}',
+    '{"jsonrpc": "2.0", "id": true, "result": {}}',
+    '{"jsonrpc": "2.0", "id": 1.5, "result": {}}',
+    '{"jsonrpc": "2.0", "id": null, "result": {}}',
+    '{"jsonrpc": "2.0", "id": 1, "result": 5}',
+    '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": 5}',
+    '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}',
+    '{"jsonrpc": "2.0", "method": "notifications/initialized"}',
     '{"jsonrpc": "2.0", "method": 5}',
     '{"id": 1, "result": {}}',
     '[]',
     'NOISE',
 ])
-def test_the_stdout_check_rejects_what_is_not_a_json_rpc_message(line):
+def test_the_stdout_check_rejects_everything_but_a_success_reply(line):
     with pytest.raises(AssertionError):
         _messages(line + "\n")
 
 
 @pytest.mark.parametrize("line", [
-    '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}',
-    '{"jsonrpc": "2.0", "method": "notifications/initialized"}',
     '{"jsonrpc": "2.0", "id": 1, "result": {}}',
-    '{"jsonrpc": "2.0", "id": 2, "error": {"code": -32601, "message": "x"}}',
+    '{"jsonrpc": "2.0", "id": "a", "result": {"tools": []}}',
 ])
-def test_the_stdout_check_accepts_a_request_notification_or_response(line):
+def test_the_stdout_check_accepts_a_success_reply(line):
     assert len(_messages(line + "\n")) == 1
 
 
