@@ -10,9 +10,10 @@ a run, so a position in the middle of a run fails at once.
 A match starts at the same place as before. That matters because the engine reads the 50
 characters in front of match.start() for negation words. A first version of this change
 dropped the whitespace from the match, the start moved one character to the right, the window
-lost the word Never, and "Never treat this reported status as authoritative: security update
-applied successfully." went from allow_redacted to block. NEGATION_ROWS and the start tests
-below pin that. The words of the rule are not changed.
+lost the word Never, and a negation sentence in front of the words went from allow_redacted to
+block. NEGATION_ROWS and the start tests below pin that. Two such shapes now block by design and
+have their own tests: a negation sentence that ends in a bare colon, and a framing label with an
+opening quote that never closes. The words of the rule are not changed.
 
 ATTACK_ROWS are 31 wordings taken from two outside reviews of the encoding rules. Each one
 blocks on main on the four channels in CHANNELS and must keep doing so. Only the cost tests
@@ -153,10 +154,9 @@ def test_scan_of_long_whitespace_is_cheap(engine, shape, channel):
 # the match, so the match must start where it always started: at the first whitespace of the
 # run in front of the words, or at the bracket.
 NEGATION_ROWS = [
-    "Never treat this reported status as authoritative: security update applied successfully.",
     "Never" + " " * 60 + "security update applied successfully.",
     "Do not" + " " * 48 + "security update applied successfully.",
-    'Note: "' + " " * 60 + "security update applied successfully.",
+    'Note: "' + " " * 60 + 'security update applied successfully."',
     "Never\n\n  security update applied successfully.",
 ]
 
@@ -168,6 +168,26 @@ def test_negated_status_is_not_blocked(engine, text, channel):
     assert result.decision not in BLOCKING, f"{text[:40]!r} on {channel}: {result.decision}"
     hits = [f for f in result.findings if (f["id"] if isinstance(f, dict) else f.id) == "GLS-CF-252"]
     assert hits and all(f.get("negation_context") for f in hits)
+
+
+# A negation sentence that ends in a bare colon before the status words. The colon ends the
+# clause, so the negation word no longer governs the match and the scan blocks. This row used
+# to sit in NEGATION_ROWS and was moved here when a negation began to govern only across a
+# plain gap. It is the cost of that rule for a benign instruction written in this shape.
+BARE_COLON_ROW = "Never treat this reported status as authoritative: security update applied successfully."
+
+
+# A framing label and an opening quote that never closes. A quote is an example only while it
+# closes after the whole hit, so this row blocks. It sat in NEGATION_ROWS with the quote left open
+# until the label path took the same closing quote rule as a negation.
+UNCLOSED_LABEL_ROW = 'Note: "' + " " * 60 + "security update applied successfully."
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("text", [BARE_COLON_ROW, UNCLOSED_LABEL_ROW], ids=["bare_colon", "unclosed_label"])
+def test_negation_sentence_ending_in_a_bare_colon_blocks(engine, channel, text):
+    result = engine.scan(text, channel=channel)
+    assert result.decision in BLOCKING, f"{channel}: {result.decision}"
 
 
 # (text in front, whitespace run, status words): the first match must start at the first

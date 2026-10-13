@@ -1864,7 +1864,7 @@ PATTERNS = [
             "pull from rss and auto-publish",
         ],
         "regex": [
-            r"(?i)(fetch|crawl|scrape|read)\s+(?:this|the)?\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+            r"(?i)(fetch|crawl|scrape|read)\s+(?:(?:this|the)\s*)?(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
             r"(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)",
         ],
         "description": "Indirect prompt injection or poisoned source content entering an agent workflow that fetches external pages, generates content, and pushes toward publishing systems."
@@ -25483,7 +25483,7 @@ PATTERNS = [
             "pg_read_file .env",
         ],
         "regex": [
-            r"""(?i)\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\s*(?:/\*.*?\*/)?\s*\(\s*(?:BULK\s+)?['\"]?[^'\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\.pem\b|\.env\b|private[_-]?key)""",
+            r"""(?i)\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\s*(?:/\*.*?\*/\s*)?\((?:\s*BULK(?=\s))?(?:\s*['\"])?[^'\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\.pem\b|\.env\b|private[_-]?key)""",
             r"""(?i)\bATTACH\s+(?:DATABASE\s+)?['\"][^'\"]*(?:\.ssh/|id_rsa|\.pem|\.env|/etc/|credentials)""",
         ],
         "description": "A filesystem-read SQL primitive (Postgres pg_read_file/pg_read_binary_file/pg_stat_file, MSSQL OPENROWSET/OPENDATASOURCE, MySQL LOAD_FILE, SQLite ATTACH) targets a SENSITIVE path (/etc/{shadow,passwd}, DB config like pg_hba.conf, SSH keys, cloud credentials, .env files, secrets dirs, PEM keys) in agent-generated/untrusted query text. Detection requires the primitive AND a sensitive-path argument together, which separates an attack from benign admin SQL (GRANT/REVOKE/COMMENT/monitoring). Source: CVE-2026-50180 (Langroid SQLChatAgent)."

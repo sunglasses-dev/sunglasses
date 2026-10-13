@@ -271,8 +271,8 @@ def check_workflow(doc) -> list[str]:
         p.append(f"coverage job env must be exactly the four needs bindings: got {coverage.get('env')}")
     if set(coverage.keys()) - COVERAGE_JOB_KEYS:
         p.append(f"coverage job has unexpected keys {sorted(set(coverage.keys()) - COVERAGE_JOB_KEYS)} (defaults/container/shell/step env are not reviewed shapes)")
-    if coverage.get("runs-on") != "ubuntu-latest":
-        p.append("coverage must run on ubuntu-latest (bash -e is the documented default shell there)")
+    if coverage.get("runs-on") != "ubuntu-24.04":
+        p.append("coverage must run on ubuntu-24.04 (a pinned image; bash -e is the documented default shell there)")
     cov_steps = coverage.get("steps") or []
     if len(cov_steps) != 1 or set(cov_steps[0].keys()) - COVERAGE_STEP_KEYS:
         p.append("coverage must be exactly one step with only name+run (a step-level env/shell would override the job bindings)")
@@ -296,8 +296,13 @@ def check_workflow(doc) -> list[str]:
     strat = integrity.get("strategy") or {}
     if set(strat.keys()) - {"fail-fast", "matrix"} or strat.get("fail-fast") is not False:
         p.append(f"integrity strategy keys/fail-fast changed: {strat}")
-    if set((strat.get("matrix") or {}).keys()) != {"python-version"}:
+    if set((strat.get("matrix") or {}).keys()) != {"python-version", "shard"}:
         p.append(f"integrity matrix has extra keys (include/exclude?): {sorted((strat.get('matrix') or {}).keys())}")
+    if (strat.get("matrix") or {}).get("shard") != ["1", "2"]:
+        p.append(f"integrity shard axis changed: {(strat.get('matrix') or {}).get('shard')}")
+    suite_steps = [s for s in integrity.get("steps", []) if s.get("run", "").strip() == INTEGRITY_SUITE_CMD]
+    if len(suite_steps) != 1 or suite_steps[0].get("env") != {"CI_SHARD": "${{ matrix.shard }}/2"}:
+        p.append("the integrity full-suite step must carry exactly env CI_SHARD: ${{ matrix.shard }}/2 (the two parts together are the suite)")
     # Exact fast-suite command shape: every token allowed, nothing positional.
     if len(suite) == 1:
         toks = shlex.split(suite[0].replace("\\\n", " "))
