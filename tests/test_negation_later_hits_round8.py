@@ -171,14 +171,28 @@ def _custom_plain_rule():
     return _rule(regex=[r"(?i)!*\s*zorbit now"])
 
 
-@pytest.mark.parametrize("run", [100, 400, 1600, 6400])
-def test_a_custom_regex_with_a_variable_lead_in_does_bounded_work(run):
+# The limits that stood here were 80 evaluations and 320 prefix reads for 100 to 6400 starts, with a
+# block as the verdict: they described the count cap (32 later hits, then live). With no count cap a
+# run of starts that the budget can read is read once per start and stays covered, so the limit is one
+# evaluation and one prefix read per start plus a constant. This replaces the old numbers; it is not
+# the same assertion.
+@pytest.mark.parametrize("run", [100, 400])
+def test_a_custom_regex_with_a_variable_lead_in_reads_each_start_once(run):
+    engine = _custom_plain_rule()
+    calls = _counting(engine)
+    result = engine.scan("Never " + "!" * run + " zorbit now", channel="message")
+    assert result.decision == "allow_redacted" and _covered(result)
+    assert calls["eval"] <= run + 8, calls
+    assert calls["prefix"] <= run + 8, calls
+
+
+@pytest.mark.parametrize("run", [1600, 6400])
+def test_a_variable_lead_in_run_the_budget_cannot_read_fails_closed_after_one_search(run):
     engine = _custom_plain_rule()
     calls = _counting(engine)
     result = engine.scan("Never " + "!" * run + " zorbit now", channel="message")
     assert result.decision in BLOCKING and not _covered(result)
-    assert calls["eval"] <= 80, calls
-    assert calls["prefix"] <= 80 * 4, calls
+    assert calls["eval"] <= 2, calls
 
 
 def test_a_custom_regex_with_a_short_variable_lead_in_stays_covered():
@@ -232,14 +246,12 @@ def test_a_literal_ampersand_and_percent_text_keep_their_origin():
     assert _RawAlign(raw).holds(view, 0, len(view)) is True
 
 
-# 4. The cap on the lead-in walk ends in a block, never in an unread rest of the text.
-@pytest.mark.parametrize("run,blocked", [(20, False), (31, False), (32, True), (33, True), (200, True)])
-def test_the_lead_in_walk_cap_makes_the_rule_live_and_does_not_end_the_read(run, blocked):
+# 4. The walk over lead-in starts has no count cap: a run is read once, and one the budget cannot
+#    read ends in a block, never in an unread rest of the text.
+@pytest.mark.parametrize("run", [20, 31, 32, 33, 200, 400])
+def test_a_long_lead_in_run_stays_covered_and_does_not_end_the_read(run):
     result = _custom_plain_rule().scan("Never " + "!" * run + " zorbit now", channel="message")
-    if blocked:
-        assert result.decision in BLOCKING and not _covered(result), run
-    else:
-        assert result.decision == "allow_redacted" and _covered(result), run
+    assert result.decision == "allow_redacted" and _covered(result), run
 
 
 @pytest.mark.parametrize("run", [20, 33, 200])
