@@ -28,7 +28,7 @@ COLLIDING = "7764e22ba1f3c8204dcc13723015cb026e8472da"
 OTHER = "35c5e775f0674a73c8de7793dd1e728efe01d2f0"
 RUN_ID = 999000159
 LEGS = ["classify", "fast", "coverage", "certify"] + [
-    f"integrity (3.{v})" for v in range(9, 15)
+    f"integrity (3.{v}, {s})" for v in range(9, 15) for s in (1, 2)
 ]
 
 SHIM = """#!%s
