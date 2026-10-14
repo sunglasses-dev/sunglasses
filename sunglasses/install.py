@@ -1834,16 +1834,27 @@ def _set_aside_failed(standby_bytes, name, *, records):
     return kept.name, _digest_file(kept)
 
 
-def _standby_is_ours(standby_bytes, bytes_path):
-    """False when the claim stored beside this standby copy names another
-    server's retained original. No claim beside it (the promotion consumed it)
-    leaves nothing to contradict, and the digest the record carries decides."""
+def _standby_is_ours(standby_bytes, bytes_path, name):
+    """True only when this standby copy is provably for `bytes_path`.
+
+    A claim that is ABSENT beside the copy means the first promotion consumed
+    it, so there is nothing to contradict and the canonical record's digest
+    decides. A claim that is PRESENT has to be readable, a complete record, and
+    name this server's retained original: one that cannot be read, is the wrong
+    shape, or names nothing is not a claim for us, and bytes are never moved on
+    the strength of it."""
+    claim_path = standby_bytes.with_suffix(".standbyrecord")
     try:
-        claim = _read_json_file(standby_bytes.with_suffix(".standbyrecord"))
-    except (OSError, ValueError):
+        claim = _read_json_file(claim_path)
+    except FileNotFoundError:
         return True
-    return not isinstance(claim, dict) or claim.get(
-        "original_bytes_path", str(bytes_path)) == str(bytes_path)
+    except (OSError, ValueError):
+        return False
+    try:
+        _validate_record(claim, name, expect_state="complete")
+    except ConfigConflict:
+        return False
+    return claim.get("original_bytes_path") == str(bytes_path)
 
 
 def _standby_pairs(home, name):
@@ -1893,17 +1904,20 @@ def _adopt_standby(home, name, target):
     # had already been consumed by the first rename. The canonical record names
     # them just as well: it carries the digest they must have.
     if rec_path.exists() and not bytes_path.exists():
+        # The canonical record is validated as a whole before a byte moves
+        # toward it: a record that uninstall would refuse is not an authority
+        # to put recovery material beside.
         try:
-            claim = _read_json_file(rec_path)
-        except (OSError, ValueError):
-            claim = None
-        before = claim.get("file_sha_before") if isinstance(claim, dict) else None
+            claim = _read_record(rec_path, name, expect_state="complete")
+        except ConfigConflict:
+            return False
+        before = claim.get("file_sha_before")
         if _is_digest(before):
             for orphan in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standby")):
                 try:
                     if _digest_file(orphan) != before:
                         continue
-                    if not _standby_is_ours(orphan, bytes_path):
+                    if not _standby_is_ours(orphan, bytes_path, name):
                         continue
                     orphan.rename(bytes_path)
                 except OSError as e:
@@ -1940,6 +1954,10 @@ def _adopt_standby(home, name, target):
         # oldest. A standby is the inverse of a PARTICULAR published wrapper, so
         # the one to adopt is the one whose record describes the file that is
         # actually there. Sorted order is not a decision.
+        try:
+            _validate_record(claim, name, expect_state="complete")
+        except ConfigConflict:
+            continue
         after = claim.get("file_sha_after")
         if not _is_digest(after) or after != _digest_bytes(live):
             continue
@@ -2013,7 +2031,7 @@ def _reclaim_taken(home, name):
     if bytes_path.exists():
         return False
     notes = [q for q in [d / f"{name}.taking"] + sorted(
-        d.glob(f"{name}.taking.*")) if q.is_file()]
+        d.glob(f"{glob.escape(name)}.taking.*")) if q.is_file()]
     refusal = None
     for taking in notes:
         peek = _read_note(taking)
@@ -2225,6 +2243,14 @@ def _read_record(path, name, *, expect_state):
         record = _strict_loads(raw, f"the record for {name!r}")
     except ConfigIOError as e:
         raise ConfigConflict(str(e)) from e
+    return _validate_record(record, name, expect_state=expect_state)
+
+
+def _validate_record(record, name, *, expect_state):
+    """The shape of a record, whoever read it. `_read_record` calls this for the
+    canonical record; a standby claim is checked with the same function BEFORE
+    anything is renamed into the canonical pair, so a claim that would be
+    refused as a record is never promoted into one."""
     if not isinstance(record, dict):
         raise ConfigConflict(f"the record for {name!r} is not an object")
     for field_name, want in RECORD_TYPES.items():

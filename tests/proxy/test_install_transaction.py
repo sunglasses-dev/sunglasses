@@ -2920,3 +2920,191 @@ def test_a_standby_claim_with_a_non_finite_number_moves_nothing(
     assert sorted((p.name, read(p)) for p in records.iterdir()) == before, (
         "a claim that could not be read strictly still moved or wrote files")
     assert not any(b"Infinity" in read(p) for p in records.iterdir())
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# A claim stored beside a standby copy is as untrusted as a config. It has to
+# be present, readable, a complete record and bound to this server before any
+# recovery file is moved on its word, and the whole standby record is checked
+# BEFORE either file is renamed into the canonical pair.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _snapshot(records):
+    return sorted((p.name, read(p)) for p in records.iterdir() if p.is_file())
+
+
+def _half_promoted(cfg, home, artifact, monkeypatch, name="github"):
+    """The canonical record is in place, its bytes are not, and the retained
+    copy is still a standby orphan with its claim beside it."""
+    _leave_a_standby(cfg, home, artifact, monkeypatch, name)
+    records = home / "proxy" / "installs"
+    (standby,) = records.glob("*.standby")
+    (claim,) = records.glob("*.standbyrecord")
+    _, rec_path, _, bytes_path = inst._record_paths(home, name)
+    rec_path.write_bytes(read(claim))
+    assert not bytes_path.exists()
+    return records, standby, claim, bytes_path
+
+
+def _break_the_claim(claim, how):
+    text = claim.read_text(encoding="utf-8")
+    if how == "overflowing_number":
+        claim.write_text(text.rstrip().rstrip("}") + ', "n": 1e999}', encoding="utf-8")
+    elif how == "malformed":
+        claim.write_text(text[: len(text) // 2], encoding="utf-8")
+    elif how == "array":
+        claim.write_text("[]", encoding="utf-8")
+    elif how == "unbound":
+        body = json.loads(text)
+        del body["original_bytes_path"]
+        claim.write_text(json.dumps(body), encoding="utf-8")
+    elif how == "bound_elsewhere":
+        body = json.loads(text)
+        body["original_bytes_path"] = str(claim.parent / "other.original")
+        claim.write_text(json.dumps(body), encoding="utf-8")
+    elif how == "incomplete_record":
+        body = json.loads(text)
+        del body["installed_entry"]
+        claim.write_text(json.dumps(body), encoding="utf-8")
+    else:                                                  # pragma: no cover
+        raise AssertionError(how)
+
+
+@pytest.mark.parametrize("how", [
+    "overflowing_number", "malformed", "array", "unbound", "bound_elsewhere",
+    "incomplete_record"])
+def test_an_invalid_sibling_claim_does_not_authorize_moving_an_orphan(
+        cfg, home, artifact, monkeypatch, how):
+    """A sibling claim that is PRESENT and unusable is not the same as an absent
+    one. Absent means the first promotion consumed it; present and unreadable,
+    the wrong shape or unbound means nothing vouches for the copy, and it must
+    not be moved into the canonical name on the canonical record's digest
+    alone."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    _break_the_claim(claim, how)
+    published = read(cfg)
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+
+    assert not bytes_path.exists(), "an orphan was moved on an invalid claim"
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_an_absent_sibling_claim_still_lets_the_canonical_digest_decide(
+        cfg, home, artifact, monkeypatch):
+    """The control: a claim the first promotion consumed is the ordinary state
+    of a half-finished promotion, and the orphan is put back."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    claim.unlink()
+
+    assert inst._adopt_standby(home, "github", cfg) is True
+
+    assert bytes_path.exists() and not standby.exists()
+
+
+def test_a_prefix_overlapping_servers_orphan_with_an_invalid_claim_stays_put(
+        tmp_path, home, artifact, monkeypatch):
+    """`github.inflight-9` leaves files that `github.inflight-*` also matches.
+    With that server's claim unreadable, nothing says whose copy it is."""
+    other = "github.inflight-9"
+    doc = {"mcpServers": {"github": {"command": "npx"}, other: {"command": "mcp-x"}}}
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    _leave_a_standby(cfg, home, artifact, monkeypatch, other)
+    records = home / "proxy" / "installs"
+    (standby,) = records.glob("*.standby")
+    (claim,) = records.glob("*.standbyrecord")
+    _, rec_path, _, bytes_path = inst._record_paths(home, "github")
+    rec_path.write_bytes(read(claim))                 # a record whose digest matches
+    claim.write_text("not json", encoding="utf-8")
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+
+
+def test_an_invalid_canonical_record_moves_no_orphan(
+        cfg, home, artifact, monkeypatch):
+    """The canonical record is validated as a whole before a byte moves toward
+    it, not just for the digest the orphan has to match."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    claim.unlink()                                    # absent claim: digest decides ...
+    _, rec_path, _, _ = inst._record_paths(home, "github")
+    body = json.loads(read(rec_path))
+    del body["installed_entry"]                       # ... but the record is incomplete
+    rec_path.write_text(json.dumps(body), encoding="utf-8")
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+
+
+@pytest.mark.parametrize("how", ["missing_entry", "wrong_entry_type", "wrong_state"])
+def test_a_standby_record_failing_the_schema_is_refused_before_any_rename(
+        cfg, home, artifact, monkeypatch, how):
+    """The standby record used to be checked field by field for the few things
+    selection needs and fully validated only later, by the uninstall, after both
+    files were already renamed into the canonical pair."""
+    _leave_a_standby(cfg, home, artifact, monkeypatch, "github")
+    records = home / "proxy" / "installs"
+    (claim,) = records.glob("*.standbyrecord")
+    body = json.loads(read(claim))
+    if how == "missing_entry":
+        del body["original_entry"]
+    elif how == "wrong_entry_type":
+        body["installed_entry"] = ["not", "an", "object"]
+    else:
+        body["state"] = "pending"
+    claim.write_text(json.dumps(body), encoding="utf-8")
+    published = read(cfg)
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+    assert _snapshot(records) == before, "files moved before the schema was checked"
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_a_take_note_lookup_reads_a_legacy_name_literally(
+        cfg, home, artifact):
+    """A name written before names were tightened can hold glob characters. The
+    lookup of notes for `a[bc]` must find `a[bc].taking.*` and must not read
+    `ab.taking.*` (another server's) as a match."""
+    name = "a[bc]"
+    d, rec_path, _, bytes_path = inst._record_paths(home, name)
+    d.mkdir(parents=True)
+    held = d / f"{name}.original.discarding-1-a"
+    held.write_bytes(b"{}")
+    (d / f"{name}.taking.1-a").write_text(json.dumps(
+        {"canonical": bytes_path.name, "held": held.name,
+         "owner": "1-a", "sha256": inst._digest_bytes(b"{}")}), encoding="utf-8")
+    # Another server's note, which the unescaped pattern `a[bc].taking.*` matches.
+    stranger_held = d / "ab.original.discarding-1-a"
+    stranger_held.write_bytes(b"{}")
+    stranger = d / "ab.taking.1-a"
+    stranger.write_text(json.dumps(
+        {"canonical": "ab.original", "held": stranger_held.name,
+         "owner": "1-a", "sha256": inst._digest_bytes(b"{}")}), encoding="utf-8")
+
+    assert inst._reclaim_taken(home, name) is True
+
+    assert bytes_path.exists()
+    assert stranger.exists() and stranger_held.exists(), (
+        "another server's take note was read as if it were this one's")
