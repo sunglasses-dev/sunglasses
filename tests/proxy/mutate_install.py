@@ -264,21 +264,58 @@ MUTATIONS = [
     ('NAME-CHECK', 'a server name is not checked before it reaches a path',
      '''    _check_name(name)
     _refuse_symlinked_config(config_path)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _install_locked(''',
      '''    _refuse_symlinked_config(config_path)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _install_locked(''',
      'test_unusable_names_are_refused_by_install_and_uninstall'),
     ('LINK-REFUSED', 'a symbolic-link config is replaced by a file on uninstall',
-     '''    _check_name(name)
+     '''    _check_name(name, writing=False)
     _refuse_symlinked_config(config_path)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _uninstall_locked(''',
-     '''    _check_name(name)
+     '''    _check_name(name, writing=False)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _uninstall_locked(''',
      'test_a_config_that_became_a_link_after_install_is_not_replaced'),
+    ('NEW-NAME-RULES', 'the stricter name rules for a new record are skipped',
+     '    if not (writing or os.name == "nt"):\n        return\n',
+     '    return\n',
+     'test_install_refuses_names_that_make_a_bad_new_record'),
+    ('COLON-NAME', 'a colon in a server name is allowed through',
+     ' or "\\x00" in name or ":" in name',
+     ' or "\\x00" in name',
+     'test_unusable_names_are_refused_by_install_and_uninstall'),
+    ('CASE-ALIAS', 'a second spelling of a recorded name is allowed to reach its files',
+     '''            if same:
+                raise ConfigConflict(
+                    f"a record named {entry!r} already exists and differs from "''',
+     '''            if False:
+                raise ConfigConflict(
+                    f"a record named {entry!r} already exists and differs from "''',
+     'test_a_name_that_reaches_another_spelling_of_itself_is_refused'),
+    ('STANDBY-BOUND', 'a standby claim for another server is promoted for this one',
+     '        if claim.get("original_bytes_path") != str(bytes_path):\n            continue\n',
+     '',
+     'test_a_standby_pair_left_for_another_server_is_not_adopted'),
+    ('STRICT-CLAIM', 'a note or claim is read with the lax parser',
+     '_strict_loads(pathlib.Path(path).read_text(encoding="utf-8"), str(path))',
+     'json.loads(pathlib.Path(path).read_text(encoding="utf-8"))',
+     'test_a_standby_claim_with_a_non_finite_number_moves_nothing'),
+    ('LOCK-RESOLVE-TYPED', 'a fault resolving the lock key escapes untyped',
+     '''    try:
+        resolved = pathlib.Path(target).resolve()
+    except (OSError, RuntimeError) as exc:     # a link loop or an unreadable parent
+        raise ConfigIOError(f"cannot resolve {target}: {exc}") from exc
+''',
+     '''    resolved = pathlib.Path(target).resolve()
+''',
+     'test_a_fault_resolving_the_lock_key_is_typed'),
     ('FINITE-FLOAT', 'a number that overflows to infinity is accepted',
      '                          parse_float=_finite_float)',
      '                          )',

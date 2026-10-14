@@ -61,7 +61,12 @@ def test_absolute_name_is_refused_before_any_write(tmp_path):
     assert not (outside / "target.original").exists()
 
 
-@pytest.mark.parametrize("name", ["", ".", "..", "a/b", "a\\b", "a\x00b"])
+@pytest.mark.parametrize("name", [
+    "", ".", "..", "a/b", "a\\b", "a\x00b",
+    # a drive qualifier replaces the records directory's drive on Windows, and
+    # `name:stream` writes an alternate data stream of another file
+    "C:evil", "C:", "name:stream", "a:b",
+])
 def test_unusable_names_are_refused_by_install_and_uninstall(tmp_path, name):
     raw = b'{"mcpServers": {}}\n'
     home, cfg = fresh(tmp_path, raw=raw)
@@ -76,6 +81,60 @@ def test_an_ordinary_name_still_installs(tmp_path):
     home, cfg = fresh(tmp_path, {"mcpServers": {"gh-2.x_ok": {"command": "npx"}}})
     I.install(cfg, "gh-2.x_ok", artifact=ART, home=home)
     assert wrapped(cfg, "gh-2.x_ok")
+
+
+@pytest.mark.parametrize("name", [
+    "CON", "con", "Nul.txt", "COM1", "lpt9.log", "COM\u00b9", "CONIN$", "aux ",
+    "a*", "a?b", "[x]", "a<b", 'a"b', "a|b", "name.", "name ",
+])
+def test_install_refuses_names_that_make_a_bad_new_record(tmp_path, name):
+    """Glob characters let the recovery lookups match another server's files,
+    and reserved device names, characters Windows cannot hold and a trailing dot
+    or space make a record file that is not the file that was named."""
+    raw = b'{"mcpServers": {}}\n'
+    home, cfg = fresh(tmp_path, raw=raw)
+    with pytest.raises(I.ConfigConflict):
+        I.install(cfg, name, artifact=ART, home=home, argv=["echo"])
+    assert cfg.read_bytes() == raw
+    assert not (home / "proxy" / "installs").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows applies the whole list to uninstall too")
+def test_uninstall_still_reaches_a_record_an_earlier_release_wrote(tmp_path, monkeypatch):
+    """The stricter tier is for NEW records. An earlier release did not check at
+    all, so a record under a name the install tier now refuses must stay
+    uninstallable, or the user's original is stranded behind a name rule."""
+    raw = (json.dumps({"mcpServers": {"a*b": {"command": "npx"}}}, indent=2) + "\n").encode()
+    home, cfg = fresh(tmp_path, raw=raw)
+    real = I._check_name
+    monkeypatch.setattr(I, "_check_name", lambda name, **kw: None)
+    I.install(cfg, "a*b", artifact=ART, home=home)
+    monkeypatch.setattr(I, "_check_name", real)
+    assert wrapped(cfg, "a*b")
+    I.uninstall(cfg, "a*b", home=home)
+    assert cfg.read_bytes() == raw
+
+
+def test_a_name_that_reaches_another_spelling_of_itself_is_refused(tmp_path, monkeypatch):
+    """On a case-insensitive file system `Foo` and `foo` are one record, so a
+    second spelling would overwrite or adopt the first one's files. The listing
+    and the same-file answer are stood in for, so this holds on every file
+    system and nothing else in the transaction can refuse first."""
+    home, cfg = fresh(tmp_path, {"mcpServers": {"foo": {"command": "npx"}}})
+    d, *_ = I._record_paths(home, "foo")
+    real_listdir = os.listdir
+
+    def listing(path="."):
+        return ["Foo.json"] if str(path) == str(d) else real_listdir(path)
+
+    monkeypatch.setattr(I.os, "listdir", listing)
+    monkeypatch.setattr(I.os.path, "samefile", lambda a, b: True)
+    raw = cfg.read_bytes()
+    with pytest.raises(I.ConfigConflict, match="letter case"):
+        I.install(cfg, "foo", artifact=ART, home=home)
+    with pytest.raises(I.ConfigConflict, match="letter case"):
+        I.uninstall(cfg, "foo", home=home)
+    assert cfg.read_bytes() == raw
 
 
 # --- a symbolic-link config --------------------------------------------------
@@ -241,3 +300,28 @@ def test_a_missing_config_is_not_mistaken_for_a_link(tmp_path):
     with pytest.raises((I.ConfigConflict, I.ConfigIOError)) as e:
         I.install(tmp_path / "absent.json", "gh", artifact=ART, home=home)
     assert "symbolic link" not in str(e.value)
+
+
+# --- a path that cannot be resolved is a typed refusal -----------------------
+
+@pytest.mark.skipif(os.name == "nt", reason="needs a POSIX symbolic link")
+def test_a_link_loop_config_is_a_typed_refusal_not_a_raw_error(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    loop = tmp_path / "loop.json"
+    loop.symlink_to(loop)
+    with pytest.raises(I.ConfigConflict):
+        I.install(loop, "github", artifact=ART, home=home, argv=["echo"])
+    with pytest.raises(I.ConfigConflict):
+        I.uninstall(loop, "github", home=home)
+
+
+def test_a_fault_resolving_the_lock_key_is_typed(tmp_path, monkeypatch):
+    home, cfg = fresh(tmp_path, {"mcpServers": {"github": {"command": "npx"}}})
+
+    def broken(self, *a, **kw):
+        raise OSError(13, "permission denied")
+
+    monkeypatch.setattr(pathlib.Path, "resolve", broken)
+    with pytest.raises(I.ConfigIOError):
+        I._lock_path(home, cfg)

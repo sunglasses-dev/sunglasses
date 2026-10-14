@@ -2825,3 +2825,98 @@ def test_evidence_swapped_after_the_gate_does_not_license_the_restore(
     assert inst.classify(json.loads(read(cfg))["mcpServers"]["github"],
                          artifact=artifact) == "WRAPPED", (
         "a restore was licensed by evidence that had already been swapped")
+
+
+# ─────────────────────────────────────────────── standby claims belong to a name
+
+def _leave_a_standby(cfg, home, artifact, monkeypatch, name):
+    """Publish a wrapper for `name`, end the process there, and take the
+    canonical journal and retained copy the way a racing uninstall does, so the
+    standby inverse is the ONLY recovery material on disk for that name."""
+    real_write = inst._atomic_write
+    ended = []
+
+    def end_after_publishing(target, data):
+        out = real_write(target, data)
+        if not ended:
+            ended.append(True)
+            _, _, pending_path, retained = inst._record_paths(home, name)
+            for q in (pending_path, retained):
+                if q.exists():
+                    q.unlink()
+            raise KeyboardInterrupt("the publisher ends here")
+        return out
+
+    monkeypatch.setattr(inst, "_atomic_write", end_after_publishing)
+    with pytest.raises(KeyboardInterrupt):
+        inst.install(cfg, name, artifact=artifact, home=home)
+    monkeypatch.setattr(inst, "_atomic_write", real_write)
+    assert ended
+
+
+def test_a_standby_pair_left_for_another_server_is_not_adopted(
+        tmp_path, home, artifact, monkeypatch):
+    """STANDBY-BOUND-TO-THE-NAME. The
+    standby lookups match files by `<name>.inflight-*`, which is a prefix test:
+    server `github.inflight-9` leaves a pair that `github` also matches. The
+    claim stored in a pair names the retained original it describes, and a pair
+    is promoted only for the name whose retained original that is."""
+    other = "github.inflight-9"
+    doc = {"mcpServers": {"github": {"command": "npx"}, other: {"command": "mcp-x"}}}
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    _leave_a_standby(cfg, home, artifact, monkeypatch, other)
+    published = read(cfg)
+    records = home / "proxy" / "installs"
+    pair = sorted(p.name for p in records.glob("*.standby*"))
+    assert len(pair) == 2
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+
+    assert read(cfg) == published, "another server's inverse was applied"
+    assert sorted(p.name for p in records.glob("*.standby*")) == pair
+    assert not (records / "github.json").exists()
+    assert not (records / "github.original").exists()
+
+
+def test_a_name_with_glob_characters_does_not_consume_another_servers_pair(
+        cfg, home, artifact, monkeypatch):
+    _leave_a_standby(cfg, home, artifact, monkeypatch, "github")
+    published = read(cfg)
+    records = home / "proxy" / "installs"
+    pair = sorted(p.name for p in records.glob("*.standby*"))
+    assert len(pair) == 2
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "git*", home=home)
+
+    assert read(cfg) == published
+    assert sorted(p.name for p in records.glob("*.standby*")) == pair
+    assert not list(records.glob("git*.json"))
+
+
+def test_a_standby_claim_with_a_non_finite_number_moves_nothing(
+        cfg, home, artifact, monkeypatch):
+    """A claim is as untrusted as a config. Read with a laxer parser, a claim
+    holding an overflowing number was accepted, the damaged bytes were moved
+    aside, and the record that followed was written with `Infinity` in it
+    before anything refused. Read strictly, the claim is unreadable and is
+    skipped before any file is touched."""
+    _leave_a_standby(cfg, home, artifact, monkeypatch, "github")
+    published = read(cfg)
+    records = home / "proxy" / "installs"
+    (standby,) = records.glob("*.standby")
+    (claim_path,) = records.glob("*.standbyrecord")
+    standby.write_bytes(b'{"not": "the original"}')        # damaged: the entry-only branch
+    text = claim_path.read_text(encoding="utf-8")
+    claim_path.write_text(text.rstrip().rstrip("}") + ', "n": 1e999}', encoding="utf-8")
+    before = sorted((p.name, read(p)) for p in records.iterdir())
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+
+    assert read(cfg) == published
+    assert sorted((p.name, read(p)) for p in records.iterdir()) == before, (
+        "a claim that could not be read strictly still moved or wrote files")
+    assert not any(b"Infinity" in read(p) for p in records.iterdir())

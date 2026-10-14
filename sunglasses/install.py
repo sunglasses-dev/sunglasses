@@ -45,6 +45,7 @@ silently collapsed, and execution options the entry carries are preserved.
 import contextlib
 import ctypes
 import errno
+import glob
 import hashlib
 import itertools
 import json
@@ -165,6 +166,17 @@ def _strict_loads(raw, what):
         raise ConfigIOError(f"{what} is nested too deeply to parse") from e
     except (ValueError, UnicodeDecodeError) as e:
         raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
+
+
+def _read_json_file(path):
+    """A small JSON file read with the same grammar as a config or a record
+    (no NaN or Infinity, no overflowing number, no duplicate key). Refusals are
+    ValueError, which is what every caller of a note or a claim already treats as
+    unreadable."""
+    try:
+        return _strict_loads(pathlib.Path(path).read_text(encoding="utf-8"), str(path))
+    except ConfigIOError as e:
+        raise ValueError(str(e)) from None
 
 
 def _reject_duplicate_keys(pairs):
@@ -695,7 +707,11 @@ def _lock_path(home, target):
     would serialise them and hand any local user a way to block installs by
     squatting the path, which is the worse trade.
     """
-    digest = hashlib.sha256(str(pathlib.Path(target).resolve()).encode("utf-8"))
+    try:
+        resolved = pathlib.Path(target).resolve()
+    except (OSError, RuntimeError) as exc:     # a link loop or an unreadable parent
+        raise ConfigIOError(f"cannot resolve {target}: {exc}") from exc
+    digest = hashlib.sha256(str(resolved).encode("utf-8"))
     return pathlib.Path(home) / "proxy" / "locks" / f"{digest.hexdigest()}.lock"
 
 
@@ -717,7 +733,7 @@ def _records_dir(home, name):
 def _read_note(path):
     """A note's contents, or None when it is not one."""
     try:
-        intent = json.loads(path.read_text(encoding="utf-8"))
+        intent = _read_json_file(path)
     except (OSError, ValueError):
         return None
     if not isinstance(intent, dict):
@@ -810,7 +826,7 @@ def _held_bytes_are_answered_for(private, *, d):
 def _note_is_live(taking, *, d):
     """True when a take note still answers for bytes that are still there."""
     try:
-        intent = json.loads(taking.read_text(encoding="utf-8"))
+        intent = _read_json_file(taking)
     except (OSError, ValueError):
         return False
     if not isinstance(intent, dict):
@@ -1574,7 +1590,7 @@ def _forget_take(taking, owner):
 def _forget_held(taking, private, owner):
     """The rest of the forget, with `private` registered as ours."""
     try:
-        intent = json.loads(private.read_text(encoding="utf-8"))
+        intent = _read_json_file(private)
     except (OSError, ValueError):
         intent = None
     # OWNERSHIP IS THE AUTHOR, not the filename. Two cleanups that took
@@ -1818,13 +1834,25 @@ def _set_aside_failed(standby_bytes, name, *, records):
     return kept.name, _digest_file(kept)
 
 
+def _standby_is_ours(standby_bytes, bytes_path):
+    """False when the claim stored beside this standby copy names another
+    server's retained original. No claim beside it (the promotion consumed it)
+    leaves nothing to contradict, and the digest the record carries decides."""
+    try:
+        claim = _read_json_file(standby_bytes.with_suffix(".standbyrecord"))
+    except (OSError, ValueError):
+        return True
+    return not isinstance(claim, dict) or claim.get(
+        "original_bytes_path", str(bytes_path)) == str(bytes_path)
+
+
 def _standby_pairs(home, name):
     """Every standby inverse left for `name`, newest last."""
     d, _, _, _ = _record_paths(home, name)
     if not d.is_dir():
         return []
     out = []
-    for record in sorted(d.glob(f"{name}.inflight-*.standbyrecord")):
+    for record in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standbyrecord")):
         bytes_path = record.with_suffix(".standby")
         if bytes_path.is_file():
             out.append((record, bytes_path))
@@ -1866,14 +1894,16 @@ def _adopt_standby(home, name, target):
     # them just as well: it carries the digest they must have.
     if rec_path.exists() and not bytes_path.exists():
         try:
-            claim = json.loads(rec_path.read_text(encoding="utf-8"))
+            claim = _read_json_file(rec_path)
         except (OSError, ValueError):
             claim = None
         before = claim.get("file_sha_before") if isinstance(claim, dict) else None
         if _is_digest(before):
-            for orphan in sorted(d.glob(f"{name}.inflight-*.standby")):
+            for orphan in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standby")):
                 try:
                     if _digest_file(orphan) != before:
+                        continue
+                    if not _standby_is_ours(orphan, bytes_path):
                         continue
                     orphan.rename(bytes_path)
                 except OSError as e:
@@ -1890,12 +1920,18 @@ def _adopt_standby(home, name, target):
             (False, pair) for pair in _standby_pairs(home, name)] + [
             (True, pair) for pair in _standby_pairs(home, name)]:
         try:
-            claim = json.loads(record_path.read_text(encoding="utf-8"))
+            claim = _read_json_file(record_path)
         except (OSError, ValueError):
             continue
         if not isinstance(claim, dict):
             continue
         if claim.get("target_path") != str(pathlib.Path(target).resolve()):
+            continue
+        # A claim names the retained original it describes. Matching files by
+        # `<name>.inflight-*` is a prefix test, and another server's name can
+        # begin with this one's (`x` and `x.inflight-9`), so the claim has to
+        # say it is for THIS server's retained original before it is promoted.
+        if claim.get("original_bytes_path") != str(bytes_path):
             continue
         # R11-ADOPT-THE-CURRENT-ONE (ASTRA round 10,
         # `R10_TWO_PAIRS_SELECT_CURRENT_WRAPPER`). More than one standby can be
@@ -1939,8 +1975,8 @@ def _adopt_standby(home, name, target):
                     standby_bytes, name, records=d)
                 record_path.write_text(json.dumps(
                     {**claim, "failed_bytes_name": failed_name,
-                     "failed_bytes_sha256": failed_sha}, indent=2),
-                    encoding="utf-8")
+                     "failed_bytes_sha256": failed_sha}, indent=2,
+                    allow_nan=False), encoding="utf-8")
                 record_path.rename(rec_path)
             except OSError as e:
                 raise ConfigIOError(
@@ -2008,7 +2044,7 @@ def _reclaim_taken(home, name):
 def _reclaim_one(taking, name, *, d, bytes_path):
     """One note: validate every part of it, then put its bytes back."""
     try:
-        intent = json.loads(taking.read_text(encoding="utf-8"))
+        intent = _read_json_file(taking)
     except OSError as e:
         raise ConfigIOError(f"cannot read the take note at {taking}: {e}") from e
     except ValueError as e:
@@ -2109,7 +2145,8 @@ def _discard(*paths):
         try:
             owner = held.name.split(".discarding-", 1)[-1]
             intent = json.dumps({"canonical": q.name, "held": held.name,
-                                 "owner": owner, "sha256": _digest_file(q)})
+                                 "owner": owner, "sha256": _digest_file(q)},
+                                allow_nan=False)
         except OSError:
             # There is nothing at the canonical name to take. Whatever note is
             # there belongs to a take that is still in flight, and removing it
@@ -2310,7 +2347,15 @@ def classify(entry, *, artifact):
     return "WRAPPED"
 
 
-def _check_name(name):
+_DEVICE_STEMS = frozenset(
+    {"con", "prn", "aux", "nul", "conin$", "conout$"}
+    | {f"com{i}" for i in "123456789\u00b9\u00b2\u00b3"}
+    | {f"lpt{i}" for i in "123456789\u00b9\u00b2\u00b3"})
+_GLOB_CHARS = frozenset("*?[]")
+_WINDOWS_INVALID = frozenset('<>"|')
+
+
+def _check_name(name, *, writing=True):
     """The server name becomes part of a file name under the records directory
     (`<name>.json`, `<name>.original`), so it is checked before it gets there.
 
@@ -2319,12 +2364,61 @@ def _check_name(name):
     write truncate a file outside the records directory, and the empty name
     produced records called `.json`. A refusal here is typed and happens before
     any write; nothing downstream has to defend against it.
+
+    TWO TIERS. What can leave the records directory is refused by both
+    commands: a path separator, NUL, a control character, `.` and `..`, and a
+    colon (a drive qualifier replaces the records directory's drive on Windows,
+    and `name:stream` writes an alternate data stream of another file). What
+    only makes a bad NEW record is refused when writing: glob characters (the
+    recovery lookups match files by name), Windows reserved device names and
+    characters Windows cannot hold in a file name, and a trailing dot or space
+    (Windows drops it, so two names become one file). An earlier release did not
+    check at all, so uninstall keeps accepting a record it can still name; on
+    Windows both commands apply the whole list.
     """
     if (not isinstance(name, str) or not name or name in (".", "..")
-            or "/" in name or "\\" in name or "\x00" in name):
+            or "/" in name or "\\" in name or "\x00" in name or ":" in name
+            or any(ord(c) < 0x20 or ord(c) == 0x7f for c in name)):
         raise ConfigConflict(
             f"{name!r} is not a usable server name: it must be non-empty and "
-            f"contain no path separator, no NUL and not be '.' or '..'")
+            f"contain no path separator, colon, NUL or control character and "
+            f"not be '.' or '..'")
+    if not (writing or os.name == "nt"):
+        return
+    if (any(c in _GLOB_CHARS or c in _WINDOWS_INVALID for c in name)
+            or name[-1] in ". "
+            or name.split(".", 1)[0].rstrip(" ").casefold() in _DEVICE_STEMS):
+        raise ConfigConflict(
+            f"{name!r} is not a usable server name: it must not hold any of "
+            f"* ? [ ] < > \" |, end in a dot or a space, or be a reserved "
+            f"device name such as CON, NUL, COM1 or LPT1")
+
+
+def _refuse_case_alias(home, name):
+    """On a case-insensitive file system `Foo` and `foo` are one record. A record
+    that is stored under another spelling of this name, and that this name's own
+    path reaches, is somebody else's, so the name is refused rather than allowed
+    to overwrite or adopt it. A case-sensitive file system keeps two spellings
+    apart, and then nothing is reached and nothing is refused."""
+    d, *_ = _record_paths(home, name)
+    try:
+        existing = os.listdir(d)
+    except OSError:
+        return
+    for suffix in (".json", ".pending", ".original"):
+        mine = f"{name}{suffix}"
+        for entry in existing:
+            if entry == mine or entry.casefold() != mine.casefold():
+                continue
+            try:
+                same = os.path.samefile(d / mine, d / entry)
+            except OSError:
+                continue
+            if same:
+                raise ConfigConflict(
+                    f"a record named {entry!r} already exists and differs from "
+                    f"{name!r} only in letter case; name the server as it was "
+                    f"installed")
 
 
 def _refuse_symlinked_config(target):
@@ -2340,9 +2434,13 @@ def _refuse_symlinked_config(target):
     except OSError as e:
         raise ConfigIOError(f"cannot inspect {target}: {e}") from e
     if is_link:
+        try:
+            behind = pathlib.Path(target).resolve()
+        except (OSError, RuntimeError):
+            behind = "the file it points at"      # a loop or an unreadable link
         raise ConfigConflict(
             f"{target} is a symbolic link; writing it would replace the link "
-            f"and leave {pathlib.Path(target).resolve()} unchanged. Name that "
+            f"and leave {behind} unchanged. Name that "
             f"file instead")
 
 
@@ -2358,6 +2456,7 @@ def install(config_path, name, *, artifact, home, argv=None):
     """
     _check_name(name)
     _refuse_symlinked_config(config_path)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _install_locked(config_path, name, artifact=artifact, home=home,
                                argv=argv)
@@ -2401,7 +2500,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
 
         if name in servers:
             _validate_entry(existing, name, target)
-            original_entry = json.loads(json.dumps(existing))
+            original_entry = json.loads(json.dumps(existing, allow_nan=False))
             entry_existed = True
         else:
             if argv is None:
@@ -2506,7 +2605,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     try:
         _write_private(
             pending_path,
-            json.dumps({**record, "state": "pending"}, indent=2).encode("utf-8"),
+            json.dumps({**record, "state": "pending"}, indent=2, allow_nan=False).encode("utf-8"),
             what="the pending record")
         identities["journal"] = _identity(pending_path)
     except (OSError, ConfigIOError) as e:
@@ -2536,7 +2635,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         })
         try:
             pending_path.write_text(
-                json.dumps({**record, "state": "pending"}, indent=2),
+                json.dumps({**record, "state": "pending"}, indent=2, allow_nan=False),
                 encoding="utf-8")
         except OSError as e:
             raise ConfigIOError(f"cannot write the pending record: {e}") from e
@@ -2557,7 +2656,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         spare_record.write_text(json.dumps(
             {**record, "file_sha_after": _digest_bytes(published),
              "original_bytes_path": str(bytes_path), "state": "complete"},
-            indent=2), encoding="utf-8")
+            indent=2, allow_nan=False), encoding="utf-8")
 
     try:
         stand_by(new_raw, raw)
@@ -2653,7 +2752,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
                          "failed_bytes_name": failed_name,
                          "failed_bytes_sha256": failed_sha,
                          "state": "complete"},
-                        indent=2), encoding="utf-8")
+                        indent=2, allow_nan=False), encoding="utf-8")
                     spare_record.rename(rec_path)
             except OSError:
                 rebuilt = False
@@ -2683,7 +2782,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         record["file_sha_after"] = _digest_bytes(wrapped_bytes)
         _publish_atomically(
             rec_path,
-            json.dumps({**record, "state": "complete"}, indent=2).encode("utf-8"),
+            json.dumps({**record, "state": "complete"}, indent=2, allow_nan=False).encode("utf-8"),
             what="the completed record")
     except (OSError, ConfigIOError) as e:
         rolled_back = True
@@ -2843,8 +2942,9 @@ def uninstall(config_path, name, *, home):
 
     Under the same transaction lock as `install`, for the reason given there.
     """
-    _check_name(name)
+    _check_name(name, writing=False)
     _refuse_symlinked_config(config_path)
+    _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _uninstall_locked(config_path, name, home=home)
 

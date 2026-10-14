@@ -174,3 +174,8 @@ a review found the absence of them:
 - Locking reads `flock` where it exists and `None` where it does not, because
   `fcntl` is POSIX-only while the README promises Windows.
 - Inode reuse is neither proven nor handled.
+- A config that is a symbolic link is refused when the command starts. A link
+  swapped in between that check and the write, or a parent directory
+  retargeted after it, is not caught, and the record names the path as it was
+  checked. Closing that needs publication bound to a held directory
+  descriptor, which is a separate change.
