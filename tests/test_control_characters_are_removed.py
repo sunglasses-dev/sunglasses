@@ -207,7 +207,13 @@ def test_a_control_character_that_only_exists_after_decoding_still_blocks(name):
 ENCODED_AFTER_A_CONTROL = "notes. " * 400 + "abcd\x00" + base64.b64encode(PHRASE.encode()).decode()
 
 
-@pytest.mark.parametrize("channel", ["message", "file", "web_content"])
+ALL_CHANNELS = {
+    "message", "file", "api_response", "web_content", "log_memory",
+    "tool_output", "agent_input", "code", "prompt",
+}
+
+
+@pytest.mark.parametrize("channel", sorted(ALL_CHANNELS - {"tool_output"}))
 def test_a_long_encoded_payload_after_a_control_blocks_where_the_gate_allows_it(channel):
     assert _decision(ENCODED_AFTER_A_CONTROL, channel) == "block"
 
