@@ -168,27 +168,51 @@ def _strict_loads(raw, what):
         raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
 
 
-def _require_regular(path):
-    """Look at an entry before reading it, and say what it is.
+def _read_regular_bytes(path):
+    """The bytes of a regular file, read through ONE descriptor that was opened
+    without following a link and without blocking, and whose type was checked
+    on the descriptor itself.
 
     A symbolic link (dangling or not), a FIFO or a device is PRESENT and
-    unusable, which is not the same as absent, and reading one can block or
-    follow a link to somewhere else. A missing entry is the one case that raises
-    FileNotFoundError, so a caller can tell the two apart; anything else
-    unusable is ValueError. This is a check made at entry, not protection
-    against a process that swaps the entry afterwards."""
-    if not stat.S_ISREG(os.lstat(path).st_mode):
-        raise ValueError(f"{path} is not a regular file")
+    unusable, which is not the same as absent: a missing entry is the one case
+    that raises FileNotFoundError, so a caller can tell the two apart; anything
+    else unusable is ValueError (or the OSError the open raised, for a link).
+    Checking the descriptor rather than the name means an entry swapped between
+    a look and a read cannot turn this into a blocking read or a read through a
+    link. It does not make a later use of the same NAME safe: see the recovery
+    concurrency contract in docs/proxy-install-transaction.md."""
+    path = pathlib.Path(path)
+    os.lstat(path)                              # FileNotFoundError = absent
+    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_NONBLOCK", 0))
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise ValueError(f"{path} is not a regular file")
+        with os.fdopen(fd, "rb") as fh:
+            fd = None
+            return fh.read()
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _is_plain_file(path):
+    """A regular file that is not itself a link. Used to decide whether a
+    recovery copy may be digested and moved at all."""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
 
 
 def _read_json_file(path):
     """A small JSON file read with the same grammar as a config or a record
     (no NaN or Infinity, no overflowing number, no duplicate key). Refusals are
     ValueError, which is what every caller of a note or a claim already treats as
-    unreadable. Only a regular file is read (see `_require_regular`)."""
-    _require_regular(path)
+    unreadable. Only a regular file is read (see `_read_regular_bytes`)."""
+    raw = _read_regular_bytes(path)
     try:
-        return _strict_loads(pathlib.Path(path).read_text(encoding="utf-8"), str(path))
+        return _strict_loads(raw, str(path))
     except ConfigIOError as e:
         raise ValueError(str(e)) from None
 
@@ -1879,7 +1903,7 @@ def _standby_pairs(home, name):
     out = []
     for record in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standbyrecord")):
         bytes_path = record.with_suffix(".standby")
-        if bytes_path.is_file():
+        if _is_plain_file(bytes_path):
             out.append((record, bytes_path))
     return out
 
@@ -1936,7 +1960,7 @@ def _adopt_standby(home, name, target):
         if _is_digest(before):
             for orphan in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standby")):
                 try:
-                    if orphan.is_symlink() or not orphan.is_file():
+                    if not _is_plain_file(orphan):
                         continue
                     if _digest_file(orphan) != before:
                         continue
@@ -2259,8 +2283,7 @@ def _read_record(path, name, *, expect_state):
     rather than an exception from three frames deeper.
     """
     try:
-        _require_regular(path)
-        raw = pathlib.Path(path).read_bytes()
+        raw = _read_regular_bytes(path)
     except (OSError, ValueError) as e:
         raise ConfigConflict(f"the record for {name!r} could not be read: {e}") from e
     try:
