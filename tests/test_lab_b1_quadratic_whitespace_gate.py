@@ -44,8 +44,8 @@ own id.
    The prefilter literals are not always the text right before a shape, so
    every entry that carries two unbounded whitespace quantifiers with at most
    one optional token between them is also probed from the shape itself: the
-   shortest text the regex reads up to the first quantifier (built from the
-   parsed regex), then the run.
+   representative text the regex reads up to the first quantifier (built from
+   the parsed regex), then the run.
    A linear entry finishes far inside the cap.
 
 KNOWN_SHAPE and KNOWN_SLOW list the entries that are red today, each a strict
@@ -344,7 +344,8 @@ def _class_char(items):
 
 
 def _witness(seq):
-    """The shortest text this parsed sequence reads, assertions taken as met."""
+    """A representative text this parsed sequence reads (the first non-empty
+    branch at each alternation), assertions taken as met. Not always the shortest."""
     out = []
     for op, av in seq:
         if op is _sre_c.LITERAL:

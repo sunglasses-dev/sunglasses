@@ -177,8 +177,11 @@ def test_a_long_run_of_blank_space_after_the_literal_stays_under_the_cap(key, bl
 @pytest.mark.parametrize("n", [16_000, 32_000, 64_000])
 def test_the_cost_does_not_grow_with_the_square_of_the_run(key, blank, n):
     text = SEED[key][0] + blank * n
-    # A linear entry stays far under the limit at the largest run, a quadratic one goes over it.
-    assert _seconds(lambda: _eval(key, text), 0.25) < 0.25
+    # The limit grows with the run, 0.25 s per 16,000 characters: a linear entry stays
+    # far under it at every size, while a quadratic one costs four times as much each
+    # time the run doubles and goes over it.
+    limit = 0.25 * n / 16_000
+    assert _seconds(lambda: _eval(key, text), limit) < limit
 
 
 @pytest.mark.parametrize("key", KEYS, ids=lambda k: f"{k[0]}-{k[1]}")
