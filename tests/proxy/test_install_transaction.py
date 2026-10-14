@@ -3108,3 +3108,108 @@ def test_a_take_note_lookup_reads_a_legacy_name_literally(
     assert bytes_path.exists()
     assert stranger.exists() and stranger_held.exists(), (
         "another server's take note was read as if it were this one's")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# What counts as PRESENT. A claim that is a link (dangling or not), a FIFO or
+# anything but a regular file is present and unusable, never absent, and is
+# never read in a way that can block. The canonical record has to name this
+# server's target and retained original before an orphan moves toward it.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class _Stuck(Exception):
+    pass
+
+
+def _bounded(seconds=5):
+    """Turn a read that would block forever into a failing assertion."""
+    def fire(signum, frame):
+        raise _Stuck("a read of a non-regular file blocked")
+    previous = signal.signal(signal.SIGALRM, fire)
+    signal.alarm(seconds)
+    return previous
+
+
+def _unbound(previous):
+    signal.alarm(0)
+    signal.signal(signal.SIGALRM, previous)
+
+
+def test_a_dangling_sibling_link_is_present_not_absent(
+        cfg, home, artifact, monkeypatch):
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    claim.unlink()
+    claim.symlink_to(records / "nothing-here")
+    published = read(cfg)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+
+    assert standby.exists() and not bytes_path.exists()
+    assert read(cfg) == published
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert standby.exists() and not bytes_path.exists()
+    assert read(cfg) == published
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs POSIX FIFOs")
+@pytest.mark.parametrize("which", ["sibling_claim", "canonical_record"])
+def test_a_fifo_where_a_claim_or_record_should_be_is_refused_without_blocking(
+        cfg, home, artifact, monkeypatch, which):
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    target = claim if which == "sibling_claim" else inst._record_paths(home, "github")[1]
+    target.unlink()
+    os.mkfifo(target)
+    previous = _bounded()
+    try:
+        assert inst._adopt_standby(home, "github", cfg) is False
+    finally:
+        _unbound(previous)
+    assert standby.exists() and not bytes_path.exists()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("original_bytes_path", "OTHER_RETAINED"),
+    ("target_path", "OTHER_CONFIG")])
+def test_a_canonical_record_for_another_target_moves_no_orphan(
+        cfg, home, artifact, monkeypatch, field, value):
+    """The canonical record is schema-valid but names a different retained
+    original or a different config. The public uninstall refuses it afterwards;
+    the recovery bytes must not have moved first."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    claim.unlink()                                    # absent: the digest would decide
+    _, rec_path, _, _ = inst._record_paths(home, "github")
+    body = json.loads(read(rec_path))
+    body[field] = str(records / "elsewhere.original") if field == "original_bytes_path" \
+        else str(cfg.parent / "other-config.json")
+    rec_path.write_text(json.dumps(body), encoding="utf-8")
+    published = read(cfg)
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_a_linked_orphan_is_not_moved(cfg, home, artifact, monkeypatch):
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    claim.unlink()
+    copy = records / "outside-copy"
+    copy.write_bytes(read(standby))
+    standby.unlink()
+    standby.symlink_to(copy)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+
+    assert standby.is_symlink() and not bytes_path.exists()

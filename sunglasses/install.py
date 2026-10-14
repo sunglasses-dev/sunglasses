@@ -168,11 +168,25 @@ def _strict_loads(raw, what):
         raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
 
 
+def _require_regular(path):
+    """Look at an entry before reading it, and say what it is.
+
+    A symbolic link (dangling or not), a FIFO or a device is PRESENT and
+    unusable, which is not the same as absent, and reading one can block or
+    follow a link to somewhere else. A missing entry is the one case that raises
+    FileNotFoundError, so a caller can tell the two apart; anything else
+    unusable is ValueError. This is a check made at entry, not protection
+    against a process that swaps the entry afterwards."""
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        raise ValueError(f"{path} is not a regular file")
+
+
 def _read_json_file(path):
     """A small JSON file read with the same grammar as a config or a record
     (no NaN or Infinity, no overflowing number, no duplicate key). Refusals are
     ValueError, which is what every caller of a note or a claim already treats as
-    unreadable."""
+    unreadable. Only a regular file is read (see `_require_regular`)."""
+    _require_regular(path)
     try:
         return _strict_loads(pathlib.Path(path).read_text(encoding="utf-8"), str(path))
     except ConfigIOError as e:
@@ -1911,10 +1925,19 @@ def _adopt_standby(home, name, target):
             claim = _read_record(rec_path, name, expect_state="complete")
         except ConfigConflict:
             return False
+        # Nor is it an authority for bytes it does not name: uninstall refuses
+        # a record whose target or retained original is not this server's, and
+        # the bytes must not move toward one first.
+        if claim.get("target_path") != str(pathlib.Path(target).resolve()):
+            return False
+        if claim.get("original_bytes_path") != str(bytes_path):
+            return False
         before = claim.get("file_sha_before")
         if _is_digest(before):
             for orphan in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standby")):
                 try:
+                    if orphan.is_symlink() or not orphan.is_file():
+                        continue
                     if _digest_file(orphan) != before:
                         continue
                     if not _standby_is_ours(orphan, bytes_path, name):
@@ -2236,8 +2259,9 @@ def _read_record(path, name, *, expect_state):
     rather than an exception from three frames deeper.
     """
     try:
+        _require_regular(path)
         raw = pathlib.Path(path).read_bytes()
-    except OSError as e:
+    except (OSError, ValueError) as e:
         raise ConfigConflict(f"the record for {name!r} could not be read: {e}") from e
     try:
         record = _strict_loads(raw, f"the record for {name!r}")
