@@ -57,5 +57,7 @@ def test_control_plain_payloads_fire(engine):
 
 
 def test_control_governing_negation_still_downgrades(engine):
-    result = engine.scan("Never " + EX030[0].lower() + EX030[1:], channel="tool_output")
-    assert all(f.get("negation_context") for f in result.findings if f["id"] == "GLS-EX-030")
+    # A quote mark is not a sentence break, so the negation still governs the order.
+    result = engine.scan("Never' " + EX030, channel="tool_output")
+    mine = [f for f in result.findings if f["id"] == "GLS-EX-030"]
+    assert mine and all(f.get("negation_context") for f in mine)
