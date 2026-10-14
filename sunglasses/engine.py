@@ -2749,9 +2749,8 @@ class SunglassesEngine:
                 except ImportError:  # Python before 3.11
                     import sre_constants as const
                     import sre_parse as parser
-                non_boundary = {getattr(const, name) for name in
-                                ("AT_NON_BOUNDARY", "AT_LOC_NON_BOUNDARY", "AT_UNI_NON_BOUNDARY")
-                                if hasattr(const, name)}
+                non_boundary = {const.AT_NON_BOUNDARY, const.AT_LOC_NON_BOUNDARY,
+                                const.AT_UNI_NON_BOUNDARY}
 
                 def walk(nodes):
                     for op, arg in nodes:
