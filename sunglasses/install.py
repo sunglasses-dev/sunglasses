@@ -2333,7 +2333,13 @@ def _refuse_symlinked_config(target):
     quietly diverges, and the record, which holds the resolved path, then
     matches neither the link nor the file. Refusing is the choice that leaves
     both exactly as they are; the user names the file the link points at."""
-    if pathlib.Path(target).is_symlink():
+    try:
+        is_link = stat.S_ISLNK(os.lstat(target).st_mode)
+    except FileNotFoundError:
+        return                     # absent: the transaction reports that itself
+    except OSError as e:
+        raise ConfigIOError(f"cannot inspect {target}: {e}") from e
+    if is_link:
         raise ConfigConflict(
             f"{target} is a symbolic link; writing it would replace the link "
             f"and leave {pathlib.Path(target).resolve()} unchanged. Name that "

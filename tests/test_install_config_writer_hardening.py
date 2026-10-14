@@ -183,3 +183,61 @@ def test_uninstall_does_not_erase_a_concurrent_install(tmp_path):
     I.uninstall(cfg, "a", home=home)
     I.uninstall(cfg, "b", home=home)
     assert not wrapped(cfg, "a") and not wrapped(cfg, "b")
+
+
+# --- a fault while looking at the config is one typed refusal ---------------
+
+def _fail_stat_of(monkeypatch, cfg, function):
+    real = getattr(os, function)
+
+    def faulting(path, *a, **k):
+        if str(path) == str(cfg):
+            raise OSError("injected")
+        return real(path, *a, **k)
+
+    monkeypatch.setattr(os, function, faulting)
+
+
+def test_a_fault_inspecting_the_config_is_a_typed_refusal_on_install(tmp_path,
+                                                                     monkeypatch):
+    home, cfg = fresh(tmp_path, {"mcpServers": {"gh": {"command": "npx"}}})
+    before = cfg.read_bytes()
+    _fail_stat_of(monkeypatch, cfg, "lstat")
+    with pytest.raises(I.ConfigIOError):
+        I.install(cfg, "gh", artifact=ART, home=home)
+    monkeypatch.undo()
+    assert cfg.read_bytes() == before
+
+
+def test_a_fault_inspecting_the_config_is_a_typed_refusal_on_uninstall(tmp_path,
+                                                                       monkeypatch):
+    home, cfg = fresh(tmp_path, {"mcpServers": {"gh": {"command": "npx"}}})
+    I.install(cfg, "gh", artifact=ART, home=home)
+    before = cfg.read_bytes()
+    _fail_stat_of(monkeypatch, cfg, "lstat")
+    with pytest.raises(I.ConfigIOError):
+        I.uninstall(cfg, "gh", home=home)
+    monkeypatch.undo()
+    assert cfg.read_bytes() == before and wrapped(cfg, "gh")
+
+
+def test_a_stat_fault_on_the_uninstall_path_is_typed(tmp_path, monkeypatch):
+    home, cfg = fresh(tmp_path, {"mcpServers": {"gh": {"command": "npx"}}})
+    I.install(cfg, "gh", artifact=ART, home=home)
+    before = cfg.read_bytes()
+    real = pathlib.Path.stat
+    monkeypatch.setattr(pathlib.Path, "stat",
+                        lambda p, *a, **k: (_ for _ in ()).throw(OSError("injected"))
+                        if p.name == ".mcp.json" else real(p, *a, **k))
+    with pytest.raises(I.ConfigIOError):
+        I.uninstall(cfg, "gh", home=home)
+    monkeypatch.undo()
+    assert cfg.read_bytes() == before and wrapped(cfg, "gh")
+
+
+def test_a_missing_config_is_not_mistaken_for_a_link(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    with pytest.raises((I.ConfigConflict, I.ConfigIOError)) as e:
+        I.install(tmp_path / "absent.json", "gh", artifact=ART, home=home)
+    assert "symbolic link" not in str(e.value)
