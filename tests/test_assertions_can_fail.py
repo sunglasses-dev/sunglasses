@@ -51,12 +51,18 @@ SANCTIONED_SUBSETS = [
     # coverage, which is the only thing it exists to separate. The result
     # direction is asserted on its own, a few lines above.
     {"file", "log_memory", "message", "web_content", "code"},   # the SD parents' own
-    # The quoted-copy rule is bound to these three channels only. Its tests walk
-    # exactly those three: the question they ask is whether two quoted copies
-    # are judged one at a time where the rule applies, and the other channels
-    # never carried it.
-    {"web_content", "agent_input", "tool_output"},
 ]
+
+# Channel sets that ONE file may iterate, and no other file. The quoted-copy rule is
+# bound to these three channels only. Its tests walk exactly those three: the question
+# they ask is whether two quoted copies are judged one at a time where the rule
+# applies, and the other channels never carried it. Any other file that iterates
+# these three leaves out message, file and api_response and is flagged.
+FILE_SUBSETS = {
+    "test_quoted_copies_are_judged_one_by_one.py": [
+        {"web_content", "agent_input", "tool_output"},
+    ],
+}
 
 
 def _test_files():
@@ -90,10 +96,10 @@ def test_no_assertion_is_unconditionally_true(path):
     )
 
 
-@pytest.mark.parametrize("path", _test_files(), ids=lambda p: p.name)
-def test_channel_lists_do_not_silently_omit_a_live_channel(path):
-    """A channel loop that skips a live channel tests less than it looks like."""
-    tree = ast.parse(path.read_text(), filename=str(path))
+def _partial_channel_lists(tree, filename):
+    """(line, channels, missing) for each channel list in `tree` that omits a live channel
+    without being sanctioned: for every file in SANCTIONED_SUBSETS, for this file by name
+    in FILE_SUBSETS."""
     offenders = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.List, ast.Tuple, ast.Set)):
@@ -104,13 +110,22 @@ def test_channel_lists_do_not_silently_omit_a_live_channel(path):
         # Only judge collections that are clearly channel lists.
         if len(known) < 3 or known != names:
             continue
-        if known in SANCTIONED_SUBSETS or known == LIVE_CHANNELS:
+        if (known in SANCTIONED_SUBSETS or known in FILE_SUBSETS.get(filename, [])
+                or known == LIVE_CHANNELS):
             continue
         missing = sorted(
             c for c in ("message", "file", "api_response", "tool_output")
             if c not in known)
         if missing:
             offenders.append((node.lineno, sorted(known), missing))
+    return offenders
+
+
+@pytest.mark.parametrize("path", _test_files(), ids=lambda p: p.name)
+def test_channel_lists_do_not_silently_omit_a_live_channel(path):
+    """A channel loop that skips a live channel tests less than it looks like."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    offenders = _partial_channel_lists(tree, path.name)
     assert not offenders, (
         f"{path.name} iterates a partial channel list: {offenders}. "
         "If the omission is deliberate, add the set to SANCTIONED_SUBSETS with "
@@ -143,3 +158,12 @@ def test_this_lint_actually_catches_both_shapes(tmp_path):
             if len(known) >= 3 and known == names and "message" not in known:
                 hits.append(node.lineno)
     assert hits == [1], "the lint no longer detects a channel list missing message"
+
+
+def test_a_sanction_for_one_file_does_not_cover_another(tmp_path):
+    """The three-channel list of the quoted-copy tests is sanctioned for that file only."""
+    sample = ast.parse('CHANNELS = ("web_content", "agent_input", "tool_output")\n')
+    assert _partial_channel_lists(sample, "test_quoted_copies_are_judged_one_by_one.py") == []
+    assert _partial_channel_lists(sample, "test_some_other_file.py") == [
+        (1, ["agent_input", "tool_output", "web_content"], ["api_response", "file", "message"])]
+    assert set(FILE_SUBSETS) <= {p.name for p in _test_files()}, "a sanctioned file is gone"
