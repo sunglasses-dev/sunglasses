@@ -104,6 +104,42 @@ def test_a_withheld_initialize_result_ends_the_session_with_one_answer(tmp_path)
     assert engine.session._closed is not None
 
 
+@pytest.mark.parametrize("extra", [{"instructions": INJECTION},
+                                   {"note": {"text": INJECTION}},
+                                   {"harmless": 1}])
+def test_a_frame_with_a_member_the_scan_does_not_read_is_withheld_whole(tmp_path,
+                                                                        extra):
+    """The scanner is shown the result object only, so a member beside it is
+    not read. Bytes cross only if the scan read them: the frame is withheld
+    whole, and on initialize that ends the session with the same reason."""
+    engine, upstream, client, scans = make_route(tmp_path, scan=flagging_scan)
+    engine.client_frame(init_request(1))
+    engine.pump_upstream(io.BytesIO(frame(
+        id=1, result={"protocolVersion": "2025-06-18",
+                      "capabilities": {"tools": {}},
+                      "serverInfo": {"name": "lab-server", "version": "1"}},
+        **extra)))
+    answers = client.messages()
+    assert len(answers) == 1
+    assert INJECTION not in json.dumps(answers[0]), answers[0]
+    assert answers[0]["error"]["message"] == "SUNGLASSES_WITHHELD"
+    assert answers[0]["error"]["data"]["reason_code"] == "UNSUPPORTED_CONTENT"
+    assert engine.session._closed is not None
+    settled = [row for row in _receipt_kinds(tmp_path) if row.get("kind") == "SETTLED"]
+    assert settled[-1]["reason_code"] == "UNSUPPORTED_CONTENT", settled[-1]
+
+
+def test_a_frame_with_no_extra_members_is_forwarded_as_before(tmp_path):
+    engine, upstream, client, scans = make_route(tmp_path, scan=flagging_scan)
+    engine.client_frame(init_request(1))
+    engine.pump_upstream(io.BytesIO(_init_result(1, instructions="be brief")))
+    assert client.messages() == [{
+        "jsonrpc": "2.0", "id": 1,
+        "result": {"protocolVersion": "2025-06-18", "capabilities": {"tools": {}},
+                   "serverInfo": {"name": "lab-server", "version": "1"},
+                   "instructions": "be brief"}}]
+
+
 def test_control_the_real_engine_flags_the_same_text_on_api_response():
     """Control: this is not a detector gap. The engine flags the text when it
     is shown it on the channel the row names."""
@@ -120,6 +156,7 @@ def test_control_the_real_engine_flags_the_same_text_on_api_response():
 SERVER = r'''
 import json, sys
 injection = sys.argv[1]
+where = sys.argv[2]
 for raw in sys.stdin.buffer:
     m = json.loads(raw)
     if "id" not in m:
@@ -127,20 +164,30 @@ for raw in sys.stdin.buffer:
     if m.get("method") == "initialize":
         r = {"protocolVersion": (m.get("params") or {}).get("protocolVersion", "2025-06-18"),
              "capabilities": {"tools": {}},
-             "serverInfo": {"name": "lab-server", "version": "1"},
-             "instructions": injection}
+             "serverInfo": {"name": "lab-server", "version": "1"}}
+        if where == "inner":
+            r["instructions"] = injection
     else:
         r = {}
-    sys.stdout.buffer.write((json.dumps({"jsonrpc": "2.0", "id": m["id"], "result": r}) + "\n").encode())
+    out = {"jsonrpc": "2.0", "id": m["id"], "result": r}
+    if where == "outer" and m.get("method") == "initialize":
+        out["instructions"] = injection
+    sys.stdout.buffer.write((json.dumps(out) + "\n").encode())
     sys.stdout.buffer.flush()
 '''
 
 
-def test_end_to_end_real_proxy_withholds_poisoned_instructions(tmp_path):
-    """The shipped artifact over real pipes: `python -m sunglasses.proxy`."""
-    argv = [sys.executable, "-m", "sunglasses.proxy", "--state-root",
-            str(tmp_path / "state"), "--", sys.executable, "-c", SERVER,
-            INJECTION]
+@pytest.mark.parametrize("worker", ["inprocess", "process"])
+@pytest.mark.parametrize("where", ["inner", "outer"])
+def test_end_to_end_real_proxy_never_forwards_the_poisoned_text(tmp_path, worker,
+                                                               where):
+    """The shipped artifact over real pipes: `python -m sunglasses.proxy`, in
+    both worker modes. `inner` puts the text in `instructions` (withheld);
+    `outer` puts it in a top-level member beside `result` (the frame is
+    withheld whole and the session closes)."""
+    argv = [sys.executable, "-m", "sunglasses.proxy", "--worker", worker,
+            "--state-root", str(tmp_path / "state"), "--", sys.executable,
+            "-c", SERVER, INJECTION, where]
     proc = subprocess.Popen(argv, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             bufsize=0)
@@ -169,5 +216,8 @@ def test_end_to_end_real_proxy_withholds_poisoned_instructions(tmp_path):
     replies = [json.loads(l) for l in (first + rest).splitlines() if l.strip()]
     assert replies, f"no reply from the proxy; stderr={err[-2000:]!r}"
     assert INJECTION not in json.dumps(replies[0]), (
-        "the real proxy forwarded the server's poisoned `instructions` to "
-        f"the client: {replies[0]}")
+        "the real proxy forwarded the server's poisoned text to the client "
+        f"({where}, {worker}): {replies[0]}")
+    if where == "outer":
+        assert replies[0]["error"]["message"] == "SUNGLASSES_WITHHELD", replies[0]
+        assert replies[0]["error"]["data"]["reason_code"] == "UNSUPPORTED_CONTENT"
