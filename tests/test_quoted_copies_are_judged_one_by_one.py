@@ -32,6 +32,7 @@ Three things keep that from lowering a hit that is live:
   * the marks of a quote are found in the view they are in, so a cue and a quote that the
     view only gets from a different place are not paired.
 """
+import itertools
 import re
 
 import pytest
@@ -350,6 +351,41 @@ def test_a_remainder_with_more_places_than_the_cap_stays_live(engine, monkeypatc
     assert engine.scan(text, channel="web_content").decision == "allow_redacted"
     monkeypatch.setattr(SunglassesEngine, "REMAINDER_ENDS_CAP", 3)
     assert engine.scan(text, channel="web_content").decision == "block"
+
+
+def _accounted(engine, monkeypatch, rx, text, start, short_end, stop, spans, cap=48):
+    spans = sorted(spans)
+    starts = [lo for lo, _, _ in spans]
+    reach = list(itertools.accumulate((hi for _, hi, _ in spans), max))
+    monkeypatch.setattr(SunglassesEngine, "REMAINDER_ENDS_CAP", cap)
+    return engine._remainder_is_accounted(rx, text, start, short_end, stop, spans, starts, reach)
+
+
+def test_every_place_a_covered_hit_ends_is_counted_against_the_cap(engine, monkeypatch):
+    """Quotes that are adjacent leave no stretch to ask about, so the only places asked
+    about are the ends of the covered hits (two here, the last at the end of the hit)."""
+    rx = re.compile("aa.{0,30}bb")
+    spans = [(0, 5, 5), (5, 8, 8), (8, 11, 11)]
+    answers = [_accounted(engine, monkeypatch, rx, "aa bb bb bb", 0, 5, 11, spans, cap)
+               for cap in range(4)]
+    assert answers == [False, False, True, True]
+
+
+def test_the_end_of_the_wide_hit_is_asked_about_even_when_no_covered_hit_ends_there(
+        engine, monkeypatch):
+    """`cc` stands between the quotes, where no quote holds it, and the chain
+    `aa .. cc .. bb` ends at the end of the wide hit inside the last quote."""
+    rx = re.compile("aa.{0,30}cc.{0,30}bb")
+    text = "aa bb cc bb"
+    assert _accounted(engine, monkeypatch, rx, text, 0, 5, 11, [(0, 5, 5), (9, 11, 10)]) is False
+
+
+def test_the_words_of_the_first_quote_are_part_of_what_is_covered(engine, monkeypatch):
+    """The chain starts in the quote that was cut short and finishes in the last one, with
+    the middle word inside a covered quote: every word of it is held."""
+    rx = re.compile("aa.{0,30}cc.{0,30}bb")
+    text = "aa bb cc bb"
+    assert _accounted(engine, monkeypatch, rx, text, 0, 5, 11, [(0, 5, 5), (6, 11, 10)]) is True
 
 
 # The walk itself, with rules that can end on the closing mark or match nothing there. No
