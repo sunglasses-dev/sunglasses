@@ -2710,9 +2710,14 @@ class SunglassesEngine:
         return held
 
     # The most places in a hit's remainder that `_remainder_is_accounted` will ask about (a
-    # stretch no quote holds, a covered quote, a place where a covered hit ends); a
-    # remainder with more stays live. Each place costs at most two match attempts.
+    # stretch no quote holds, a covered quote, a place where a covered hit ends), and the most
+    # match attempts it will make in all; a remainder with more of either stays live. An end
+    # found in a place costs three attempts (find it, ask the blanked text, search either side).
     REMAINDER_ENDS_CAP = 48
+    REMAINDER_ATTEMPTS_CAP = 3 * REMAINDER_ENDS_CAP
+
+    _ENDING_WITHIN: dict = {}
+    _ENDS_CAN_BE_ASKED: dict = {}
 
     @staticmethod
     def _ending_within(rx, slack: int):
@@ -2725,22 +2730,24 @@ class SunglassesEngine:
         if found is None:
             if len(cache) >= 4096:
                 cache.clear()
-            flags = re.match(r"\(\?[aiLmsux]+\)", rx.pattern)
-            head = flags.group(0) if flags else ""
+            pattern = rx.pattern
+            head = re.match(r"(?:\(\?[aiLmsux]+\))*", pattern).group(0)
+            # a verbose pattern may end in a comment, which would swallow the closing bracket
+            end = "\n" if rx.flags & re.VERBOSE else ""
             found = cache[(rx, slack)] = re.compile(
-                head + "(?:" + rx.pattern[len(head):] + r")(?=[\s\S]{0,%d}\Z)" % slack, rx.flags)
+                head + "(?:" + pattern[len(head):] + end + r")(?=[\s\S]{0,%d}\Z)" % slack, rx.flags)
         return found
 
-    _ENDING_WITHIN: dict = {}
-    _RIGHT_CONTEXT: dict = {}
-
     @staticmethod
-    def _reads_right_context(rx) -> bool:
-        """Whether a match of `rx` can depend on the text after the match: a lookahead that
-        must hold, or a non-boundary. `match(text, start, end)` cuts the text at `end`, so for
-        such a rule it cannot say whether a match ends there, and the remainder cannot be
-        accounted for. A rule that does not parse here is read as one that does."""
-        cache = SunglassesEngine._RIGHT_CONTEXT
+    def _ends_can_be_asked(rx) -> bool:
+        """Whether `rx` is a rule `_ending_within` can be trusted on. The text is cut where the
+        match is asked to end, so a rule is accepted only when it is made of constructs that
+        read nothing but the matched text itself: literals and sets, repeats, groups,
+        alternations, `^`, `$`, `\\A`, `\\Z` and `\\b`. Anything else is declined: an assertion
+        of any kind (look-ahead or look-behind, either polarity), a back-reference, a scoped
+        flag group, a non-boundary, a conditional, an atomic group or possessive repeat. So is a rule that
+        does not parse here or whose rewrite does not compile."""
+        cache = SunglassesEngine._ENDS_CAN_BE_ASKED
         found = cache.get(rx)
         if found is None:
             try:
@@ -2749,36 +2756,36 @@ class SunglassesEngine:
                 except ImportError:  # Python before 3.11
                     import sre_constants as const
                     import sre_parse as parser
+                plain = (const.LITERAL, const.NOT_LITERAL, const.ANY, const.IN)
                 non_boundary = {const.AT_NON_BOUNDARY, const.AT_LOC_NON_BOUNDARY,
                                 const.AT_UNI_NON_BOUNDARY}
 
-                def walk(nodes):
+                def accepted(nodes):
                     for op, arg in nodes:
-                        if op is const.ASSERT and arg[0] == 1:
-                            return True
-                        if op is const.AT and arg in non_boundary:
-                            return True
-                        if op is const.SUBPATTERN:
-                            inner = [arg[-1]]
-                        elif op is const.BRANCH:
-                            inner = arg[1]
-                        elif op in (const.MAX_REPEAT, const.MIN_REPEAT, getattr(const, "POSSESSIVE_REPEAT", None)):
-                            inner = [arg[2]]
-                        elif op in (const.ASSERT, const.ASSERT_NOT):
-                            inner = [arg[1]]
-                        elif op is const.GROUPREF_EXISTS:
-                            inner = [part for part in arg[1:] if part]
-                        elif op is getattr(const, "ATOMIC_GROUP", None):
-                            inner = [arg]
-                        else:
+                        if op in plain:
                             continue
-                        if any(walk(part) for part in inner):
-                            return True
-                    return False
+                        if op is const.AT:
+                            if arg in non_boundary:
+                                return False
+                        elif op is const.SUBPATTERN:
+                            if arg[1] or arg[2] or not accepted(arg[-1]):  # a scoped flag group
+                                return False
+                        elif op is const.BRANCH:
+                            if not all(accepted(part) for part in arg[1]):
+                                return False
+                        elif op in (const.MAX_REPEAT, const.MIN_REPEAT):
+                            if not accepted(arg[2]):
+                                return False
+                        else:
+                            return False
+                    return True
 
-                found = walk(parser.parse(rx.pattern, rx.flags))
+                found = accepted(parser.parse(rx.pattern, rx.flags))
+                if found:
+                    SunglassesEngine._ending_within(rx, 0)
+                    SunglassesEngine._ending_within(rx, 1)
             except Exception:
-                found = True
+                found = False
             cache[rx] = found
         return found
 
@@ -2797,14 +2804,16 @@ class SunglassesEngine:
         match required to end there (see _ending_within):
           * in a stretch outside every covered quote (the words between two quotations, the
             cue and the marks), no match may end anywhere;
-          * in a covered quote, a match that ends there must also be there in the text
-            with everything outside the covered quotes blanked out, and a match that
-            ends where a covered hit ends (or where the wide hit ends) must end there in
-            the blanked text too.
-        A rule that can read the text after its match (a lookahead, a non-boundary) cannot
-        be asked this way, and a remainder with more places to ask about than
-        REMAINDER_ENDS_CAP stays live."""
-        if self._reads_right_context(rx):
+          * in a covered quote, and at each place a covered hit ends, every end a match has
+            in the text must be an end a match has in the text with everything outside the
+            covered quotes blanked out. The ends are taken one at a time (each end found is
+            asked of the blanked text on its own, then the stretch on either side of it is
+            searched again), so one end cannot stand in for another. The end of the wide hit
+            lies in one of these stretches, so it is asked with them.
+        A rule that `_ends_can_be_asked` declines, a remainder with more places than
+        REMAINDER_ENDS_CAP, and one that needs more than REMAINDER_ATTEMPTS_CAP match attempts,
+        stay live."""
+        if not self._ends_can_be_asked(rx):
             return False
         window = spans[bisect.bisect_right(reach, short_end):bisect.bisect_left(starts, stop)]
         gaps = []
@@ -2822,28 +2831,43 @@ class SunglassesEngine:
         quotes = [(max(lo, short_end), min(hi, stop)) for lo, hi, _ in window]
         quotes = [(a, b) for a, b in quotes if b > a]
         covered = sorted({end for _, _, end in window if short_end < end <= stop})
-        if stop not in covered:
-            covered.append(stop)
-        if len(gaps) + len(quotes) + len(covered) > self.REMAINDER_ENDS_CAP:
+        places = quotes + [(end - 1, end) for end in covered]
+        if len(gaps) + len(places) > self.REMAINDER_ENDS_CAP:
             return False
+        attempts = self.REMAINDER_ATTEMPTS_CAP
         for a, b in gaps:
-            if self._ending_within(rx, b - a - 1).match(text, start, b):
+            attempts -= 1
+            if attempts < 0 or self._ending_within(rx, b - a - 1).match(text, start, b):
                 return False
         masked = None
         offset = 0
-        for lo, hi in quotes + [(end - 1, end) for end in covered]:
-            if not self._ending_within(rx, hi - lo - 1).match(text, start, hi):
-                continue
-            if masked is None:
-                offset = max(0, start - 64)
-                body = [" "] * (stop + 1 - start)
-                for qlo, qhi, _ in spans[bisect.bisect_right(reach, start):
-                                         bisect.bisect_left(starts, stop)]:
-                    for i in range(max(qlo, start), min(qhi, stop + 1)):
-                        body[i - start] = text[i]
-                masked = text[offset:start] + "".join(body)
-            if not self._ending_within(rx, hi - lo - 1).match(masked, start - offset, hi - offset):
-                return False
+        for place in places:
+            todo = [place]
+            while todo:
+                lo, hi = todo.pop()
+                if hi <= lo:
+                    continue
+                attempts -= 1
+                found = self._ending_within(rx, hi - lo - 1).match(text, start, hi)
+                if attempts < 0:
+                    return False
+                if not found:
+                    continue
+                if masked is None:
+                    offset = max(0, start - 64)
+                    body = [" "] * (stop + 1 - start)
+                    for qlo, qhi, _ in spans[bisect.bisect_right(reach, start):
+                                             bisect.bisect_left(starts, stop)]:
+                        for i in range(max(qlo, start), min(qhi, stop + 1)):
+                            body[i - start] = text[i]
+                    masked = text[offset:start] + "".join(body)
+                end = found.end()
+                attempts -= 1
+                if attempts < 0 or not self._ending_within(rx, 0).match(
+                        masked, start - offset, end - offset):
+                    return False
+                todo.append((lo, end - 1))
+                todo.append((end, hi))
         return True
 
     # The marks that can open, close or hold a quotation, grouped by the kind of quotation.

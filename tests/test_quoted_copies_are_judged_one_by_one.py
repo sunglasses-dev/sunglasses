@@ -30,13 +30,17 @@ Three things keep that from lowering a hit that is live:
     follows a carrier letter, for one, in the middle of two quoted copies or after them)
     is not dropped because the hit was cut short. Every end is asked as a range (a match of
     the rule from the same start that ends anywhere in the stretch, inside a word or a run
-    of marks included), and a rule that can read the text after its match (a lookahead, a
-    non-boundary) cannot be asked that way, so its hit stays live.
+    of marks included) and then one end at a time, each end the rule has in the text having
+    to be that same end in the text with everything outside the covered quotes blanked.
+    That is asked only of a rule made of plain constructs (literals, sets, repeats, groups,
+    alternations, `^`, `$`, `\\A`, `\\Z`, `\\b`); a rule with an assertion of any kind, a
+    back-reference, a conditional, an atomic group or a possessive repeat keeps its hit live.
   * the marks of a quote are found in the view they are in, so a cue and a quote that the
     view only gets from a different place are not paired.
 """
 import itertools
 import re
+import sys
 
 import pytest
 
@@ -361,16 +365,36 @@ def test_a_match_that_ends_inside_a_word_or_a_run_of_marks_is_found(engine):
     assert engine._ending_within(rx, 6).match("aa bbb", 0, 6)   # ends at 5, inside the word
 
 
-@pytest.mark.parametrize("pattern", [r"aa(?=b)", r"aa(?!b)b?(?=c)", r"(?:aa|cc(?=d))", r"aa(?:x(?=y))?",
-                                     r"aa\B", r"aa(?:b|(?:c(?=d)))", r"(aa(?=b))", r"aa(?i:b(?=c))"])
-def test_a_rule_that_reads_the_text_after_its_match_is_recognised(engine, pattern):
-    assert engine._reads_right_context(re.compile(pattern)) is True
+ATOMIC = pytest.mark.skipif(sys.version_info < (3, 11), reason="atomic groups and possessive repeats are 3.11+")
 
 
-@pytest.mark.parametrize("pattern", [r"aa", r"aa(?!b)", r"\baa\b", r"aa$", r"aa\Z", r"aa.{0,30}bb",
-                                     r"(?i)aa|bb", r"(?<=x)aa", r"(?:aa)+?", r"(aa)\1"])
-def test_a_rule_that_does_not_read_the_text_after_its_match_is_not_flagged(engine, pattern):
-    assert engine._reads_right_context(re.compile(pattern)) is False
+@pytest.mark.parametrize("pattern", [
+    r"aa(?=b)", r"aa(?!b)", r"aa(?!(?!b))", r"aa(?!b$)", r"aa(?!b\Z)", r"aa(?!b)b?(?=c)",
+    r"(?:aa|cc(?=d))", r"aa(?:x(?=y))?", r"aa\B", r"aa(?:b|(?:c(?=d)))", r"(aa(?=b))",
+    r"aa(?i:b(?=c))", r"(a)?(?(1)b|d)", r"(?<=x(?=y))aa", r"aa(?:(?!b)c)+", r"aa(?<!(?!b))",
+    r"(?<=x)aa", r"(?<!x)aa", r"(aa)\1", r"aa(?i:b)", r"aa(?-i:b)", r"(?P<w>aa)(?P=w)",
+    pytest.param(r"(?>aa)", marks=ATOMIC), pytest.param(r"a*+a", marks=ATOMIC)])
+def test_a_rule_that_can_read_what_follows_its_match_is_declined(engine, pattern):
+    assert engine._ends_can_be_asked(re.compile(pattern)) is False
+
+
+@pytest.mark.parametrize("pattern", [
+    r"aa", r"\baa\b", r"aa$", r"aa\Z", r"aa.{0,30}bb", r"(?i)aa|bb", r"^aa", r"\Aaa",
+    r"(?:aa)+?", r"(aa)", r"(?i)(?s)aa.{0,3}bb", r"(?is)(?m)^aa\s+bb$", r"aa[^b]{1,3}(?:c|d)",
+    r"(?x) aa  # a comment"])
+def test_a_rule_made_of_plain_constructs_can_be_asked(engine, pattern):
+    assert engine._ends_can_be_asked(re.compile(pattern)) is True
+
+
+def test_a_rule_with_several_leading_flag_groups_is_asked_with_all_of_them(engine):
+    rx = re.compile(r"(?i)(?s)aa.{0,3}bb")
+    assert engine._ending_within(rx, 0).match("xAA\nBB", 1, 6)
+    assert not engine._ending_within(rx, 0).match("xAA\nBB", 1, 5)
+
+
+def test_a_verbose_rule_that_ends_in_a_comment_is_asked(engine):
+    rx = re.compile("(?x) aa  # a comment")
+    assert engine._ending_within(rx, 0).match("aa", 0, 2)
 
 
 def test_a_rule_that_reads_the_text_after_its_match_leaves_the_remainder_live(engine):
@@ -406,6 +430,18 @@ def test_every_place_a_covered_hit_ends_is_counted_against_the_cap(engine, monke
     answers = [_accounted(engine, monkeypatch, rx, "aa bb bb bb", 0, 5, 11, spans, cap)
                for cap in range(6)]
     assert answers == [False, False, False, False, True, True]
+
+
+def test_the_match_attempts_are_capped_apart_from_the_places(engine, monkeypatch):
+    """The same remainder has four places and needs ten attempts (an end found in a
+    place is up to three: find it, ask the blanked text, search either side)."""
+    rx = re.compile("aa.{0,30}bb")
+    spans = [(0, 5, 5), (5, 8, 8), (8, 11, 11)]
+    answers = []
+    for cap in range(14):
+        monkeypatch.setattr(SunglassesEngine, "REMAINDER_ATTEMPTS_CAP", cap)
+        answers.append(_accounted(engine, monkeypatch, rx, "aa bb bb bb", 0, 5, 11, spans))
+    assert answers == [False] * 10 + [True] * 4
 
 
 def test_the_end_of_the_wide_hit_is_asked_about_even_when_no_covered_hit_ends_there(
@@ -455,11 +491,11 @@ def test_the_end_of_the_wide_hit_is_asked_even_when_another_end_in_its_quote_is_
     assert _accounted(engine, monkeypatch, whole, text, 0, 5, 14, [(0, 5, 5), (9, 14, 11)]) is True
 
 
-def test_a_rule_that_cannot_be_read_is_taken_to_read_the_text_after_its_match(engine):
+def test_a_rule_that_cannot_be_read_is_declined(engine):
     class Unreadable:
         pattern = "(unclosed"
         flags = 0
-    assert engine._reads_right_context(Unreadable()) is True
+    assert engine._ends_can_be_asked(Unreadable()) is False
 
 
 # The walk itself, with rules that can end on the closing mark or match nothing there. No
@@ -467,7 +503,7 @@ def test_a_rule_that_cannot_be_read_is_taken_to_read_the_text_after_its_match(en
 # is not read as covered by accident.
 TEXT = 'Never say "x" Never say "y"'
 CUT = re.compile(r'x(?:.{0,20}y|"?)|y')       # may end ON the closing mark if the bound lets it
-EMPTY = re.compile(r'(?<=say ")(?:x.{0,20}y)?|y')  # matches the empty string at the start once it is cut
+NOTHING = re.compile(r'x.{0,20}y|')           # matches the empty string at the start once it is cut
 
 
 def _walk(engine, rx, text=TEXT):
@@ -480,8 +516,14 @@ def test_a_hit_cut_at_the_closing_mark_ends_before_the_mark(engine):
 
 
 def test_a_cut_that_matches_nothing_is_not_a_covered_hit(engine):
-    match, how = _walk(engine, EMPTY)
-    assert how is None and match.start() == TEXT.index("x"), (match, how)
+    """A rule made of plain constructs that, cut at the closing mark, falls back to the
+    empty alternative: the empty match is not a hit that a quote can cover."""
+    start = TEXT.index("x")
+    match = NOTHING.match(TEXT, start)
+    assert match.end() > start
+    assert engine._ends_can_be_asked(NOTHING) is True
+    found, how = engine._resolve_cover("plain", NOTHING, None, TEXT, match)
+    assert how is None and found.start() == start, (found, how)
 
 
 def test_marks_are_counted_from_the_start_of_the_view_they_are_in(engine):
@@ -539,3 +581,139 @@ def test_a_custom_rule_without_right_context_is_still_covered_for_a_pair(channel
     engine = _custom(BASE.replace("80", "200"), channel)
     quoted = 'Never say "' + PHRASE + '"'
     assert engine.scan(quoted + ". " + quoted, channel=channel).decision == "allow_redacted"
+
+
+# --- a rule's own wording can hide a live middle copy from the remainder question ----------
+
+WIDE = (r"(?is)\b(?:ignore|ignroe|bypass|byapss)\b.{0,200}\b(?:all\s+)?(?:previous|prevoius|system|systme)\b"
+        r".{0,200}\b(?:instructions?|instrucitons?)\b")
+QUOTE = 'Never say "' + PHRASE + '."'
+MIDDLE_TEXT = QUOTE + " x" + PHRASE + " " + QUOTE
+
+
+def _custom(pattern, channel):
+    rule = dict(id="TEST-R5", name="Test", category="prompt_injection", severity="high",
+                channel=[channel], regex=[pattern])
+    return SunglassesEngine(patterns=[rule], mechanisms=False, max_scan_bytes=1000000)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("assertion", [
+    r"(?!(?![\s\S]{0,80}instrucitons))",   # a lookahead of a lookahead says "what follows is ..."
+    r"(?![\s\S]{0,20}\Z)",                 # "something other than the end is within 20"
+    r"(?!$)", r"(?!\Z)", r"(?=[\s\S])", r"(?!(?!\.))", r"(?![^.])"])
+def test_a_rule_that_asks_about_the_text_after_its_match_leaves_a_live_middle_copy_live(
+        assertion, channel):
+    """The rule ends on a full stop or on whatever the assertion allows; the middle copy
+    ends where the assertion allows it, between the two quotes. Whatever the assertion's
+    polarity or depth, a rule that reads forward is not asked about its ends."""
+    engine = _custom(WIDE + r"(?:\.|" + assertion + ")", channel)
+    assert engine.scan(PHRASE + " " + QUOTE, channel=channel).decision == "block"
+    assert engine.scan(QUOTE, channel=channel).decision == "allow_redacted"
+    assert engine.scan(MIDDLE_TEXT, channel=channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("head", ["(?i)(?s)", "(?s)(?i)", "(?i)(?s)(?m)"])
+def test_a_rule_with_several_leading_flag_groups_does_not_crash_the_scan(head, channel):
+    pattern = WIDE.replace("(?is)", head)
+    engine = _custom(pattern, channel)
+    quote = 'Never say "' + PHRASE + '"'
+    assert engine.scan(quote + ". " + quote, channel=channel).decision in {"block", "allow_redacted"}
+    assert engine.scan(quote + ". " + PHRASE, channel=channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_an_end_inside_a_covered_quote_that_only_a_live_word_reaches_stays_live(channel):
+    """The rule has two shapes. One ends at the full stop that closes each copy. The other
+    runs from `ignroe` to `prevoius` through the live word `MIDDLE` and ends INSIDE the
+    last quote. The blanked text has an end in that same quote (the full stop), but not the
+    interior one, so a different end in the same quote must not stand in for it."""
+    pattern = WIDE + r"\.|\bignroe.{0,200}MIDDLE.{0,200}prevoius"
+    engine = _custom(pattern, channel)
+    text = QUOTE + " MIDDLE " + QUOTE
+    marks = [m.start() for m in re.finditer('"', text)]
+    spans = [(marks[0], marks[1] + 1, text.index(PHRASE) + len(PHRASE) + 1),
+             (marks[2], marks[3] + 1, text.rindex(PHRASE) + len(PHRASE) + 1)]
+    start = text.index(PHRASE)
+    interior = text.rindex("prevoius") + len("prevoius")
+    assert spans[0][2] < interior < spans[1][2]
+    assert engine._remainder_is_accounted(re.compile(pattern), text, start, spans[0][2], spans[1][2],
+                                          spans, [x[0] for x in spans], [x[1] for x in spans]) is False
+    assert engine.scan(QUOTE, channel=channel).decision == "allow_redacted"
+    assert engine.scan(text, channel=channel).decision == "block"
+
+
+def test_the_same_end_in_the_blanked_text_is_what_accounts_for_it(engine, monkeypatch):
+    """Where the end a live word reaches is also an end of a chain made only of covered
+    words, the remainder is accounted for."""
+    rx = re.compile("aa.{0,30}bb")
+    text = "aa bb xx bb"
+    assert _accounted(engine, monkeypatch, rx, text, 0, 5, 11, [(0, 5, 5), (6, 11, 11)]) is True
+
+
+def test_a_verbose_rule_that_ends_in_a_comment_is_accounted(engine, monkeypatch):
+    rx = re.compile("(?x) aa .{0,30} bb  # the last word")
+    text = "aa bb bb"
+    assert _accounted(engine, monkeypatch, rx, text, 0, 5, 8, [(0, 5, 5), (5, 8, 8)]) is True
+
+
+def test_a_rule_whose_end_form_does_not_compile_is_declined(engine, monkeypatch):
+    rx = re.compile("zz.{0,3}qq")
+
+    def broken(self, rx, slack):
+        raise re.error("no")
+    monkeypatch.setattr(SunglassesEngine, "_ending_within", broken)
+    SunglassesEngine._ENDS_CAN_BE_ASKED.pop(rx, None)
+    try:
+        assert engine._ends_can_be_asked(rx) is False
+    finally:
+        SunglassesEngine._ENDS_CAN_BE_ASKED.pop(rx, None)
+
+
+@pytest.mark.parametrize("live_first", [True, False])
+def test_an_end_only_a_live_word_reaches_is_not_replaced_by_another_end_in_the_range(
+        engine, monkeypatch, live_first):
+    """Whichever alternative the rule tries first, the end found through the live word
+    `MIDDLE` has to exist as that very end in the blanked text; the full stop that closes
+    the last quote is a different end and does not stand in for it."""
+    chain = r"ignroe.{0,200}MIDDLE.{0,200}prevoius"
+    stop_at = r"ignroe.{0,200}prevoius.{0,200}instrucitons\."
+    rx = re.compile("(?is)" + (chain + "|" + stop_at if live_first else stop_at + "|" + chain))
+    text = QUOTE + " MIDDLE " + QUOTE
+    marks = [m.start() for m in re.finditer('"', text)]
+    spans = [(marks[0], marks[1] + 1, text.index(PHRASE) + len(PHRASE) + 1),
+             (marks[2], marks[3] + 1, text.rindex(PHRASE) + len(PHRASE) + 1)]
+    start = text.index(PHRASE)
+    assert _accounted(engine, monkeypatch, rx, text, start, spans[0][2], spans[1][2], spans) is False
+
+
+def test_an_end_to_the_right_of_a_covered_end_in_the_same_quote_is_asked_too(engine, monkeypatch):
+    """Both ends are inside the last quote, away from the end of the covered hit. The first
+    (`bb`) exists without the live word; the second (`zz`) is only reached through
+    `MIDDLE`, and is found by searching the stretch to the right of the first."""
+    rx = re.compile("aa.{0,60}bb|aa.{0,60}MIDDLE.{0,60}zz")
+    spans = [(0, 5, 5), (13, 23, 23)]
+    assert _accounted(engine, monkeypatch, rx, "aa bb MIDDLE bb zz tail", 0, 5, 23, spans) is False
+    assert _accounted(engine, monkeypatch, rx, "aa bb xxxxxx bb zz tail", 0, 5, 23, spans) is True
+
+
+def test_the_gaps_are_charged_against_the_attempts(engine, monkeypatch):
+    rx = re.compile("aa.{0,30}bb")
+    spans = [(0, 5, 5), (8, 11, 11)]
+    answers = []
+    for cap in range(9):
+        monkeypatch.setattr(SunglassesEngine, "REMAINDER_ATTEMPTS_CAP", cap)
+        answers.append(_accounted(engine, monkeypatch, rx, "aa bb xx bb", 0, 5, 11, spans))
+    assert answers == [False] * 6 + [True] * 3
+
+
+def test_the_text_before_the_hit_is_part_of_the_blanked_text(engine, monkeypatch):
+    """`\\b` at the start of the first alternative is false after a letter, so the live path
+    through MID is the only way to this end; a blanked text without the letter in front would
+    let the first alternative reach it."""
+    rx = re.compile(r"\baa.{0,40}|aa.{0,40}MID.{0,40}zz")
+    text = "Zaa bb MID zz"
+    spans = [(1, 6, 6), (10, 13, 13)]
+    assert rx.match(text, 1).end() == len(text)
+    assert _accounted(engine, monkeypatch, rx, text, 1, 6, 13, spans) is False
