@@ -108,7 +108,8 @@ TARGET = ROOT / "sunglasses/install.py"
 # their only controls there.
 SUITE = ["tests/proxy/test_install_transaction.py",
          "tests/proxy/test_install_cli.py",
-         "tests/proxy/test_install_atomic_storage.py"]
+         "tests/proxy/test_install_atomic_storage.py",
+         "tests/test_install_config_writer_hardening.py"]
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
@@ -256,9 +257,38 @@ MUTATIONS = [
      '        record = json.loads(raw.decode("utf-8"))',
      'test_uninstall_validates_a_record_as_strictly_as_a_config'),
     ('NONFINITE', 'NaN and Infinity are accepted as JSON',
-     '                          parse_constant=_reject_constant)',
-     '                          )',
+     '                          parse_constant=_reject_constant,',
+     '                          ',
      'test_install_refuses_a_config_with_nan'),
+    # ── Config writer hardening: one mutation per guard ─────────────────────
+    ('NAME-CHECK', 'a server name is not checked before it reaches a path',
+     '''    _check_name(name)
+    _refuse_symlinked_config(config_path)
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _install_locked(''',
+     '''    _refuse_symlinked_config(config_path)
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _install_locked(''',
+     'test_unusable_names_are_refused_by_install_and_uninstall'),
+    ('LINK-REFUSED', 'a symbolic-link config is replaced by a file on uninstall',
+     '''    _check_name(name)
+    _refuse_symlinked_config(config_path)
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _uninstall_locked(''',
+     '''    _check_name(name)
+    with _locked_for(config_path, _lock_path(home, config_path)):
+        return _uninstall_locked(''',
+     'test_a_config_that_became_a_link_after_install_is_not_replaced'),
+    ('FINITE-FLOAT', 'a number that overflows to infinity is accepted',
+     '                          parse_float=_finite_float)',
+     '                          )',
+     'test_overflowing_number_is_refused_before_any_mutation'),
+    ('UNINSTALL-CAS', 'the byte-exact uninstall writes without a compare-and-swap',
+     '''        with _expect_unchanged(target, _digest_bytes(current), current_identity):
+            _atomic_write(target, retained)   # byte-exact restore''',
+     '''        if True:
+            _atomic_write(target, retained)   # byte-exact restore''',
+     'test_uninstall_does_not_erase_a_concurrent_install'),
     # ── Round 4. One mutation per new guard, so each is proven reachable ────
     ('F1-PATH', 'the retained original is read from any path the record names',
      '    if retained_path != canonical:',

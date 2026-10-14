@@ -134,6 +134,20 @@ def _reject_constant(name):
     raise ValueError(f"{name} is not JSON")
 
 
+def _finite_float(text):
+    """`1e400` is a grammatical JSON number that Python reads as `inf`, and
+    `json.dumps` then writes it back as `Infinity`, which is not JSON. A config
+    that went in parseable would come out as one no client can read, and the
+    record of it would be refused by this loader on the way back. Refusing at
+    the read is the same rule as `_reject_constant`, for the same reason: we do
+    not accept a document we cannot write back as the grammar we read."""
+    value = float(text)
+    if value in (float("inf"), float("-inf")):
+        raise ValueError(f"the number {text} is outside the range of a finite "
+                         f"JSON number")
+    return value
+
+
 def _strict_loads(raw, what):
     """One loader for every document we read, config or record.
 
@@ -145,7 +159,8 @@ def _strict_loads(raw, what):
     try:
         text = raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw
         return json.loads(text, object_pairs_hook=_reject_duplicate_keys,
-                          parse_constant=_reject_constant)
+                          parse_constant=_reject_constant,
+                          parse_float=_finite_float)
     except RecursionError as e:
         raise ConfigIOError(f"{what} is nested too deeply to parse") from e
     except (ValueError, UnicodeDecodeError) as e:
@@ -2295,6 +2310,36 @@ def classify(entry, *, artifact):
     return "WRAPPED"
 
 
+def _check_name(name):
+    """The server name becomes part of a file name under the records directory
+    (`<name>.json`, `<name>.original`), so it is checked before it gets there.
+
+    `pathlib` resolves `..` and drops the base for an absolute name, so a name
+    chosen by a cloned project's `.mcp.json` could make the retained-original
+    write truncate a file outside the records directory, and the empty name
+    produced records called `.json`. A refusal here is typed and happens before
+    any write; nothing downstream has to defend against it.
+    """
+    if (not isinstance(name, str) or not name or name in (".", "..")
+            or "/" in name or "\\" in name or "\x00" in name):
+        raise ConfigConflict(
+            f"{name!r} is not a usable server name: it must be non-empty and "
+            f"contain no path separator, no NUL and not be '.' or '..'")
+
+
+def _refuse_symlinked_config(target):
+    """Both writers replace the file by rename, and a rename onto a symbolic
+    link replaces the LINK. The real file behind it is left as it was and
+    quietly diverges, and the record, which holds the resolved path, then
+    matches neither the link nor the file. Refusing is the choice that leaves
+    both exactly as they are; the user names the file the link points at."""
+    if pathlib.Path(target).is_symlink():
+        raise ConfigConflict(
+            f"{target} is a symbolic link; writing it would replace the link "
+            f"and leave {pathlib.Path(target).resolve()} unchanged. Name that "
+            f"file instead")
+
+
 def install(config_path, name, *, artifact, home, argv=None):
     """Wrap one entry. Validates everything, then mutates recoverably.
 
@@ -2305,6 +2350,8 @@ def install(config_path, name, *, artifact, home, argv=None):
     unclaimed and the unlink that removed it. Serialising one syscall at a time
     is how a race gets moved rather than closed.
     """
+    _check_name(name)
+    _refuse_symlinked_config(config_path)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _install_locked(config_path, name, artifact=artifact, home=home,
                                argv=argv)
@@ -2370,7 +2417,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
                            "command": sys.executable}
         servers[name] = wrapper
         return (original_entry, entry_existed, wrapper,
-                (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+                (json.dumps(doc, indent=2, allow_nan=False) + "\n").encode("utf-8"))
 
     original_entry, entry_existed, wrapper, new_raw = derive(raw)
 
@@ -2725,7 +2772,7 @@ def _installed_rendering(retained: bytes, name, journal):
     if not isinstance(journal.get("installed_entry"), dict):
         return None
     doc["mcpServers"][name] = journal["installed_entry"]
-    return (json.dumps(doc, indent=2) + "\n").encode("utf-8")
+    return (json.dumps(doc, indent=2, allow_nan=False) + "\n").encode("utf-8")
 
 
 def _recover_from_journal(target, name, pending_path, *, home):
@@ -2790,6 +2837,8 @@ def uninstall(config_path, name, *, home):
 
     Under the same transaction lock as `install`, for the reason given there.
     """
+    _check_name(name)
+    _refuse_symlinked_config(config_path)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _uninstall_locked(config_path, name, home=home)
 
@@ -2870,13 +2919,20 @@ def _uninstall_locked(config_path, name, *, home):
         # an untrustworthy record is not a safer outcome, it is a quieter one.
         retained_failure = e.conflict
 
-    current = _read_bytes(target)
+    current, current_identity = _read_bytes_and_identity(target)
 
     if retained is not None and _digest_bytes(current) == record.get("file_sha_after"):
         # C1: the retained BYTES, never a re-serialisation of the parsed
         # original. A re-render compares equal under json.loads and differs on
         # disk, so it would reformat a file we do not own.
-        _atomic_write(target, retained)   # byte-exact restore
+        #
+        # A COMPARE-AND-SWAP, like the recovery and the install rollback:
+        # the lock is taken inside the write, so a second process that finished
+        # an install on this file after the read above was silently erased and
+        # this reported a byte-exact restore. The write now refuses unless the
+        # file is still the very one these bytes were read from.
+        with _expect_unchanged(target, _digest_bytes(current), current_identity):
+            _atomic_write(target, retained)   # byte-exact restore
         _discard(rec_path, pending_path, retained_path)
         return UninstallResult(byte_exact=True)
 
@@ -2914,7 +2970,9 @@ def _uninstall_locked(config_path, name, *, home):
         _AUTHORISED[str(target)] = authority
 
     try:
-        _atomic_write(target, (json.dumps(doc, indent=2) + "\n").encode("utf-8"))
+        with _expect_unchanged(target, _digest_bytes(current), current_identity):
+            _atomic_write(target, (json.dumps(doc, indent=2, allow_nan=False)
+                                   + "\n").encode("utf-8"))
     finally:
         spent = _AUTHORISED.pop(str(target), None)
         if spent is not None:
