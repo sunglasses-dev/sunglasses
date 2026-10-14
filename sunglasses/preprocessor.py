@@ -320,11 +320,13 @@ _LOOKALIKE_TABLE = str.maketrans({**HOMOGLYPHS, **PUNCT_LOOKALIKES, **BLANKS})
 _WORD_CHAR = "A-Za-z0-9" + "".join(re.escape(c) for c, a in HOMOGLYPHS.items() if a.isalnum())
 _IGNORABLE_BETWEEN_WORDS = re.compile(
     f"(?<=[{_WORD_CHAR}])[{_IGNORABLE_CLASS}]+(?=[{_WORD_CHAR}])")
+WORD_CHAR = re.compile(f"[{_WORD_CHAR}]")
 
 # A numeric character reference that spells an ASCII letter or digit. Markup
 # escapes (&lt; &#60; &#39; ...) are left alone on purpose: decoding them would
 # turn every escaped code sample in a web page into live markup.
 _LETTER_REFERENCE = re.compile(r"&#(?:[xX]0*([0-9A-Fa-f]{1,6})|0*([0-9]{1,7}));?")
+_REFERENCE_TAIL = frozenset("0123456789abcdefABCDEFxX;")
 
 
 def _letter_reference(match):
@@ -332,6 +334,30 @@ def _letter_reference(match):
     if value < 128 and chr(value).isalnum():
         return chr(value)
     return match.group(0)
+
+
+def decoded_before(text: str, pos: int) -> str:
+    """The character that decode_letter_references(text) holds just before what
+    text[pos] becomes, or "" at the start."""
+    k = pos
+    while k > 0 and text[k - 1] in _REFERENCE_TAIL:
+        k -= 1
+    if k >= 2 and text.startswith("&#", k - 2):
+        match = _LETTER_REFERENCE.match(text, k - 2)
+        if match and match.end() == pos:
+            return _letter_reference(match)[-1]
+    return text[pos - 1] if pos else ""
+
+
+def decoded_at(text: str, pos: int) -> str:
+    """The first character that decode_letter_references makes of text[pos:], or ""
+    at the end. Only right for a position no reference reaches over, such as the
+    end of an ignorable run."""
+    if text.startswith("&#", pos):
+        match = _LETTER_REFERENCE.match(text, pos)
+        if match:
+            return _letter_reference(match)[0]
+    return text[pos] if pos < len(text) else ""
 
 
 def decode_letter_references(text: str) -> str:
