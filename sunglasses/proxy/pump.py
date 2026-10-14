@@ -2143,7 +2143,7 @@ class Session:
                         "inspection", rule=cause.rule,
                         kind="INITIALIZE_RESULT_WITHHELD")
             return None
-        return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
+        return (_json.dumps(rebuilt, separators=(",", ":"), allow_nan=False) + "\n").encode()
 
     def _respond_upstream(self, request_id, reason, rule="S1"):
         """T6.R3. The refusal goes back up the pipe it came down.
@@ -2206,7 +2206,8 @@ class Session:
             accepted=False, status="not_run", inspection_complete=False,
             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
             rule_ids=(), catalog=frozenset(), budget=budget)
-        return (_json.dumps(body, separators=(",", ":")) + "\n").encode()
+        return (_json.dumps(body, separators=(",", ":"), allow_nan=False)
+                + "\n").encode()
 
     # ── outcome ─────────────────────────────────────────────────────────────
 

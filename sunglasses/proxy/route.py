@@ -648,7 +648,7 @@ class Route:
             rule_ids=settlement.rule_ids if settlement else (),
             catalog=self.catalog,
             **self._approval_hint(reason))
-        return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
+        return ((json.dumps(body, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8"),
                 reason, rule)
     def _approval_hint(self, reason):
         """The two ids `proxy approve` needs, for the one reason it answers.
@@ -1005,6 +1005,11 @@ class Route:
         if target is None and not (isinstance(params, dict)
                                    and "requestId" in params):
             return
+        if not framing.valid_id(target):
+            # Not a string, a number or null, so it names no request, and a
+            # list or an object cannot be a key of the sets below. A cancel is
+            # a notification and is owed no answer; there is nothing to cancel.
+            return
         self._cancelled.add(_typed(target))
         # R-168-R4a. Accepted in the session, under ITS lock, so a reader
         # parked at the handoff sees the epoch move and re-derives. The writer
@@ -1331,6 +1336,10 @@ class Route:
             return REASON_APPROVAL_REQUIRED
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
+        if name is not None and not isinstance(name, str):
+            # A tool name is a string. Anything else names no approved tool,
+            # and a list or an object cannot be looked up in the tables below.
+            return REASON_APPROVAL_REQUIRED
         self._activate_once()
         if self._state_fault is not None:
             return REASON_STATE_IO_ERROR
@@ -1447,7 +1456,7 @@ class Route:
         CALLER, which is the party that knows its token, immediately before
         calling this. `_withhold` and `_cancel` both do.
         """
-        self.client_write((json.dumps(body, separators=(",", ":")) + "\n")
+        self.client_write((json.dumps(body, separators=(",", ":"), allow_nan=False) + "\n")
                           .encode("utf-8"))
         self._record("FRAME_OUT", direction="upstream_to_client",
                      raw_len=len(json.dumps(body)))
