@@ -368,7 +368,6 @@ class Session:
         self._exit_judged = threading.Event()
         self._core = CoreSession()
         self._pending: dict = {}          # key -> method
-        self._answered: set = set()
         # ONE TABLE for correlation, keyed by origin, and one hand-off dict
         # beside it for answers the client must never see. Not a second
         # correlation table: two of those drift, and the one that drifts is
@@ -754,6 +753,7 @@ class Session:
             # hand the caller a request the session has no intention of
             # answering.
             self._pending.pop(identity, None)
+            self._admitted_at.pop(identity, None)
             return False
         return True
 
@@ -883,6 +883,18 @@ class Session:
 
     def expects(self, request_id, *, origin):
         return key(origin, request_id) in self._pending
+
+    def was_issued(self, request_id, *, origin):
+        """True once a request with this id has been given an attempt, whether
+        it was admitted or refused. A generation is handed out for every
+        attempt, so the table holds exactly the ids that have been tried.
+
+        Read without `_settlement`, as `accept_cancellation` reads the same
+        table: a cancellation must complete while a reader holds the
+        settlement owner, and admission and cancellation both run on the
+        client reader, so the answer is ordered after the admission it asks
+        about."""
+        return key(origin, request_id) in self._generation
 
     def accept_cancellation(self, request_id, *, origin):
         """Record a cancellation as AUTHORITATIVE, and never wait on a reader.
@@ -1255,7 +1267,7 @@ class Session:
             if self._closed or identity not in self._pending:
                 return None
             self._pending.pop(identity)
-            self._answered.add(identity)
+            self._admitted_at.pop(identity, None)
             # RC13. The entry leaves `_pending` and the RECORD takes its place
             # in the same locked step, so there is no instant in which this
             # request is in neither. A close that wins now finds it in
@@ -1388,7 +1400,7 @@ class Session:
             if identity not in self._pending:
                 return False
             self._pending.pop(identity)
-            self._answered.add(identity)
+            self._admitted_at.pop(identity, None)
             # R-179-R6/R5_LOCAL_CAP. STILL COUNTED, AND THIS LINE IS THE FIX.
             # Round 5 dropped the item out of `_pending` and into nothing that
             # `_outstanding_locked` reads, so eight attempts refused by the
@@ -1480,7 +1492,7 @@ class Session:
             mine = self._generation.get(identity) == token[-1]
             if mine:
                 self._pending.pop(identity, None)
-                self._answered.add(identity)
+                self._admitted_at.pop(identity, None)
             # THE ANSWER OBLIGATION ENDS HERE, so the count this attempt has
             # been holding since `claim_for_local_answer` is released here --
             # by the OWNED token and never blind, because `_settling` is keyed
@@ -1553,7 +1565,7 @@ class Session:
             # OBSERVED, not recomputed later: captured with the pop.
             observed = token if token is not None else self._core_key(identity)
             self._pending.pop(identity)
-            self._answered.add(identity)
+            self._admitted_at.pop(identity, None)
         return self._core.settle(observed, Cause(reason, rule))
 
     def cancel(self, request_id, *, origin, token=None):
@@ -1599,6 +1611,7 @@ class Session:
             observed = token if token is not None else self._core_key(identity)
             if not stale:
                 self._pending.pop(identity, None)
+                self._admitted_at.pop(identity, None)
         if stale:
             self._core._emit("SETTLEMENT_REFUSED", request_id,
                              reason="wrong_item" if wrong_item
@@ -1944,7 +1957,7 @@ class Session:
                         # answer in the collector for a session that is gone.
                         continue
                     self._pending.pop(identity)
-                    self._answered.add(identity)
+                    self._admitted_at.pop(identity, None)
                     self._control_answers[identity] = message
                     self._settling.add(identity)
                     self._settling_key[identity] = self._core_key(identity)

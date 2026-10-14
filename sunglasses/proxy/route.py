@@ -115,11 +115,6 @@ class _NoId:
 NO_ID = _NoId()
 
 
-def _typed(request_id):
-    """T6.R6's identity, for the sets this module keeps: the JSON type is part
-    of it, so `"1"` and `1` are different held items here too."""
-    return (type(request_id).__name__, request_id)
-
 RULE_ADMISSION = "S1"
 RULE_RESOURCE = "S3"
 RULE_APPROVAL = "S4"
@@ -169,7 +164,6 @@ class Route:
         # decides whether a result may be released, and a check that lives in
         # the middle of the release path is a check the next release path
         # forgets to make.
-        self._cancelled = set()
         self._invalidated_reason = None
 
     # ── one frame from the client ──────────────────────────────────────────
@@ -1010,7 +1004,11 @@ class Route:
             # list or an object cannot be a key of the sets below. A cancel is
             # a notification and is owed no answer; there is nothing to cancel.
             return
-        self._cancelled.add(_typed(target))
+        if not self.session.was_issued(target, origin=CLIENT):
+            # No request with this id was ever admitted, so there is nothing to
+            # cancel, and recording it would grow the tables below by one entry
+            # for every id a peer cares to invent.
+            return
         # R-168-R4a. Accepted in the session, under ITS lock, so a reader
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
