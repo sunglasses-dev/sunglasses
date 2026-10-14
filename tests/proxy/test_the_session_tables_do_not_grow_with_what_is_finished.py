@@ -76,3 +76,14 @@ def test_a_cancel_for_an_admitted_request_is_still_honoured(tmp_path):
     answers = client.messages()
     assert len(answers) == 1 and answers[0]["id"] == 3
     assert len(engine.session._cancelled_ids) == 1
+
+
+def test_closing_the_session_clears_the_admission_times_with_the_pending_table(tmp_path):
+    engine, upstream, client, scans = make_route(tmp_path)
+    for i in range(1, 4):
+        engine.client_frame(call_request(i))
+    assert len(engine.session._admitted_at) == 3
+    engine.client_frame(b"this is not json\n")
+    assert engine.session.closed_with() is not None
+    assert len(engine.session._pending) == 0
+    assert len(engine.session._admitted_at) == 0

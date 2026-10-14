@@ -2702,6 +2702,7 @@ class Session:
                     self._owed_refusals.append((identity, reason, rule))
                     self._budget_for[identity] = budget
             self._pending.clear()
+            self._admitted_at.clear()
             # The debt above is now recorded for both tables, so the record has
             # done its job and must not keep the watcher awake (RC15) or block
             # a later admission (RC17).

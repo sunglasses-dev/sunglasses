@@ -1334,9 +1334,11 @@ class Route:
             return REASON_APPROVAL_REQUIRED
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
-        if name is not None and not isinstance(name, str):
-            # A tool name is a string. Anything else names no approved tool,
-            # and a list or an object cannot be looked up in the tables below.
+        if not isinstance(name, str) or not name:
+            # A tool name is a non-empty string. Anything else, a missing name
+            # included, names no approved tool, cannot be looked up in the
+            # tables below, and must not start the activation (which writes a
+            # control request upstream) on its way to being refused.
             return REASON_APPROVAL_REQUIRED
         self._activate_once()
         if self._state_fault is not None:
