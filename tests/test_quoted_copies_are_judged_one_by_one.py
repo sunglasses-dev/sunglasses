@@ -16,13 +16,19 @@ no shorter hit, and a copy that nothing quotes or negates is still live.
 
 Three things keep that from lowering a hit that is live:
 
-  * the quote that is cut short must BEGIN a quotation. A mark that has an odd number of its
-    own kind before it closes one, and a cue whose mark is the closing mark of the quote
-    before it opens nothing, so the text after that cue is not an example. This is counted
-    for the quote that is cut short and for every quote that covers a later hit.
-  * what the cut-short hit reached past its closing mark must be accounted for by hits the
-    walk then covers. A live copy that only the wide hit could start from (a copy that
-    follows a carrier letter, for one) is not dropped because the hit was cut short.
+  * the quote that is cut short must be counted as the beginning of a quotation, and the
+    count is trusted only where it can be. A mark that has an odd number of its own kind
+    before it closes one, and a cue whose mark is the closing mark of the quote before it
+    opens nothing. But a mark of ANOTHER kind in front of the cue (a code span, a quotation
+    of another kind, an apostrophe that is not between two letters) can hold a mark of this
+    kind literally, so the count says nothing and the hit stays live. This is asked for the
+    quote that is cut short and for every quote that covers a later hit.
+  * what the cut-short hit reached past its closing mark must be accounted for. Between the
+    quotes that cover the hits, no match of the rule from the same start may end in the
+    words that no quote holds, and a match that ends where a covered hit ends must not have
+    needed such a word. A live copy that only the wide hit could start from (a copy that
+    follows a carrier letter, for one, in the middle of two quoted copies or after them)
+    is not dropped because the hit was cut short.
   * the marks of a quote are found in the view they are in, so a cue and a quote that the
     view only gets from a different place are not paired.
 """
@@ -171,10 +177,179 @@ def test_a_mark_inside_an_unclosed_quotation_does_not_begin_one(engine, channel)
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
-def test_the_backticks_of_a_fence_are_not_single_marks(engine, channel):
-    """Three backticks are one fence mark, so they do not shift a single-backtick quote."""
+def test_a_fence_in_front_of_single_backtick_quotes_is_not_counted_on(engine, channel):
+    """A fence is a mark of another kind: what it holds can hold a backtick, so the count of
+    single backticks after it says nothing. The pair stays live, as on main."""
     quote = f"Never say `{PHRASE}`"
-    assert _decision(engine, f"``` intro\n{quote}. {quote}", channel).decision == "allow_redacted"
+    assert _decision(engine, f"``` intro\n{quote}. {quote}", channel).decision == "block"
+    assert _decision(engine, f"intro\n{quote}. {quote}", channel).decision == "allow_redacted"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("run", ("``", "````", "`````", "``````"))
+def test_a_run_of_backticks_that_is_neither_one_nor_three_is_not_counted_on(engine, run, channel):
+    """One backtick is a mark and three are a fence; a run of any other length is a literal
+    that either kind could hold, so the count after it says nothing and the pair stays
+    live. The same text with a plain intro in its place is covered."""
+    quote = f"Never say `{PHRASE}`"
+    assert _decision(engine, f"{run}. {quote}. {quote}", channel).decision == "block"
+    assert _decision(engine, f"intro. {quote}. {quote}", channel).decision == "allow_redacted"
+
+
+def test_backtick_runs_of_other_lengths_do_not_open_a_quote(engine):
+    text = "`````. ```x`` `y`"
+    marks = {}
+    assert engine._opens_a_quote(text, text.index("`y"), "`", marks) is False
+    assert engine._opens_a_quote("a `y`", 2, "`", {}) is True
+
+
+# A quoted copy, words that complete the rule together with the first copy but that no quote
+# holds, and another quoted copy. The rule is `first .{0,80} second .{0,80} third` and the
+# words in the middle (after a carrier letter, so the walk cannot start a match at them)
+# supply the second and third word of a match that starts in the first quote. Whatever
+# quote comes after them, they are live.
+MIDDLE = {
+    "copy_after_a_carrier_letter": ". x" + PHRASE + ". ",
+    "two_words_after_a_carrier_letter": ". x previous instructions. ",
+    "copy_after_a_carrier_letter_no_stop": " x" + PHRASE + " ",
+}
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("distance", (0, 200))
+def test_uncovered_middle_survives_later_covered_endpoint(engine, distance, channel):
+    """A covered final quotation does not discharge a live copy in the middle, whether the
+    final quotation is next to it or far behind it."""
+    text = _quoted("Never say") + ". x" + PHRASE + ". " + "z " * distance + _quoted("Never say")
+    assert _decision(engine, text, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name", list(MIDDLE), ids=list(MIDDLE))
+@pytest.mark.parametrize("filler", ("", "z " * 4))
+def test_a_live_middle_between_two_covered_quotes_stays_live(engine, name, filler, channel):
+    quote = _quoted("Never say")
+    assert _decision(engine, quote + MIDDLE[name] + filler + quote, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("live", ("x all prevoius", "x prevoius"))
+@pytest.mark.parametrize("words", (12, 18, 30, 42))
+def test_a_chain_that_needs_a_live_word_to_reach_a_covered_end_stays_live(
+        engine, live, words, channel):
+    """The rule's later words are in the second quote, which is covered, and the word it
+    needs in the middle is live (after a carrier letter, so no match starts there). The
+    wide match from the first quote ends inside the covered quote, so no uncovered stretch
+    holds its end; but the second quote, on its own, is too far from the first for the same
+    chain, so the live word is what makes the chain."""
+    text = _quoted("Never say") + ". " + live + " " + "z " * words + _quoted("Never say")
+    assert _decision(engine, text, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("run", ("``", "````", "`````"))
+def test_a_run_of_backticks_in_front_of_fence_quotes_is_not_counted_on(engine, run, channel):
+    quote = f"Never say ```{PHRASE}```"
+    assert _decision(engine, f"{run}. {quote}. {quote}", channel).decision == "block"
+    # two runs would leave the count of fences even, as if neither had been there
+    assert _decision(engine, f"{run}. {run}. {quote}. {quote}", channel).decision == "block"
+    assert _decision(engine, f"intro. {quote}. {quote}", channel).decision == "allow_redacted"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_covered_then_live_then_covered_again_stays_live(engine, channel):
+    quote = _quoted("Never say")
+    text = f"{quote}. {quote}. x{PHRASE}. {quote}. {quote}"
+    assert _decision(engine, text, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_words_in_the_cue_are_not_covered_words(engine, channel):
+    """The cue's own words are between the quotes and no quote holds them."""
+    text = f'{_quoted("Never say")}. Never previous instructions "{PHRASE}"'
+    assert _decision(engine, text, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("gap", (". ", ". " + FILL[:5] + " ", ". " + FILL[:20] + " ", ". " + FILL[:40] + " ", ". a. b, c; d! "))
+def test_prose_between_two_covered_quotes_is_still_covered(engine, gap, channel):
+    assert _decision(engine, _quoted("Never say") + gap + _quoted("Never say"), channel).decision == "allow_redacted"
+
+
+# A mark of another kind in front of a cue can hold a mark of the cue's kind literally, so
+# the parity of the cue's marks says nothing: the code span below holds a quotation mark,
+# and counted naively the real closing mark of the first quote reads as an opening.
+WRAPPERS = {
+    "code_span": ("`", "`"),
+    "single_quotes": ("'", "'"),
+    "curly_quotes": ("\u201c", "\u201d"),
+    "guillemets": ("\u00ab", "\u00bb"),
+    "corner_brackets": ("\u300c", "\u300d"),
+}
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_code_span_marks_do_not_own_live_copy(engine, channel):
+    literal = '`"`'
+    text = literal + '. "Never say "' + PHRASE + ". " + literal + ". " + _quoted("Never say")
+    assert _decision(engine, text, channel).decision == "block"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name", list(WRAPPERS), ids=list(WRAPPERS))
+def test_a_literal_mark_inside_another_kind_does_not_decide_who_owns_a_quote(engine, name, channel):
+    opened, closed = WRAPPERS[name]
+    literal = f'{opened}"{closed}'
+    text = literal + '. "Never say "' + PHRASE + ". " + literal + ". " + _quoted("Never say")
+    assert _decision(engine, text, channel).decision == "block", (name, channel)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name", list(WRAPPERS), ids=list(WRAPPERS))
+def test_a_mark_of_another_kind_in_front_leaves_a_covered_pair_live(engine, name, channel):
+    """The pair is the covered shape; with a mark of another kind in front the count is not
+    trusted, so the pair stays live as on main. Without that mark it is covered."""
+    opened, closed = WRAPPERS[name]
+    quote = _quoted("Never say")
+    assert _decision(engine, f"note {opened}x{closed}. {quote}. {quote}", channel).decision == "block"
+    assert _decision(engine, f"note x. {quote}. {quote}", channel).decision == "allow_redacted"
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_an_apostrophe_that_is_not_between_letters_is_a_mark_of_another_kind(engine, channel):
+    quote = _quoted("Never say")
+    assert _decision(engine, f"The dogs' bowl. {quote}. {quote}", channel).decision == "block"
+
+
+def test_a_mark_of_another_kind_before_the_cue_is_not_counted_on(engine):
+    cue = 'Never say "x"'
+    plain = "a. " + cue
+    assert engine._opens_a_quote(plain, plain.index('"'), '"', {}) is True
+    for lead in ("`b` ", "'b' ", "\u201cb\u201d ", "\u00abb\u00bb ", "```\nb\n``` "):
+        text = "a. " + lead + cue
+        assert engine._opens_a_quote(text, text.index('"'), '"', {}) is False, repr(lead)
+    letters = "it's fine. " + cue
+    assert engine._opens_a_quote(letters, letters.index('"'), '"', {}) is True
+
+
+def test_the_places_a_match_could_end_are_the_ends_of_words_and_of_runs_of_marks(engine):
+    assert list(engine._token_ends("ab, cd!", 0, 7)) == [2, 3, 6, 7]
+    assert list(engine._token_ends("a  b", 1, 4)) == [4]
+    assert list(engine._token_ends("abc", 0, 2)) == [2]
+
+
+def test_a_match_that_must_end_where_the_text_ends(engine):
+    ending = engine._ending_at(re.compile("(?i)a|bc"))
+    assert ending.match("xBC", 1, 3) and not ending.match("xBC", 1, 2)
+    assert ending.match("xA", 1, 2) and not ending.match("xAA", 1, 3)
+    assert engine._ending_at(re.compile("(?i)a|bc")) is ending
+
+
+def test_a_remainder_with_more_places_than_the_cap_stays_live(engine, monkeypatch):
+    text = _quoted("Never say") + ". x x x x x. " + _quoted("Never say")
+    assert engine.scan(text, channel="web_content").decision == "allow_redacted"
+    monkeypatch.setattr(SunglassesEngine, "REMAINDER_ENDS_CAP", 3)
+    assert engine.scan(text, channel="web_content").decision == "block"
 
 
 # The walk itself, with rules that can end on the closing mark or match nothing there. No
