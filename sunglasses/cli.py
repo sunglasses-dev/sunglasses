@@ -25,7 +25,6 @@ from . import __version__
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .reporter import ProtectedEngine, generate_report
-from .mailer import set_email, get_email, send_report
 from .sarif import to_sarif
 
 
@@ -2457,6 +2456,16 @@ class _MachineAwareParser(argparse.ArgumentParser):
 
 
 def main():
+    # `sunglasses mcp …` hands everything after the word to the MCP server's own
+    # main(), whole, for the same reason as `proxy`: the server answers --help and
+    # --version itself and must see argv exactly as `python -m sunglasses.mcp` does.
+    # It runs first, before the colour policy and the parsers, and this module no
+    # longer imports the mailer (and its optional `resend` import) at load time.
+    # Imports the server shares with the CLI, such as the scanner engine's, still
+    # run before this point. Its exit status is the server's own.
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        from .mcp import main as mcp_main
+        sys.exit(mcp_main(sys.argv[2:]))
     _apply_color_policy()
     parser = _MachineAwareParser(
         prog="sunglasses",
@@ -2657,6 +2666,13 @@ def main():
              "snapshot (sunglasses proxy approve <server_id> --snapshot <sha>)",
         add_help=False)
 
+    # Listed so `sunglasses --help` shows it. Like `proxy`, the word never
+    # reaches this parser; see the interception at the top of main().
+    subparsers.add_parser(
+        "mcp",
+        help="Run the SUNGLASSES MCP server on stdio (same as python -m sunglasses.mcp)",
+        add_help=False)
+
     # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
     # 0.6.0 beta's product surface is this command, and everything it does
     # lives in sunglasses.proxy.commands. It is intercepted rather than made a
@@ -2685,6 +2701,7 @@ def main():
 
 def cmd_report(args):
     """Generate daily protection report."""
+    from .mailer import get_email, send_report
     if args.send:
         html = generate_report(date=args.date, as_html=True)
         email = get_email()
@@ -2978,6 +2995,7 @@ def cmd_doctor(args, _run=None):
 
 def cmd_config(args):
     """Configure SUNGLASSES."""
+    from .mailer import get_email, set_email
     if args.email:
         set_email(args.email)
         print(f"\n  {GREEN}Email saved:{RESET} {args.email}")

@@ -58,6 +58,7 @@ setup(
     entry_points={
         "console_scripts": [
             "sunglasses=sunglasses.cli:main",
+            "sunglasses-mcp=sunglasses.mcp:main",
         ],
     },
     classifiers=[
