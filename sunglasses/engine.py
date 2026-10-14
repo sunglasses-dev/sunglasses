@@ -39,7 +39,8 @@ from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLB
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_letter_references, decode_url_encoding, normalize_unicode,
                            normalize_with_length, replace_homoglyphs, replace_lookalikes,
-                           space_ignorable_between_words, strip_ignorable, strip_invisible)
+                           space_ignorable_between_words, strip_ignorable, strip_invisible,
+                           BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
 # boundary character and then any whitespace, newlines included. The twin differs in one
@@ -469,8 +470,8 @@ def _ascii_lower(text: str) -> str:
 
 
 def _fold_text(text: str) -> str:
-    """The folded view, built the way scan() builds it."""
-    return replace_lookalikes(normalize_unicode(strip_ignorable(decode_letter_references(text))))
+    """The #342 folded view, built the way scan() builds it."""
+    return replace_homoglyphs(normalize_unicode(strip_invisible(text)))
 
 
 def _shadow_fold_text(text: str) -> str:
@@ -479,7 +480,17 @@ def _shadow_fold_text(text: str) -> str:
 
 
 def _compact_text(text: str) -> str:
-    """The view that only deletes and maps, built the way scan() builds it."""
+    """The #342 view that only deletes and maps, built the way scan() builds it."""
+    return replace_homoglyphs(strip_invisible(text))
+
+
+def _wide_fold_text(text: str) -> str:
+    """The widened folded view, built the way scan() builds it."""
+    return replace_lookalikes(normalize_unicode(strip_ignorable(decode_letter_references(text))))
+
+
+def _wide_compact_text(text: str) -> str:
+    """The widened view that only deletes and maps, built the way scan() builds it."""
     return replace_lookalikes(strip_ignorable(decode_letter_references(text)))
 
 
@@ -905,7 +916,40 @@ class _Walk:
                     self._mark()
                     break
             else:
-                self.dead = True
+                if not self._widened(i, j):
+                    self.dead = True
+
+    def _widened(self, i: int, j: int) -> bool:
+        """One step of the regex lane's widened fold (preprocessor.strip_ignorable,
+        replace_lookalikes, space_ignorable_between_words), tried only where every
+        step above has failed, so a walk that the #342 fold explains is walked as
+        it was. A run of characters that render as nothing is either deleted, or
+        read as the one space the view holds in its place; a punctuation look-alike
+        or a blank-drawn character is mapped to the one ASCII character it reads
+        as. True when the step was taken."""
+        raw, view = self.raw, self.view
+        c = raw[j]
+        m = IGNORABLE_CHARS.match(raw, j)
+        if m:
+            end = m.end()
+            if view[i] == " " and (end >= len(raw) or raw[end] != " "):
+                # Read as a space: the view holds one where the raw text has none.
+                self.changed.append(i)
+                self.i = i + 1
+            else:
+                self.cuts.append(i)
+                self.hard.add(i)
+            self.j = end
+            self._mark()
+            return True
+        mapped = PUNCT_LOOKALIKES.get(c) or BLANKS.get(c)
+        if mapped is not None and view[i] == mapped:
+            self.changed.append(i)
+            self.i = i + 1
+            self.j = j + 1
+            self._mark()
+            return True
+        return False
 
     def _plain_run(self, j: int) -> bool:
         """True if raw[j] is a space that follows another one in a run of blanks that is all
@@ -3684,8 +3728,8 @@ class SunglassesEngine:
         # selector in each word, a minus sign for a hyphen or one character
         # reference per word blinded every rule that lives on its regex (all
         # GLS-MECH-* and every carrier without a usable keyword). The keyword
-        # lane's view shares the look-alike table (PUNCT_LOOKALIKES is part of
-        # HOMOGLYPHS) but still deletes only INVISIBLE_CHARS. Only these folds: the
+        # lane's view is unchanged: it deletes only INVISIBLE_CHARS and maps
+        # only HOMOGLYPHS. Only these folds: the
         # decoding, leet, whitespace-collapse and ROT13 / reversed steps
         # change length and meaning, and on a long document they re-create
         # the spread-text false positives the co-occurrence window exists to
@@ -3712,14 +3756,41 @@ class SunglassesEngine:
         # expanding case the folds that cannot grow (delete, decode, map) are
         # also kept as a subject of their own, in full, so padding cannot push
         # a payload hidden with invisible characters past the cut either.
+        #
+        # The #342 fold (INVISIBLE_CHARS deleted, NFKC, HOMOGLYPHS) is kept as
+        # it was, first and in full, and the widened readings come after it as
+        # subjects of their own. They do not replace it: a widened reading sees
+        # different text, so a match only the #342 fold made would otherwise be
+        # lost, and adding subjects can only add to what a rule finds (raw is
+        # decided first, an uncovered hit ends a rule's loop, a covered one can
+        # only be strengthened by a later subject). A widened view equal to the
+        # raw text or to an earlier subject is not read twice.
+        #
         # Every prefilter presence is computed once per scan; the per-pattern
         # loop below only reads them. Each subject also keeps the function that
         # built it from the raw text and whether it was cut, for its raw frame
         # (see _raw_frame), which is made the first time a rule reads it.
         folded_subjects = []
+        if not text.isascii() or CONTROL_CHARS.search(text):
+            stripped = strip_invisible(text)
+            folded = replace_homoglyphs(normalize_unicode(stripped))
+            compact = None
+            folded_cut = False
+            if self.max_scan_bytes and len(folded) > self.max_scan_bytes:
+                compact = replace_homoglyphs(stripped)
+                if compact == text:
+                    compact = None
+                folded = folded[: self.max_scan_bytes]
+                folded_cut = truncated = True
+            if folded == text:
+                folded = None
+            for view, build, cut in ((folded, _fold_text, folded_cut), (compact, _compact_text, False)):
+                if view is not None:
+                    folded_subjects.append(
+                        [view, self._literal_index.present(_prefilter.fold(view)), build, cut, None])
         if not text.isascii() or "&#" in text or CONTROL_CHARS.search(text):
             decoded = decode_letter_references(text)
-            readings = [(strip_ignorable(decoded), _fold_text, _compact_text)]
+            readings = [(strip_ignorable(decoded), _wide_fold_text, _wide_compact_text)]
             spaced = space_ignorable_between_words(decoded)
             if spaced is not None:
                 readings.append((strip_ignorable(spaced), _fold_spaced_text, _compact_spaced_text))

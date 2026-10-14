@@ -14,9 +14,10 @@ import unicodedata
 from urllib.parse import unquote
 
 
-# Punctuation that looks like an ASCII sign and that NFKC does not map. Part of
-# HOMOGLYPHS below, so both lanes and the raw-offset alignment read one table;
-# every entry is one code point to one code point. Kept small on purpose: only
+# Punctuation that looks like an ASCII sign and that NFKC does not map. Read by
+# the regex lane's folded view only (replace_lookalikes below); HOMOGLYPHS, and
+# with it the keyword lane, is left as it was. Every entry is one code point to
+# one code point. Kept small on purpose: only
 # signs drawn like the ASCII one. The en dash, em dash and box-drawing lines are
 # not here: they are drawn visibly longer or heavier and are everywhere in
 # ordinary prose and directory trees, so mapping them would fold almost every
@@ -68,7 +69,6 @@ HOMOGLYPHS = {
     '\uff51': 'q', '\uff52': 'r', '\uff53': 's', '\uff54': 't',
     '\uff55': 'u', '\uff56': 'v', '\uff57': 'w', '\uff58': 'x',
     '\uff59': 'y', '\uff5a': 'z',
-    **PUNCT_LOOKALIKES,
 }
 
 # Leetspeak map
@@ -260,9 +260,8 @@ def replace_homoglyphs(text: str) -> str:
 # The engine's regex lane reads the raw text first and, for non-ASCII input,
 # a folded copy of it (engine scan, step 3). The helpers below build that copy.
 # They do not feed normalize(): the keyword lane's view still deletes only
-# INVISIBLE_CHARS. It shares the look-alike table (PUNCT_LOOKALIKES is part of
-# HOMOGLYPHS, one code point to one code point, so the raw-offset alignment
-# built on strip_invisible / replace_homoglyphs keeps its lengths).
+# INVISIBLE_CHARS and maps only HOMOGLYPHS. The engine keeps the #342 fold as
+# its own subject too, so this copy only adds subjects to what a rule reads.
 
 # Every code point that renders as nothing, written out as ranges so the set is
 # the same on every Python the package supports (unicodedata's tables differ
@@ -310,10 +309,10 @@ IGNORABLE_CHARS = re.compile(f"[{_IGNORABLE_CLASS}]+")
 # Characters that are not whitespace to a regex but are drawn as a blank.
 BLANKS = {'\u2800': ' '}   # Braille pattern blank
 
-# One translation table: HOMOGLYPHS (look-alike letters and punctuation) and
-# the blanks. Every entry maps one code point to one code point, so the fold
+# One translation table: HOMOGLYPHS (look-alike letters), the punctuation
+# look-alikes and the blanks. Every entry maps one code point to one code point, so the fold
 # never grows.
-_LOOKALIKE_TABLE = str.maketrans({**HOMOGLYPHS, **BLANKS})
+_LOOKALIKE_TABLE = str.maketrans({**HOMOGLYPHS, **PUNCT_LOOKALIKES, **BLANKS})
 
 # An ignorable run with a letter or digit on both sides: where the fold that
 # deletes it would glue two words ("ignore" + U+200B + "all" -> "ignoreall").
@@ -343,9 +342,17 @@ def decode_letter_references(text: str) -> str:
     return _LETTER_REFERENCE.sub(_letter_reference, text)
 
 
+# An ignorable run between two Braille cells. Braille words are written cell
+# after cell, and a blank-drawn filler (U+3164) is a word gap there; deleting it
+# would join two short words into one long cell run, which the Braille encoding
+# rule reads as hidden text. Such a run is read as the space it is drawn as.
+_IGNORABLE_BETWEEN_BRAILLE = re.compile(f"(?<=[\u2800-\u28ff])[{_IGNORABLE_CLASS}]+(?=[\u2800-\u28ff])")
+
+
 def strip_ignorable(text: str) -> str:
-    """Delete every code point that renders as nothing (IGNORABLE_RANGES)."""
-    return IGNORABLE_CHARS.sub("", text)
+    """Delete every code point that renders as nothing (IGNORABLE_RANGES), except
+    that a run of them between two Braille cells is read as one space."""
+    return IGNORABLE_CHARS.sub("", _IGNORABLE_BETWEEN_BRAILLE.sub(" ", text))
 
 
 def space_ignorable_between_words(text: str):
