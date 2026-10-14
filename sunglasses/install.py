@@ -169,25 +169,38 @@ def _strict_loads(raw, what):
 
 
 def _read_regular_bytes(path):
-    """The bytes of a regular file, read through ONE descriptor that was opened
-    without following a link and without blocking, and whose type was checked
-    on the descriptor itself.
+    """The bytes of a regular file, read through ONE descriptor whose type was
+    checked on the descriptor itself.
 
     A symbolic link (dangling or not), a FIFO or a device is PRESENT and
     unusable, which is not the same as absent: a missing entry is the one case
     that raises FileNotFoundError, so a caller can tell the two apart; anything
-    else unusable is ValueError (or the OSError the open raised, for a link).
-    Checking the descriptor rather than the name means an entry swapped between
-    a look and a read cannot turn this into a blocking read or a read through a
-    link. It does not make a later use of the same NAME safe: see the recovery
-    concurrency contract in docs/proxy-install-transaction.md."""
+    else unusable is ValueError.
+
+    The name is looked at first and refused unless it is a regular file, which
+    holds on every platform. The open then asks not to follow a link and not to
+    block (every POSIX platform has both flags), and the type is checked again
+    on the descriptor, so an entry swapped between the look and the open can
+    neither block the read nor be read through a link. Where the platform has
+    no no-follow flag the open cannot refuse a link by itself, so the
+    descriptor must be the very file the look saw (same device and inode) or
+    the read is refused; an entry that cannot be told apart that way is
+    refused rather than read. A platform without the nonblocking flag has no
+    FIFO to open, and the look above is all there is. This does not make a
+    later use of the same NAME safe: see the recovery concurrency contract in
+    docs/proxy-install-transaction.md."""
     path = pathlib.Path(path)
-    os.lstat(path)                              # FileNotFoundError = absent
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-                 | getattr(os, "O_NONBLOCK", 0))
+    seen = os.lstat(path)                       # FileNotFoundError = absent
+    if not stat.S_ISREG(seen.st_mode):
+        raise ValueError(f"{path} is not a regular file")
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, os.O_RDONLY | no_follow | getattr(os, "O_NONBLOCK", 0))
     try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
             raise ValueError(f"{path} is not a regular file")
+        if not no_follow and not os.path.samestat(seen, opened):
+            raise ValueError(f"{path} changed while it was being opened")
         with os.fdopen(fd, "rb") as fh:
             fd = None
             return fh.read()

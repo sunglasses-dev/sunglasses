@@ -3262,3 +3262,82 @@ def test_a_linked_paired_standby_copy_is_not_moved(
         inst.uninstall(cfg, "github", home=home)
     assert _snapshot(records) == before
     assert read(cfg) == published
+
+
+@pytest.mark.parametrize("flag", ["O_NOFOLLOW", "O_NONBLOCK"])
+@pytest.mark.parametrize("which", ["sibling_claim", "canonical_record"])
+def test_a_static_link_is_still_refused_when_the_platform_lacks_an_open_flag(
+        cfg, home, artifact, monkeypatch, which, flag):
+    """The refusal of a link that is already in place must not depend on the
+    open flags: a platform without the no-follow flag used to read a record
+    link as the file behind it, and the public uninstall went on to finish."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    target = claim if which == "sibling_claim" else inst._record_paths(home, "github")[1]
+    behind = records / "outside-copy"
+    behind.write_bytes(read(target))
+    target.unlink()
+    target.symlink_to(behind)
+    published = read(cfg)
+    before = _snapshot(records)
+    monkeypatch.delattr(os, flag, raising=False)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_a_link_swapped_in_after_the_look_is_refused_without_the_no_follow_flag(
+        tmp_path, monkeypatch):
+    """Without the flag the open follows a link that arrives between the look
+    and the open, so the descriptor has to be the file the look saw."""
+    target = tmp_path / "claim.json"
+    behind = tmp_path / "behind.json"
+    target.write_bytes(b'{"a": 1}')
+    behind.write_bytes(b'{"a": 2}')
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    real_open = os.open
+
+    def swap_then_open(path, *a, **kw):
+        if pathlib.Path(path) == target:
+            target.unlink()
+            target.symlink_to(behind)
+        return real_open(path, *a, **kw)
+
+    monkeypatch.setattr(inst.os, "open", swap_then_open)
+    with pytest.raises(ValueError):
+        inst._read_regular_bytes(target)
+
+
+def test_an_ordinary_file_is_read_whichever_open_flags_the_platform_has(
+        tmp_path, monkeypatch):
+    target = tmp_path / "claim.json"
+    target.write_bytes(b'{"a": 1}')
+    assert inst._read_regular_bytes(target) == b'{"a": 1}'
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    monkeypatch.delattr(os, "O_NONBLOCK", raising=False)
+    assert inst._read_regular_bytes(target) == b'{"a": 1}'
+    with pytest.raises(FileNotFoundError):
+        inst._read_regular_bytes(tmp_path / "absent.json")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs POSIX FIFOs")
+def test_a_fifo_is_refused_without_blocking_when_the_platform_lacks_nonblock(
+        tmp_path, monkeypatch):
+    """The look at the name is what keeps a FIFO from being opened at all when
+    the open itself cannot ask not to block."""
+    fifo = tmp_path / "claim.json"
+    os.mkfifo(fifo)
+    monkeypatch.delattr(os, "O_NONBLOCK", raising=False)
+    previous = _bounded()
+    try:
+        with pytest.raises(ValueError):
+            inst._read_regular_bytes(fifo)
+    finally:
+        _unbound(previous)
