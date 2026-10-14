@@ -2493,7 +2493,7 @@ def main():
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
-                             choices=["message", "file", "api_response", "web_content", "log_memory"],
+                             choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
                              help="Where the content came from, not what the attack is. "
                                   "Patterns are scoped by channel, so this changes which "
                                   "rules apply (default: message)")
