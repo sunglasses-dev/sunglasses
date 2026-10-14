@@ -38,7 +38,8 @@ from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLB
                            decode_letter_references, decode_url_encoding, normalize_unicode,
                            normalize_with_length, replace_homoglyphs, replace_lookalikes,
                            space_ignorable_between_words, strip_ignorable, strip_invisible,
-                           BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES)
+                           BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES, WORD_CHAR, decoded_at,
+                           decoded_before)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
 # boundary character and then any whitespace, newlines included. The twin differs in one
@@ -358,6 +359,10 @@ def _normal_text(text: str) -> str:
     return normalize_with_length(text)[0]
 
 
+def _braille(ch: str) -> bool:
+    return "\u2800" <= ch <= "\u28ff" if ch else False
+
+
 class _Walk:
     """One view of the input walked in step with the raw input.
 
@@ -379,7 +384,7 @@ class _Walk:
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
                  "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard",
-                 "mark_i", "mark_j")
+                 "mark_i", "mark_j", "run")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -399,6 +404,7 @@ class _Walk:
         self.hard = set()  # view indexes with any other cut; one of these ends the tolerance there
         self.mark_i = [0]  # view index where an identical run starts ...
         self.mark_j = [0]  # ... and the raw index it starts at
+        self.run = None     # the last ignorable run looked at (see _run_sides)
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
@@ -721,9 +727,17 @@ class _Walk:
                     self.dead = True
                     break
             if INVISIBLE_CHARS.match(c):
-                self.cuts.append(i)
-                self.hard.add(i)
-                self.j = j + 1
+                end = self._spaced_run(i, j)
+                if end is not None:
+                    # A widened reading put a space where this run is (see _widened);
+                    # the #342 fold never holds one there.
+                    self.changed.append(i)
+                    self.i = i + 1
+                    self.j = end
+                else:
+                    self.cuts.append(i)
+                    self.hard.add(i)
+                    self.j = j + 1
                 self._mark()
                 continue
             if c.isspace():
@@ -767,20 +781,24 @@ class _Walk:
         it was. A run of characters that render as nothing is either deleted, or
         read as the one space the view holds in its place; a punctuation look-alike
         or a blank-drawn character is mapped to the one ASCII character it reads
-        as. True when the step was taken."""
+        as. The run is read as a space only where a builder puts one (see
+        _spaced_run). True when the step was taken."""
         raw, view = self.raw, self.view
         c = raw[j]
         m = IGNORABLE_CHARS.match(raw, j)
         if m:
-            end = m.end()
-            if view[i] == " " and (end >= len(raw) or raw[end] != " "):
-                # Read as a space: the view holds one where the raw text has none.
+            end = self._spaced_run(i, j)
+            if end is not None:
                 self.changed.append(i)
                 self.i = i + 1
+                self.j = end
+            elif self._between_braille(j):
+                # strip_ignorable reads this run as a space in every widened reading.
+                return False
             else:
                 self.cuts.append(i)
                 self.hard.add(i)
-            self.j = end
+                self.j = m.end()
             self._mark()
             return True
         mapped = PUNCT_LOOKALIKES.get(c) or BLANKS.get(c)
@@ -791,6 +809,39 @@ class _Walk:
             self._mark()
             return True
         return False
+
+    def _run_sides(self, j: int):
+        """The ignorable run that holds raw[j]: its end, and the characters that
+        decode_letter_references puts on either side of it. The walk asks once
+        per character of a run it deletes one at a time, so the run is kept."""
+        run = self.run
+        if run is not None and run[0] <= j < run[1]:
+            return run[1], run[2], run[3]
+        raw = self.raw
+        end = IGNORABLE_CHARS.match(raw, j).end()
+        lo = j
+        while lo > 0 and IGNORABLE_CHARS.match(raw, lo - 1, lo):
+            lo -= 1
+        self.run = (lo, end, decoded_before(raw, lo), decoded_at(raw, end))
+        return self.run[1], self.run[2], self.run[3]
+
+    def _between_braille(self, j: int) -> bool:
+        _, before, after = self._run_sides(j)
+        return _braille(before) and _braille(after)
+
+    def _spaced_run(self, i: int, j: int):
+        """End of the ignorable run at raw[j] if it is read as the space at view[i],
+        else None. A builder reads a run as a space only between two Braille cells
+        (strip_ignorable) or between two letters or digits (the spaced reading);
+        anywhere else it deleted the run, and a space after it came from what
+        follows the run."""
+        if self.view[i] != " " or not IGNORABLE_CHARS.match(self.raw, j, j + 1):
+            return None
+        end, before, after = self._run_sides(j)
+        if (_braille(before) and _braille(after)) or (
+                WORD_CHAR.match(before) is not None and WORD_CHAR.match(after) is not None):
+            return end
+        return None
 
     def _plain_run(self, j: int) -> bool:
         """True if raw[j] is a space that follows another one in a run of blanks that is all

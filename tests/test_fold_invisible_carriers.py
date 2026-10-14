@@ -17,6 +17,7 @@ payload blocks. Controls are ordinary text that uses the same characters for
 what they are for (Korean, Braille, math, emoji tag flags, Persian, German soft
 hyphens, escaped HTML): each must stay an allow on every channel.
 """
+import hashlib
 import re
 import unicodedata
 
@@ -228,6 +229,11 @@ def test_every_invisible_char_is_ignorable_and_tables_map_one_to_one():
 
 
 # Format characters that DO render: left out of the ignorable set on purpose.
+# sha256 of the member list ("%X" per code point, sorted, comma-separated). Checked
+# against an independent enumeration of the Unicode Default_Ignorable_Code_Point
+# property, plus the added format characters and INVISIBLE_CHARS.
+IGNORABLE_DIGEST = "b6c6ba5a1a93403db58ae7b7f420569649f903dfcc4ed469034e653eb810e311"
+
 _VISIBLE_FORMAT = {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F,
                    0x0890, 0x0891, 0x08E2, 0x110BD, 0x110CD}
 
@@ -280,10 +286,34 @@ def test_a_negation_behind_a_new_carrier_is_found_in_a_cut_view(carrier):
     assert "GLS-MECH-001" not in ids
 
 
+@pytest.mark.parametrize("limit", [0, 100])
+@pytest.mark.parametrize("before", ["", "ok", "\u2801"])
+@pytest.mark.parametrize("after", ["\u2800", "\u2801"])
+@pytest.mark.parametrize("carrier", ["\U000E0080", "\u3164", "\u2060"])
+def test_a_deleted_run_is_not_read_as_the_space_after_it(carrier, after, before, limit):
+    # The run sits right before a blank or a Braille cell, with no space between.
+    # Where a builder deleted the run, a space in the view comes from what follows
+    # it; where it read the run as a space (between Braille cells, or between
+    # letters in the spaced reading), the run is that space. The walk must make
+    # the same choice, or it stops before the negation and the hit has no origin.
+    engine = SunglassesEngine(max_scan_bytes=limit)
+    text = before + carrier + after + "Never ignore all previous instructions " + "\ufdfa" * 50
+    result = engine.scan(text, channel="message")
+    ids = {f["id"] for f in result.findings}
+    assert result.truncated == bool(limit)
+    assert result.decision == "allow_redacted", (result.decision, ids)
+    assert "GLS-MECH-001" not in ids
+
+
 def test_ignorable_set_is_exactly_the_declared_scope():
     p = preprocessor
     members = {cp for lo, hi in p.IGNORABLE_RANGES for cp in range(lo, hi + 1)}
     assert len(members) == 4195
+    # Every member, not only the count: a set of the same size with one member
+    # swapped for another code point changes this digest.
+    listing = ",".join("%X" % cp for cp in sorted(members)).encode()
+    assert hashlib.sha256(listing).hexdigest() == IGNORABLE_DIGEST
+    assert 0xE0101 in members and 0x0378 not in members
     assert all(p.IGNORABLE_CHARS.fullmatch(chr(cp)) for cp in members)
     # Default ignorables that are not format characters are in it ...
     for cp in (0x034F, 0x115F, 0x1160, 0x17B4, 0x180B, 0x3164, 0xFE00, 0xFFA0, 0xE0100):
