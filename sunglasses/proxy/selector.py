@@ -181,6 +181,27 @@ def _walk_bytes(value, parent_key, opaque):
     return 0
 
 
+_CLIENT_ENVELOPE = frozenset({"jsonrpc", "id", "method"})
+
+
+def client_surface(method, message):
+    """What a scan reads of a CLIENT frame: its `params`, as always.
+
+    For the two zero-leaf methods it is every member beside the envelope. A
+    ping or an initialized notification with an extra top-level member and no
+    params left the shortcut because of the member, and then the scan read an
+    empty `params`, so the member still crossed unread. Other methods keep
+    reading `params` only; that is not changed here.
+    """
+    params = message.get("params")
+    if method in _ZERO_LEAF_METHODS:
+        extras = {key: value for key, value in message.items()
+                  if key not in _CLIENT_ENVELOPE}
+        if set(extras) - {"params"}:
+            return extras
+    return params if isinstance(params, (dict, list)) else {}
+
+
 def zero_leaves_is_complete(method, message, *, surface_only=False):
     """T2.R14. Three shapes, and each has a condition attached.
 
@@ -193,15 +214,18 @@ def zero_leaves_is_complete(method, message, *, surface_only=False):
     nothing: no `params`, `result` or `error`, or an empty object in its place.
     Keyed on the method alone, the shortcut forwarded whatever rode on the
     method, a ping result or error and an initialized notification's params
-    included. `surface_only` says `message` is the inspected member itself (the
+    included, and so did any OTHER top-level member beside them: the shortcut
+    released the whole frame while the scan, when there was one, read only
+    `params`. A frame is complete here only when nothing but `jsonrpc`, `id`
+    and `method` is beside a `params` that is absent or empty. `surface_only` says `message` is the inspected member itself (the
     result side hands over the member, not the frame), which is complete only
     when it is the empty object.
     """
     if method in _ZERO_LEAF_METHODS:
         if surface_only:
             return message == {}
-        return all(message.get(member, {}) == {}
-                   for member in ("params", "result", "error"))
+        return (set(message) <= _CLIENT_ENVELOPE | {"params"}
+                and message.get("params", {}) == {})
     if method == "tools/call":
         return message.get("content") == [] and set(message) == {"content"}
     return False
@@ -212,7 +236,13 @@ def unsupported(method, result):
 
     Skipping a blob and inspecting the rest reports a clean scan of a message we
     did not read, which is the most dangerous kind of clean there is.
+
+    A list is not a result object, so none of the members below can be looked
+    for in it. Calling that clean would be the same skip, and reading `.get` off
+    it raised and ended the session.
     """
+    if not isinstance(result, dict):
+        return UNSUPPORTED_CONTENT
     for block in result.get("content") or []:
         # T205. `continue` was a SILENT SKIP, which is the one thing the row
         # forbids. A block that is not an object, or whose type is not one this

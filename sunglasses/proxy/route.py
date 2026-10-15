@@ -630,7 +630,12 @@ class Route:
                     return None, None
                 if not isinstance(surface, (dict, list)):
                     return _UNREADABLE, None
-                return surface, selector.channel_for(method, RESULT)
+                # An ERROR is a reply whatever it answers, and the selector
+                # names its channel under `error`, not under the method. Asked
+                # by method, a ping error found no channel at all and was
+                # refused unread, where main forwarded it.
+                return surface, selector.channel_for(
+                    "error" if member == "error" else method, RESULT)
         return None, None
 
     def _withhold_result(self, request_id, reason, rule, *, settlement=None,
@@ -644,7 +649,11 @@ class Route:
         SETTLED row per build is a second terminal for an item that settles
         once. The caller records separately, after the decision is final.
         """
-        if record:
+        # A notification is built once and has no later decision to wait for,
+        # so `record=False` does not apply to it: the pump's own drop event is
+        # in memory only, and without this row nothing durable says why the
+        # frame never reached the client.
+        if record or request_id is NO_ID:
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
         if request_id is NO_ID:
@@ -808,7 +817,7 @@ class Route:
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         over = bounds.check_content(
-            selector.content_bytes(message.get("params") or {}))
+            selector.content_bytes(selector.client_surface(method, message)))
         if over:
             # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
             # existed, so it was the one `_withhold` in this method that did not
@@ -1069,8 +1078,7 @@ class Route:
     def _inspect(self, raw, message, method, *, request_id, attempt=None,
                  approved_under=None):
         channel = selector.channel_for(method, REQUEST)
-        params = message.get("params")
-        params = params if isinstance(params, (dict, list)) else {}
+        params = selector.client_surface(method, message)
         held_bytes = selector.content_bytes(params)
 
         binding = {
