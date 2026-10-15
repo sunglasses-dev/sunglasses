@@ -60,6 +60,10 @@ _REQUEST_CHANNEL = {
     "tools/list": CONTROL,          # T2.R6
     "resources/read": MESSAGE,      # T2.R8
     "prompts/get": MESSAGE,         # T2.R10
+    # A bare ping never reaches the scan (T2.R14). One that carries params, a
+    # `_meta` trace header for instance, is read like an initialized
+    # notification's params and refused only if the scan says so.
+    "ping": MESSAGE,
 }
 _RESULT_CHANNEL = {
     "initialize": API_RESPONSE,     # T2.R2

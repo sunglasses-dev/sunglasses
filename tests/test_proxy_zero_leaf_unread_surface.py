@@ -10,7 +10,9 @@ crossed with no rule reading it:
      to inspect" and forwarded
 
 Complete now means the surface is absent or an empty object. Anything else is
-read, or refused when the method has no channel to read it on.
+read: a nonempty ping answer has no channel to be read on and is withheld, a
+ping request's or initialized notification's params are read on the message
+channel and forwarded only if the scan is clean.
 """
 import io
 import json
@@ -75,11 +77,32 @@ def test_a_ping_answer_that_carries_nothing_is_forwarded_unscanned(tmp_path, bod
 @pytest.mark.parametrize("params", [
     {"note": INJECTION}, {"_meta": {"x": INJECTION}}, [INJECTION], INJECTION,
 ], ids=["object", "meta", "list", "string"])
-def test_a_ping_request_with_content_never_reaches_the_server(tmp_path, params):
+def test_a_ping_request_with_flagged_content_never_reaches_the_server(
+        tmp_path, params):
     engine, upstream, client, _scans = make_route(tmp_path, scan=flagging_scan)
     engine.client_frame(_ping(1, params=params))
     assert not _crossed(upstream), upstream.bytes
     assert client.messages()[0]["error"]["code"] == -32070
+
+
+@pytest.mark.parametrize("params", [
+    {"_meta": {"traceparent": "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}},
+    {"_meta": {"progressToken": 7}},
+    {"note": "hello"},
+], ids=["traceparent", "progress-token", "plain"])
+def test_a_ping_request_with_clean_params_is_read_then_forwarded(
+        tmp_path, params):
+    """A tracing client puts `_meta` on every request, ping included. Refusing
+    it would make that client think the server is dead, so the params are read
+    on the message channel and the original bytes go through if the scan is
+    clean."""
+    engine, upstream, client, scans = make_route(tmp_path, scan=flagging_scan)
+    raw = _ping(1, params=params)
+    engine.client_frame(raw)
+    assert [s["channel"] for s in scans] == ["message"]
+    assert scans[0]["params"] == params
+    assert upstream.bytes == raw
+    assert client.bytes == b""
 
 
 @pytest.mark.parametrize("extra", [{}, {"params": {}}],

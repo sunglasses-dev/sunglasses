@@ -760,9 +760,7 @@ def test_a_refusal_never_renames_a_live_request(tmp_path):
     session = pump.Session()
     forwarded = []
     route = _route_for(session, tmp_path, upstream_write=forwarded.append)
-    # A bare ping, the shape clients send: a ping carrying params is refused
-    # now and would never become the live request this test needs.
-    route.client_frame(b'{"jsonrpc":"2.0","id":99,"method":"ping"}\n')
+    route.client_frame(_request(99, "ping"))
     live = session._core_key(pump.key("client", 99))
     assert live in session._core.owed(), "the ping was never really forwarded"
 
