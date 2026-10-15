@@ -2009,10 +2009,53 @@ def evaluate(payload: dict, home=None) -> "tuple":
     return (policy_down or _CLEAN), confession(), extras
 
 
-def run_hook(stdin_text: str, home=None) -> dict:
-    """stdin JSON → hook output dict. NEVER raises, NEVER exits non-zero.
+_MALFORMED_RULE = "GLS-FW-MALFORMED-EVENT"
 
-    Every failure mode lands on `defer`: fall through to Claude Code's own
+
+def _read_envelope(stdin_text, too_deep):
+    """(payload, problem). `problem` is None for an envelope the hook can read.
+
+    A readable envelope is a JSON object whose `tool_name`, if present, is a
+    string and whose `tool_input`, if present, is an object. A missing field is
+    not a problem: that is the old behaviour and it stays. Anything else was
+    not sent by the host this hook is installed for, so there is no tool call
+    to decide, and the old answer (an empty `defer`, exit 0) read as "checked,
+    nothing found" when nothing had been checked. `payload` is `{}` whenever
+    there is a problem, so unreadable fields never reach the receipt.
+    """
+    import json as _json
+    if too_deep:
+        return {}, None          # already a defined answer: _TOO_DEEP denies it
+    if not isinstance(stdin_text, str) or not stdin_text.strip():
+        return {}, "EMPTY"
+    try:
+        payload = _json.loads(stdin_text)
+    except Exception:  # noqa: BLE001 — bad syntax, the int-digit limit, recursion
+        return {}, "NOT_JSON"
+    if not isinstance(payload, dict):
+        return {}, "NOT_AN_OBJECT"
+    name, tool_input = payload.get("tool_name"), payload.get("tool_input")
+    if (name is not None and not isinstance(name, str)) or (
+            tool_input is not None and not isinstance(tool_input, dict)):
+        return {}, "WRONG_SHAPE"
+    return payload, None
+
+
+def run_hook(stdin_text: str, home=None) -> dict:
+    """stdin JSON → hook output dict. See `run_hook_ex` for the exit contract."""
+    return run_hook_ex(stdin_text, home=home)[0]
+
+
+def run_hook_ex(stdin_text: str, home=None) -> "tuple":
+    """(hook output dict, malformed reason or None). NEVER raises.
+
+    A malformed envelope (see `_read_envelope`) is recorded in the receipts as
+    `GLS-FW-MALFORMED-EVENT` and answered with `{}`; the second item names the
+    reason so `main` can end the process with a hook failure instead of exit 0.
+    The host's install policy then settles it: `onFailure: "block"` refuses the
+    call, anything else is the normal permission flow.
+
+    Every other failure mode lands on `defer`: fall through to Claude Code's own
     permission flow (emitted as `{}` — see Decision.to_hook_output for why it
     must never be a literal "defer" on the wire). `defer` rather than `allow` is
     deliberate — a crashed firewall must not silently grant something the harness
@@ -2049,13 +2092,9 @@ def run_hook(stdin_text: str, home=None) -> dict:
         too_deep = input_too_deep(stdin_text)
     except Exception:  # noqa: BLE001 — not str: the parse below decides
         too_deep = False
-    try:
-        payload = (_json.loads(stdin_text)
-                   if stdin_text.strip() and not too_deep else {})
-        if not isinstance(payload, dict):
-            payload = {}
-    except Exception:  # noqa: BLE001 — a malformed payload is still an arrival
-        payload = {}
+    # A malformed payload is still an arrival: it gets its in_flight record,
+    # with no tool name or digest, and a terminal record naming the reason.
+    payload, malformed = _read_envelope(stdin_text, too_deep)
     eval_id = _new_eval_id()
     error_types = ()
     # T9 RULING 34. THE RECEIPTS PATH IS INSIDE THE GUARD, construction too.
@@ -2082,10 +2121,15 @@ def run_hook(stdin_text: str, home=None) -> dict:
     try:
         if too_deep:
             decision = _TOO_DEEP
+        elif malformed:
+            error = f"malformed event: {malformed}"
+            error_types = (malformed,)
+            extras = {"malformed_event": malformed}
+            decision = Decision(
+                "defer", "error", _MALFORMED_RULE,
+                f"SUNGLASSES firewall: the hook input was not a tool call it "
+                f"can read ({malformed}), so nothing was checked.")
         else:
-            payload = _json.loads(stdin_text) if stdin_text.strip() else {}
-            if not isinstance(payload, dict):
-                raise ValueError("hook payload was not a JSON object")
             decision, error, extras = evaluate(payload, home=home)
             error_types = getattr(error, "types", ())
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
@@ -2133,7 +2177,10 @@ def run_hook(stdin_text: str, home=None) -> dict:
     except Exception as exc:  # noqa: BLE001
         decision, error = _receipts_unwritable(decision, error, receipts, exc)
 
-    return decision.to_hook_output()
+    # Still the malformed answer (not turned into an ask by a down audit trail):
+    # the caller ends the process with a hook failure.
+    return (decision.to_hook_output(),
+            malformed if decision.rule_id == _MALFORMED_RULE else None)
 
 
 def _receipts_unwritable(decision, error, receipts, exc):
@@ -2753,8 +2800,9 @@ def main(argv=None) -> int:
         stdin_text = _sys.stdin.read()
     except Exception:  # noqa: BLE001
         stdin_text = ""
+    malformed = None
     try:
-        out = run_hook(stdin_text)
+        out, malformed = run_hook_ex(stdin_text)
     except Exception as exc:  # noqa: BLE001
         # T9 RULING 35, THE BELT. Anything that escapes `run_hook` would exit
         # 1, and the host proceeds on exit 1: the fail-open. It asks instead,
@@ -2765,6 +2813,15 @@ def main(argv=None) -> int:
             f"SUNGLASSES firewall: the hook failed ({type(exc).__name__}), so "
             "this call was not checked and not recorded. Approve only if you "
             "would have approved it unchecked.").to_hook_output()
+    if malformed:
+        # Not a tool call we can read: end as a hook failure, with no stdout, so
+        # the install's `onFailure` decides (block refuses; otherwise the
+        # normal permission flow). Exit 1, never 2: 2 would refuse even for an
+        # install that chose to continue.
+        _sys.stderr.write(
+            f"SUNGLASSES firewall: hook input was not a readable tool call "
+            f"({malformed}); nothing was checked.\n")
+        return 1
     _sys.stdout.write(_json.dumps(out))
     return 0
 

@@ -126,7 +126,7 @@ def test_the_entry_point_answers_even_when_run_hook_raises(monkeypatch, capsys):
     the exception's TYPE and nothing it says about itself."""
     def raising(stdin_text, home=None):
         raise _Unprintable()
-    monkeypatch.setattr(firewall, "run_hook", raising)
+    monkeypatch.setattr(firewall, "run_hook_ex", raising)
     monkeypatch.setattr(sys, "stdin", io.StringIO(CALL))
     assert firewall.main([]) == 0
     kind, reason = _decision(json.loads(capsys.readouterr().out))
