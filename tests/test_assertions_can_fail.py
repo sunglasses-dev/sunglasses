@@ -51,6 +51,10 @@ SANCTIONED_SUBSETS = [
     # coverage, which is the only thing it exists to separate. The result
     # direction is asserted on its own, a few lines above.
     {"file", "log_memory", "message", "web_content", "code"},   # the SD parents' own
+    # The control-character tests judge a negated quote on the three channels where
+    # a negated quotation is redacted. The question is whether a control character
+    # changes that decision; the other channels never redact it.
+    {"web_content", "agent_input", "tool_output"},
 ]
 
 
