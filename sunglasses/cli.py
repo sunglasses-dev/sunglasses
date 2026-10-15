@@ -1859,7 +1859,7 @@ def _offer_starter_policy(args):
 
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
-    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+    from .firewall import (_HOOK_TIMEOUT, build_hook_entry, install_hook, self_test_hook,
                            settings_path_for, uninstall_hook)
 
     path = settings_path_for(args.scope_global)
@@ -1871,13 +1871,17 @@ def cmd_init(args):
               f"sits next to the file.{RESET}\n")
         return 0
 
-    entry = build_hook_entry()
+    fail_open = bool(getattr(args, "fail_open", False))
+    entry = build_hook_entry(fail_open=fail_open)
     command = entry["hooks"][0]["command"]
 
     # Self-test BEFORE writing. A hook that fails, fails open — so a broken
     # wire would leave the firewall silently off. Better to refuse to install.
     print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
-    ok, detail = self_test_hook(command)
+    # A blocking hook turns "cannot answer" into "every tool call refused", so it
+    # is judged by the time limit the host will apply. The fail-open entry keeps
+    # the longer one.
+    ok, detail = self_test_hook(command) if fail_open else self_test_hook(command, timeout=_HOOK_TIMEOUT)
     if not ok:
         print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
         print(f"  {DIM}Command tried: {command}{RESET}")
@@ -1889,13 +1893,22 @@ def cmd_init(args):
     print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
 
     try:
-        install_hook(path)
+        install_hook(path, fail_open=fail_open)
     except Exception as exc:
         print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
         return 1
 
     print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
     print(f"  {DIM}{command}{RESET}")
+    if fail_open:
+        print(f"  {DIM}Failure policy: Claude Code's default. A hook that fails opens "
+              f"(the tool call goes ahead).{RESET}")
+    else:
+        print(f"  {DIM}Failure policy: \"onFailure\": \"block\". A hook that times out or cannot "
+              f"start refuses the tool call. Claude Code reads this key from v2.1.295; "
+              f"`sunglasses init --fail-open` leaves it out.{RESET}")
+        print(f"  {DIM}If the hook ever cannot start, every tool call is refused until you remove "
+              f"its entry from {path} or run `sunglasses init --uninstall` in a terminal.{RESET}")
 
     _offer_starter_policy(args)
     print(f"\n  {DIM}{_policy_state_line()}{RESET}")
@@ -2561,6 +2574,9 @@ def main():
     init_parser.add_argument(
         "--no-policy", action="store_true",
         help="Do not write ~/.sunglasses/policy.yaml at all")
+    init_parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Leave onFailure out of the hook entry, so a hook that fails lets the tool call go ahead")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts
