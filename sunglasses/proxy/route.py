@@ -78,6 +78,10 @@ REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
 REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
+
+# `_surface` answer for a member that is present and is not an object or list.
+# Distinct from None, which means "the frame carries no such member".
+_UNREADABLE = object()
 REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
 REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
@@ -508,14 +512,22 @@ class Route:
                                          RULE_RESOURCE, record=False)
 
         surface, channel = self._surface(message, method)
+        if surface is _UNREADABLE:
+            # A result, error or params that is a string, number or boolean is
+            # not an object a scan reads, and "nothing to inspect" forwarded it.
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE, record=False)
         if surface is None:
             return None
 
         # T2.R14 BEFORE everything else, exactly as in the client direction.
-        # A ping result has zero inspectable leaves and no channel of its own,
-        # so scanning it means handing a worker nothing to read on a channel
-        # that does not exist, and every rule is scoped to a channel.
-        if selector.zero_leaves_is_complete(method, surface):
+        # A ping result with nothing in it has zero inspectable leaves and no
+        # channel of its own, so scanning it means handing a worker nothing to
+        # read on a channel that does not exist, and every rule is scoped to a
+        # channel. One that carries content is not that shape and falls to the
+        # channel test below.
+        if selector.zero_leaves_is_complete(method, surface, surface_only=True):
             return None
 
         if channel is None:
@@ -614,8 +626,10 @@ class Route:
         for member in ("result", "error", "params"):
             if member in message:
                 surface = message[member]
-                if not isinstance(surface, (dict, list)):
+                if surface is None:
                     return None, None
+                if not isinstance(surface, (dict, list)):
+                    return _UNREADABLE, None
                 return surface, selector.channel_for(method, RESULT)
         return None, None
 

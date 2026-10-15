@@ -177,16 +177,27 @@ def _walk_bytes(value, parent_key, opaque):
     return 0
 
 
-def zero_leaves_is_complete(method, message):
-    """T2.R14. Three shapes, and the third has a condition attached.
+def zero_leaves_is_complete(method, message, *, surface_only=False):
+    """T2.R14. Three shapes, and each has a condition attached.
 
     A `tools/call` result whose `content` is `[]` WITH NO OTHER MEMBERS. An
     empty content list arriving beside a `structuredContent` object has leaves,
     and calling that complete would pass the other members uninspected, which is
     the reading the row's own wording rules out.
+
+    `ping` and `notifications/initialized` have zero leaves when they CARRY
+    nothing: no `params`, `result` or `error`, or an empty object in its place.
+    Keyed on the method alone, the shortcut forwarded whatever rode on the
+    method, a ping result or error and an initialized notification's params
+    included. `surface_only` says `message` is the inspected member itself (the
+    result side hands over the member, not the frame), which is complete only
+    when it is the empty object.
     """
     if method in _ZERO_LEAF_METHODS:
-        return True
+        if surface_only:
+            return message == {}
+        return all(message.get(member, {}) == {}
+                   for member in ("params", "result", "error"))
     if method == "tools/call":
         return message.get("content") == [] and set(message) == {"content"}
     return False
