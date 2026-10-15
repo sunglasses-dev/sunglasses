@@ -313,6 +313,11 @@ def _fold_text(text: str) -> str:
     return replace_homoglyphs(normalize_unicode(strip_invisible(text)))
 
 
+def _shadow_fold_text(text: str) -> str:
+    """The folded view of the shadow view, built the way scan() builds it."""
+    return _fold_text(decode_shadow_ascii(text) or text)
+
+
 def _compact_text(text: str) -> str:
     """The view that only deletes and maps, built the way scan() builds it."""
     return replace_homoglyphs(strip_invisible(text))
@@ -2838,6 +2843,25 @@ class SunglassesEngine:
         shadow_present = None
         if shadow is not None:
             shadow_present = self._literal_index.present(_prefilter.fold(shadow))
+        # The shadow view, folded. The folded subject below deletes the carrier
+        # itself, so it never holds the text the carrier spells; the shadow
+        # subject holds that text but with every control in it. A control inside
+        # a decoded phrase therefore split it for the regex lane on both. Built
+        # only when the shadow view holds a control, so text without one gains no
+        # subject, and cut at max_scan_bytes like the folded subject.
+        shadow_folded = None
+        shadow_folded_cut = False
+        shadow_folded_present = None
+        if shadow is not None and CONTROL_CHARS.search(shadow):
+            shadow_folded = _shadow_fold_text(text)
+            if self.max_scan_bytes and len(shadow_folded) > self.max_scan_bytes:
+                shadow_folded = shadow_folded[: self.max_scan_bytes]
+                shadow_folded_cut = True
+                truncated = True
+            if shadow_folded == shadow:
+                shadow_folded = None
+            else:
+                shadow_folded_present = self._literal_index.present(_prefilter.fold(shadow_folded))
         # The raw text with three of the preprocessor's character folds applied:
         # invisible characters deleted, NFKC (which composes some sequences and
         # expands some code points), homoglyphs mapped to their ASCII look-alike. The
@@ -2893,7 +2917,7 @@ class SunglassesEngine:
         # unreachable by design rather than by oversight. Those rules ask for the
         # normalized view directly here instead.
         normalized_present = None
-        folded_frame = compact_frame = None
+        folded_frame = compact_frame = shadow_folded_frame = None
         copies = _RawCopies(text, self._check_negation)
         norm_frame = self._raw_frame(align, copies, normalized, _normal_text, shape=True)
         for pattern, regexes in self._regex_patterns:
@@ -2909,6 +2933,14 @@ class SunglassesEngine:
             subjects = [(text, prefilter_present, None)]
             if shadow is not None:
                 subjects.append((shadow, shadow_present, None))
+            if shadow_folded is not None:
+                # The shadow view with its controls deleted. The decoded text is
+                # not in the raw text, so the walk against it ends at the first
+                # carrier and the raw text only speaks for a copy it holds.
+                if shadow_folded_frame is None:
+                    shadow_folded_frame = self._raw_frame(
+                        align, copies, shadow_folded, _shadow_fold_text, cut=shadow_folded_cut)
+                subjects.append((shadow_folded, shadow_folded_present, shadow_folded_frame))
             if folded is not None:
                 # Raw decided first; this is the second look. The match offsets are
                 # offsets into the folded view. The fold can lengthen the text
