@@ -19,7 +19,7 @@
     "wallet"
   ],
   "regex": [
-    "(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|POST|upload|C2|send)"
+    "(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|\\bPOST(?:s|ed)?\\b|upload|C2|send)"
   ],
   "examples": {
     "malicious": [],

@@ -3146,7 +3146,7 @@ PATTERNS = [
             "wallet",
         ],
         "regex": [
-            r"(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|POST|upload|C2|send)",
+            r"(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|\bPOST(?:s|ed)?\b|upload|C2|send)",
         ],
         "description": "Detects AMOS-style infostealer behavior: harvesting sensitive data then compressing and exfiltrating."
     },

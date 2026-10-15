@@ -1362,6 +1362,10 @@ class SunglassesEngine:
         "beware of", "not run", "not execute", "not use",
         "should not", "shouldn't", "shouldn't",
         "must not", "must never",
+        # Plain negations: they cover the clause they govern on the same terms as "do not".
+        "no", "not", "does not", "did not", "cannot", "will not", "is not", "are not", "without",
+        "doesn't", "didn't", "can't", "won't", "isn't", "aren't",
+        "doesn\u2019t", "didn\u2019t", "can\u2019t", "won\u2019t", "isn\u2019t", "aren\u2019t",
     ]
     FRAMING_LABELS = [
         "warning:", "warning -", "example of", "example:",
@@ -1395,9 +1399,35 @@ class SunglassesEngine:
     # two words of the gap, and a longer run (more than _Walk.BLANK_RUN) is kept as it is; both
     # fail the allowlist.
     _GAP_SPACES_RX = re.compile("(?<=[a-z0-9]) {2,%d}(?=[a-z0-9])" % _Walk.BLANK_RUN)
-    _NEGATION_FLIP_WORDS = frozenset(("hesitate", "fail", "forget", "refuse", "neglect", "omit", "skip", "miss"))
+    _NEGATION_FLIP_WORDS = frozenset((
+        "hesitate", "fail", "forget", "refuse", "neglect", "omit", "skip", "miss",
+        # "no problem, run X", "without question X": the phrase after the cue is an
+        # idiom that grants the next thing, not a restriction on it.
+        "problem", "problems", "worry", "worries", "matter", "doubt", "question",
+        "hesitation", "delay"))
+    # Longest phrase first so "does not" is read before "no". A cue that follows a hyphen is
+    # the end of a longer word ("pre-no"), not a cue.
     _NEGATION_RX = re.compile(
-        r"(?<![\w'’])(?:" + "|".join(re.escape(p) for p in TRUE_NEGATIONS) + r")(?![\w'’])")
+        r"(?<![\w'’-])(?:" + "|".join(
+            re.escape(p) for p in sorted(TRUE_NEGATIONS, key=len, reverse=True)) + r")(?![\w'’])")
+    # A negation also covers a short list of plain words ("do not log, store, or transmit
+    # X"; "do not change provider, model, or render path"). The list is read by
+    # _negation_reach. These words end it: a clause word, a word that turns the next item
+    # into an order, or a word that joins another sentence onto this one.
+    _NEGATION_LIST_STOPS = frozenset((
+        "then", "now", "but", "so", "instead", "else", "otherwise", "unless", "if", "because",
+        "however", "yet", "still", "rather", "you", "your", "yours", "yourself", "we", "i",
+        "just", "simply", "please", "also", "go", "ahead", "feel", "free", "can", "could",
+        "should", "would", "will", "may", "might", "must", "shall", "let", "to")) | _NEGATION_FLIP_WORDS
+    NEGATION_LIST_COMMAS = 3
+    NEGATION_LIST_WORDS = 6
+    NEGATION_LIST_ITEM_WORDS = 3
+    _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
+    _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+    _LIST_WORD_RX = re.compile(_LIST_WORD)
+    _LIST_OPEN_TAIL_RX = re.compile(
+        r"(" + _LIST_WORD + r"(?: " + _LIST_WORD + r"){0,%d})(?:, (?:and|or)|,? (?:and|or)) (" % (NEGATION_LIST_ITEM_WORDS - 1)
+        + _LIST_WORD + r")")
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
     # A framing label asks for a quoted payload, so the gap after a label is one
@@ -2142,7 +2172,8 @@ class SunglassesEngine:
         at = text[match_start:match_start + 1]
         return at if at in self._LEADIN_BREAKS else ""
 
-    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
+    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
+                        refusal_ok: bool = False) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -2160,11 +2191,16 @@ class SunglassesEngine:
         them from, so a negation built by decoding, erasing or folding characters
         never downgrades. The text is lowercased for ASCII letters only.
         """
+        if refusal_ok and self._refusal_string(text, match_start, match_end, align):
+            return True
         window_start = max(0, match_start - self.NEGATION_WINDOW)
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
+        view_end = None
         if align is not None:
-            hit_end = min(match_start + _RawAlign.HIT, align.end_of_view(text, match_start))
+            view_end = align.end_of_view(text, match_start)
+            hit_end = min(match_start + _RawAlign.HIT, view_end)
+        tail = None
         for m in self._NEGATION_RX.finditer(before_text):
             # A window that starts inside a word would read a word fragment as a cue.
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
@@ -2173,11 +2209,22 @@ class SunglassesEngine:
             # A rule whose lead-in consumed the sentence break starts its match ON the
             # break, so the gap above stops short of it. The break is part of what
             # lies between the cue and the payload and ends the clause.
-            if not (self._negation_governs(gap + self._leadin_break(text, match_start))
-                    or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
-                continue
+            gap_end = hit_end
+            leadin = self._leadin_break(text, match_start)
+            if not self._negation_governs(gap + leadin):
+                if tail is None:
+                    tail = _ascii_lower(text[match_start:match_start + self.NEGATION_LIST_TAIL])
+                reach = self._negation_reach(gap + leadin, tail)
+                if reach is not None:
+                    # A list read through the words after the match start: the raw input
+                    # must say the same there too.
+                    gap_end = max(hit_end, match_start + reach)
+                    if view_end is not None:
+                        gap_end = min(gap_end, view_end)
+                elif not self._quoted_gap_holds(gap, text, match_start, match_end, align):
+                    continue
             if align is None or align.holds(
-                    text, max(0, window_start + m.start() - 1), hit_end,
+                    text, max(0, window_start + m.start() - 1), gap_end,
                     self._spaced_inside(text, window_start + m.end(), match_start)):
                 return True
         for phrase in self.FRAMING_LABELS:
@@ -2422,24 +2469,25 @@ class SunglassesEngine:
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None):
+    def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None,
+                         refusal_ok: bool = False):
         """Offset of the first word-bounded occurrence of `keyword` at or after
         `begin` that is not negated, or None. `align` is the walk of the views
         against the raw input (see _check_negation)."""
         at = normalized.find(keyword, begin)
         while at != -1:
             if self._word_bounded(normalized, at, keyword) and \
-                    not self._negated_here(normalized, at, align, at + len(keyword)):
+                    not self._negated_here(normalized, at, align, at + len(keyword), refusal_ok):
                 return at
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _negated_here(self, view: str, pos: int, align, end: int) -> bool:
+    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
         one that does not keep the offsets never is."""
         if align is not None and align.moved(view, pos):
             return False
-        return self._check_negation(view, pos, self._align_at(view, pos, align), end)
+        return self._check_negation(view, pos, self._align_at(view, pos, align), end, refusal_ok)
 
     def _framed_here(self, view: str, pos: int, align, end: int) -> bool:
         """Whether the hit at view[pos:end] sits in a clause that describes the attack.
@@ -2649,6 +2697,122 @@ class SunglassesEngine:
             return False
         return not any(w in self._NEGATION_CLAUSE_WORDS for w in words)
 
+    NEGATION_LIST_TAIL = 80  # characters from the match start read when a list is open
+
+    # A source file that REFUSES with a sentence is not a source file that is told something:
+    #     raise RuntimeError("model checksum mismatch: refusing to load")
+    # GLS-RP-250 is a keyword-only rule that reads the words "checksum mismatch" next to a
+    # retrieved document, so a program's own error message trips it. For the rules named
+    # here, a hit that sits wholly inside ONE single-line string literal that is the first
+    # argument of a raise, throw, error, warning, log or panic call, or the message of an
+    # assert, in a file or code channel, is a review. Every other rule keeps reading such a
+    # string: a prompt injection inside a raise string is still a prompt injection.
+    _REFUSAL_STRING_RULES = frozenset(("GLS-RP-250",))
+    _SOURCE_CHANNELS = frozenset(("file", "code"))
+    _REFUSAL_CALL_RX = re.compile(
+        r"(?:^|[^\w.])(?P<call>"
+        r"raise\s+[\w.]+\(\s*"
+        r"|throw\s+(?:new\s+)?[\w.]+\(\s*"
+        r"|(?:[\w]+\.)+(?:error|errorf|warn|warning|warnf|critical|fatal|exception)\(\s*"
+        r"|(?:errors|fmt)\.(?:new|errorf)\(\s*"
+        r"|panic\(\s*"
+        r"|assert\b[^\"'`\n;]*,\s*"
+        r")$")
+    REFUSAL_STRING_SPAN = 240  # characters either side of the hit that the string may take
+
+    def _refusal_string(self, text: str, match_start: int, match_end: Optional[int], align=None) -> bool:
+        """Whether text[match_start:match_end] sits wholly inside one single-line, single- or
+        double-quoted string literal that is the first argument of a refusing call (see
+        _REFUSAL_STRING_RULES). The call, the quotes and the string must be the same
+        characters at the same place in the raw input (a view that holds a copy of it, written
+        backwards or in ROT13, is never vouched for), and the string must close on the same
+        line before the end of its view."""
+        if match_end is None or getattr(_SCAN_LOCAL, "channel", None) not in self._SOURCE_CHANNELS:
+            return False
+        stop = self._view_end(text, match_start, align)
+        if match_end > stop:
+            return False
+        lo = max(0, match_start - self.REFUSAL_STRING_SPAN)
+        hi = min(stop, match_end + self.REFUSAL_STRING_SPAN)
+        before, after = text[lo:match_start], text[match_end:hi]
+        quote = None
+        for i in range(len(before) - 1, -1, -1):
+            ch = before[i]
+            if ch == "\n":
+                return False
+            if ch in "\"'" and (i == 0 or before[i - 1] != "\\"):
+                quote, open_at = ch, i
+                break
+        if quote is None:
+            return False
+        close_at = None
+        for i, ch in enumerate(after):
+            if ch == "\n":
+                return False
+            if ch == quote and (i == 0 or after[i - 1] != "\\"):
+                close_at = i
+                break
+        if close_at is None:
+            return False
+        prefix = _ascii_lower(before[:open_at])
+        call = self._REFUSAL_CALL_RX.search(prefix)
+        if call is None:
+            return False
+        if align is None:
+            return True
+        return align.holds(text, lo + call.start("call"), match_end + close_at + 1)
+
+    def _negation_reach(self, gap: str, tail: str):
+        """A negation covers a short LIST of plain words: "do not log, store, or transmit X",
+        "do not change provider, model, or render path". Returns None when the gap is not
+        such a list, else the number of characters from the match start that the reading
+        relied on (0 when the list closed before the match).
+
+        The gap is plain ASCII words (letters, digits, hyphens) in items of at most
+        NEGATION_LIST_ITEM_WORDS words, joined by a comma and one space, at most
+        NEGATION_LIST_COMMAS commas and NEGATION_LIST_WORDS words in all. It has to end the
+        list one of two ways:
+          closed: the gap ends with "and " or "or " after a comma ("log, store, or "), so the
+                  match is the last item;
+          open:   the gap ends with a comma ("change provider, ") and the match itself is an
+                  item of plain words that the list goes on from (", or ", " and "). A list
+                  with no "and"/"or" in it is not a list ("Do not worry, stay calm, X").
+        A clause word, a word of omission, a word that turns the next item into an order
+        (you, just, please, go...) or any other character ends the list."""
+        gap = self._GAP_SPACES_RX.sub(" ", gap)
+        if not self._LIST_GAP_CHARS_RX.fullmatch(gap) or gap.count(",") > self.NEGATION_LIST_COMMAS:
+            return None
+        reach = 0
+        if gap.endswith(", "):
+            m = self._LIST_OPEN_TAIL_RX.match(tail)
+            if m is None:
+                return None
+            reach = m.end()
+            words = m.group(1).split(" ") + [m.group(2)]
+            body = gap[1:-2]
+        else:
+            body = None
+            for conj in (", and ", ", or ", " and ", " or "):
+                if gap.endswith(conj):
+                    body = gap[1:-len(conj)]
+                    if not (conj.startswith(",") or "," in body):
+                        return None
+                    break
+            if body is None:
+                return None
+            words = []
+        for item in body.split(", "):
+            item_words = item.split(" ")
+            if len(item_words) > self.NEGATION_LIST_ITEM_WORDS or not all(
+                    self._LIST_WORD_RX.fullmatch(w) for w in item_words):
+                return None
+            words.extend(item_words)
+        if len(words) > self.NEGATION_LIST_WORDS:
+            return None
+        if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
+            return None
+        return reach
+
     @property
     def pattern_count(self) -> int:
         return self._pattern_count
@@ -2717,11 +2881,14 @@ class SunglassesEngine:
                 nothing and returning a clean allow.
         """
         previous = getattr(_SCAN_LOCAL, "ends", None)
+        previous_channel = getattr(_SCAN_LOCAL, "channel", None)
         _SCAN_LOCAL.ends = _ViewEnds()
+        _SCAN_LOCAL.channel = channel
         try:
             return self._scan(text, channel)
         finally:
             _SCAN_LOCAL.ends = previous
+            _SCAN_LOCAL.channel = previous_channel
 
     def _scan(self, text: str, channel: str) -> ScanResult:
         """The scan itself (see scan)."""
@@ -2769,7 +2936,8 @@ class SunglassesEngine:
                     held = negated_kw.get(pattern["id"])
                     if held is not None:
                         here = end_idx - len(keyword) + 1
-                        if not self._negated_here(normalized, here, align, end_idx + 1):
+                        if not self._negated_here(normalized, here, align, end_idx + 1,
+                                                  pattern["id"] in self._REFUSAL_STRING_RULES):
                             self._restore_live(held, self._excerpt(normalized, here, end_idx + 1))
                             del negated_kw[pattern["id"]]
                         continue
@@ -2789,7 +2957,8 @@ class SunglassesEngine:
                     # Negation context check (skipped for negation_immune patterns —
                     # e.g. emotional-coercion jailbreaks where "don't" is part of the
                     # attack template itself, not a warning context)
-                    if not pattern.get("negation_immune") and self._check_negation(normalized, kw_start, align, end_idx + 1):
+                    if not pattern.get("negation_immune") and self._check_negation(
+                            normalized, kw_start, align, end_idx + 1, pattern["id"] in self._REFUSAL_STRING_RULES):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
@@ -2805,7 +2974,8 @@ class SunglassesEngine:
                             continue
                         held = negated_kw.get(pattern["id"])
                         if held is not None:
-                            live = self._live_occurrence(normalized, keyword, 0, align)
+                            live = self._live_occurrence(normalized, keyword, 0, align,
+                                                         pattern["id"] in self._REFUSAL_STRING_RULES)
                             if live is not None:
                                 self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
                                 del negated_kw[pattern["id"]]
@@ -2821,11 +2991,13 @@ class SunglassesEngine:
                             **pattern,
                             "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
                         }
-                        if not pattern.get("negation_immune") and self._check_negation(normalized, idx, align, idx + len(keyword)):
+                        refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
+                        if not pattern.get("negation_immune") and self._check_negation(
+                                normalized, idx, align, idx + len(keyword), refusal_ok):
                             finding["severity"] = "review"
                             finding["negation_context"] = True
                             finding["original_severity"] = pattern["severity"]
-                            live = self._live_occurrence(normalized, keyword, idx + 1, align)
+                            live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
                             if live is not None:
                                 self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
                             else:
