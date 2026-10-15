@@ -189,6 +189,58 @@ def test_the_decline_does_not_close_the_session(tmp_path):
     assert session.closed_with() is None
 
 
+def _declined(tmp_path, client):
+    return ("PROBE_DECLINED" in [row["kind"] for row in _rows(tmp_path)]
+            or any(m.get("error", {}).get("code") == -32601
+                   for m in client.messages()))
+
+
+def test_a_probe_on_a_cancelled_id_is_not_declined_as_a_probe(tmp_path):
+    """A cancelled id is refused for the rest of the session, with no reason
+    attached to the refusal. The decline was reached on "no reason", so a probe
+    reusing a cancelled id was answered "method not found" and receipted as a
+    probe decline. It is a refused request, not an old peer asking."""
+    engine, upstream, client, session = _engine(tmp_path)
+    assert session.admit_request(5, method="tools/call", origin=pump.ORIGIN_CLIENT)
+    session.cancel(5, origin=pump.ORIGIN_CLIENT)
+    engine.client_frame(
+        b'{"jsonrpc":"2.0","id":5,"method":"server/discover"}\n')
+    assert not _declined(tmp_path, client), (_rows(tmp_path), client.messages())
+    assert upstream.bytes == b""
+
+
+def test_a_probe_whose_admission_fails_without_a_reason_is_not_declined(
+        tmp_path, monkeypatch):
+    """The decline is for an attempt the pump refused as an unknown method, and
+    only that. An admission that returns False and says nothing is not one."""
+    engine, upstream, client, session = _engine(tmp_path)
+    monkeypatch.setattr(session, "admit_request",
+                        lambda *args, **kwargs: False)
+    engine.client_frame(PROBE)
+    assert not _declined(tmp_path, client), (_rows(tmp_path), client.messages())
+    assert upstream.bytes == b""
+
+
+def test_a_probe_refused_for_another_reason_is_not_declined(
+        tmp_path, monkeypatch):
+    """Only the unknown-method refusal is declined. A probe refused for any
+    other stated reason keeps that reason."""
+    engine, upstream, client, session = _engine(tmp_path)
+
+    def refuse_overloaded(request_id, *, method, origin, on_refusal=None,
+                          on_attempt=None):
+        on_refusal(pump.Attempt(pump.key(origin, request_id), 1,
+                                pump.Cause("OVERLOADED", "S3")))
+        return False
+
+    monkeypatch.setattr(session, "admit_request", refuse_overloaded)
+    engine.client_frame(PROBE)
+    assert not _declined(tmp_path, client), (_rows(tmp_path), client.messages())
+    answer = client.messages()[0]
+    assert answer["error"]["data"]["reason_code"] == "OVERLOADED"
+    assert upstream.bytes == b""
+
+
 @pytest.mark.parametrize("method", [
     "x/experimental", "server/discover/extra", "Server/Discover", "discover",
     "sampling/createMessage", "completion/complete",
@@ -278,5 +330,6 @@ def test_a_run_that_declined_a_probe_still_verifies(tmp_path):
     signer = keys.load(home)
     public = keys.public_path(home, signer.fingerprint).read_bytes()
     results = verify.verify_log(log.path, public).results
+    assert results["chain_integrity"] == "CHAIN_OK", results
     assert results["lifecycle"] == "PAIRING_UNKEYED", results
     assert all(not str(v).startswith("MALFORMED") for v in results.values()), results

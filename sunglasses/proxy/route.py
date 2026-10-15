@@ -736,8 +736,8 @@ class Route:
             if closed:
                 self._answer_close(closed, request_id)
             elif (method == handshake.DISCOVER_PROBE_METHOD
-                  and (not refusal or refusal[0].cause is None
-                       or refusal[0].cause.reason == REASON_UNINSPECTED_METHOD)):
+                  and refusal and refusal[0].cause is not None
+                  and refusal[0].cause.reason == REASON_UNINSPECTED_METHOD):
                 self._decline_probe(request_id)
             else:
                 self._withhold_refusal(request_id, refusal[0] if refusal
