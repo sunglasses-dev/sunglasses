@@ -108,6 +108,7 @@ CAUSE_KINDS = frozenset({
     "UPSTREAM_EXIT_WITH_PENDING",
     "FRAME_UNTERMINATED",
     "INITIALIZE_RESULT_SHAPE",
+    "INITIALIZE_RESULT_WITHHELD",
     "TOMBSTONE_TABLE_FULL",
     "HANDOFF_GENERATION_MISMATCH",
     # framing's MALFORMED returns, which reach a close through the two sites

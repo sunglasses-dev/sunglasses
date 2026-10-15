@@ -497,6 +497,16 @@ class Route:
         if retired is not None and is_response:
             return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
+        # A CLEAN VERDICT COVERS WHAT WAS READ. The scan reads one member of the
+        # frame and a clean verdict forwards the original bytes, so a second
+        # member crossed to the client without a rule seeing it. Withheld whole,
+        # the way binary content is: reporting the read part clean describes a
+        # frame that was not read.
+        if self._unread_members(message, is_response):
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE, record=False)
+
         surface, channel = self._surface(message, method)
         if surface is None:
             return None
@@ -580,6 +590,24 @@ class Route:
         return self._withhold_result(request_id, settlement.reason,
                                      settlement.rule, settlement=settlement,
                                      result=result, record=False)
+
+    @staticmethod
+    def _unread_members(message, is_response):
+        """The top-level members of this frame that no scan will read.
+
+        `_surface` reads the first of `result`, `error` and `params`. The frame
+        envelope (`jsonrpc`, `id`) is correlated by the session, and `method`
+        is read by the selector on a notification and is not a member of a
+        response at all. Anything else in the frame is not read.
+        """
+        read = {"jsonrpc", "id"}
+        if not is_response:
+            read.add("method")
+        for member in ("result", "error", "params"):
+            if member in message:
+                read.add(member)
+                break
+        return sorted(set(message) - read)
 
     def _surface(self, message, method):
         """The inspected surface and its channel, per T2's result rows."""
