@@ -61,6 +61,13 @@ in both directions. The database file was backed up before the change.
 The `readme-truth` key is deliberately untouched: the site already said 1554, so
 nothing that `publish.sh` reads had to move.
 
+## 2026-09-27 — there is no 0.6.1
+
+The release after `0.6.0` was cut as `0.6.2`, the version the CHANGELOG
+heading on main already carried. Nothing was ever uploaded as `0.6.1`, so
+PyPI, the git tags and the CHANGELOG all go `0.6.0` → `0.6.2`. No code or
+pattern is missing; the number was skipped.
+
 ## Allowlist (machine-readable — integrity check parses these)
 
 PyPI versions accepted as not-published:
@@ -73,6 +80,7 @@ PyPI versions accepted as not-published:
 - pypi-gap: 0.2.9
 - pypi-gap: 0.2.27
 - pypi-gap: 0.2.30
+- pypi-gap: 0.6.1
 
 Pre-launch tags accepted as not-recovered:
 - tag-gap: 0.1.0
