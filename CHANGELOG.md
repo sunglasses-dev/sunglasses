@@ -3,6 +3,82 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.9] — 2026-10-15
+
+### Added
+
+- The command line now has a `sunglasses mcp` command and a `sunglasses-mcp` console script that
+  start the MCP server, so a client that needs a console command to launch a listed Python package
+  can start it. Both routes run the same server as `python -m sunglasses.mcp`, whose entry is
+  unchanged, and both answer help and version without starting anything. No scanner code changes.
+  (#365)
+
+### Changed
+
+- GLS-PE-111 now covers more wordings of an instruction to take the proxy out of the client config.
+  This is a bounded expansion of the existing rule, so the rule count does not move. Some quoted or
+  fenced examples can be flagged too, and some wordings are still not covered and are tracked as
+  known limits. (#369)
+
+- A negation or a defensive framing clause now lowers a rule only when it covers every occurrence of
+  that rule in the views that are read. A negated or framed hit is held back until every view has
+  been read, and the old limit on how many later occurrences were walked is replaced by a reading
+  budget that is reserved before each search. A search that does not fit the budget is judged live,
+  which is the stricter direction. Some texts that were redacted are now blocked. The budget bounds
+  reads and not time, a few steps are not charged and the limits are tracked. (#372)
+
+- A sentence break after a negation now ends the negation's reach for the rules whose match opens on
+  that break. Six regexes of two rules began on the break, so the negation was taken to cover a
+  clause it never reached, and a live instruction after a negated sentence was lowered to review.
+  Those rules, and any other rule whose match opens on a break, now decide such text as they decide
+  the same words without the negation, so some texts that were redacted are now blocked. Negation
+  coverage inside one clause is unchanged and further limits are tracked. (#375)
+
+### Fixed
+
+- The proxy no longer refuses every server that negotiates protocol version 2025-11-25, which is a
+  version current clients offer, so a wrapped server connects again. The discover probe that newer
+  clients send first is now declined with Method not found and not forwarded, so the client falls
+  back to a normal initialize. Every other unknown method is still refused and the version check
+  stays exact. The decline is recorded in the receipts as a new event kind, and a verifier that
+  predates it reads that row as an unknown event. (#385)
+
+- The initialize result previously bypassed inspection. It now passes through the scan after the
+  existing negotiation and filtering, and a clean result continues as before. A result the scan
+  withholds ends the session, because the handshake is what the rest of the session rests on, and
+  the refusal carries the scan's own reason. A frame with any member beside the envelope and the
+  result is withheld whole. (#376)
+
+- The proxy no longer forwards a ping or an initialized message unread on the strength of the method
+  name alone. On a client ping or initialized message the params and any extra top level member are
+  now scanned, and a clean message is forwarded unchanged. A ping error is scanned as a reply. A
+  ping result that holds anything is withheld, which includes a result whose only member is the
+  metadata field, so a server that answers a ping that way now has that answer withheld. A scalar
+  ping result is withheld too, and an initialized message whose params are a list is withheld while
+  the session continues. A notification the proxy withholds now leaves a receipt row with its
+  reason. (#386)
+
+- `sunglasses scan --channel` now offers every channel the engine documents. It kept a list of five,
+  so a tool result, an agent input, code or a prompt could not be scanned from the shell although
+  the library and the MCP server accepted them. The command line now reads the engine's own list, so
+  the two cannot drift apart. What each channel scans is unchanged. (#374)
+
+- Five rules no longer take time that grows with the square of a long run of blank space around an
+  optional token. The blanks now belong to one quantifier, in GLS-SC-018, GLS-CF-251, GLS-TMS-243,
+  GLS-PI-025 and GLS-AW-713. The new regexes were compared with the old ones on hand written cases
+  and on seeded random text and matched the same text. No id, count or channel changes. (#378)
+
+### Continuous integration
+
+- The cost table that splits each long integrity leg into two parts is rebalanced from measured run
+  times, which are estimates and not a promise about any one run. The split logic and the gates
+  are unchanged. (#371)
+
+### Documentation
+
+- The stats file now carries the day 0.6.8 was published. The counts, the code, the rules and the
+  tests do not change. (#373)
+
 ## [0.6.8] — 2026-10-12
 
 ### Added
