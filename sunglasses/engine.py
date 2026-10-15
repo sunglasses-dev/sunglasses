@@ -2212,8 +2212,14 @@ class SunglassesEngine:
             # A rule whose lead-in consumed the sentence break starts its match ON the
             # break, so the gap above stops short of it. The break is part of what
             # lies between the cue and the payload and ends the clause.
-            gap_words = (self.NEGATION_PLAIN_GAP_WORDS if m.group(0) in self._PLAIN_NEGATION_SET
-                         else self.NEGATION_GAP_WORDS)
+            plain = m.group(0) in self._PLAIN_NEGATION_SET
+            gap_words = self.NEGATION_PLAIN_GAP_WORDS if plain else self.NEGATION_GAP_WORDS
+            # A plain cue whose clause goes on with a comma after the payload is the front of
+            # a list. Lists are not read here, so it does not govern: the first item gets the
+            # severity the rest of the list gets.
+            if plain and self._comma_ends_clause_later(text, match_end if match_end is not None
+                                                       else match_start):
+                continue
             if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
                     or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
                 continue
@@ -2231,6 +2237,22 @@ class SunglassesEngine:
             if align is None or align.holds(text, window_start + pos, hit_end):
                 return True
         return False
+
+    # Where a clause ends, and how far past the payload a comma still counts as part of it.
+    _CLAUSE_END_RX = re.compile(r"[.;!?\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
+    NEGATION_COMMA_LOOKAHEAD = 200
+    _COMMAS = ",\uff0c\u3001\ufe50\ufe51\uff64\u060c"
+
+    @classmethod
+    def _comma_ends_clause_later(cls, text: str, start: int) -> bool:
+        """Whether a comma stands between ``start`` and the end of the clause that
+        runs on from it (the next sentence mark or line break, at most
+        NEGATION_COMMA_LOOKAHEAD characters on)."""
+        tail = text[start:start + cls.NEGATION_COMMA_LOOKAHEAD]
+        end = cls._CLAUSE_END_RX.search(tail)
+        if end is not None:
+            tail = tail[:end.start()]
+        return any(c in tail for c in cls._COMMAS)
 
     @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
