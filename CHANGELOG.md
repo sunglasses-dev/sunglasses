@@ -3054,7 +3054,7 @@ Backfilled 2026-10-15 by the daily integrity audit from the release commit (`1fa
 Backfilled 2026-10-15 by the daily integrity audit from the release commit (`290ad17b`). Shipped to PyPI and tagged `v0.2.10`; no CHANGELOG entry was written at the time.
 
 ### Added
-- 11 new pattern packs and a preprocessor expansion (internal recall 40.6% → 100%).
+- 11 new pattern packs and a preprocessor expansion.
 
 ## [0.2.3] — 2026-04-04
 
