@@ -268,9 +268,10 @@ def test_a_control_inside_a_tag_spelled_phrase_decides_as_without_it(channel, co
     assert _decision(text, channel) == _decision(twin, channel)
 
 
-@pytest.mark.parametrize("channel", ["api_response", "log_memory", "tool_output", "agent_input"])
+@pytest.mark.parametrize("channel", sorted(ALL_CHANNELS))
 def test_the_minimized_tag_counterexample_blocks(channel):
-    """One backspace at offset 2 of the tag spelled phrase: allowed on these four channels
-    before the shadow view was folded, blocked with the backspace deleted."""
+    """One backspace at offset 2 of the tag spelled phrase: allowed on api_response, log_memory,
+    tool_output and agent_input before the shadow view was folded, blocked with the backspace
+    deleted. The other five channels block it either way and are pinned too."""
     text = _tag_spelled(TAG_PHRASE[:2]) + "\x08" + _tag_spelled(TAG_PHRASE[2:])
     assert _decision(text, channel) == "block"
