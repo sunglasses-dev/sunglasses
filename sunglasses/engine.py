@@ -14,6 +14,7 @@ import bisect
 import collections
 import functools
 import html
+import keyword
 import re
 import threading
 import unicodedata
@@ -1433,39 +1434,6 @@ class SunglassesEngine:
     _NEGATION_RX = re.compile(
         r"(?<![\w'’-])(?:" + "|".join(
             re.escape(p) for p in sorted(TRUE_NEGATIONS, key=len, reverse=True)) + r")(?![\w'’])")
-    # A negation also covers a short list of plain words ("do not log, store, or transmit
-    # X"; "do not change provider, model, or render path"). The list is read by
-    # _negation_reach. These words end it: a clause word, a word that turns the next item
-    # into an order, or a word that joins another sentence onto this one.
-    _NEGATION_LIST_STOPS = frozenset((
-        "then", "now", "but", "so", "instead", "else", "otherwise", "unless", "if", "because",
-        "however", "yet", "still", "rather", "you", "your", "yours", "yourself", "we", "i",
-        "just", "simply", "please", "also", "go", "ahead", "feel", "free", "can", "could",
-        "should", "would", "will", "may", "might", "must", "shall", "let", "to")) | _NEGATION_FLIP_WORDS
-    # A trailing phrase may say "to anyone" or "your key"; it may not open another clause.
-    _LIST_TRAIL_STOPS = _NEGATION_LIST_STOPS - frozenset(("to", "your", "yours", "yourself"))
-    NEGATION_LIST_COMMAS = 3
-    NEGATION_LIST_WORDS = 8  # the whole list: items, the conjunction, the last item
-    NEGATION_LIST_ITEM_WORDS = 3
-    # What may follow the last item of a list: nothing, or a trailing phrase of at most
-    # NEGATION_LIST_TRAIL_WORDS plain words that starts with a word of _LIST_TRAIL_STARTS
-    # ("to anyone", "anywhere other than the API itself"), then the end of the text, a
-    # sentence-ending mark, a closing bracket or a line end. A comma, a colon, a clause word or a
-    # longer run of words means the item goes on or another clause starts.
-    NEGATION_LIST_TRAIL_WORDS = 8
-    NEGATION_LIST_FINAL_WORDS = 5  # the last item of a closed list (the match), blank-separated
-    _LIST_TRAIL_STARTS = frozenset((
-        "to", "anywhere", "anyone", "anybody", "elsewhere", "without", "outside", "beyond",
-        "except", "other", "for", "from", "with", "in", "on", "at", "by", "into", "about",
-        "before", "after", "during", "while"))
-    _LIST_TRAIL_RX = re.compile(r"((?: [a-z0-9]+(?:-[a-z0-9]+)*)*)")
-    _LIST_END_RX = re.compile(r"[ \t]*(?:\Z|[.!?;)\]]|\n|\x1e)")
-    _LIST_BREAK_CHARS = frozenset("\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
-    _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
-    _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
-    _LIST_WORD_RX = re.compile(_LIST_WORD)
-    _LIST_OPEN_TAIL_RX = re.compile(
-        r"(" + _LIST_WORD + r"(?: " + _LIST_WORD + r"){0,%d}),? (?:and|or) " % (NEGATION_LIST_ITEM_WORDS - 1))
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
     # A framing label asks for a quoted payload, so the gap after a label is one
@@ -2234,11 +2202,8 @@ class SunglassesEngine:
         window_start = max(0, match_start - self.NEGATION_WINDOW)
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
-        view_end = None
         if align is not None:
-            view_end = align.end_of_view(text, match_start)
-            hit_end = min(match_start + _RawAlign.HIT, view_end)
-        tail = None
+            hit_end = min(match_start + _RawAlign.HIT, align.end_of_view(text, match_start))
         for m in self._NEGATION_RX.finditer(before_text):
             # A window that starts inside a word would read a word fragment as a cue.
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
@@ -2247,25 +2212,13 @@ class SunglassesEngine:
             # A rule whose lead-in consumed the sentence break starts its match ON the
             # break, so the gap above stops short of it. The break is part of what
             # lies between the cue and the payload and ends the clause.
-            gap_end = hit_end
-            leadin = self._leadin_break(text, match_start)
             gap_words = (self.NEGATION_PLAIN_GAP_WORDS if m.group(0) in self._PLAIN_NEGATION_SET
                          else self.NEGATION_GAP_WORDS)
-            if not self._negation_governs(gap + leadin, gap_words):
-                if tail is None:
-                    tail = _ascii_lower(text[match_start:match_start + self.NEGATION_LIST_TAIL])
-                hit = None if match_end is None else text[match_start:match_end]
-                reach = self._negation_reach(gap + leadin, tail, hit)
-                if reach is not None:
-                    # A list read through the words after the match start: the raw input
-                    # must say the same there too.
-                    gap_end = max(hit_end, match_start + reach)
-                    if view_end is not None:
-                        gap_end = min(gap_end, view_end)
-                elif not self._quoted_gap_holds(gap, text, match_start, match_end, align):
-                    continue
+            if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
+                    or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
+                continue
             if align is None or align.holds(
-                    text, max(0, window_start + m.start() - 1), gap_end,
+                    text, max(0, window_start + m.start() - 1), hit_end,
                     self._spaced_inside(text, window_start + m.end(), match_start)):
                 return True
         for phrase in self.FRAMING_LABELS:
@@ -2744,8 +2697,6 @@ class SunglassesEngine:
             return False
         return not any(w in self._NEGATION_CLAUSE_WORDS for w in words)
 
-    NEGATION_LIST_TAIL = 80  # characters from the match start read when a list is open
-
     # A source file that REFUSES with a sentence is not a source file that is told something:
     #     raise RuntimeError("model checksum mismatch: refusing to load")
     # GLS-RP-250 is a keyword-only rule that reads the words "checksum mismatch" next to a
@@ -2758,7 +2709,7 @@ class SunglassesEngine:
     _REFUSAL_STRING_RULES = frozenset(("GLS-RP-250",))
     _SOURCE_CHANNELS = frozenset(("file", "code"))
     _REFUSAL_LINE_RX = re.compile(
-        r"[ \t]*raise[ \t]+[A-Za-z_][A-Za-z0-9_.]*\([ \t]*"
+        r"[ \t]*raise[ \t]+(?P<n>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\([ \t]*"
         r"(?P<q>[\"'])(?P<s>(?:(?!(?P=q))[^\n\r\\])*)(?P=q)[ \t]*\)[ \t]*")
     _REFUSAL_BREAKS = frozenset("\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
     REFUSAL_LINE_SPAN = 400  # characters either side of the hit in which the line must start and end
@@ -2813,119 +2764,10 @@ class SunglassesEngine:
             if hi - last > self.REFUSAL_LINE_SPAN:
                 return False
         m = self._REFUSAL_LINE_RX.fullmatch(raw, lo, hi)
-        return m is not None and m.start("s") <= first and last < m.end("s")
-
-    def _negation_reach(self, gap: str, tail: str, hit: Optional[str] = None):
-        """A negation covers a short LIST of plain words: "do not log, store, or transmit X",
-        "do not change provider, model, or render path". Returns None when the gap is not
-        such a list, else the number of characters from the match start that the reading
-        relied on (0 when the list closed before the match).
-
-        The gap is plain ASCII words (letters, digits, hyphens) in items of at most
-        NEGATION_LIST_ITEM_WORDS words, joined by a comma and one space. The whole list, as
-        written, has at most NEGATION_LIST_COMMAS commas and NEGATION_LIST_WORDS words in the
-        gap, the conjunction counted as a word. The last item is followed by at most
-        NEGATION_LIST_TRAIL_WORDS plain words and then the end of the text, a sentence-ending
-        mark or a line end (_list_ends); a comma, a colon, a clause word or a longer run means
-        the list goes on and is not read. It has to end the list one of two ways:
-          closed: the gap ends with "and " or "or " after a comma ("log, store, or "), so the
-                  match is the last item: on one line, at most NEGATION_LIST_FINAL_WORDS
-                  blank-separated words;
-          open:   the gap ends with a comma ("change provider, ") and the match itself is an
-                  item of plain words that the list goes on from (", or ", " and "), then one
-                  more word. A list with no "and"/"or" in it is not a list ("Do not worry,
-                  stay calm, X"). The comma of the conjunction counts.
-        A clause word, a word of omission, a word that turns the next item into an order
-        (you, just, please, go...) or any other character ends the list."""
-        gap = self._GAP_SPACES_RX.sub(" ", gap)
-        if not self._LIST_GAP_CHARS_RX.fullmatch(gap):
-            return None
-        commas = gap.count(",")
-        reach = 0
-        if gap.endswith(", "):
-            m = self._LIST_OPEN_TAIL_RX.match(tail)
-            if m is None:
-                return None
-            commas += m.group(0).count(",")
-            # The item after the conjunction is one to NEGATION_LIST_ITEM_WORDS plain words;
-            # the shortest one that ends the list (or leads into its trailing phrase) is read.
-            last = None
-            at = m.end()
-            final_item = []
-            for n in range(1, self.NEGATION_LIST_ITEM_WORDS + 1):
-                w = self._LIST_WORD_RX.match(tail, at)
-                if w is None:
-                    break
-                at = w.end()
-                final_item.append(w.group(0))
-                if self._list_ends(tail, at):
-                    last = (n, at)
-                    break
-                if tail[at:at + 1] != " ":
-                    break
-                at += 1
-            if last is None:
-                return None
-            reach = last[1]
-            words = m.group(1).split(" ")
-            # the item after the conjunction is held to the stop list like any other item
-            if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in final_item):
-                return None
-            final_words = last[0] + 1  # the item after the conjunction, and the conjunction
-            body = gap[1:-2]
-        else:
-            body = None
-            for conj in (", and ", ", or ", " and ", " or "):
-                if gap.endswith(conj):
-                    body = gap[1:-len(conj)]
-                    if not (conj.startswith(",") or "," in body):
-                        return None
-                    break
-            if body is None:
-                return None
-            # The last item is the match. It is read whole, on one line, and it ends the list.
-            if hit is None or not hit or self._LIST_BREAK_CHARS.intersection(hit):
-                return None
-            words = []
-            final_words = len(hit.split(" "))
-            if final_words > self.NEGATION_LIST_FINAL_WORDS:
-                return None
-            final_words += 1  # the conjunction
-            if not self._list_ends(tail, len(hit)):
-                return None
-        if commas > self.NEGATION_LIST_COMMAS:
-            return None
-        for item in body.split(", "):
-            item_words = item.split(" ")
-            if len(item_words) > self.NEGATION_LIST_ITEM_WORDS or not all(
-                    self._LIST_WORD_RX.fullmatch(w) for w in item_words):
-                return None
-            words.extend(item_words)
-        # the conjunction is a word of the list, and so is the last item
-        if len(words) + final_words > self.NEGATION_LIST_WORDS:
-            return None
-        if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
-            return None
-        return reach
-
-    def _list_ends(self, tail: str, at: int) -> bool:
-        """Whether the list that was read up to tail[at] ends within NEGATION_LIST_TRAIL_WORDS
-        plain words after it: the text itself ends, or a sentence-ending mark, a closing bracket
-        or a line end follows."""
-        rest = tail[at:]
-        if not rest:
-            return len(tail) < self.NEGATION_LIST_TAIL  # a full tail may hide what follows
-        trail = self._LIST_TRAIL_RX.match(rest)
-        words = trail.group(1).split()
-        if words and words[0] not in self._LIST_TRAIL_STARTS:
+        if m is None or not (m.start("s") <= first and last < m.end("s")):
             return False
-        if len(words) > self.NEGATION_LIST_TRAIL_WORDS or any(
-                w in self._LIST_TRAIL_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
-            return False
-        after = rest[trail.end():]
-        if not after:
-            return len(tail) < self.NEGATION_LIST_TAIL
-        return self._LIST_END_RX.match(after) is not None
+        # a name is a dotted run of identifiers: no component is a reserved word or a constant
+        return not any(keyword.iskeyword(part) for part in m.group("n").split("."))
 
     @property
     def pattern_count(self) -> int:
