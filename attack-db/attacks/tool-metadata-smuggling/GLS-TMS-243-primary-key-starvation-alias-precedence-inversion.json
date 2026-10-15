@@ -26,7 +26,7 @@
     "silent integrity loss bifurcation"
   ],
   "regex": [
-    "(?i)(?:(?:primary[- ]?key\\s+starvation|alias\\s+precedence\\s+inversion|null[- ]?coalescing\\s+laundering|row[- ]?field\\s+polymorphism)|(?:omits?|drops?|nulls?)\\s+(?:canonical|primary)\\s+(?:keys?|fields?)\\s+(?:to\\s+)?(?:force|steer|coerce)\\s+(?:parser\\s+)?(?:fallback|alias)|(?:tool\\s+(?:result|output))\\s+(?:schema)?\\s*(?:bifurcation|variants?|polymorphism)\\s+(?:steers?|promotes?|elevates?)\\s+(?:weaker|stale|attacker[- ]controlled))"
+    "(?i)(?:(?:primary[- ]?key\\s+starvation|alias\\s+precedence\\s+inversion|null[- ]?coalescing\\s+laundering|row[- ]?field\\s+polymorphism)|(?:omits?|drops?|nulls?)\\s+(?:canonical|primary)\\s+(?:keys?|fields?)\\s+(?:to\\s+)?(?:force|steer|coerce)\\s+(?:parser\\s+)?(?:fallback|alias)|(?:tool\\s+(?:result|output))\\s+(?:schema\\s*)?(?:bifurcation|variants?|polymorphism)\\s+(?:steers?|promotes?|elevates?)\\s+(?:weaker|stale|attacker[- ]controlled))"
   ],
   "examples": {
     "malicious": [],
