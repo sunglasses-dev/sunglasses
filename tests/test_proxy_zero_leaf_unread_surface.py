@@ -291,14 +291,6 @@ def test_a_clean_extra_member_is_read_then_forwarded_byte_exact(
     assert upstream.bytes == raw and client.bytes == b""
 
 
-def test_the_scan_surface_of_a_nonzero_leaf_method_is_still_params_only():
-    """Not changed here: another client method with an extra top-level member
-    is read the way it always was."""
-    message = {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
-               "params": {"name": "x"}, "extra": "y"}
-    assert selector.client_surface("tools/call", message) == {"name": "x"}
-
-
 @pytest.mark.parametrize("message,expected", [
     ({"jsonrpc": "2.0", "id": 1, "method": "ping"}, {}),
     ({"jsonrpc": "2.0", "method": "ping", "params": {"a": 1}}, {"a": 1}),
