@@ -78,6 +78,10 @@ REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
 REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
+
+# `_surface` answer for a member that is present and is not an object or list.
+# Distinct from None, which means "the frame carries no such member".
+_UNREADABLE = object()
 REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
 REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
@@ -508,14 +512,22 @@ class Route:
                                          RULE_RESOURCE, record=False)
 
         surface, channel = self._surface(message, method)
+        if surface is _UNREADABLE:
+            # A result, error or params that is a string, number or boolean is
+            # not an object a scan reads, and "nothing to inspect" forwarded it.
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE, record=False)
         if surface is None:
             return None
 
         # T2.R14 BEFORE everything else, exactly as in the client direction.
-        # A ping result has zero inspectable leaves and no channel of its own,
-        # so scanning it means handing a worker nothing to read on a channel
-        # that does not exist, and every rule is scoped to a channel.
-        if selector.zero_leaves_is_complete(method, surface):
+        # A ping result with nothing in it has zero inspectable leaves and no
+        # channel of its own, so scanning it means handing a worker nothing to
+        # read on a channel that does not exist, and every rule is scoped to a
+        # channel. One that carries content is not that shape and falls to the
+        # channel test below.
+        if selector.zero_leaves_is_complete(method, surface, surface_only=True):
             return None
 
         if channel is None:
@@ -614,9 +626,16 @@ class Route:
         for member in ("result", "error", "params"):
             if member in message:
                 surface = message[member]
-                if not isinstance(surface, (dict, list)):
+                if surface is None:
                     return None, None
-                return surface, selector.channel_for(method, RESULT)
+                if not isinstance(surface, (dict, list)):
+                    return _UNREADABLE, None
+                # An ERROR is a reply whatever it answers, and the selector
+                # names its channel under `error`, not under the method. Asked
+                # by method, a ping error found no channel at all and was
+                # refused unread, where main forwarded it.
+                return surface, selector.channel_for(
+                    "error" if member == "error" else method, RESULT)
         return None, None
 
     def _withhold_result(self, request_id, reason, rule, *, settlement=None,
@@ -630,7 +649,11 @@ class Route:
         SETTLED row per build is a second terminal for an item that settles
         once. The caller records separately, after the decision is final.
         """
-        if record:
+        # A notification is built once and has no later decision to wait for,
+        # so `record=False` does not apply to it: the pump's own drop event is
+        # in memory only, and without this row nothing durable says why the
+        # frame never reached the client.
+        if record or request_id is NO_ID:
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
         if request_id is NO_ID:
@@ -813,7 +836,7 @@ class Route:
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         over = bounds.check_content(
-            selector.content_bytes(message.get("params") or {}))
+            selector.content_bytes(selector.client_surface(method, message)))
         if over:
             # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
             # existed, so it was the one `_withhold` in this method that did not
@@ -1074,8 +1097,7 @@ class Route:
     def _inspect(self, raw, message, method, *, request_id, attempt=None,
                  approved_under=None):
         channel = selector.channel_for(method, REQUEST)
-        params = message.get("params")
-        params = params if isinstance(params, (dict, list)) else {}
+        params = selector.client_surface(method, message)
         held_bytes = selector.content_bytes(params)
 
         binding = {
