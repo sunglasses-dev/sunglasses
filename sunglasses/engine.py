@@ -856,6 +856,10 @@ class _RawAlign(_ViewEnds):
         self._moved = {}
         _ViewEnds.__init__(self)
 
+    @property
+    def raw(self) -> str:
+        return self._raw
+
     def moved(self, view: str, pos: int) -> bool:
         """Whether view[pos] stands in a reversed view: a view behind the plain one that
         holds everything before it written backwards, where the character at an offset
@@ -1356,17 +1360,20 @@ class SunglassesEngine:
     # illustratively (quoted/backticked); a bare imperative after a label is NOT
     # downgraded. This closes the Jul-12 "label it an example" bypass without
     # re-blocking genuine security docs.
+    # Plain negations. They are everyday words that also open idioms ("without further ado",
+    # "no longer", "cannot wait to"), so they reach one word before the payload, not two.
+    PLAIN_NEGATIONS = (
+        "no", "not", "does not", "did not", "cannot", "will not", "is not", "are not", "without",
+        "doesn't", "didn't", "can't", "won't", "isn't", "aren't",
+        "doesn\u2019t", "didn\u2019t", "can\u2019t", "won\u2019t", "isn\u2019t", "aren\u2019t",
+    )
     TRUE_NEGATIONS = [
         "do not", "don't", "don't", "dont",
         "never", "avoid", "be careful", "watch out for",
         "beware of", "not run", "not execute", "not use",
         "should not", "shouldn't", "shouldn't",
         "must not", "must never",
-        # Plain negations: they cover the clause they govern on the same terms as "do not".
-        "no", "not", "does not", "did not", "cannot", "will not", "is not", "are not", "without",
-        "doesn't", "didn't", "can't", "won't", "isn't", "aren't",
-        "doesn\u2019t", "didn\u2019t", "can\u2019t", "won\u2019t", "isn\u2019t", "aren\u2019t",
-    ]
+    ] + list(PLAIN_NEGATIONS)
     FRAMING_LABELS = [
         "warning:", "warning -", "example of", "example:",
         "for example", "caution:", "note:",
@@ -1393,18 +1400,34 @@ class SunglassesEngine:
     # them. A framing label downgrades only a quoted payload, with the same
     # closing-quote rule as a negation (_quoted_gap_holds).
     NEGATION_GAP_WORDS = 2
+    NEGATION_PLAIN_GAP_WORDS = 1  # the reach of a plain negation (PLAIN_NEGATIONS)
+    _PLAIN_NEGATION_SET = frozenset(PLAIN_NEGATIONS)
     _NEGATION_CLAUSE_WORDS = frozenset(("then", "now", "but", "so", "instead", "and", "or"))
     # A run of plain spaces between two words of the gap, read as the one space it would be in
     # a view that collapses blanks. A run next to the cue or next to the match is not between
     # two words of the gap, and a longer run (more than _Walk.BLANK_RUN) is kept as it is; both
     # fail the allowlist.
     _GAP_SPACES_RX = re.compile("(?<=[a-z0-9]) {2,%d}(?=[a-z0-9])" % _Walk.BLANK_RUN)
+    # A word that turns the thing after a negation into an order or a grant: "do not hesitate to
+    # X", "no problem, X", "without further ado X", "not only X", "cannot wait to X". One of
+    # these ANYWHERE in the gap means the negation does not govern. The list is finite; an
+    # idiom outside it is read as a negation (a stated limit of this reading).
     _NEGATION_FLIP_WORDS = frozenset((
-        "hesitate", "fail", "forget", "refuse", "neglect", "omit", "skip", "miss",
-        # "no problem, run X", "without question X": the phrase after the cue is an
-        # idiom that grants the next thing, not a restriction on it.
-        "problem", "problems", "worry", "worries", "matter", "doubt", "question",
-        "hesitation", "delay"))
+        "hesitate", "hesitates", "hesitated", "hesitating", "hesitation", "hesitations",
+        "fail", "fails", "failed", "failing", "forget", "forgets", "forgetting", "refuse",
+        "refuses", "refusing", "neglect", "neglecting", "omit", "omitting", "skip", "skipping",
+        "miss", "missing",
+        "problem", "problems", "worry", "worries", "matter", "matters", "doubt", "doubts",
+        "question", "questions", "delay", "delays", "ado", "further", "more", "only", "just",
+        "merely", "simply", "longer", "need", "needs", "wait", "waiting", "afraid", "shy",
+        "reluctant", "hurry", "exception", "exceptions", "reservation", "reservations",
+        "objection", "objections", "complaint", "complaints", "pause", "fear", "ceremony",
+        "thought", "choice", "stop", "cease"))
+    # These four read as plain modifiers of a negated clause after the existing cues
+    # ("Do not just run rm -rf", "Do not stop the job") and are pinned that way; they turn
+    # the next thing into an order only after a new cue, which has no such history.
+    _NEGATION_FLIP_PLAIN_ONLY = frozenset(("just", "wait", "waiting", "stop"))
+    _NEGATION_FLIP_OLD_CUES = _NEGATION_FLIP_WORDS - _NEGATION_FLIP_PLAIN_ONLY
     # Longest phrase first so "does not" is read before "no". A cue that follows a hyphen is
     # the end of a longer word ("pre-no"), not a cue.
     _NEGATION_RX = re.compile(
@@ -1422,11 +1445,12 @@ class SunglassesEngine:
     NEGATION_LIST_COMMAS = 3
     NEGATION_LIST_WORDS = 6
     NEGATION_LIST_ITEM_WORDS = 3
+    NEGATION_LIST_FINAL_WORDS = 5  # the matched last item of a closed list, blank-separated
     _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
     _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
     _LIST_WORD_RX = re.compile(_LIST_WORD)
     _LIST_OPEN_TAIL_RX = re.compile(
-        r"(" + _LIST_WORD + r"(?: " + _LIST_WORD + r"){0,%d})(?:, (?:and|or)|,? (?:and|or)) (" % (NEGATION_LIST_ITEM_WORDS - 1)
+        r"(" + _LIST_WORD + r"(?: " + _LIST_WORD + r"){0,%d}),? (?:and|or) (" % (NEGATION_LIST_ITEM_WORDS - 1)
         + _LIST_WORD + r")")
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
@@ -2211,10 +2235,13 @@ class SunglassesEngine:
             # lies between the cue and the payload and ends the clause.
             gap_end = hit_end
             leadin = self._leadin_break(text, match_start)
-            if not self._negation_governs(gap + leadin):
+            gap_words = (self.NEGATION_PLAIN_GAP_WORDS if m.group(0) in self._PLAIN_NEGATION_SET
+                         else self.NEGATION_GAP_WORDS)
+            if not self._negation_governs(gap + leadin, gap_words):
                 if tail is None:
                     tail = _ascii_lower(text[match_start:match_start + self.NEGATION_LIST_TAIL])
-                reach = self._negation_reach(gap + leadin, tail)
+                hit = None if match_end is None else text[match_start:match_end]
+                reach = self._negation_reach(gap + leadin, tail, hit)
                 if reach is not None:
                     # A list read through the words after the match start: the raw input
                     # must say the same there too.
@@ -2680,20 +2707,24 @@ class SunglassesEngine:
             pos = text.find(close, pos + 1, stop)
         return -1
 
-    def _negation_governs(self, gap: str) -> bool:
+    def _negation_governs(self, gap: str, max_words: Optional[int] = None) -> bool:
         """True if the text between a TRUE_NEGATION and the match keeps the
         match inside the negated clause. The gap is accepted only when it is
         plain ASCII words (letters, digits, hyphens) joined by single spaces,
-        within NEGATION_GAP_WORDS, with no clause word and no leading verb of
-        omission. A run of up to _Walk.BLANK_RUN spaces between two words of the gap counts
-        as one space. Anything else in the gap means it does not govern."""
+        within max_words (NEGATION_GAP_WORDS unless the cue is a plain one), with no
+        clause word and no word that turns the next thing into an order, in any place of
+        the gap ("do not hesitate to X", "without any hesitation X"). A run of up to
+        _Walk.BLANK_RUN spaces between two words of the gap counts as one space.
+        Anything else in the gap means it does not govern."""
         gap = self._GAP_SPACES_RX.sub(" ", gap)
         if not self._NEGATION_GAP_RX.fullmatch(gap):
             return False
         words = gap.split()
-        if len(words) > self.NEGATION_GAP_WORDS:
+        if len(words) > (self.NEGATION_GAP_WORDS if max_words is None else max_words):
             return False
-        if words and words[0] in self._NEGATION_FLIP_WORDS:
+        flips = (self._NEGATION_FLIP_WORDS if max_words == self.NEGATION_PLAIN_GAP_WORDS
+                 else self._NEGATION_FLIP_OLD_CUES)
+        if any(w in flips for w in words):
             return False
         return not any(w in self._NEGATION_CLAUSE_WORDS for w in words)
 
@@ -2711,19 +2742,52 @@ class SunglassesEngine:
     _SOURCE_CHANNELS = frozenset(("file", "code"))
     _REFUSAL_CALL_RX = re.compile(
         r"(?:^|[^\w.])(?P<call>"
-        r"raise\s+[\w.]+\(\s*"
-        r"|throw\s+(?:new\s+)?[\w.]+\(\s*"
-        r"|(?:[\w]+\.)+(?:error|errorf|warn|warning|warnf|critical|fatal|exception)\(\s*"
-        r"|(?:errors|fmt)\.(?:new|errorf)\(\s*"
-        r"|panic\(\s*"
-        r"|assert\b[^\"'`\n;]*,\s*"
-        r")$")
+        r"raise[ \t]+[\w.]+\([ \t]*"
+        r"|throw[ \t]+(?:new[ \t]+)?[\w.]+\([ \t]*"
+        r"|(?:[\w]+\.)+(?:error|errorf|warn|warning|warnf|critical|fatal|exception)\([ \t]*"
+        r"|(?:errors|fmt)\.(?:new|errorf)\([ \t]*"
+        r"|panic\([ \t]*"
+        r"|(?P<assert>assert\b[^\"'`\n;]*,[ \t]*)"
+        r")\Z")
+    # After the closing quote the message is the whole argument: the call goes on with a comma
+    # (more arguments) or closes. An assert message ends the statement.
+    _REFUSAL_AFTER_RX = re.compile(r"[ \t]*[,)]")
+    _REFUSAL_AFTER_ASSERT_RX = re.compile(r"[ \t]*(?:[;#,)]|\n|\x1e)")
     REFUSAL_STRING_SPAN = 240  # characters either side of the hit that the string may take
+    REFUSAL_LINE_SPAN = 400    # characters before the call that are read to see the line it is on
+
+    def _refusal_line_is_code(self, raw: str, call_at: int) -> bool:
+        """Whether the call at raw[call_at] stands in code: the line it is on is no longer than
+        REFUSAL_LINE_SPAN before the call, no comment opens before the call, and the call is
+        not inside a string. The line is read as code: quotes ('"`) open and close strings, a
+        backslash escapes, and # or // or /* outside a string starts a comment."""
+        lo = max(0, call_at - self.REFUSAL_LINE_SPAN)
+        segment = raw[lo:call_at]
+        cut = max(segment.rfind("\n"), segment.rfind("\r"), segment.rfind(VIEW_SEP))
+        if cut == -1 and lo > 0:
+            return False
+        line = segment[cut + 1:]
+        quote = None
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if quote is not None:
+                if ch == "\\":
+                    i += 1
+                elif ch == quote:
+                    quote = None
+            elif ch in "\"'`":
+                quote = ch
+            elif ch == "#" or (ch == "/" and line[i + 1:i + 2] in ("/", "*")):
+                return False
+            i += 1
+        return quote is None
 
     def _refusal_string(self, text: str, match_start: int, match_end: Optional[int], align=None) -> bool:
         """Whether text[match_start:match_end] sits wholly inside one single-line, single- or
-        double-quoted string literal that is the first argument of a refusing call (see
-        _REFUSAL_STRING_RULES). The call, the quotes and the string must be the same
+        double-quoted string literal that is the whole first argument of a refusing call (see
+        _REFUSAL_STRING_RULES), in a line of code (not a comment, not inside another string).
+        The line, the call, the quotes, the string and the mark after it must be the same
         characters at the same place in the raw input (a view that holds a copy of it, written
         backwards or in ROT13, is never vouched for), and the string must close on the same
         line before the end of its view."""
@@ -2754,40 +2818,64 @@ class SunglassesEngine:
                 break
         if close_at is None:
             return False
-        prefix = _ascii_lower(before[:open_at])
-        call = self._REFUSAL_CALL_RX.search(prefix)
+        call = self._REFUSAL_CALL_RX.search(_ascii_lower(before[:open_at]))
         if call is None:
             return False
+        rest = after[close_at + 1:]
+        if call.group("assert") is not None:
+            ends = (self._REFUSAL_AFTER_ASSERT_RX.match(rest) is not None
+                    or (hi == stop and not rest.strip(" \t")))
+        else:
+            ends = self._REFUSAL_AFTER_RX.match(rest) is not None
+        if not ends:
+            return False
+        # The call, the string and the mark after it, in the raw input: one line, in code.
+        call_at = lo + call.start("call")
+        mark = len(rest) - len(rest.lstrip(" \t"))
+        end = match_end + close_at + 1 + mark + (1 if rest[mark:mark + 1] and rest[mark] in ",);#" else 0)
         if align is None:
-            return True
-        return align.holds(text, lo + call.start("call"), match_end + close_at + 1)
+            raw, first, last = text, call_at, end
+        else:
+            first, last = align.origin(text, call_at), align.origin(text, end - 1)
+            if first is None or last is None:
+                return False
+            raw, last = align.raw, last + 1
+        if "\n" in raw[first:last] or "\r" in raw[first:last]:
+            return False
+        if not self._refusal_line_is_code(raw, first):
+            return False
+        return align is None or align.holds(text, call_at, end)
 
-    def _negation_reach(self, gap: str, tail: str):
+    def _negation_reach(self, gap: str, tail: str, hit: Optional[str] = None):
         """A negation covers a short LIST of plain words: "do not log, store, or transmit X",
         "do not change provider, model, or render path". Returns None when the gap is not
         such a list, else the number of characters from the match start that the reading
         relied on (0 when the list closed before the match).
 
         The gap is plain ASCII words (letters, digits, hyphens) in items of at most
-        NEGATION_LIST_ITEM_WORDS words, joined by a comma and one space, at most
-        NEGATION_LIST_COMMAS commas and NEGATION_LIST_WORDS words in all. It has to end the
-        list one of two ways:
+        NEGATION_LIST_ITEM_WORDS words, joined by a comma and one space. The whole list, as
+        written, has at most NEGATION_LIST_COMMAS commas and NEGATION_LIST_WORDS words, the
+        conjunction counted as a word. It has to end the list one of two ways:
           closed: the gap ends with "and " or "or " after a comma ("log, store, or "), so the
-                  match is the last item;
+                  match is the last item; the match itself is at most NEGATION_LIST_FINAL_WORDS
+                  words (blank-separated) on one line;
           open:   the gap ends with a comma ("change provider, ") and the match itself is an
-                  item of plain words that the list goes on from (", or ", " and "). A list
-                  with no "and"/"or" in it is not a list ("Do not worry, stay calm, X").
+                  item of plain words that the list goes on from (", or ", " and "), then one
+                  more word. A list with no "and"/"or" in it is not a list ("Do not worry,
+                  stay calm, X"). The comma of the conjunction counts.
         A clause word, a word of omission, a word that turns the next item into an order
         (you, just, please, go...) or any other character ends the list."""
         gap = self._GAP_SPACES_RX.sub(" ", gap)
-        if not self._LIST_GAP_CHARS_RX.fullmatch(gap) or gap.count(",") > self.NEGATION_LIST_COMMAS:
+        if not self._LIST_GAP_CHARS_RX.fullmatch(gap):
             return None
+        commas = gap.count(",")
         reach = 0
         if gap.endswith(", "):
             m = self._LIST_OPEN_TAIL_RX.match(tail)
             if m is None:
                 return None
             reach = m.end()
+            commas += m.group(0).count(",")
             words = m.group(1).split(" ") + [m.group(2)]
             body = gap[1:-2]
         else:
@@ -2801,13 +2889,18 @@ class SunglassesEngine:
             if body is None:
                 return None
             words = []
+            # The last item is the match. It is read whole, on one line, and is short.
+            if (hit is None or "\n" in hit or len(hit.split()) > self.NEGATION_LIST_FINAL_WORDS):
+                return None
+        if commas > self.NEGATION_LIST_COMMAS:
+            return None
         for item in body.split(", "):
             item_words = item.split(" ")
             if len(item_words) > self.NEGATION_LIST_ITEM_WORDS or not all(
                     self._LIST_WORD_RX.fullmatch(w) for w in item_words):
                 return None
             words.extend(item_words)
-        if len(words) > self.NEGATION_LIST_WORDS:
+        if len(words) + 1 > self.NEGATION_LIST_WORDS:  # the conjunction is a word of the list
             return None
         if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
             return None
