@@ -15,7 +15,18 @@ from __future__ import annotations
 
 # T1.R2. Frozen for 0.6.0. Membership, never prefix or ordering: a version is
 # supported because it is IN this set, not because it resembles one that is.
-SUPPORTED_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18")
+#
+# 0.6.9 added 2025-11-25. It is the version current Claude Code offers and the
+# one every current MCP SDK echoes, so a set that stopped at 2025-06-18 refused
+# the server's own initialize result and closed the session: the proxy could not
+# connect to any such server. One more entry, exactly spelled; the set is still
+# a closed list and the next version needs its own change.
+SUPPORTED_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
+
+# The 2026-07-28 era opens with this probe, before any `initialize`. This proxy
+# speaks the earlier era, so the true answer is "no such method", and that is
+# what a client that also speaks the earlier era is told to look for.
+DISCOVER_PROBE_METHOD = "server/discover"
 
 # T1.R3, verbatim from the row.
 SUPPORTED_CAPABILITIES = frozenset({
