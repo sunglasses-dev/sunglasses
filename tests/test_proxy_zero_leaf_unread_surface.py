@@ -57,6 +57,9 @@ def test_a_ping_answer_with_content_never_reaches_the_client(tmp_path, body):
     assert not _crossed(client), client.bytes
     answers = client.messages()
     assert len(answers) == 1 and "result" not in answers[0], answers
+    if "error" in body:
+        assert [s["channel"] for s in scans] == ["api_response"]
+        assert answers[0]["error"]["data"]["reason_code"] == "PROHIBITED_CONTENT"
 
 
 def test_a_withheld_ping_answer_is_answered_once_with_a_refusal(tmp_path):
