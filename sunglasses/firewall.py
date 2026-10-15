@@ -2050,10 +2050,12 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     """(hook output dict, malformed reason or None). NEVER raises.
 
     A malformed envelope (see `_read_envelope`) is recorded in the receipts as
-    `GLS-FW-MALFORMED-EVENT` and answered with `{}`; the second item names the
-    reason so `main` can end the process with a hook failure instead of exit 0.
-    The host's install policy then settles it: `onFailure: "block"` refuses the
-    call, anything else is the normal permission flow.
+    `GLS-FW-MALFORMED-EVENT`. One that main answered with `{}` is still answered
+    with `{}` here, and the second item names the reason so `main` can end the
+    process with a hook failure instead of exit 0; the host's install policy
+    then settles it (`onFailure: "block"` refuses the call, anything else is the
+    normal permission flow). One that main answered with an `ask` (valid JSON
+    that is not an object) is still an `ask`, with no failure.
 
     Every other failure mode lands on `defer`: fall through to Claude Code's own
     permission flow (emitted as `{}` — see Decision.to_hook_output for why it
@@ -2125,10 +2127,23 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
             error = f"malformed event: {malformed}"
             error_types = (malformed,)
             extras = {"malformed_event": malformed}
-            decision = Decision(
-                "defer", "error", _MALFORMED_RULE,
-                f"SUNGLASSES firewall: the hook input was not a tool call it "
-                f"can read ({malformed}), so nothing was checked.")
+            if malformed == "NOT_AN_OBJECT":
+                # Valid JSON with no tool call in it. On main this input asked
+                # (by way of the receipts path failing on `payload.get`), in
+                # every install state. That prompt is kept, now on purpose: a
+                # hook failure here would fall to the normal permission flow
+                # under `continue`, an install with no `onFailure`, or a host
+                # that ignores the key, and drop the prompt.
+                decision = Decision(
+                    "ask", "error", _MALFORMED_RULE,
+                    "SUNGLASSES firewall: the hook input was JSON but not a "
+                    "tool call, so nothing was checked. Approve only if you "
+                    "would have approved it unchecked.")
+            else:
+                decision = Decision(
+                    "defer", "error", _MALFORMED_RULE,
+                    f"SUNGLASSES firewall: the hook input was not a tool call "
+                    f"it can read ({malformed}), so nothing was checked.")
         else:
             decision, error, extras = evaluate(payload, home=home)
             error_types = getattr(error, "types", ())
@@ -2177,10 +2192,11 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     except Exception as exc:  # noqa: BLE001
         decision, error = _receipts_unwritable(decision, error, receipts, exc)
 
-    # Still the malformed answer (not turned into an ask by a down audit trail):
-    # the caller ends the process with a hook failure.
+    # Still the malformed `defer` (not an ask, whether chosen or forced by a
+    # down audit trail): the caller ends the process with a hook failure.
     return (decision.to_hook_output(),
-            malformed if decision.rule_id == _MALFORMED_RULE else None)
+            malformed if (decision.rule_id == _MALFORMED_RULE
+                          and decision.action == "defer") else None)
 
 
 def _receipts_unwritable(decision, error, receipts, exc):

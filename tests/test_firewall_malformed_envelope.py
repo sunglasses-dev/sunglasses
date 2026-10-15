@@ -11,6 +11,14 @@ Now the process ends with exit 1 and no stdout. The host applies the install's
 flow. Exit 1 and not 2, because 2 refuses even for an install that chose to
 continue. The receipts record the arrival and the reason either way.
 
+One class keeps its answer: valid JSON that is not an object (an array, a
+number, a string, null, a boolean). Main answered those with an `ask` in every
+install state (by way of its receipts path failing on `payload.get`), and a
+hook failure would fall to the normal permission flow under `continue`, an
+install with no `onFailure`, or a host that ignores the key, which drops that
+prompt. So it stays an `ask`, exit 0, now on purpose. Every other class was
+`{}` and exit 0 on main, so for those a failure is never weaker.
+
 What these tests do not show: how a Claude Code build treats exit 1. That is the
 host's documented contract, read, not run here.
 """
@@ -41,6 +49,7 @@ GARBAGE = {
     "scalar": ("3", "NOT_AN_OBJECT"),
     "string": ('"Bash"', "NOT_AN_OBJECT"),
     "null": ("null", "NOT_AN_OBJECT"),
+    "boolean": ("true", "NOT_AN_OBJECT"),
     "name-list": (json.dumps({"tool_name": ["Bash"], "tool_input": {}}),
                   "WRONG_SHAPE"),
     "name-number": (json.dumps({"tool_name": 7, "tool_input": {}}), "WRONG_SHAPE"),
@@ -78,13 +87,47 @@ def _ids():
     return sorted(GARBAGE)
 
 
-@pytest.mark.parametrize("case", _ids())
+# Pinned from running main: the inputs it answered with an ask.
+_ASKED_ON_MAIN = {"array", "scalar", "string", "null", "boolean"}
+_FAILS = [c for c in _ids() if c not in _ASKED_ON_MAIN]
+_ASKS = [c for c in _ids() if c in _ASKED_ON_MAIN]
+
+
+def _decision(stdout):
+    return json.loads(stdout)["hookSpecificOutput"]["permissionDecision"]
+
+
+@pytest.mark.parametrize("case", _FAILS)
 def test_an_unreadable_input_ends_as_a_hook_failure(home, case):
     text, reason = GARBAGE[case]
     proc = _cli(text, home)
     assert proc.returncode == 1, (proc.returncode, proc.stderr)
     assert proc.stdout == ""
     assert reason in proc.stderr and "nothing was checked" in proc.stderr
+
+
+@pytest.mark.parametrize("case", _ASKS)
+def test_a_non_object_root_still_asks_and_does_not_fail(home, case):
+    """Main asked on these, in every install state. A failure exit would fall
+    to the normal permission flow under `continue` and drop the prompt."""
+    proc = _cli(GARBAGE[case][0], home)
+    assert proc.returncode == 0 and proc.stderr == "", (
+        proc.returncode, proc.stderr)
+    assert _decision(proc.stdout) == "ask"
+    assert "not a tool call" in json.loads(proc.stdout)[
+        "hookSpecificOutput"]["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize("case", _ids())
+def test_nothing_main_asked_on_is_now_weaker_than_an_ask(home, case):
+    """The baseline comparison: an input main asked on must still ask; every
+    other unreadable input was `{}` on main and must now be an ask or a
+    failure, never `{}`."""
+    proc = _cli(GARBAGE[case][0], home)
+    if case in _ASKED_ON_MAIN:
+        assert proc.returncode == 0 and _decision(proc.stdout) == "ask"
+    else:
+        assert proc.returncode == 1 and proc.stdout == ""
 
 
 @pytest.mark.parametrize("case", _ids())
@@ -96,23 +139,90 @@ def test_the_arrival_and_the_reason_are_recorded(home, case):
     assert rows[0]["eval_id"] == rows[1]["eval_id"]
     final = rows[1]
     assert final["rule_id"] == "GLS-FW-MALFORMED-EVENT"
+    assert final["decision"] == ("ask" if case in _ASKED_ON_MAIN else "defer")
     assert final["malformed_event"] == reason and final["degraded"] is True
     assert reason in final["error"]
     # Nothing the sender wrote reaches the log: not a tool name, not a digest.
     assert rows[0]["tool_name"] is None and final["tool_name"] is None
 
 
-@pytest.mark.parametrize("case", _ids())
+@pytest.mark.parametrize("case", _FAILS)
 def test_in_process_the_answer_is_empty_and_the_reason_is_returned(home, case):
     text, reason = GARBAGE[case]
     assert firewall.run_hook(text) == {}
     assert firewall.run_hook_ex(text) == ({}, reason)
 
 
+@pytest.mark.parametrize("case", _ASKS)
+def test_in_process_a_non_object_root_asks_and_returns_no_reason(home, case):
+    out, reason = firewall.run_hook_ex(GARBAGE[case][0])
+    assert reason is None and out["hookSpecificOutput"][
+        "permissionDecision"] == "ask"
+
+
 @pytest.mark.parametrize("case", _ids())
 def test_the_exit_code_is_never_two(home, case):
     """2 refuses for every install, including one that chose `continue`."""
     assert _cli(GARBAGE[case][0], home).returncode != 2
+
+
+# ── the floor: never less restrictive than main, in every install state ─────
+#
+# What the host does with (exit code, stdout) under each way the hook can be
+# installed. From the Claude Code hooks reference (exit codes, `onFailure`),
+# read, not run in an authenticated session here:
+#
+#   exit 0 + deny JSON -> refused           in every state
+#   exit 0 + ask JSON  -> prompt            in every state
+#   exit 0 + `{}`      -> normal permission flow in every state
+#   exit 1, no stdout  -> refused under onFailure "block"; the normal
+#                         permission flow under "continue", with no key at all,
+#                         and on a host that ignores the key
+#
+# Ranked by how restrictive: normal flow (1) < prompt (2) < refused (3).
+_STATES = ["block", "continue", "no-key", "host-ignores-key"]
+_RANK = {"normal": 1, "ask": 2, "refused": 3}
+
+
+def _effective(returncode, stdout, state):
+    if returncode == 0:
+        if stdout.strip() in ("", "{}"):
+            return "normal"
+        return {"ask": "ask", "deny": "refused"}[_decision(stdout)]
+    assert returncode == 1 and stdout == ""
+    return "refused" if state == "block" else "normal"
+
+
+# Pinned from running main: the effective outcome of each input, the same in
+# every install state (main exits 0 for all of them).
+_MAIN = {case: ("ask" if case in _ASKED_ON_MAIN else "normal")
+         for case in GARBAGE}
+
+
+@pytest.mark.parametrize("state", _STATES)
+@pytest.mark.parametrize("case", _ids())
+def test_no_install_state_is_less_restrictive_than_main(home, case, state):
+    proc = _cli(GARBAGE[case][0], home)
+    new = _effective(proc.returncode, proc.stdout, state)
+    assert _RANK[new] >= _RANK[_MAIN[case]], (case, state, new, _MAIN[case])
+
+
+@pytest.mark.parametrize("case", _ASKS)
+def test_every_input_main_asked_on_still_prompts_in_every_state(home, case):
+    proc = _cli(GARBAGE[case][0], home)
+    assert {_effective(proc.returncode, proc.stdout, s)
+            for s in _STATES} == {"ask"}
+
+
+def test_the_failure_group_is_refused_only_where_the_install_blocks(home):
+    seen = {}
+    for case in _FAILS:
+        proc = _cli(GARBAGE[case][0], home)
+        for state in _STATES:
+            seen.setdefault(state, set()).add(
+                _effective(proc.returncode, proc.stdout, state))
+    assert seen["block"] == {"refused"}
+    assert all(seen[s] == {"normal"} for s in _STATES if s != "block")
 
 
 # ── controls: a readable envelope behaves exactly as before ─────────────────
@@ -147,6 +257,8 @@ def test_a_large_valid_envelope_is_read_not_refused(home):
            "tool_input": {"file_path": "/tmp/a", "content": "x" * 3_000_000}}
     proc = _cli(json.dumps(big), home)
     assert proc.returncode == 0 and proc.stderr == ""
+    assert proc.stdout == "{}"          # decided clean, not refused
+    assert _receipts(home)[-1]["rule_id"] == "GLS-FW-CLEAN"
 
 
 def test_an_input_nested_past_the_bound_is_still_denied_not_a_failure(home):
