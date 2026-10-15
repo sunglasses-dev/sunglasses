@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1872,6 +1873,10 @@ def cmd_init(args):
         return 0
 
     fail_open = bool(getattr(args, "fail_open", False))
+    # The commands printed below must act on the file just written: a global install
+    # needs --global, a project install needs the directory it was run in.
+    scope = " --global" if args.scope_global else ""
+    where = "" if args.scope_global else f"cd {shlex.quote(str(path.parent.parent))} && "
     entry = build_hook_entry(fail_open=fail_open)
     command = entry["hooks"][0]["command"]
 
@@ -1906,9 +1911,10 @@ def cmd_init(args):
     else:
         print(f"  {DIM}Failure policy: \"onFailure\": \"block\". A hook that times out or cannot "
               f"start refuses the tool call. Claude Code reads this key from v2.1.295; "
-              f"`sunglasses init --fail-open` leaves it out.{RESET}")
+              f"`{where}sunglasses init{scope} --fail-open` leaves it out.{RESET}")
         print(f"  {DIM}If the hook ever cannot start, every tool call is refused until you remove "
-              f"its entry from {path} or run `sunglasses init --uninstall` in a terminal.{RESET}")
+              f"its entry from {path} or run `{where}sunglasses init{scope} --uninstall` "
+              f"in a terminal.{RESET}")
 
     _offer_starter_policy(args)
     print(f"\n  {DIM}{_policy_state_line()}{RESET}")
