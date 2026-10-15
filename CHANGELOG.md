@@ -15,23 +15,17 @@ All notable changes to Sunglasses are documented here.
 
 ### Changed
 
-- GLS-PE-111 now also refuses text that tells the agent to take the proxy out of the client config.
-  That covers an instruction to unwrap the proxy entry from the MCP settings, to stop the running
-  proxy, to uninstall it with a reason that keeps the human out of it and to rewrite the config
-  around the wrapper with a stream editing command. The new wordings are branches of the existing
-  rule, so the rule count does not move. Every branch names the wrapper itself and most also need a
-  client config in the text, which keeps the rule narrow. Quoted or fenced examples of these
-  commands are flagged too. (#369)
+- GLS-PE-111 now covers more wordings of an instruction to take the proxy out of the client config.
+  This is a bounded expansion of the existing rule, so the rule count does not move. Some quoted or
+  fenced examples can be flagged too, and some wordings are still not covered and are tracked as
+  known limits. (#369)
 
-- A rule is no longer lowered because its first occurrence was negated. The scan used to stamp a
-  rule on its first hit and run the negation check on that hit only, so a negated first occurrence
-  lowered the rule even when the same rule matched again later with no negation. A negated hit, or a
-  hit covered by a defensive framing clause, is now held back until every view has been read, and a
-  rule stays lowered only when every occurrence in the views that are read is covered. The walk over
-  later occurrences no longer stops at a count. It is bounded by a reading budget that is reserved
-  before each search, and a search that does not fit the budget is judged live, which is the
-  stricter direction. Some texts that were redacted are now blocked. The budget bounds reads and not
-  time, a few steps are not charged and the limits are tracked. (#372)
+- A negation or a defensive framing clause now lowers a rule only when it covers every occurrence of
+  that rule in the views that are read. A negated or framed hit is held back until every view has
+  been read, and the old limit on how many later occurrences were walked is replaced by a reading
+  budget that is reserved before each search. A search that does not fit the budget is judged live,
+  which is the stricter direction. Some texts that were redacted are now blocked. The budget bounds
+  reads and not time, a few steps are not charged and the limits are tracked. (#372)
 
 - A sentence break after a negation now ends the negation's reach for the rules whose match opens on
   that break. Six regexes of two rules began on the break, so the negation was taken to cover a
@@ -42,19 +36,18 @@ All notable changes to Sunglasses are documented here.
 
 ### Fixed
 
-- The proxy no longer refuses every server that negotiates protocol version 2025-11-25, which is the
-  version current Claude Code offers, so a wrapped server connects again. The discover probe that
-  newer Claude Code sends first is now declined with Method not found and not forwarded, so the
-  client falls back to a normal initialize. Every other unknown method is still refused and the
-  version check stays exact. The decline is recorded in the receipts as a new event kind, and a
-  verifier that predates it reads that row as an unknown event. (#385)
+- The proxy no longer refuses every server that negotiates protocol version 2025-11-25, which is a
+  version current clients offer, so a wrapped server connects again. The discover probe that newer
+  clients send first is now declined with Method not found and not forwarded, so the client falls
+  back to a normal initialize. Every other unknown method is still refused and the version check
+  stays exact. The decline is recorded in the receipts as a new event kind, and a verifier that
+  predates it reads that row as an unknown event. (#385)
 
-- The proxy now scans the initialize result before it reaches the client. That result was the one
-  upstream response delivered without the scan, so the server's instructions text and its server
-  info strings crossed unread. A clean result is forwarded unchanged. A result the scan withholds
-  ends the session, because the handshake is what the rest of the session rests on, and the refusal
-  carries the scan's own reason. A frame with any member beside the envelope and the result is
-  withheld whole. (#376)
+- The initialize result previously bypassed inspection. It now passes through the scan after the
+  existing negotiation and filtering, and a clean result continues as before. A result the scan
+  withholds ends the session, because the handshake is what the rest of the session rests on, and
+  the refusal carries the scan's own reason. A frame with any member beside the envelope and the
+  result is withheld whole. (#376)
 
 - The proxy no longer forwards a ping or an initialized message unread on the strength of the method
   name alone. On a client ping or initialized message the params and any extra top level member are
@@ -77,9 +70,9 @@ All notable changes to Sunglasses are documented here.
 
 ### Continuous integration
 
-- The cost table that splits each long integrity leg into two parts is measured again from real run
-  times, so the two parts take about the same time and the slowest leg no longer runs past its cap.
-  The split logic and the gates are unchanged. (#371)
+- The cost table that splits each long integrity leg into two parts is rebalanced from measured run
+  times, which are estimates and not a promise about any one run. The split logic and the gates
+  are unchanged. (#371)
 
 ### Documentation
 
