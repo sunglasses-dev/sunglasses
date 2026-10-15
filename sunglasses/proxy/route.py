@@ -28,8 +28,8 @@ import json
 import pathlib
 import uuid
 
-from . import (activation, bounds, envelope, framing, inspection, policy, pump,
-               receipts, selector, snapshot, worker)
+from . import (activation, bounds, envelope, framing, handshake, inspection,
+               policy, pump, receipts, selector, snapshot, worker)
 
 # ONE DEFINITION, ALIASED RATHER THAN RE-SPELLED. These were two more copies
 # of a vocabulary `pump` already owns: `ORIGIN_CLIENT`, `ORIGIN_UPSTREAM`,
@@ -702,6 +702,21 @@ class Route:
             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
             catalog=self.catalog))
 
+    def _decline_probe(self, request_id):
+        """The `server/discover` probe, answered the way an older peer answers.
+
+        Not a refusal. The pump already reserved and settled this attempt when
+        it reported the admission refusal, so there is nothing to settle here
+        either (the `_withhold_refusal` argument). The client gets plain
+        JSON-RPC "Method not found", its own id in its own type, and upstream
+        sees nothing.
+        """
+        # No `method` field: the receipt log only takes methods the selector
+        # knows, and this one is by definition not among them. The event name
+        # says which probe it was.
+        self._record("PROBE_DECLINED", id_type=type(request_id).__name__)
+        self._to_client(envelope.method_not_found(request_id))  # to-client-exempt: a declined probe was refused AT ADMISSION and the pump already settled it under its own token, so no obligation is owed here
+
     # ── requests ───────────────────────────────────────────────────────────
 
     def _client_request(self, raw, message, method):
@@ -720,6 +735,10 @@ class Route:
             closed = self.session.closed_with()
             if closed:
                 self._answer_close(closed, request_id)
+            elif (method == handshake.DISCOVER_PROBE_METHOD
+                  and (not refusal or refusal[0].cause is None
+                       or refusal[0].cause.reason == REASON_UNINSPECTED_METHOD)):
+                self._decline_probe(request_id)
             else:
                 self._withhold_refusal(request_id, refusal[0] if refusal
                                        else None)
