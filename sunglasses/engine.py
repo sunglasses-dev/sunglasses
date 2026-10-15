@@ -2720,13 +2720,14 @@ class SunglassesEngine:
     _ENDS_CAN_BE_ASKED: dict = {}
 
     @staticmethod
-    def _ending_within(rx, slack: int):
+    def _ending_within(rx, slack: int, tail: int = 0):
         """`rx` with the match required to end within `slack` characters of where the text
-        ends (the end the caller gives as `endpos`): `match(text, start, end)` says whether
-        some match from `start` ends in (end - slack - 1, end]. With `slack` 0 the match
-        must end exactly at `end`. Kept per compiled pattern and slack."""
+        ends, leaving `tail` characters after it (the end the caller gives as `endpos`):
+        `match(text, start, end)` says whether some match from `start` ends in
+        (end - slack - tail - 1, end - tail]. With `slack` 0 the match must end exactly
+        `tail` characters before `end`. Kept per compiled pattern, slack and tail."""
         cache = SunglassesEngine._ENDING_WITHIN
-        found = cache.get((rx, slack))
+        found = cache.get((rx, slack, tail))
         if found is None:
             if len(cache) >= 4096:
                 cache.clear()
@@ -2734,19 +2735,29 @@ class SunglassesEngine:
             head = re.match(r"(?:\(\?[aiLmsux]+\))*", pattern).group(0)
             # a verbose pattern may end in a comment, which would swallow the closing bracket
             end = "\n" if rx.flags & re.VERBOSE else ""
-            found = cache[(rx, slack)] = re.compile(
-                head + "(?:" + pattern[len(head):] + end + r")(?=[\s\S]{0,%d}\Z)" % slack, rx.flags)
+            found = cache[(rx, slack, tail)] = re.compile(
+                head + "(?:" + pattern[len(head):] + end + r")(?=[\s\S]{%d,%d}\Z)" % (tail, tail + slack),
+                rx.flags)
         return found
 
     @staticmethod
+    def _match_ending_in(rx, text: str, start: int, lo: int, hi: int):
+        """The match of `rx` from `start` that ends in (lo, hi], or None. The character
+        after `hi` is kept, because a word boundary at the end of a match reads it: cut at
+        `hi` itself, a boundary before a word character would not be there."""
+        stop = min(len(text), hi + 1)
+        return SunglassesEngine._ending_within(rx, hi - lo - 1, stop - hi).match(text, start, stop)
+
+    @staticmethod
     def _ends_can_be_asked(rx) -> bool:
-        """Whether `rx` is a rule `_ending_within` can be trusted on. The text is cut where the
-        match is asked to end, so a rule is accepted only when it is made of constructs that
-        read nothing but the matched text itself: literals and sets, repeats, groups,
-        alternations, `^`, `$`, `\\A`, `\\Z` and `\\b`. Anything else is declined: an assertion
-        of any kind (look-ahead or look-behind, either polarity), a back-reference, a scoped
-        flag group, a non-boundary, a conditional, an atomic group or possessive repeat. So is a rule that
-        does not parse here or whose rewrite does not compile."""
+        """Whether `rx` is a rule `_ending_within` can be trusted on. The text is cut one
+        character after where the match is asked to end, so a rule is accepted only when it is
+        made of constructs that read nothing but the matched text and the one character after
+        it: literals and sets, repeats, groups, alternations, `^`, `$`, `\\A`, `\\Z` and `\\b`.
+        Anything else is declined: an assertion of any kind (look-ahead or look-behind, either
+        polarity), a back-reference, a scoped flag group, a non-boundary, a conditional, an
+        atomic group or possessive repeat. So is a rule that does not parse here or whose
+        rewrite does not compile."""
         cache = SunglassesEngine._ENDS_CAN_BE_ASKED
         found = cache.get(rx)
         if found is None:
@@ -2782,8 +2793,9 @@ class SunglassesEngine:
 
                 found = accepted(parser.parse(rx.pattern, rx.flags))
                 if found:
-                    SunglassesEngine._ending_within(rx, 0)
-                    SunglassesEngine._ending_within(rx, 1)
+                    for tail in (0, 1):
+                        SunglassesEngine._ending_within(rx, 0, tail)
+                        SunglassesEngine._ending_within(rx, 1, tail)
             except Exception:
                 found = False
             cache[rx] = found
@@ -2837,7 +2849,7 @@ class SunglassesEngine:
         attempts = self.REMAINDER_ATTEMPTS_CAP
         for a, b in gaps:
             attempts -= 1
-            if attempts < 0 or self._ending_within(rx, b - a - 1).match(text, start, b):
+            if attempts < 0 or self._match_ending_in(rx, text, start, a, b):
                 return False
         masked = None
         offset = 0
@@ -2848,9 +2860,9 @@ class SunglassesEngine:
                 if hi <= lo:
                     continue
                 attempts -= 1
-                found = self._ending_within(rx, hi - lo - 1).match(text, start, hi)
                 if attempts < 0:
                     return False
+                found = self._match_ending_in(rx, text, start, lo, hi)
                 if not found:
                     continue
                 if masked is None:
@@ -2863,8 +2875,8 @@ class SunglassesEngine:
                     masked = text[offset:start] + "".join(body)
                 end = found.end()
                 attempts -= 1
-                if attempts < 0 or not self._ending_within(rx, 0).match(
-                        masked, start - offset, end - offset):
+                if attempts < 0 or not self._match_ending_in(
+                        rx, masked, start - offset, end - offset - 1, end - offset):
                     return False
                 todo.append((lo, end - 1))
                 todo.append((end, hi))

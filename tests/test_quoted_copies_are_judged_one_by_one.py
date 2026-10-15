@@ -661,7 +661,7 @@ def test_a_verbose_rule_that_ends_in_a_comment_is_accounted(engine, monkeypatch)
 def test_a_rule_whose_end_form_does_not_compile_is_declined(engine, monkeypatch):
     rx = re.compile("zz.{0,3}qq")
 
-    def broken(self, rx, slack):
+    def broken(*args):
         raise re.error("no")
     monkeypatch.setattr(SunglassesEngine, "_ending_within", broken)
     SunglassesEngine._ENDS_CAN_BE_ASKED.pop(rx, None)
@@ -717,3 +717,63 @@ def test_the_text_before_the_hit_is_part_of_the_blanked_text(engine, monkeypatch
     spans = [(1, 6, 6), (10, 13, 13)]
     assert rx.match(text, 1).end() == len(text)
     assert _accounted(engine, monkeypatch, rx, text, 1, 6, 13, spans) is False
+
+
+def test_a_boundary_at_the_end_of_a_match_reads_the_character_after_it(engine):
+    """A boundary between a non-word character and a word character is there only while the
+    word character is. Cut at the end of the match it vanishes; the end is asked with the
+    one character that follows kept."""
+    rx = re.compile(r"aa\s\b")
+    text = "aa bb"
+    assert rx.match(text, 0).end() == 3
+    assert not engine._ending_within(rx, 0).match(text, 0, 3)   # cut at the end: boundary gone
+    assert engine._match_ending_in(rx, text, 0, 2, 3)           # one character kept
+    assert not engine._match_ending_in(rx, text, 0, 3, 4)       # only the ends in (3, 4]
+    assert engine._match_ending_in(re.compile(r"aa\b"), "aa", 0, 1, 2)   # nothing follows
+    assert engine._match_ending_in(re.compile(r"aa\b"), "aa bb", 0, 1, 2)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("ending", [r" \b", r" (?:\b){1,2}"], ids=["boundary", "repeated-boundary"])
+def test_a_live_endpoint_that_needs_a_boundary_stays_live(ending, channel):
+    """The first alternative can reach the end of the last quote only through the live word
+    MIDDLE, and ends at a boundary there; the second alternative covers the quoted copies.
+    The boundary needs the character after it, so it must not be lost when the end is asked."""
+    pattern = (r"(?is)\bignroe.{0,200}MIDDLE.{0,200}prevoius" + ending + "|"
+               + BASE.removeprefix("(?is)").replace("80", "200") + r"\.")
+    engine = _custom(pattern, channel)
+    quoted = 'Never say "' + PHRASE + '."'
+    text = quoted + " MIDDLE " + quoted
+    assert engine.scan(quoted, channel=channel).decision == "allow_redacted"
+    assert engine.scan(PHRASE + " MIDDLE " + PHRASE + ".", channel=channel).decision == "block"
+    assert engine.scan(text, channel=channel).decision == "block"
+
+
+def test_an_end_next_to_the_end_found_is_asked_on_the_left(engine, monkeypatch):
+    """`a.*d` ends at 6, `a.*b.*c` at 5: the end to the left of the one found first (inside
+    the last quote) is a live end, since "b" is not covered."""
+    spans = [(0, 1, 1), (4, 6, 6)]
+    rx = re.compile("a.*d|a.*b.*c")
+    assert _accounted(engine, monkeypatch, rx, "a b cd", 0, 1, 6, spans) is False
+
+
+def test_an_end_next_to_the_end_found_is_asked_on_the_right(engine, monkeypatch):
+    spans = [(0, 1, 1), (4, 6, 5)]
+    rx = re.compile("a.*c|a.*b.*d")
+    assert _accounted(engine, monkeypatch, rx, "a b cd", 0, 1, 6, spans) is False
+
+
+def test_no_more_matches_are_made_than_the_attempts_cap_allows(engine, monkeypatch):
+    rx = re.compile("aa.{0,30}bb")
+    spans = [(0, 5, 5), (5, 8, 8), (8, 11, 11)]
+    real = SunglassesEngine._match_ending_in
+    for cap in range(14):
+        calls = []
+
+        def counting(*args):
+            calls.append(1)
+            return real(*args)
+        monkeypatch.setattr(SunglassesEngine, "_match_ending_in", staticmethod(counting))
+        monkeypatch.setattr(SunglassesEngine, "REMAINDER_ATTEMPTS_CAP", cap)
+        _accounted(engine, monkeypatch, rx, "aa bb bb bb", 0, 5, 11, spans)
+        assert len(calls) <= cap, cap
