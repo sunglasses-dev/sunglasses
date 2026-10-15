@@ -1,10 +1,12 @@
 """A hook input that is not a readable tool call is a hook failure, not a clean pass.
 
-The hook answered every unreadable input (empty, not JSON, not an object, a
-tool name that is not a string, a number past Python's digit limit) with `{}` and
-exit 0. That reads to the host as "checked, nothing found" when nothing was
-checked, and it made Claude Code's `onFailure` setting irrelevant for exactly the
-inputs the hook could not read.
+Main answered an unreadable hook input in one of two ways. Valid JSON that is
+not an object got an `ask` (by accident, see below). Every other class (empty,
+not JSON, a tool name that is not a string, a `tool_input` that is not an
+object, a number past Python's digit limit) got `{}` and exit 0, which defers to
+the normal permission flow and reads to the host as "checked, nothing found"
+when nothing was checked. It also made Claude Code's `onFailure` setting
+irrelevant for exactly the inputs the hook could not read.
 
 Now the process ends with exit 1 and no stdout. The host applies the install's
 `onFailure`: "block" refuses the call, anything else is the normal permission
@@ -60,6 +62,11 @@ GARBAGE = {
                    "WRONG_SHAPE"),
     "input-number": (json.dumps({"tool_name": "Bash", "tool_input": 1}),
                      "WRONG_SHAPE"),
+    # The one readable-looking case that moves: main read an empty list as "no
+    # input" and decided it clean (`{}`, exit 0). It is now a wrong shape, so a
+    # failure; under every install state that is the same permission routing.
+    "input-empty-array": (json.dumps({"tool_name": "Bash", "tool_input": []}),
+                          "WRONG_SHAPE"),
 }
 
 

@@ -2019,8 +2019,10 @@ def _read_envelope(stdin_text, too_deep):
     string and whose `tool_input`, if present, is an object. A missing field is
     not a problem: that is the old behaviour and it stays. Anything else was
     not sent by the host this hook is installed for, so there is no tool call
-    to decide, and the old answer (an empty `defer`, exit 0) read as "checked,
-    nothing found" when nothing had been checked. `payload` is `{}` whenever
+    to decide. Main answered two baseline classes differently: valid JSON that
+    is not an object was an `ask`, and every other unreadable input was `{}`
+    with exit 0, which defers to the normal permission flow and so reads as
+    "nothing found" when nothing had been checked. `payload` is `{}` whenever
     there is a problem, so unreadable fields never reach the receipt.
     """
     import json as _json
