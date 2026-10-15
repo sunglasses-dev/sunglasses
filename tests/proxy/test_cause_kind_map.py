@@ -233,7 +233,8 @@ def test_the_only_reason_that_closes_without_a_kind_is_over_budget():
 THE_CATALOG = frozenset({
     "ID_NAMESPACE_CLAIMED", "ID_REUSED_WHILE_SETTLING", "ID_REUSED_WHILE_PENDING",
     "RESPONSE_NOT_PENDING", "RESPONSE_SHAPE_MISMATCH", "UPSTREAM_EXIT_WITH_PENDING",
-    "FRAME_UNTERMINATED", "INITIALIZE_RESULT_SHAPE", "TOMBSTONE_TABLE_FULL",
+    "FRAME_UNTERMINATED", "INITIALIZE_RESULT_SHAPE",
+    "INITIALIZE_RESULT_WITHHELD", "TOMBSTONE_TABLE_FULL",
     "HANDOFF_GENERATION_MISMATCH", "FRAME_INVALID_UTF8", "FRAME_JSON_CONSTANT",
     "FRAME_DUPLICATE_KEY", "FRAME_UNPARSEABLE", "FRAME_TOP_LEVEL_NOT_OBJECT",
     "FRAME_JSONRPC_VERSION", "FRAME_ENVELOPE_INVALID", "FRAME_ID_TYPE",
@@ -259,7 +260,7 @@ def test_the_catalog_is_pinned_here_not_only_validated_at_construction():
         "added without declaring": sorted(CAUSE_KINDS - THE_CATALOG),
         "declared but gone": sorted(THE_CATALOG - CAUSE_KINDS),
     }
-    assert len(THE_CATALOG) == 26
+    assert len(THE_CATALOG) == 27
 
 
 def test_the_receipt_field_set_is_exactly_the_four_fixed_vocabularies():
