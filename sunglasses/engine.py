@@ -2133,6 +2133,15 @@ class SunglassesEngine:
         """True when view[a:b] holds only blanks and boundary characters."""
         return all(c.isspace() or c in self._LEADIN_PUNCT for c in view[a:b])
 
+    _LEADIN_BREAKS = frozenset(".!?;:\n([{")
+
+    def _leadin_break(self, text: str, match_start: int) -> str:
+        """The sentence break a lead-in match opens on, or "" when it opens on anything
+        else. Quotes stay out: a quote the match opens on is the quoted-example shape,
+        which _quoted_gap_holds reads."""
+        at = text[match_start:match_start + 1]
+        return at if at in self._LEADIN_BREAKS else ""
+
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
         """
         Check if negation/framing context before a matched keyword should
@@ -2161,7 +2170,10 @@ class SunglassesEngine:
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
                 continue
             gap = before_text[m.end():]
-            if not (self._negation_governs(gap)
+            # A rule whose lead-in consumed the sentence break starts its match ON the
+            # break, so the gap above stops short of it. The break is part of what
+            # lies between the cue and the payload and ends the clause.
+            if not (self._negation_governs(gap + self._leadin_break(text, match_start))
                     or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
                 continue
             if align is None or align.holds(

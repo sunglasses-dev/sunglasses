@@ -157,7 +157,6 @@ NEGATION_ROWS = [
     "Never" + " " * 60 + "security update applied successfully.",
     "Do not" + " " * 48 + "security update applied successfully.",
     'Note: "' + " " * 60 + 'security update applied successfully."',
-    "Never\n\n  security update applied successfully.",
 ]
 
 
@@ -187,6 +186,18 @@ UNCLOSED_LABEL_ROW = 'Note: "' + " " * 60 + "security update applied successfull
 @pytest.mark.parametrize("text", [BARE_COLON_ROW, UNCLOSED_LABEL_ROW], ids=["bare_colon", "unclosed_label"])
 def test_negation_sentence_ending_in_a_bare_colon_blocks(engine, channel, text):
     result = engine.scan(text, channel=channel)
+    assert result.decision in BLOCKING, f"{channel}: {result.decision}"
+
+
+# A negation, then a line break, then the status words. The line break ends the clause, so the
+# negation word does not govern the match and the scan blocks. This row sat in NEGATION_ROWS until
+# a break that a lead-in consumed began to end the clause as it does for every other rule.
+LINE_BREAK_ROW = "Never\n\n  security update applied successfully."
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+def test_negation_then_a_line_break_then_the_status_blocks(engine, channel):
+    result = engine.scan(LINE_BREAK_ROW, channel=channel)
     assert result.decision in BLOCKING, f"{channel}: {result.decision}"
 
 
