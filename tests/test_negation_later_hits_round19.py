@@ -368,12 +368,25 @@ def _functions_reached(overrides=None):
     return seen
 
 
+def _unparse(node):
+    """ast.unparse, with a tuple assignment target written without brackets.
+
+    Python 3.9 writes `(a, b) = x` where 3.11 and later write `a, b = x`; a ledger key
+    has to read the same on every interpreter the suite runs on.
+    """
+    if isinstance(node, ast.Assign) and any(isinstance(t, ast.Tuple) for t in node.targets):
+        targets = [", ".join(ast.unparse(e) for e in t.elts) if isinstance(t, ast.Tuple) else ast.unparse(t)
+                   for t in node.targets]
+        return " = ".join(targets + [ast.unparse(node.value)])
+    return ast.unparse(node)
+
+
 def _statements(name, source):
     """Every statement in the function that binds a name or returns a value, as 'function: source'."""
     keys = []
     for node in ast.walk(ast.parse(textwrap.dedent(source))):
         if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.NamedExpr, ast.Return)):
-            keys.append("%s: %s" % (name, ast.unparse(node)))
+            keys.append("%s: %s" % (name, _unparse(node)))
         elif isinstance(node, (ast.For, ast.AsyncFor)):
             keys.append("%s: for %s in %s" % (name, ast.unparse(node.target), ast.unparse(node.iter)))
         elif isinstance(node, ast.comprehension):
