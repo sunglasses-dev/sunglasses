@@ -248,7 +248,7 @@ PRODUCER_STEPS = {
     "decode_url_encoding", "decode_hex_escapes", "decode_shadow_ascii", "decode_base64_segments",
 }
 AFTER_THE_PASSES = {"decode_leetspeak", "strip_delimiter_padding", "collapse_whitespace"}
-VIEWS_BEHIND_THE_SEPARATOR = {"decode_rot13"}
+VIEWS_BEHIND_THE_SEPARATOR = {"decode_rot13", "controls_as_spaces"}
 RECURSION = {"normalize", "normalize_with_length"}
 BUILTINS = {"len", "range"}
 METHODS_ON_THE_TEXT = {
@@ -256,7 +256,7 @@ METHODS_ON_THE_TEXT = {
     "text.lower": "lower-casing after the passes",
     "re.sub": "the l-for-I view, behind the separator",
     "CONTROL_CHARS.search": "whether a control character is present; no control, no extra view",
-    "CONTROL_CHARS.sub": "the control view: each control read as a blank, a copy behind the separator",
+    "CONTROL_CHARS.sub": "the plain view's deletion of the controls, compared with the control view to see whether it would only repeat it",
 }
 SLICES = {"text[::-1]": "the reversed view, behind the separator"}
 
@@ -265,9 +265,12 @@ STATEMENTS = {
     # normalize_with_length, in order
     "normalize_with_length: text = text.replace(VIEW_SEP, ' ')": "separator read as a blank",
     "normalize_with_length: shadow = decode_shadow_ascii(text)": "producer: shadow view",
-    "normalize_with_length: spaced = CONTROL_CHARS.sub(' ', text) if CONTROL_CHARS.search(text) else None":
-        "control view: a copy of the input with each control read as a blank, taken before the plain view "
-        "deletes them; the plain view and the raw offsets are not touched",
+    "normalize_with_length: spaced = controls_as_spaces(text) if CONTROL_CHARS.search(text) else None":
+        "control view: a copy of the input with each run of controls read as one blank, taken before the plain "
+        "view deletes them; the plain view and the raw offsets are not touched",
+    "normalize_with_length: spaced = None":
+        "the control view is dropped when it equals the plain text with the controls deleted, so it adds no hit "
+        "the plain view does not already have",
     "normalize_with_length: text = strip_invisible(text)": "producer",
     "normalize_with_length: text = normalize_unicode(text)": "producer",
     "normalize_with_length: text = replace_homoglyphs(text)": "producer",
@@ -294,6 +297,11 @@ STATEMENTS = {
         "shadow view's own pipeline, behind the separator",
     "normalize_with_length: return (text, folded_length)": "the result",
     # the functions it reaches
+    "controls_as_spaces: a, b = (run.start(), run.end())": "control view: where the run stands",
+    "controls_as_spaces: return ''":
+        "control view: a run beside blank space or at an edge is deleted, as the plain view deletes it",
+    "controls_as_spaces: return ' '": "control view: any other run is one blank",
+    "controls_as_spaces: return _CONTROL_RUN.sub(one, text)": "control view: the text with each run replaced",
     "strip_invisible: return INVISIBLE_CHARS.sub('', text)": "producer",
     "normalize_unicode: return unicodedata.normalize('NFKC', text)": "producer",
     "replace_homoglyphs: return ''.join((HOMOGLYPHS.get(c, c) for c in text))": "producer",

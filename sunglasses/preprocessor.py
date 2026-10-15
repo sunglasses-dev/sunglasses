@@ -67,6 +67,20 @@ LEET = {
 # reads them as spaces, and escape stays because a rule matches it raw.
 CONTROL_RANGES = '\x00-\x08\x0e-\x1a\x7f-\x84\x86-\x9f'
 CONTROL_CHARS = re.compile('[' + CONTROL_RANGES + ']')
+_CONTROL_RUN = re.compile('[' + CONTROL_RANGES + ']+')
+
+
+def controls_as_spaces(text: str) -> str:
+    """The text with each run of control characters read as one space, except where the run
+    already stands next to blank space or at an edge of the text: deleting it there leaves
+    the same words as reading it as a space, and the extra space would only double a blank
+    that the normalizer collapses again."""
+    def one(run):
+        a, b = run.start(), run.end()
+        if a == 0 or b == len(text) or text[a - 1].isspace() or text[b].isspace():
+            return ""
+        return " "
+    return _CONTROL_RUN.sub(one, text)
 
 # Zero-width and invisible Unicode characters
 INVISIBLE_CHARS = re.compile(
@@ -123,7 +137,10 @@ def normalize_with_length(text: str, record=None) -> tuple:
     # a NUL then merges with the word before it and no longer decodes. So the
     # same text with each control read as a space is kept as a view of its own,
     # behind the separator, and decoded on its original boundaries.
-    spaced = CONTROL_CHARS.sub(" ", text) if CONTROL_CHARS.search(text) else None
+    spaced = controls_as_spaces(text) if CONTROL_CHARS.search(text) else None
+    if spaced is not None and spaced == CONTROL_CHARS.sub("", text):
+        # Every control stands next to blank space: the view would repeat the plain one.
+        spaced = None
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
