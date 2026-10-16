@@ -7,6 +7,13 @@ R=Path(__file__).resolve().parents[1]
 def specimen(name):
  tree=ast.parse((R/'stack/tests/test_proxy_serve.py').read_text())
  return next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id==name for t in n.targets))
+def read_pgid(path,tries=20,pause=0.05):
+ # The peer may still be writing when the proxy is killed. An empty or partial file is retried a few
+ # times and then given up on: a teardown that cannot name the group must not fail the test.
+ for _ in range(tries):
+  try:return json.loads(path.read_text())['pgid']
+  except (ValueError,KeyError,OSError):time.sleep(pause)
+ return None
 def wire(m):return (json.dumps(m,separators=(',',':'))+'\n').encode()
 def req(i,method='ping',params=None):
  m={'jsonrpc':'2.0','id':i,'method':method}
@@ -84,8 +91,10 @@ class Artifact:
    os.killpg(self.p.pid,signal.SIGKILL);self.p.wait(timeout=3)
   c=self.root/'child.json'
   if c.exists():
-   try:os.killpg(json.loads(c.read_text())['pgid'],signal.SIGKILL)
-   except (ProcessLookupError,PermissionError):pass
+   pgid=read_pgid(c)
+   if pgid is not None:
+    try:os.killpg(pgid,signal.SIGKILL)
+    except (ProcessLookupError,PermissionError):pass
   self.reader.join(timeout=1) if self.reader.is_alive() else None
   self.err.close()
  def arrived(self):
@@ -330,3 +339,12 @@ def test_an_explicit_timeout_is_still_honoured():
  r=_Responder(delay=5.0)
  with pytest.raises(AssertionError,match="within 1s"):
   Artifact.answer(r,1,timeout=1)
+
+def test_a_child_file_that_is_empty_or_partial_does_not_fail_the_teardown(tmp_path):
+ c=tmp_path/'child.json'
+ c.write_text('');assert read_pgid(c,tries=3,pause=0.01) is None
+ c.write_text('{"pid": 1, "pg');assert read_pgid(c,tries=3,pause=0.01) is None
+ c.write_text('{"pid": 1}');assert read_pgid(c,tries=3,pause=0.01) is None
+ c.write_text('');threading.Timer(0.1,lambda:c.write_text('{"pid": 7, "pgid": 7}')).start()
+ assert read_pgid(c,tries=50,pause=0.02)==7
+ c.write_text('{"pid": 8, "pgid": 8}');assert read_pgid(c)==8

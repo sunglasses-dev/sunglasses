@@ -26,7 +26,7 @@
     "board-level decision spoof"
   ],
   "regex": [
-    "(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\\s+(?:policy|governance|compliance|authority|board[- ]level)\\s+(?:tag|preamble|directive|decision|override)|(?:compliance\\s+update|policy\\s+(?:update|supersede)|decision\\s*:?\\s*must[_ ]run)\\s+.{0,80}?(?:supersede|override|outrank|inverts?)\\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\\s+(?:content|chunk|payload|context)\\s+(?:outranks?|overrides?|beats?|exceeds?)\\s+(?:canonical|board|system|mission)\\s+(?:policy|priority|directive))"
+    "(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\\s+(?:policy|governance|compliance|authority|board[- ]level)\\s+(?:tag|preamble|directive|decision|override)|(?:compliance\\s+update|policy\\s+(?:update|supersede)|decision\\s*(?::\\s*)?must[_ ]run)\\s+.{0,80}?(?:supersede|override|outrank|inverts?)\\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\\s+(?:content|chunk|payload|context)\\s+(?:outranks?|overrides?|beats?|exceeds?)\\s+(?:canonical|board|system|mission)\\s+(?:policy|priority|directive))"
   ],
   "examples": {
     "malicious": [],

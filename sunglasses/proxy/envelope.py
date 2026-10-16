@@ -74,6 +74,24 @@ def _number(value, field):
     return value
 
 
+METHOD_NOT_FOUND_CODE = -32601
+METHOD_NOT_FOUND_MESSAGE = "Method not found"
+
+
+def method_not_found(request_id):
+    """The plain JSON-RPC answer for a method this proxy does not speak.
+
+    Used for exactly one method, the `server/discover` probe, and for nothing
+    that carries content: a probe has no payload to inspect and no obligation
+    to withhold, and a client that speaks the earlier protocol era reads
+    exactly this error as "legacy peer, fall back to initialize". No data
+    member, so there is nowhere for peer text to ride out on.
+    """
+    return {"jsonrpc": "2.0", "id": request_id,
+            "error": {"code": METHOD_NOT_FOUND_CODE,
+                      "message": METHOD_NOT_FOUND_MESSAGE}}
+
+
 def withheld(*, request_id, reason_code, rule, accepted, status,
              inspection_complete, inspected_utf8_bytes, observed_content_bytes,
              elapsed_ms, rule_ids=(), catalog=frozenset(), budget=None,

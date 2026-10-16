@@ -12,7 +12,7 @@
   "description": "A repair evaluator accepts generated code as secure because the insecure pattern disappeared, without requiring the replacement defense.",
   "keywords": [],
   "regex": [
-    "(?is)^\\s*(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:require|add|verify|preserve)|do\\s+not\\s+(?:accept|credit|trust)|fail(?:s|ed)?\\s+closed)\\b)(?=.*\\b(?:repair|patch|fix|remediat\\w*|generated\\s+code)\\b)(?=.*\\b(?:insecure|vulnerab\\w*|unsafe)\\b)(?=.*\\b(?:removed|disappeared|gone|eliminated|no\\s+longer\\s+present)\\b)(?=.*\\b(?:no|without|missing|omitted|lacks?)\\b.{0,80}\\b(?:defen[cs]e|parameteri[sz]|escape|sanitize|authorize|validation|access\\s+control|authentication|prepared\\s+statement)\\b)(?=.*\\b(?:accept|accepted|pass|passed|greenlit|secure|safe|correct|release|approve|approval|evidence|verdict)\\b).*$"
+    "(?is)^(?:(?=(\\s*))\\1)(?!.*\\b(?:security\\s+(?:guide|training|review|policy)|unit\\s+test|negative\\s+fixture|incident\\s+report|postmortem|defensive|blocked|quarantined|must\\s+(?:require|add|verify|preserve)|do\\s+not\\s+(?:accept|credit|trust)|fail(?:s|ed)?\\s+closed)\\b)(?=.*\\b(?:repair|patch|fix|remediat\\w*|generated\\s+code)\\b)(?=.*\\b(?:insecure|vulnerab\\w*|unsafe)\\b)(?=.*\\b(?:removed|disappeared|gone|eliminated|no\\s+longer\\s+present)\\b)(?=.*\\b(?:no|without|missing|omitted|lacks?)\\b.{0,80}\\b(?:defen[cs]e|parameteri[sz]|escape|sanitize|authorize|validation|access\\s+control|authentication|prepared\\s+statement)\\b)(?=.*\\b(?:accept|accepted|pass|passed|greenlit|secure|safe|correct|release|approve|approval|evidence|verdict)\\b).*$"
   ],
   "examples": {
     "malicious": [],

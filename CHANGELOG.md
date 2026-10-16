@@ -3,6 +3,471 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [0.6.9] — 2026-10-15
+
+### Added
+
+- The command line now has a `sunglasses mcp` command and a `sunglasses-mcp` console script that
+  start the MCP server, so a client that needs a console command to launch a listed Python package
+  can start it. Both routes run the same server as `python -m sunglasses.mcp`, whose entry is
+  unchanged, and both answer help and version without starting anything. No scanner code changes.
+  (#365)
+
+### Changed
+
+- GLS-PE-111 now covers more wordings of an instruction to take the proxy out of the client config.
+  This is a bounded expansion of the existing rule, so the rule count does not move. Some quoted or
+  fenced examples can be flagged too, and some wordings are still not covered and are tracked as
+  known limits. (#369)
+
+- A negation or a defensive framing clause now lowers a rule only when it covers every occurrence of
+  that rule in the views that are read. A negated or framed hit is held back until every view has
+  been read, and the old limit on how many later occurrences were walked is replaced by a reading
+  budget that is reserved before each search. A search that does not fit the budget is judged live,
+  which is the stricter direction. Some texts that were redacted are now blocked. The budget bounds
+  reads and not time, a few steps are not charged and the limits are tracked. (#372)
+
+- A sentence break after a negation now ends the negation's reach for the rules whose match opens on
+  that break. Six regexes of two rules began on the break, so the negation was taken to cover a
+  clause it never reached, and a live instruction after a negated sentence was lowered to review.
+  Those rules, and any other rule whose match opens on a break, now decide such text as they decide
+  the same words without the negation, so some texts that were redacted are now blocked. Negation
+  coverage inside one clause is unchanged and further limits are tracked. (#375)
+
+### Fixed
+
+- The proxy no longer refuses every server that negotiates protocol version 2025-11-25, which is a
+  version current clients offer, so a wrapped server connects again. The discover probe that newer
+  clients send first is now declined with Method not found and not forwarded, so the client falls
+  back to a normal initialize. Every other unknown method is still refused and the version check
+  stays exact. The decline is recorded in the receipts as a new event kind, and a verifier that
+  predates it reads that row as an unknown event. (#385)
+
+- The initialize result previously bypassed inspection. It now passes through the scan after the
+  existing negotiation and filtering, and a clean result continues as before. A result the scan
+  withholds ends the session, because the handshake is what the rest of the session rests on, and
+  the refusal carries the scan's own reason. A frame with any member beside the envelope and the
+  result is withheld whole. (#376)
+
+- The proxy no longer forwards a ping or an initialized message unread on the strength of the method
+  name alone. On a client ping or initialized message the params and any extra top level member are
+  now scanned, and a clean message is forwarded unchanged. A ping error is scanned as a reply. A
+  ping result that holds anything is withheld, which includes a result whose only member is the
+  metadata field, so a server that answers a ping that way now has that answer withheld. A scalar
+  ping result is withheld too, and an initialized message whose params are a list is withheld while
+  the session continues. A notification the proxy withholds now leaves a receipt row with its
+  reason. (#386)
+
+- `sunglasses scan --channel` now offers every channel the engine documents. It kept a list of five,
+  so a tool result, an agent input, code or a prompt could not be scanned from the shell although
+  the library and the MCP server accepted them. The command line now reads the engine's own list, so
+  the two cannot drift apart. What each channel scans is unchanged. (#374)
+
+- Five rules no longer take time that grows with the square of a long run of blank space around an
+  optional token. The blanks now belong to one quantifier, in GLS-SC-018, GLS-CF-251, GLS-TMS-243,
+  GLS-PI-025 and GLS-AW-713. The new regexes were compared with the old ones on hand written cases
+  and on seeded random text and matched the same text. No id, count or channel changes. (#378)
+
+### Continuous integration
+
+- The cost table that splits each long integrity leg into two parts is rebalanced from measured run
+  times, which are estimates and not a promise about any one run. The split logic and the gates
+  are unchanged. (#371)
+
+### Documentation
+
+- The stats file now carries the day 0.6.8 was published. The counts, the code, the rules and the
+  tests do not change. (#373)
+
+## [0.6.8] — 2026-10-12
+
+### Added
+
+- The PDF reader now reads form field values and the alternate and tooltip text of a field, JavaScript
+  actions and text attachments. Each piece is labelled by where it came from, so a finding names the
+  field, the action or the attachment. Script actions on outline items, files listed as associated
+  files and a field value held on its parent are read as well. What is not read is now named in the
+  result instead of passing as clean. That covers XFA form data, an attachment that is itself a PDF
+  or a PostScript or archive or binary file, anything past a cap, a tree nested too deep, a stream
+  that does not end where it should and text that does not decode. The decision stays allow when
+  nothing is found, the result is marked incomplete, a warning is printed and the command line
+  exits 3. A threat finding still comes first. (#349)
+
+### Changed
+
+- A PDF page that paints a picture and holds no readable text, such as a scanned page or a
+  screenshot printed to PDF, is now named as not inspected. Before, the scan found nothing, raised
+  nothing and returned allow with the inspection marked complete. Now the decision stays allow when
+  nothing is found, the result is marked incomplete and not clean, a warning names the page and the
+  picture count, and the command line exits 3. A picture is looked for through the routes a page
+  draws one by, which are an image, a form, an inline image, a soft mask, a Type3 font and the
+  appearance of a shown annotation. A resource entry that nothing draws does not count, so a blank
+  page with an unused picture stays complete. A page with one stray character and a picture is
+  named too. The search is bounded, so PDF visual coverage remains partial. A threat finding still
+  comes first. (#348)
+
+- An image over a pixel budget is refused before it is decoded. A small file can hold a very large
+  picture, and the text reader, the hidden text pass, the metadata reader and the QR reader used to
+  decode it in full before the scan knew whether any reader could run. The size is now read from the
+  file first, in one place, and an image over the budget is not decoded by any reader. The refusal
+  is named in the failures, so the scan reports the file as not fully inspected and not clean. A
+  file is opened only as PNG and JPEG and GIF and BMP and TIFF and WebP, judged by its first bytes
+  and not by its name. Any other container is named and not opened, even under the budget, because
+  those readers cannot be bounded from outside. A GIF is planned from its own block structure so
+  that no frame over the budget is ever allocated. (#346)
+
+- A negation now downgrades a match to review only when it governs the clause the match sits in. The
+  old test was a plain substring search for a negation word within a short distance, and review maps
+  to allow_redacted, so a live instruction placed after a short negation was let through. The check
+  is now a bounded clause check made by position in the raw text, so a copy of the same words
+  elsewhere cannot vouch for a match, and a rule keeps the downgrade only when every one of its hits
+  is covered. Misleading context around a negation now blocks more often. This narrows the
+  downgrade and does not close the finding, and known limits are tracked. (#345)
+
+- A doubled space between two words of a negated clause is read as the one space it
+  collapses to, within bounds. A sentence that was downgraded with one space and blocked with two
+  is now decided the same way with both. The normalization is bounded and the stricter clause checks
+  still apply around the cue and the match. (#361)
+
+- A framing word that describes an attack now downgrades a match to review only when it leads the
+  clause the match sits in. The old test was a plain substring search anywhere in a window before
+  the match. The check reuses the bounded clause walk of the negation rule. Misleading framing now
+  blocks more often, and some legitimate descriptions of an attack now block as well. The finding is
+  narrowed and not closed, and known limits are tracked. (#347)
+
+### Fixed
+
+- The regex lane now reads a folded view, so rules that live on a regex catch more text hidden with
+  invisible characters, soft hyphens or look alike letters. The lane read the raw text and two other
+  views but never a view with these folds, so one zero width space per word, or one Cyrillic look
+  alike letter, blinded every mechanism rule and every carrier without a usable keyword. The lane
+  now reads one more view, the raw text with invisible characters deleted, NFKC applied and look
+  alike letters mapped to ASCII. Raw text is checked first. A raw match that a negation or framing
+  clause covers stays provisional while the other views and alternatives are checked, the folded
+  view is read for a rule the raw text has not settled, and it is capped like the rest. ASCII text
+  never pays a second pass. Folding coverage remains incomplete and the limits are tracked. (#342)
+
+- GLS-IP-006 and GLS-EX-030 no longer take time that grows with the square of a long run of blank
+  lines. Six regexes opened with a lead in that let a sentence end be followed by any whitespace, so
+  each newline in a run started an attempt that read the rest of the run. They now run in a mode
+  that finds the same match with the same start and end in linear time. A regex gets the mode only
+  when its whole source equals one of the six, so a custom rule keeps its previous behaviour. (#340)
+
+- GLS-AW-001 no longer takes time that grows with the square of a long run of blank space after its
+  verb. The first regex split the run between two open ended quantifiers before the noun failed to
+  appear. The second quantifier now belongs to the optional word. The regex accepts exactly the
+  same strings with the same span and groups. (#354)
+
+- GLS-SQLFS-001 no longer takes time that grows with the square, or the cube when blanks sit on
+  both sides of the bracket, of a long run of blank space around its bracket. Each run now belongs
+  to one quantifier in the three places it was split, after the primitive, after the bracket and
+  after BULK, and the required blank after BULK is still required. The rule still reads one regex
+  and the mirror file is regenerated for this rule only. (#357)
+
+### Continuous integration
+
+- Every workflow job is pinned to ubuntu-24.04 in place of ubuntu-latest, so a runner image change
+  lands in its own reviewed commit and not during a release. The check in the CI gate test now
+  names the pinned image. (#353)
+
+- The integrity job cap is raised twice because the growing suite let the slower legs be cancelled
+  by the cap while every test was passing, which shows as a cancelled job and not as a result. (#358
+  and #362)
+
+### Tests
+
+- A per entry whitespace cost gate now checks every regex entry the engine loads, with a static part
+  that finds a newline admitting atom followed by an unbounded quantifier and a timed part, and two
+  more test files pin the newline run budget and the lead in shapes that must keep detecting. The
+  gate prose points at its constants instead of stating sizes. (#351 and #360)
+
+- The teardown of the proxy artifact fixture reads the peer's process group file whole or not at
+  all, so a stop that lands while the peer is still writing no longer turns a passing leg red. Test
+  code only. (#359)
+
+- The group teardown test waits for the marker file to hold content before it reads the
+  pid, so a slow runner no longer fails it with an empty read. Test code only. (#356)
+
+### Documentation
+
+- The stats file now carries the day 0.6.7 was published. The counts, the code, the rules and the
+  tests do not change. (#339)
+
+- README, the PDF docstring and one advisory summary no longer promise more than the scanner does.
+  Obfuscation coverage is described as tested per technique and not complete, and PDF scanning is
+  described by what it reads. No count changes. (#352)
+
+- The known gaps file records the cost and folding limits known when it was written, and some of
+  them are repaired by entries in this release. Further cost and folding limitations remain and are
+  tracked. A test keeps the recorded rows honest. (#355)
+
+- Comments and docstrings in three files now match how the starter file write cleans up its staging
+  file and how the credential prefilter derives its literals. No code moves. (#341)
+
+## [0.6.7] — 2026-10-07
+
+### Added
+
+- Two rules for text on a page or in a file that is written to AI models and tells them how to
+  answer. GLS-IP-007 is medium and reads three forms. The first is a heading or label that names AI
+  assistants or models followed by a sentence that orders or obliges the model. The second is a
+  label such as AI assistants with a colon and an order. The third is a sentence that tells AI
+  assistants what to say when they answer or discuss a subject. A heading followed by a description,
+  or by an instruction aimed at human staff, is not held in the cases tested. A sentence that itself
+  names the model and orders it is found after a staff line. Documentation that tells an AI
+  assistant how to behave may be held at medium. GLS-IP-008 is low. It reads an order to put a
+  marker such as an emoji or a phrase in the reply. Both rules read web content and files and not a
+  plain message, and neither one blocks on its own. (#332)
+
+### Changed
+
+- GLS-SEM-UI-219 no longer reads a deferred stylesheet loader as an element injection. The exception
+  covers only the exact media switch handler on a link tag that has one media attribute set to a
+  quoted print and no other event handler, with the element name spelled in ASCII letters. The same
+  handler on another tag, beside a second handler, on a link with unquoted values or on a link with
+  a second media attribute is read as before. Render orders that name a form, a frame, a script or a
+  handler are still found in the cases tested. (#332)
+
+- The gauntlet report now counts executed variants from the records its driver writes. Each run is
+  bound to the corpus of the night, the adapter code, the schema and its age, and a run that fails
+  one of these is set aside and not counted. An executed count with no measured run beneath it is
+  refused, and a published page must equal what the renderer makes of the report byte for byte, so
+  an altered page is a finding. A run that completes with nothing executed now ends in a refusal,
+  exit code 3 with the reason EXEC_NONE. A nightly that exports an archive of the checkout must set
+  GAUNTLET_ENGINE_HEAD. With no run document the report reads as it did before. (#329)
+
+- The gauntlet capability map classifies its last two route operations, one on a recorded run of the
+  product route and one on source inspection, and records its review. (#335)
+
+- GLS-EX-007 writes its credential words as plain alternatives in place of optional characters. The
+  rule matches the same texts as before and keeps the same group shape, so the regex costs what it
+  did when it runs. The engine now derives required literals from the credential words and skips the
+  regex on an eligible text that holds a curl and none of those literals. A text that holds one
+  credential word still runs the regex in full, so this removes accidental cost and not the cost an
+  attacker can choose. (#337)
+
+- The starter policy header now says that detected secret material in outbound tool calls is denied
+  even without a policy file, and that the file adds your path and host rules. It used to say that a
+  missing file enforces nothing. A second run of `sunglasses init --policy` on an enabled starter
+  now says it is already enabled, and on a file that is not an unchanged disabled starter it says
+  the file was left untouched. (#336)
+
+- The stats file carries the 0.6.6 release date. No code, rule or test changes. (#330)
+
+### Fixed
+
+- `sunglasses init --policy` enables an unchanged disabled starter policy again when an earlier
+  release wrote it. The check compared the file only with the text the running code writes, so after
+  the header was reworded an unchanged older starter no longer matched, and the command left it
+  disabled and said the file had your own edits. The text each earlier release wrote is now kept as
+  a hash and compared on raw bytes, so a file you changed, even by a line ending, is left as it is.
+  A link, a folder or a fifo at the policy path is not followed or replaced. A new policy file is
+  staged in the same folder and published under a name that must still be free, so it is not seen
+  part written. An upgrade replaces the file only when it is still the same unchanged file. One
+  narrow window stays open, a save that lands just before the final rename is replaced. (#336)
+
+- The gauntlet report tool no longer fails with a PermissionError when the review folder exists and
+  cannot be read. It exited with code 1 and wrote no report, where an absent folder ends in the
+  designed refusal. It now ends in that same refusal, exit code 3 with the reason EVIDENCE_UNBOUND,
+  and prints one line to standard error with the error class, the operating system text and the
+  error number, and without the path. (#331)
+
+### Tests
+
+- A gauntlet report test that checks the page does not print a given count no longer matches that
+  count inside a timestamp, a digest or an id. Only the test changes. (#334)
+
+## [0.6.6] — 2026-10-06
+
+### Added
+
+- The benchmark script has a new flag, `--installed`, that measures the package you installed and
+  not the source checkout. Until now the script put the checkout first on the import path, so the
+  README command measured the source tree and not the wheel a user installs. With `--installed`
+  the script leaves the import path alone and measures the engine it finds there, and it refuses
+  with exit code 2 when nothing is installed or when the importable package is the checkout
+  itself, such as an editable install. The report now says which engine it measured, in an
+  `engine` key beside the metrics, and the sealed hash means what it did before. An unknown flag
+  is now an error. Without the flag the script still measures the checkout. The README documents
+  both. (#303)
+
+- Three rules for text that dresses itself as an instruction channel. GLS-TMS-255 reads a command
+  fence marker in a message, file, tool result or API response, GLS-TOP-651 reads a bracketed role label followed within a
+  short span by wording such as decided or approved and GLS-TOP-652 reads an invented priority tag followed
+  by text that opens with an order word. Each one keys on literal markup. A shell here document, a page that only
+  names a role label and one well known README are pinned as not matching. (#315)
+
+### Changed
+
+- `sunglasses init` now prints one line naming the state of the policy file and
+  its path, and `sunglasses receipts` marks each call whose receipt records that it
+  ran with no policy or with a policy that lists nothing enabled, using the same
+  words the hook already writes on its receipt. The hook decides exactly as before.
+  Sentences about a missing or empty policy file were wrong. Where they speak
+  of an ask, they now say that the firewall asks on a call nothing else settles
+  until the file is restored. (#313)
+
+- The WARN lane now stops its own pattern scan after 7 seconds, below the 10
+  second hook timeout, and asks you instead of being killed by the host with no
+  answer. Two limits remain. On Python 3.9 and 3.10 (and 3.11 before 3.11.6,
+  3.12.0) a single regex call made of many short match attempts cannot be
+  interrupted, so the WARN lane can still run past its budget on that input
+  shape, while Python 3.11.6, 3.12.1 and newer stop it close to the 7 seconds.
+  And on large content passed as tool input, about 200 KB and up, the WARN lane
+  can use up its 7 seconds on any Python and ask you without a completed
+  pattern check, because the time adds up over hundreds of checks plus the
+  first pattern database build. Hard blocks do not use this budget. (#307)
+
+- Eight rules now carry medium severity, GLS-PI-INFO, GLS-TOP-245, GLS-TD-001,
+  GLS-SCHEMA-LEAK-215, GLS-CAI-243, GLS-TS-252, GLS-SO-001 and GLS-TP-003. Each
+  of them has matched short lines found in project documentation files, and at
+  high or critical severity one such line was enough for a scan to block the
+  text it sat in. The scan decides by the worst finding, so a text where one of these
+  rules is the only finding is now quarantined and was blocked before. A text
+  that holds one of these shapes and also trips a rule of high or critical
+  severity is still blocked. This is a design change to those rules and not a
+  bug fix. (#316)
+
+- The stored benchmark receipt `tests/benchmark/results/benchmark_latest.json` is refreshed from a
+  tool run at engine 0.6.5. It was stale at engine 0.5.0 and one negative short. The public numbers
+  match the published ones, and only the engine version, the negatives count, the true negatives
+  count and the metrics hash moved. No code and no README change. (#306)
+
+### Fixed
+
+- The hook receipt now records whether a policy existed. A call made with no policy file and a
+  call that a policy checked and passed both wrote the same GLS-FW-CLEAN receipt, so the record
+  could not tell them apart. The receipt now carries `policy_state`, set to `none_configured` when
+  there is no policy file and to `inert` when the file has no enabled entry. A policy that lists
+  something carries no state. What the hook decides is the same as before. Two sentences were also
+  wrong. The policy file header said an empty file enforces nothing, and it asks before each tool
+  call. The README opening line said the hook blocks credential leaks, and it blocks secret
+  material in tool calls and the paths and hosts your policy lists. (#301)
+
+- A server that writes its answer and exits right away no longer has the clean answer replaced by
+  a `MALFORMED_UPSTREAM` fault. This hit one shot tools and an echo server that closes on end of
+  input. In a window of about a millisecond the exit watcher saw the call as unanswered and closed
+  the session while the answer was still being read or scanned. The reader now judges the exit
+  once nothing is left to read, so the answer always wins over the news of the exit. If the reader
+  cannot judge within 1 second the watcher judges it as before, and a server that exits while it
+  still owes an answer is still a fault. One limit remains. A batch of answers that are each slow
+  to scan can still lose the last ones to a refusal once that 1 second has passed. (#310)
+
+- GLS-SMP-023 could take far longer than the scan budget on inputs of a few
+  kilobytes. GLS-AW-613 carries the same chained shape and is restacked with it
+  as related hardening. Both rules chained their signal checks with a wildcard
+  between them, so when the first signals were present and a later one was
+  missing the engine retried the checks over and over. The checks now sit side
+  by side. A match starts and ends where it did on the generated texts the tests
+  compare. A new test reads the shipped regexes and fails when a rule chains
+  lookaheads in the shape it recognizes. (#312)
+
+- The proxy no longer forwards a tool call after the client was told it was cancelled. A cancel
+  could be recorded and answered while the request was still being scanned, and the call was then
+  released to the server anyway. The proxy now checks at release whether the request was
+  cancelled, and a cancelled request goes nowhere. A late cancel for a request that was already
+  answered no longer speaks for a later request that reuses the same id, which before could run on
+  the server and still be answered to the client as cancelled. A cancel that arrives while its
+  call is being written is answered only after the write has finished, so the client is never told
+  a call was cancelled before its bytes have left, and a failed write still answers the cancel
+  once. A tool call approved against tool descriptors that changed before the call left is held
+  back with one DESCRIPTOR_CHANGED answer, while a call approved again against the new descriptors
+  goes through. The check runs when a scan has finished and does not stop a scan that has started.
+  A cancel that arrives after the write began is answered after it, so the server may still run
+  that call. No scan decision, rule or verdict changes. (#317)
+
+- GLS-CF-252 no longer retries the status alternative at every position of a whitespace run.
+  The alternative began with an optional bracket and optional whitespace, so on a text with
+  the word applied in it followed by a long run of whitespace the search read the whole run
+  again from each position, and the time grew with the square of the length. Whitespace is now taken only from the
+  start of a run. A match starts at the same place as before and the words of the rule are
+  not changed. (#319)
+
+- GLS-CMP-009 reads the gap between its verb and its noun in a different shape. Three of
+  its alternatives joined the two words with leading whitespace, a bounded stretch of text and
+  trailing whitespace, and those three parts could take the same spaces, so a text that held the
+  anchor words followed by a long run of whitespace made the search read that run again for each
+  way of splitting it. The gap now reads a run of two or more whitespace characters, or leading
+  whitespace, a core that starts and ends with a character that is not whitespace, and trailing
+  whitespace. The words of the rule, its severity and its channels are not changed. A match
+  starts and ends where it did on the generated texts the tests compare. (#320)
+
+- Eighteen rules (GLS-SE-010, GLS-MR-003, GLS-MR-004, GLS-MR-015, GLS-MR-035, GLS-MR-036,
+  GLS-MR-039, GLS-MR-040, GLS-MR-041, GLS-MR-047, GLS-MR-049, GLS-MR-056, GLS-AW-671,
+  GLS-AW-676, GLS-AW-679, GLS-AW-683, GLS-AW-685 and GLS-AW-712) read the whitespace at the
+  start of the text in a different shape. Each of them begins with whitespace and then tests the
+  whole text, and when that test failed the search gave back one character of the run at a time and
+  tested the text again. The run is now read in one step by a lookahead and a backreference. The
+  rules stay in the plain mode with the same required words. The words of the rules, their severity
+  and their channels are not changed. A match starts and ends where it did on the generated texts
+  the tests compare. (#322)
+
+### Continuous integration
+
+- The release workflow now sets the build timestamp from the commit time of the tagged commit
+  before it builds. Two builds of one commit then give one wheel, so the wheel hash says something
+  about the commit and not about the moment CI ran. A workflow check fails when that step is
+  missing, is not taken from the commit time or comes after the build. (#300)
+
+- The release workflow now repacks the source distribution with a new script,
+  `scripts/repack_sdist.sh`, so its bytes follow the tagged commit. Two builds of one tag used to
+  give two different files because the archive carried file times, owner names and an order that
+  depended on the machine. The script keeps every member name, mode, size and content hash, and it
+  refuses and leaves its input alone when the commit time is missing or the file is not a tar.gz.
+  The build step also checks that the wheel hash did not move. The wheel is not affected. The
+  source distribution already on PyPI for 0.6.5 stays as published, and the claim holds for
+  releases built after this change. (#304)
+
+- The release workflow has a new postcondition job that runs after the upload and fails the run
+  when PyPI holds something other than what the tag builds. `scripts/release_postcondition.sh`
+  fetches the files PyPI lists for the version, refuses any file whose hash differs from the one
+  PyPI states, builds the same tag in a fresh clone and compares the unpacked wheels and source
+  distributions by content. A file PyPI has not served yet is retried every 20 seconds for up to
+  300 seconds. The job never uploads, yanks or deletes anything, and the SBOM and the checksums
+  do not wait for it. (#305)
+
+- The CLI matrix test now runs one test for each output format, so a failure names the surface,
+  the state and the format. The human and sarif legs carry a `full_matrix` marker. A pull request
+  that touches none of a short list of output and CI files skips those legs in CI, and a push to
+  main, a tag, a schedule and a manual run always run them. A plain `pytest` still runs every
+  leg. (#325)
+
+### Tests
+
+- The proxy serve tests now keep the client's stdin open until the first reply has been read. They
+  closed it together with the request, so an echo server that exits on end of input could race its
+  own answer and the ordinary call test failed with a missing result in some CI runs. The poisoned
+  result test also asserts the reason code `PROHIBITED_CONTENT`, because a session torn down during
+  the scan gave the same withheld message and let that test pass without the result ever being
+  scanned. Only tests change. (#309)
+
+- One firewall test no longer depends on how fast the process runs. It checks that an alarm landing
+  at the first line of the warn lane cleanup still restores the signal handler and still stops the
+  call. Its short budget began before the tracer reached that line, so a stalled process could run
+  the timer out first. The call now gets a long budget and the real expiry starts once the tracer
+  reaches the cleanup. Only the test changes. (#323)
+
+- The gauntlet and installed benchmark tests now share their repeated real runs. Three gauntlet
+  tests that each started the same full run and two benchmark tests that each ran the same default
+  JSON run now read one module scoped run each. Every assertion is unchanged and each test job
+  does four fewer full runs. Only tests change. (#324)
+
+- The stacked lookahead tests now count the matches of each rule, so one rule can no longer pass on
+  the count of the other, and the agreement test compares the whole matched text and not a cut of
+  its start. The corpus reader used to hand the test the label words of the attack db files and now
+  reads the real example texts. A failure message now says quadratic for one gap and cubic for two.
+  Only tests change. (#326)
+
+### Documentation
+
+- The benchmark table in the README is now headed Metric (v0.6.5). The benchmark was run again on
+  the installed 0.6.5 wheel and on a clone at the v0.6.5 tag, every row read the same on both, and
+  no value in the table changed. (#302)
+
+- The README now shows the install command and the demo before the proxy section. The demo image
+  and the Sixty seconds section moved up to sit just ahead of What the proxy enforces, and no word
+  was edited. (#327)
+
 ## [0.6.5] — 2026-10-02
 
 ### Changed

@@ -3,7 +3,7 @@
   "name": "Indirect injection \u2014 <INFORMATION> / <IMPORTANT> wrapper",
   "version": "1.0",
   "category": "prompt_injection",
-  "severity": "high",
+  "severity": "medium",
   "channels": [
     "message",
     "file",

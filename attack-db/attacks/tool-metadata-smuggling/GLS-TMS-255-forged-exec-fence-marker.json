@@ -1,0 +1,26 @@
+{
+  "id": "GLS-TMS-255",
+  "name": "Forged Exec Fence Marker",
+  "version": "1.0",
+  "category": "tool_metadata_smuggling",
+  "severity": "high",
+  "channels": [
+    "message",
+    "file",
+    "tool_output",
+    "api_response"
+  ],
+  "description": "A command fence marker, an opening double angle bracket then EXEC or EXECUTE and a colon, found in a message, a file, a tool result or an API response, for example one carried inside a tool description or schema attribute. A match is treated as text dressed as an instruction channel.",
+  "keywords": [],
+  "regex": [
+    "(?i)<<[ \\t]{0,2}(?:exec|execute)[ \\t]{0,2}:[ \\t]{0,3}\\S"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-03",
+  "source": "patterns.py:GLS-TMS-255"
+}

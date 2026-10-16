@@ -112,3 +112,21 @@ def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("SUNGLASSES_HOME", str(tmp_path_factory.mktemp("sunglasses-home")))
     monkeypatch.setenv("PYTHONUSERBASE", _os.environ.get("PYTHONUSERBASE") or _site.getuserbase())
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+
+
+def pytest_collection_modifyitems(config, items):
+    """CI_SHARD="i/n": keep part i of the collected suite (see tests/ci_shard.py)."""
+    import ci_shard
+    spec = ci_shard.spec_from_env()
+    if not spec:
+        return
+    try:
+        kept, dropped = ci_shard.select(items, spec)
+    except ValueError as e:
+        import pytest
+        raise pytest.UsageError(str(e))
+    config.hook.pytest_deselected(items=dropped)
+    items[:] = kept
+    # The part belongs to this run only. A test that starts its own pytest
+    # (collection checks, mutation runs) must see the whole suite, not part i.
+    _os.environ.pop("CI_SHARD", None)

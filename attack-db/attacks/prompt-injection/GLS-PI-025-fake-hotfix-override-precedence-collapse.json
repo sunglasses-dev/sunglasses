@@ -28,7 +28,7 @@
   "regex": [
     "(?i)(?:(?:patch[- ]note|hotfix|vnext|latest[- ]version|newer\\s+prompt)\\s+(?:authority|directive|update)\\s+(?:flip|overrides?|deprecates?|replaces?)\\s+(?:previous|canonical|true)\\s+(?:constraints?|prompt|spec|contract))",
     "(?i)(?:reply[- ]?template|cycle[- ]update|runbook)\\s+(?:shadow|overwrite|graft)\\s+(?:contains?|plants?|injects?)\\s+(?:fake|mandatory|new)\\s+(?:rules?|policy|directives?)",
-    "(?i)(?:production\\s+emergency|urgent\\s+hotfix|critical\\s+bypass)\\s*[,:.]?\\s+(?:bypass|skip|merge|override)\\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\\s+(?:rule|gate|constraint)"
+    "(?i)(?:production\\s+emergency|urgent\\s+hotfix|critical\\s+bypass)(?:\\s*[,:.])?\\s+(?:bypass|skip|merge|override)\\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\\s+(?:rule|gate|constraint)"
   ],
   "examples": {
     "malicious": [],

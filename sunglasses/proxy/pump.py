@@ -18,8 +18,11 @@ the next newline, so reading stops rather than resumes.
 """
 from __future__ import annotations
 
+import os
+import select
 import threading
 import time
+import weakref
 
 from . import bounds, envelope, framing, handshake, selector, supervisor
 from .session import Cause, Session as CoreSession, Settled
@@ -342,10 +345,13 @@ class _Replaced:
     is settled and NOTHING crosses.
     """
 
-    __slots__ = ("frame",)
+    __slots__ = ("frame", "cause")
 
-    def __init__(self, frame):
+    def __init__(self, frame, cause=None):
         self.frame = frame
+        # The Cause the item settled with, for a caller that ends the session
+        # on a replacement and has to name the same reason the receipt does.
+        self.cause = cause
 
 
 class Session:
@@ -356,6 +362,10 @@ class Session:
         self._pgid = pgid
         self._strict = strict
         self._watcher = None
+        # The exit-vs-answer wake (see `_exit_aware`); None until a reader that
+        # can wait on a real pipe asks for it.
+        self._exit_wake = None
+        self._exit_judged = threading.Event()
         self._core = CoreSession()
         self._pending: dict = {}          # key -> method
         self._answered: set = set()
@@ -418,7 +428,33 @@ class Session:
         # other thread, which is the exclusion the property needs.
         self._authority_lock = threading.RLock()
         self._cancelled_ids: set = set()
+        # R106.3. identity -> the generation that was live when its
+        # cancellation was accepted. `_cancelled_ids` is never cleared, so on
+        # its own it cannot tell a cancel for THIS request from a late one for
+        # an earlier generation of the same id. The request gate withholds
+        # without answering, so it may only act on the live generation's
+        # cancel; `_cancel` has answered that one. A stale mark would drop an
+        # admitted id with no answer at all (R66).
+        self._cancelled_at: dict = {}
+        # R111.2. identity -> the generation whose request is being released
+        # upstream right now. The gate's check and this claim are one step
+        # under `_authority_lock`, and a cancellation is accepted under the
+        # same lock, so every cancel lands either BEFORE the claim (the gate
+        # withholds) or AFTER it (the call is on its way). A cancel after it
+        # is recorded in `_cancel_deferred` and not answered until the write
+        # has returned, so no client is told "cancelled" before the bytes of
+        # that call leave. The claim is not the settlement lock held across
+        # the write: that lock would park the upstream reader behind a write
+        # the upstream may not be reading, and the pair can deadlock.
+        self._releasing: dict = {}
+        self._cancel_deferred: set = set()
         self._invalidated_as = None
+        # R111.3. Moves on every accepted invalidation and on nothing else.
+        # `_invalidated_as` is sticky for the session, so gating on it would
+        # also refuse a call re-approved against the NEW descriptors, and the
+        # authority epoch moves on cancellations too. A request carries the
+        # value it was admitted under and the gate compares that.
+        self._descriptor_revision = 0
         # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
         # Round 4 claimed the decision and the discharge were atomic because
@@ -856,9 +892,21 @@ class Session:
         the thing the reviewer's XB03 requires and the thing a writer under the
         settlement lock cannot do.
         """
+        identity = key(origin, request_id)
         with self._authority_lock:
-            self._cancelled_ids.add(key(origin, request_id))
+            self._cancelled_ids.add(identity)
+            # Read without `_settlement`, and ordered anyway: admission and
+            # cancellation both run on the client reader, so the generation
+            # this sees is the one the reader last admitted.
+            self._cancelled_at[identity] = self._generation.get(identity, 0)
             self._authority_epoch += 1
+            # R111.2. The request of this generation is being written
+            # upstream. Its cancel is recorded and stays authoritative, but
+            # the answer waits for the write (`end_request_release`).
+            if self._releasing.get(identity) == self._cancelled_at[identity]:
+                self._cancel_deferred.add(identity)
+                return True
+            return False
 
     def accept_invalidation(self, reason):
         """T5.R4. The descriptors moved; every undelivered answer of this
@@ -887,6 +935,7 @@ class Session:
         """
         with self._authority_lock:
             self._invalidated_as = reason
+            self._descriptor_revision += 1
             self._authority_epoch += 1
             self._core._emit("APPROVAL_INVALIDATED", None, reason_code=reason)
 
@@ -901,7 +950,30 @@ class Session:
         """
         with self._authority_lock:
             self._observe_authority()
-            return key(origin, request_id) in self._cancelled_ids
+            return self._cancel_is_live(key(origin, request_id))
+
+    def _cancel_is_live(self, identity):
+        """R107. Does an accepted cancel speak for the item being decided now?
+
+        `_cancelled_ids` is never cleared, and both result-side readers used to
+        ask it by identity alone. A late cancel for an id that was already
+        answered then stood for the rest of the session: the client reused the
+        id (RC19b accepts that once the frame is gone), the server executed the
+        call, and the result was answered REQUEST_CANCELLED. The client was
+        told "cancelled" about a call that ran (R106.4, measured red 3/3).
+
+        A cancel speaks for the generation that was live when it was accepted
+        (`_cancelled_at`, R106.3). The item being decided is named the way the
+        settlement names it, by id AND generation: the standing record's key
+        while it settles, otherwise the live core key, the same pair
+        `recorded_terminal` reads. A cancel for a retired generation is inert,
+        which is what the protocol asks of a cancel for a completed request.
+        The set stays as the record. Caller holds `_authority_lock`.
+        """
+        if identity not in self._cancelled_ids:
+            return False
+        record_key = self._settling_key.get(identity) or self._core_key(identity)
+        return self._cancelled_at.get(identity) == record_key[-1]
 
     def authority_state(self):
         """The cancelled ids and the invalidation, read TOGETHER under one lock.
@@ -963,11 +1035,80 @@ class Session:
             recorded = self.recorded_terminal(request_id, origin=origin)
             if recorded is not None and recorded.rule == "S3":
                 return None
-            if identity in self._cancelled_ids:
+            if self._cancel_is_live(identity):
                 return "REQUEST_CANCELLED"
             if self._invalidated_as:
                 return "DESCRIPTOR_CHANGED"
             return None
+
+    def descriptor_revision(self):
+        """R111.3. The value a request is admitted under."""
+        with self._authority_lock:
+            return self._descriptor_revision
+
+    def request_release_decision(self, request_id, *, origin=ORIGIN_CLIENT,
+                                 admitted_under=None):
+        """R106.3. The REQUEST side's handoff gate, inside the settlement owner.
+
+        The result direction asks `release_decision` at the handoff and the
+        request direction asked nobody: a cancel recorded and answered while
+        its request was being scanned still let the call reach the server
+        (R104, measured red 3/3). This is that question for the request side,
+        asked where the result side asks it: under `_settlement`, then
+        `_authority_lock`, the same order `_retire_prepared` takes them.
+
+        THE LINEARISATION POINT IS THIS CALL. A cancellation is accepted under
+        `_authority_lock`, and `_cancel` answers the client only after that
+        acceptance returns, so a cancel the client saw answered before this
+        call is seen here and nothing is forwarded. A cancel accepted after it
+        is a cancel of a forwarded call, which is what it was before this gate.
+
+        It reads the cancelled set directly and does NOT call
+        `release_decision`, because that stamps `_authority_observed`, the
+        epoch the RESULT reader's pending decision was derived from. A second
+        thread stamping it would move the result side's staleness test.
+
+        Only the cancellation withholds. `DESCRIPTOR_CHANGED` passes through
+        (R106.3 ruling A): a withheld request that `_cancel` did not answer has
+        no answer at all. Returns `"REQUEST_CANCELLED"` or None.
+
+        R111.2. A None is a CLAIM, taken in the same step as the check, and the
+        caller must end it with `end_request_release` once the write returns.
+        A cancel accepted while the claim is held is not answered by `_cancel`;
+        `end_request_release` hands it back to the caller, after the write.
+
+        R111.3. `admitted_under` is the descriptor revision a call's approval
+        was read under. If an invalidation was accepted since, the call was
+        approved against descriptors that moved and the answer is
+        `"DESCRIPTOR_CHANGED"`, with no claim taken. The caller owes that
+        answer; unlike a cancel, nobody has sent it. A cancellation is asked
+        first, because its answer is already on the wire.
+        """
+        identity = key(origin, request_id)
+        with self._settlement:
+            with self._authority_lock:
+                if identity in self._cancelled_ids and \
+                        self._cancelled_at.get(identity) == \
+                        self._generation.get(identity, 0):
+                    return "REQUEST_CANCELLED"
+                if admitted_under is not None and \
+                        admitted_under != self._descriptor_revision:
+                    return "DESCRIPTOR_CHANGED"
+                self._releasing[identity] = self._generation.get(identity, 0)
+                self._cancel_deferred.discard(identity)
+                return None
+
+    def end_request_release(self, request_id, *, origin=ORIGIN_CLIENT):
+        """R111.2. End the claim `request_release_decision` took. True means
+        a cancel was accepted while the call was being written, and its answer
+        is now the caller's to finish."""
+        identity = key(origin, request_id)
+        with self._authority_lock:
+            self._releasing.pop(identity, None)
+            if identity in self._cancel_deferred:
+                self._cancel_deferred.discard(identity)
+                return True
+            return False
 
     def _final_decision(self, request_id, decided):
         """The decision that actually reaches the wire, taken UNDER the lock.
@@ -1126,7 +1267,7 @@ class Session:
         if not self._settle_outside_lock(identity):
             return None
         if verdict is not None:
-            return _Replaced(replacement)
+            return _Replaced(replacement, cause)
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -1534,6 +1675,18 @@ class Session:
         # a client still waiting, which is the whole reason the record exists.
         if self._closed or not (self._pending or self._settling):
             return
+        # THE EXIT IS A FACT, THE VERDICT IS TAKEN AT THE PIPE. A server that
+        # answers and then exits (an echo server on stdin EOF, any one-shot
+        # tool) has its answer in the pipe, or in the reader's hands being
+        # scanned, at the moment this thread wakes. Closing here replaced a
+        # clean, fully scanned answer with MALFORMED_UPSTREAM, on a window of
+        # about a millisecond. The reader is told instead, and judges the exit
+        # at the one point where the question has an exact answer: it has
+        # nothing left to read and is about to wait.
+        if self._wake_reader_for_exit():
+            return
+        # No reader that can be told (a stream without a descriptor): the old
+        # behaviour, unchanged.
         # T7.R1, then T8.R12. The fault is recorded first so the cause is the
         # exit rather than whatever the kill produces, and the group is then
         # stopped, which closes the descendant's copy of the write end and is
@@ -1541,9 +1694,59 @@ class Session:
         # _close supervises now, so the group is stopped as part of the
         # teardown rather than beside it. Doing it twice was how the close
         # could be claimed before anything had actually been stopped.
+        self._judge_upstream_exit()
+
+    def _judge_upstream_exit(self):
+        """The upstream has exited and nothing it wrote is left unread.
+
+        T7.R1: whatever is STILL owed now will never be answered, so the close
+        names the exit. Nothing owed is an ordinary shutdown and closes
+        nothing.
+        """
+        if self._closed or not (self._pending or self._settling):
+            return
         self._close("MALFORMED_UPSTREAM",
                     "the upstream process exited with calls still pending",
                     kind="UPSTREAM_EXIT_WITH_PENDING")
+
+    def _wake_reader_for_exit(self):
+        """Tell the reader the process is gone and wait, briefly, for its verdict.
+
+        True means the reader judged the exit (or the session closed meanwhile).
+        False means nobody can judge it for us in time -- no reader to tell, or
+        a reader that is not coming back to the pipe, which is a consumer that
+        stopped taking frames -- and the watcher takes the verdict itself, as it
+        always did. The grace is what keeps a stalled consumer from holding the
+        fault hostage; it is long next to a scan (about a millisecond) and short
+        next to every wait the existing gates make.
+        """
+        wake = self._exit_wake
+        if wake is None or not wake.signal():
+            return False
+        deadline = time.monotonic() + _EXIT_GRACE_S
+        while time.monotonic() < deadline:
+            if self._exit_judged.wait(0.02) or self._closed:
+                return True
+        return False
+
+    def _exit_aware(self, source):
+        """Wrap a pipe so the reader can be told the upstream has exited.
+
+        The reader waits on the pipe AND on a one-byte wake the watcher writes
+        when the process is gone. Data always wins: while the pipe has bytes
+        the reader reads them, which is how an answer written just before an
+        exit is delivered, and only when the pipe is empty does the exit get
+        judged. A source with no descriptor is returned as it came.
+        """
+        if self._upstream is None:
+            return source
+        try:
+            fd = source.fileno()
+        except (AttributeError, OSError, ValueError):
+            return source
+        if self._exit_wake is None:
+            self._exit_wake = _ExitWake()
+        return _ExitAwareSource(source, fd, self._exit_wake, self)
 
     # ── reading ─────────────────────────────────────────────────────────────
     def read_upstream(self, stream, inspect=None, gate=None):
@@ -1585,6 +1788,9 @@ class Session:
                 "strict mode needs the upstream handle: pass it to Session() or "
                 "attach_upstream() before reading, because an exit cannot be "
                 "observed on the pipe")
+        # Before the watcher starts, so an exit that has already happened is
+        # signalled to a reader that is listening for it.
+        stream = self._exit_aware(_as_reader(stream))
         if self._upstream is not None and self._watcher is None:
             self._watcher = threading.Thread(target=self._watch_upstream,
                                              daemon=True)
@@ -1688,9 +1894,15 @@ class Session:
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
                     # T2.R12. Dropped with a receipt and never a response,
-                    # because a notification has no id to answer in.
+                    # because a notification has no id to answer in. The
+                    # verdict is (replacement, reason, rule) and the reason is
+                    # the part that says WHY: dropped without it, the row on
+                    # disk could not tell a flagged notification from a lost
+                    # one.
+                    why = verdict[1] if len(verdict) > 1 else None
+                    fields = {"reason_code": why} if isinstance(why, str) else {}
                     self._core._emit("NOTIFICATION_DROPPED", None,
-                                     supported=True)
+                                     supported=True, **fields)
                     continue
                 # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
@@ -1760,7 +1972,7 @@ class Session:
                     "initialize" and "result" in message:
                 init_identity = key(ORIGIN_CLIENT, message["id"])
                 init_key = self._core_key(init_identity)
-                forwarded = self._initialize_result(message, raw)
+                forwarded = self._initialize_result(message, raw, inspect=inspect)
                 if forwarded is None:
                     yield from self._drain_refusals()
                     return
@@ -1864,7 +2076,7 @@ class Session:
         # recorded while this reader was blocked on the pipe.
         yield from self._drain_refusals()
 
-    def _initialize_result(self, message, raw):
+    def _initialize_result(self, message, raw, inspect=None):
         """T1.R2 and T1.R3, on the one frame where they apply.
 
         Negotiation and the capability intersection are not advisory helpers a
@@ -1911,10 +2123,31 @@ class Session:
         # performs the handoff. It was using the direct-caller retirement, so
         # the obligation ended one step too early and a close landing in that
         # step paid nothing: one frame for two known requests.
-        self.deliver_response(origin=ORIGIN_UPSTREAM,
-                              request_id=message["id"], frame=rebuilt,
-                              defer_retire=True)
+        #
+        # R5-1. THE RESULT IS INSPECTED LIKE EVERY OTHER ONE. This call was the
+        # only delivery without `inspect=`, so `instructions` (free text that
+        # clients place in the model's system prompt) and `serverInfo` reached
+        # the client unread while the receipts said SETTLED CLEAN. The seam is
+        # handed the frame as REBUILT, after negotiation and the capability
+        # filter, so what is scanned is what would have crossed; `raw` stays
+        # the bytes the server sent, which is what the receipt digest binds.
+        answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
+                                       request_id=message["id"], frame=rebuilt,
+                                       defer_retire=True, inspect=inspect,
+                                       raw=raw)
         if self._closed:
+            return None
+        if isinstance(answer, _Replaced):
+            # A withheld initialize result ends the session. The handshake is
+            # the one frame the whole session rests on, so there is nothing to
+            # carry on with and no reason to keep a server that put text like
+            # this in it running. The close pays the client's one answer from
+            # the cause the inspection already settled this item with; the raw
+            # frame is never handed over.
+            cause = answer.cause
+            self._close(cause.reason, "the initialize result was withheld by "
+                        "inspection", rule=cause.rule,
+                        kind="INITIALIZE_RESULT_WITHHELD")
             return None
         return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
 
@@ -2689,6 +2922,100 @@ class Session:
     @property
     def events(self):
         return self._core.events
+
+
+# How long the watcher lets the reader judge an upstream exit before it does.
+_EXIT_GRACE_S = 1.0
+
+
+class _ExitWake:
+    """A one-byte pipe the watcher writes to and only the reader reads.
+
+    The descriptors close when the object is collected, not with a generator
+    that may never be finished. The watcher holds the session and the session
+    holds this, so nothing can write to a descriptor after it has closed.
+    """
+
+    def __init__(self):
+        self.r, self._w = os.pipe()
+        weakref.finalize(self, _close_fds, self.r, self._w)
+
+    def signal(self):
+        try:
+            os.write(self._w, b"x")
+        except OSError:
+            return False
+        return True
+
+    def consume(self):
+        try:
+            os.read(self.r, 1)
+        except OSError:
+            pass
+
+
+def _close_fds(*fds):
+    for fd in fds:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+class _ExitAwareSource:
+    """`read1` that returns data before it returns the news of an exit."""
+
+    def __init__(self, source, fd, wake, session):
+        self._source, self._fd = source, fd
+        self._wake, self._session = wake, session
+
+    def _held(self, n):
+        """Whatever the source already holds, without waiting for more.
+
+        A caller's BufferedReader may have read ahead (`peek`), which leaves
+        the answer in Python's memory and the kernel pipe empty, so the
+        descriptor says nothing about it. The descriptor is made nonblocking
+        for the length of one read, so an empty source returns at once instead
+        of waiting; b"" here means nothing is held, not end of file.
+        """
+        try:
+            was_blocking = os.get_blocking(self._fd)
+            os.set_blocking(self._fd, False)
+        except (OSError, ValueError):
+            return b""
+        try:
+            read = getattr(self._source, "read1", None) or self._source.read
+            return read(n) or b""
+        except (BlockingIOError, InterruptedError):
+            return b""
+        finally:
+            try:
+                os.set_blocking(self._fd, was_blocking)
+            except (OSError, ValueError):
+                pass
+
+    def read1(self, n):
+        while True:
+            held = self._held(n)
+            if held:
+                return held             # data first, before any waiting or judging
+            try:
+                ready = select.select([self._fd, self._wake.r], [], [])[0]
+            except (OSError, ValueError):
+                break               # let the read itself report a dead pipe
+            if self._fd in ready:
+                break               # bytes, or EOF: what the server wrote first
+            # Only the wake: the pipe is empty and the process is gone. The
+            # exit is judged now, once.
+            self._wake.consume()
+            self._session._judge_upstream_exit()
+            self._session._exit_judged.set()
+            if self._session._closed:
+                return b""
+        read = getattr(self._source, "read1", None) or self._source.read
+        return read(n)
+
+    read = read1
 
 
 def _as_reader(stream):

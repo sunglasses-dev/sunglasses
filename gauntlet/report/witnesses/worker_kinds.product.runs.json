@@ -1,0 +1,303 @@
+{
+ "witness": "execute_armed_worker_fault",
+ "run_id": "7895d5fed636",
+ "driven_against": "PRODUCT: sunglasses/proxy route.Route + worker_process.ProcessScan at afbffbcbc4a5 (serve --worker process), stimulus child substituted",
+ "driver": "gauntlet/boundary/gen2/product_route.py WITH ONE-LINE FIX: the stimulus child read SUNGLASSES_WORKER_READY_FD from the environment, the product now passes --ready-fd N on argv (worker_process.py:70-76, _spawn). Unfixed driver: 16 of 16 drives crashed incl. every control (SCAN_EXCEPTION, detector_status crashed)",
+ "command": "python3 gauntlet/boundary/gen2/product_route_report.py 3 <afbffbcb tree> <out>   (GAUNTLET_REVIEW_ROOT set, nice 15, 79 s wall measured)",
+ "repeats_per_row": 3,
+ "rows": [
+  {
+   "label": "missing_axes",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "not_run",
+    "sr": {
+     "status": "exception",
+     "accepted": false,
+     "inspection_complete": false
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "missing_axes CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "false_string",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "not_run",
+    "sr": {
+     "status": "exception",
+     "accepted": false,
+     "inspection_complete": false
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "false_string CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "conflicting_allow",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "not_run",
+    "sr": {
+     "status": "exception",
+     "accepted": false,
+     "inspection_complete": false
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "conflicting_allow CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "wrong_binding",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "not_run",
+    "sr": {
+     "status": "exception",
+     "accepted": false,
+     "inspection_complete": false
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "wrong_binding CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "review_only",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "REVIEW_REQUIRED",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": []
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "review_only CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": true,
+    "reason": null,
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": []
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "finding_incomplete",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "incomplete",
+    "sr": {
+     "status": "incomplete",
+     "accepted": true,
+     "inspection_complete": false,
+     "rule_ids": [
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "finding_incomplete CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "complete_finding",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "complete_finding CONTROL",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "worker_redaction:stderr",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "SCAN_EXCEPTION",
+    "status": "not_run",
+    "sr": {
+     "status": "exception",
+     "accepted": false,
+     "inspection_complete": false
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  },
+  {
+   "label": "worker_redaction:extra",
+   "repeats": "3/3 same",
+   "observed": {
+    "delivered": false,
+    "reason": "PROHIBITED_CONTENT",
+    "status": "complete",
+    "sr": {
+     "status": "complete",
+     "accepted": true,
+     "inspection_complete": true,
+     "rule_ids": [
+      "GLS-MECH-003",
+      "GLS-PI-016-API"
+     ]
+    },
+    "leak_receipts": false,
+    "leak_client": false
+   }
+  }
+ ]
+}

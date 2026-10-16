@@ -3,7 +3,7 @@
   "name": "Frontmatter Role Priority Smuggle",
   "version": "1.0",
   "category": "token_smuggling",
-  "severity": "high",
+  "severity": "medium",
   "channels": [
     "file",
     "web_content",
