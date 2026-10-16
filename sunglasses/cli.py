@@ -509,6 +509,14 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 
+    # Lockfiles do not change the exit code, so they must not pass in silence either:
+    # a count on stderr, the names in `skipped`.
+    lockfile_count = sum(1 for _f, r in walker_skips if _is_lockfile_skip(r))
+    if lockfile_count:
+        noun = "lockfile" if lockfile_count == 1 else "lockfiles"
+        print(f"  skipped {lockfile_count} {noun} (named in the skipped list; "
+              f"they do not change the exit code)", file=sys.stderr, flush=True)
+
     # Clean up
     if cleanup:
         cleanup()

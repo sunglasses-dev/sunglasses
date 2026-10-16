@@ -434,7 +434,8 @@ One progress line per file (`[3/120]`, the time spent, the file) goes to stderr,
 listed in `skipped` with the reason, never dropped silently: files over 1 MB, binary
 types, lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
 `Cargo.lock`, `go.sum`), and every file past `--max-files N`. A lockfile on its own does
-not turn the exit code to `3`; any other skipped file does. A path that is not a
+not turn the exit code to `3` (a `skipped N lockfiles` line goes to stderr so it is never
+silent); any other skipped file does. A path that is not a
 directory is refused with exit `2`. `--file` still refuses a directory: scanning a tree
 is a different claim from scanning one file, and `--dir` is where it is made.
 

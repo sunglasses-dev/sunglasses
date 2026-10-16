@@ -249,6 +249,25 @@ def test_lockfiles_get_no_progress_line(work, mode):
     assert not any(any(name in line for name in LOCKFILES) for line in lines)
 
 
+@MODES
+def test_skipped_lockfiles_are_counted_on_stderr_never_silent(work, mode):
+    proc = _scan(work, mode, "lock", "-o", "json")
+    assert re.search(r"skipped 7 lockfiles", proc.stderr), proc.stderr
+    assert "skipped" not in proc.stderr.lower() or "lockfile" in proc.stderr.lower()
+    json.loads(proc.stdout)                 # stdout is still one document
+
+
+@MODES
+def test_a_tree_without_lockfiles_prints_no_lockfile_line(work, mode):
+    assert "lockfile" not in _scan(work, mode, "five", "-o", "json").stderr
+
+
+@MODES
+def test_lockfile_only_skips_leave_the_exit_code_alone(work, mode):
+    # the lock tree holds two ordinary clean files: lockfiles alone must not turn it into exit 3
+    assert _scan(work, mode, "lock", "-o", "json").returncode == EXIT_CLEAN
+
+
 # ── 4. the local tree mode ─────────────────────────────────────────────────
 
 def _cli(*args, cwd):
