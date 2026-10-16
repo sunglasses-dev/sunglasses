@@ -52,13 +52,16 @@ EDGES = {"under": CAP - 1, "at": CAP, "over": CAP + 1}
 PLACEMENTS = ["params", "extra", "split"]
 
 
-def _build(method, placement, total, filler="a"):
-    """A no-id frame whose selected surface is exactly `total` content bytes."""
+def _build(method, placement, total, filler="a", request_id=None):
+    """A frame whose counted surface is exactly `total` content bytes. No id by
+    default; `request_id` makes it a request."""
     def text(n):
         return filler * n
 
     def message(first, second):
         msg = {"method": method}
+        if request_id is not None:
+            msg["id"] = request_id
         if placement in ("params", "split"):
             msg["params"] = {"data": text(first)}
         if placement in ("extra", "split"):
@@ -178,25 +181,42 @@ def test_the_session_survives_an_oversized_notification_and_works_after(tmp_path
     assert len(scans) == 1
 
 
-def test_a_request_with_an_oversized_extra_is_refused_too(tmp_path):
-    """The count is shared with the request path, so an oversized top-level
-    member on a request is now refused the way oversized params already were."""
-    engine, upstream, client, scans = make_route(tmp_path)
-    engine.client_frame(frame(id=5, method="resources/read",
-                              params={"uri": "file:///a"},
-                              extra="a" * (CAP + 1)))
-    assert upstream.bytes == b"" and scans == []
-    answers = client.messages()
-    assert len(answers) == 1 and answers[0]["id"] == 5
-    assert answers[0]["error"]["data"]["reason_code"] == "OVER_BUDGET"
+# What the REQUEST path did on main for the same 14 method names sent WITH an id,
+# in the order params/extra/split x under/at/over, F = forwarded after one scan,
+# N = not forwarded and not scanned (an existing admission or special path, or
+# the content bound). This change leaves the request path exactly as it was: an
+# oversized top-level extra on a request is a separate change with its own
+# measurement, because counting it newly refuses frames that carry extras.
+REQUEST_ON_MAIN = {
+    "initialize": "FFNFFFFFF",
+    "tools/call": "FFNFFFFFF",
+    "tools/list": "NNNNNNNNN",
+    "resources/read": "FFNFFFFFF",
+    "prompts/get": "FFNFFFFFF",
+    "ping": "FFNFFNFFN",
+    "notifications/initialized": "FFNFFNFFN",
+    "notifications/message": "FFNFFFFFF",
+    "notifications/progress": "FFNFFFFFF",
+    "notifications/prompts/list_changed": "NNNNNNNNN",
+    "notifications/resources/list_changed": "NNNNNNNNN",
+    "notifications/resources/updated": "NNNNNNNNN",
+    "notifications/roots/list_changed": "FFNFFFFFF",
+    "notifications/tools/list_changed": "FFNFFFFFF",
+}
 
 
-def test_a_request_with_a_small_extra_is_forwarded_and_its_scan_is_unchanged(
-        tmp_path):
-    """Counted, not scanned: the scan still reads `params` only."""
+@pytest.mark.parametrize("edge", ["under", "at", "over"])
+@pytest.mark.parametrize("placement", PLACEMENTS)
+@pytest.mark.parametrize("method", SHAPES)
+def test_the_request_path_is_unchanged(tmp_path, method, placement, edge):
     engine, upstream, _client, scans = make_route(tmp_path)
-    engine.client_frame(frame(id=5, method="resources/read",
-                              params={"uri": "file:///a"}, extra="hello"))
-    assert len(scans) == 1
-    assert scans[0]["params"] == {"uri": "file:///a"}
-    assert json.loads(upstream.bytes)["extra"] == "hello"
+    raw = _build(method, placement, EDGES[edge], request_id=7)
+    engine.client_frame(raw)
+    slot = PLACEMENTS.index(placement) * 3 + list(EDGES).index(edge)
+    expected = REQUEST_ON_MAIN[method][slot]
+    assert ("F" if upstream.bytes else "N") == expected
+    assert len(scans) == (1 if expected == "F" else 0)
+    if scans:
+        # The scan reads what it always read, not the wider counted surface.
+        message = json.loads(raw)
+        assert scans[0]["params"] == selector.client_surface(method, message)
