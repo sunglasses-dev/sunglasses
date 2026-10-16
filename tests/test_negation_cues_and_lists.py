@@ -873,7 +873,8 @@ BREAKS = ["\n", "\r", "\r\n", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\
 @pytest.mark.parametrize("br", BREAKS)
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_line_break_in_front_of_the_cue_counts_with_text_before_or_after_it(engine, cue, br, channel):
-    for front in (f"{br}foo ", f"foo{br}", f"foo{br}bar "):
+    for front in (f"{br}foo ", f"foo{br}", f"foo{br}bar ", f"Done. {br}foo ", f"Done. foo{br}",
+                  f"Done.{br}foo{br}bar "):
         got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
         assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
 
