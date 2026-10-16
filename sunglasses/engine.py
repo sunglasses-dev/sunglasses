@@ -2329,8 +2329,11 @@ class SunglassesEngine:
             return True
         b = bisect.bisect_left(breaks_at, start)
         # A break counts when there is text in the stretch at all, before it or after it; the
-        # break that only follows a sentence end, with nothing else in front of the cue, does not.
-        return b < len(breaks_at) and breaks_at[b] < cue_start and text[start:cue_start].strip() != ""
+        # break that only follows a sentence end, with nothing else in front of the cue, does
+        # not. At the start of the text there is no sentence end to follow: a break there counts.
+        if b >= len(breaks_at) or breaks_at[b] >= cue_start:
+            return False
+        return k == 0 or text[start:cue_start].strip() != ""
 
     @classmethod
     def _raw_sentence_is_a_list(cls, view: str, cue_start: int, cue_len: int, match_start: int,

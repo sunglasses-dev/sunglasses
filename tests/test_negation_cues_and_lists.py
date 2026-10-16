@@ -880,10 +880,20 @@ def test_a_line_break_in_front_of_the_cue_counts_with_text_before_or_after_it(en
 
 @pytest.mark.parametrize("br", BREAKS)
 @pytest.mark.parametrize("cue", NEW_CUES)
-def test_a_break_with_nothing_else_in_front_of_the_cue_is_a_paragraph_start(engine, cue, br):
-    for front in (br, f" {br}", f"Done.{br}", f"Done. {br}"):
+def test_a_break_right_after_a_sentence_end_is_a_paragraph_start(engine, cue, br):
+    for front in (f"Done.{br}", f"Done. {br}"):
         governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
         assert governed, repr(front)
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_break_at_the_start_of_the_text_has_no_sentence_end_to_follow_and_counts(
+        engine, cue, br, channel):
+    for front in (br, f" {br}", f"{br}{br}"):
+        got = _sev(engine, f"{front}{cue} {LIST_FIRST}", channel)
+        assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}", channel), repr(front)
 
 
 def _comma_named_characters():
