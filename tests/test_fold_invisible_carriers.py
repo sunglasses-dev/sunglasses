@@ -232,7 +232,7 @@ def test_every_invisible_char_is_ignorable_and_tables_map_one_to_one():
 # sha256 of the member list ("%X" per code point, sorted, comma-separated). Checked
 # against an independent enumeration of the Unicode Default_Ignorable_Code_Point
 # property, plus the added format characters and INVISIBLE_CHARS.
-IGNORABLE_DIGEST = "b6c6ba5a1a93403db58ae7b7f420569649f903dfcc4ed469034e653eb810e311"
+IGNORABLE_DIGEST = "97c8e737ac572b888dc949ebe5e33a23f1a5a1590c7ffa420ebd22495eb48435"
 
 _VISIBLE_FORMAT = {0x0600, 0x0601, 0x0602, 0x0603, 0x0604, 0x0605, 0x06DD, 0x070F,
                    0x0890, 0x0891, 0x08E2, 0x110BD, 0x110CD}
@@ -308,13 +308,16 @@ def test_a_deleted_run_is_not_read_as_the_space_after_it(carrier, after, before,
 def test_ignorable_set_is_exactly_the_declared_scope():
     p = preprocessor
     members = {cp for lo, hi in p.IGNORABLE_RANGES for cp in range(lo, hi + 1)}
-    assert len(members) == 4195
+    # 4195 that render as nothing plus the 54 control characters #344 deletes (CONTROL_RANGES).
+    assert len(members) == 4249
     # Every member, not only the count: a set of the same size with one member
     # swapped for another code point changes this digest.
     listing = ",".join("%X" % cp for cp in sorted(members)).encode()
     assert hashlib.sha256(listing).hexdigest() == IGNORABLE_DIGEST
     assert 0xE0101 in members and 0x0378 not in members
     assert all(p.IGNORABLE_CHARS.fullmatch(chr(cp)) for cp in members)
+    assert all(cp in members for cp in range(0x110) if preprocessor.CONTROL_CHARS.fullmatch(chr(cp)))
+    assert 0x09 not in members and 0x0A not in members and 0x1B not in members and 0x85 not in members
     # Default ignorables that are not format characters are in it ...
     for cp in (0x034F, 0x115F, 0x1160, 0x17B4, 0x180B, 0x3164, 0xFE00, 0xFFA0, 0xE0100):
         assert cp in members, hex(cp)
