@@ -180,6 +180,21 @@ _SKIP_DIRS = {
     '.tox', '.mypy_cache', '.pytest_cache', 'egg-info',
 }
 
+# Generated dependency lists. Thousands of lines of hashes and URLs, no prose an agent
+# would read, and the biggest single cost of scanning a JavaScript repo. They are left
+# out the way node_modules is, but NAMED in `skipped` (a skip must not vanish); a
+# lockfile on its own does not make a scan incomplete, see `_is_lockfile_skip`.
+_LOCKFILES = {
+    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+    'poetry.lock', 'Cargo.lock', 'go.sum',
+}
+_LOCKFILE_SKIP_REASON = "lockfile (generated dependency list) — not inspected"
+
+
+def _is_lockfile_skip(reason):
+    return reason == _LOCKFILE_SKIP_REASON
+
+
 _BINARY_EXTENSIONS = {
     '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
     '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.webm',
@@ -225,6 +240,9 @@ def _walk_repo_files_with_skips(repo_dir):
             filepath = os.path.join(root, f)
             rel = os.path.relpath(filepath, repo_dir)
             ext = os.path.splitext(f)[1].lower()
+            if f in _LOCKFILES:
+                skips.append((rel, _LOCKFILE_SKIP_REASON))
+                continue
             if ext in _BINARY_EXTENSIONS:
                 skips.append((rel, f"binary file type ({ext}) — not inspected"))
                 continue
@@ -240,6 +258,10 @@ def _walk_repo_files_with_skips(repo_dir):
                 skips.append((rel, "not a regular file — not inspected"))
                 continue
             files.append((filepath, None))
+    # os.walk order is the filesystem's. The same tree must give the same order, so a
+    # file cap leaves out the same files on every run and every machine.
+    files.sort()
+    skips.sort()
     return files, skips
 
 
@@ -275,8 +297,43 @@ def _wants_machine_output(args) -> bool:
     return bool(getattr(args, "json", False)) or getattr(args, "output", "human") in ("json", "sarif")
 
 
+def _check_max_files(args):
+    """`--max-files` must be a positive number; refuse before cloning or walking anything."""
+    cap = getattr(args, "max_files", None)
+    if cap is not None and cap < 1:
+        _usage_error(args, f"--max-files must be a positive number, got {cap}.",
+                     "Nothing was scanned. Leave --max-files out to read every file.")
+    return cap
+
+
+def _progress_line(index, total, started, rel_path):
+    """One line per file, on STDERR: stdout stays the one document a pipe expects."""
+    elapsed = time.perf_counter() - started
+    stamp = f"{elapsed * 1000:.0f}ms" if elapsed < 1 else f"{elapsed:.1f}s"
+    print(f"  [{index}/{total}] {stamp:>7}  {rel_path}", file=sys.stderr, flush=True)
+
+
+def _scan_dir(args, engine):
+    """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
+    _check_max_files(args)
+    path = os.path.expanduser(args.directory)
+    if not os.path.exists(path):
+        _usage_error(args, f"Directory not found: {args.directory}",
+                     "Nothing was scanned. Check the path.")
+    if not os.path.isdir(path):
+        _usage_error(args, f"Not a directory: {args.directory} is not a directory.",
+                     "Nothing was scanned. To scan one file, use --file.")
+    path = os.path.abspath(path)
+    if not _wants_machine_output(args):
+        print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — directory scan")
+        print(f"  {DIM}{'─' * 50}{RESET}")
+        print(f"  {DIM}Scanning {path}...{RESET}")
+    _scan_tree(args, engine, path, source=path, kind="directory")
+
+
 def _scan_repo(args, engine):
     """Clone a GitHub repo and scan all files."""
+    _check_max_files(args)
     repo_url = args.repo
     repo_hash = hashlib.md5(repo_url.encode()).hexdigest()[:10]
     tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
@@ -308,6 +365,18 @@ def _scan_repo(args, engine):
     if not _wants_machine_output(args):
         print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
+    _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo",
+               cleanup=lambda: shutil.rmtree(tmp_dir, ignore_errors=True))
+
+
+def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
+    """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
+
+    `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
+    `source` is its path). Everything after the clone is the same code on purpose:
+    a local tree and its clone must come back with the same files, skips and exit.
+    """
+    repo_url = source
     # Walk and scan
     start = time.perf_counter()
     files_scanned = 0
@@ -324,8 +393,19 @@ def _scan_repo(args, engine):
     repo_results = []
 
     walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
-    for filepath, _reason in walked:
+    # The total cap. A file left out by it is a skip with the flag's name in the reason,
+    # never a silent drop, and the scan is incomplete because of it.
+    max_files = getattr(args, "max_files", None)
+    if max_files is not None and len(walked) > max_files:
+        for filepath, _reason in walked[max_files:]:
+            walker_skips.append((
+                os.path.relpath(filepath, tmp_dir),
+                f"over the --max-files {max_files} limit — not inspected"))
+        walked = walked[:max_files]
+    total_files = len(walked)
+    for index, (filepath, _reason) in enumerate(walked, 1):
         rel_path = os.path.relpath(filepath, tmp_dir)
+        _progress_line(index, total_files, start, rel_path)
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
@@ -430,12 +510,16 @@ def _scan_repo(args, engine):
     elapsed_ms = (time.perf_counter() - start) * 1000
 
     # Clean up
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    if cleanup:
+        cleanup()
 
     # Output
-    repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+    if kind == "repo":
+        repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+    else:
+        repo_name = os.path.basename(repo_url.rstrip(os.sep)) or repo_url
     summary = {
-        "repo": repo_url,
+        ("repo" if kind == "repo" else "directory"): repo_url,
         "repo_name": repo_name,
         "files_scanned": files_scanned,
         "files_with_threats": files_with_threats,
@@ -460,7 +544,10 @@ def _scan_repo(args, engine):
     # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
-    incomplete = bool(files_incomplete or walker_skips or nothing_inspected)
+    # A lockfile skip is a stated policy, listed in `skipped`, and by itself it does not
+    # turn a scan incomplete (else every npm repo would exit 3). Every other skip does.
+    unread_skips = [(f, r) for f, r in walker_skips if not _is_lockfile_skip(r)]
+    incomplete = bool(files_incomplete or unread_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
     # Through the one normalizer, like every other document. This block used to
@@ -473,7 +560,7 @@ def _scan_repo(args, engine):
         {
             "threat_found": bool(total_threats),
             "extraction_complete": not incomplete,
-            "warnings": ([f"{path}: {reason}" for path, reason in walker_skips]
+            "warnings": ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
             "channel": "file",
@@ -486,7 +573,7 @@ def _scan_repo(args, engine):
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
         sarif_doc = to_sarif(repo_results, source=repo_url)
-        not_inspected = ([f"{path}: {reason}" for path, reason in walker_skips]
+        not_inspected = ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in partially_read])
         not_inspected += [
             f"{r.source}: not fully inspected"
@@ -510,16 +597,17 @@ def _scan_repo(args, engine):
     # Human-readable output
     print(f"\n  {BOLD}SCAN COMPLETE{RESET}")
     print(f"  {DIM}{'─' * 50}{RESET}")
-    print(f"  Repo:            {CYAN}{repo_name}{RESET} ({repo_url})")
+    print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{repo_name}{RESET} ({repo_url})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
-    if files_incomplete or walker_skips:
+    if files_incomplete or unread_skips:
         # The banner introduces the list. Round 5: it was printed in the verdict
         # block BELOW, so a reader met the named skips first and the header last,
         # and a header that promises a list of what went unread has to arrive
         # before the list. Caught by the round-5 `banner_without_named_scope`
         # assertion on this surface.
-        _print_coverage_banner("part of this repo was not read")
+        _print_coverage_banner("part of this repo was not read" if kind == "repo"
+                               else "part of this directory was not read")
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
         for name, reason in partially_read[:10]:
@@ -774,6 +862,13 @@ def cmd_scan(args):
     # stdin, repo and deep — instead of four separate checks that can drift.
     if getattr(args, "output", "human") == "json":
         args.json = True
+
+    if getattr(args, "directory", None) is not None and args.repo:
+        _usage_error(args, "--dir and --repo cannot be used together.",
+                     "Nothing was scanned. Scan a clone with --repo, or a local tree with --dir.")
+    if getattr(args, "directory", None) is not None:
+        _scan_dir(args, engine)
+        return
 
     if args.repo:
         _scan_repo(args, engine)
@@ -2491,6 +2586,12 @@ def main():
     )
     scan_parser.add_argument("--file", "-f", help="File to scan")
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
+    scan_parser.add_argument("--dir", dest="directory", metavar="PATH",
+                             help="Local directory to scan (same files, skips and exit codes as --repo, "
+                                  "no clone)")
+    scan_parser.add_argument("--max-files", dest="max_files", type=int, metavar="N",
+                             help="With --repo or --dir: read at most N files; the rest are listed "
+                                  "as skipped and the scan is incomplete (default: no cap)")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
                              choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),

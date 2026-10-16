@@ -419,6 +419,25 @@ sunglasses scan ./typo.txt; echo $?            # 2 — no such file; nothing was
 A path-shaped argument that does not exist is a usage error, not text. Pass
 `--text` if you really do mean to scan the string `./typo.txt` itself.
 
+### Scanning a whole directory or repository
+
+```bash
+sunglasses scan --dir ./my-project                       # a local tree, no clone
+sunglasses scan --repo https://github.com/org/repo       # clone, then the same scan
+sunglasses scan --dir ./my-project --max-files 500       # read at most 500 files
+```
+
+`scan --dir` reads a local directory exactly the way `--repo` reads a clone: the same
+files, the same skips, the same exit codes. It does not change anything in the tree.
+One progress line per file (`[3/120]`, the time spent, the file) goes to stderr, so
+`-o json` and `-o sarif` still leave stdout as one document. What the scan leaves out is
+listed in `skipped` with the reason, never dropped silently: files over 1 MB, binary
+types, lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+`Cargo.lock`, `go.sum`), and every file past `--max-files N`. A lockfile on its own does
+not turn the exit code to `3`; any other skipped file does. A path that is not a
+directory is refused with exit `2`. `--file` still refuses a directory: scanning a tree
+is a different claim from scanning one file, and `--dir` is where it is made.
+
 ### Deep Scan Setup (Audio & Video)
 
 Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:
