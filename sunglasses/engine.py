@@ -14,6 +14,7 @@ import bisect
 import collections
 import functools
 import html
+import keyword
 import re
 import threading
 import unicodedata
@@ -802,6 +803,14 @@ class _ViewEnds:
     def __init__(self):
         self._seps = {}
         self._closes = {}
+        self._sentences = {}
+
+    def sentence_index(self, text: str, build):
+        """`build(text)`, made once for a text and kept while the same object is asked about."""
+        kept = self._sentences.get(id(text))
+        if kept is None or kept[0] is not text:
+            kept = self._sentences[id(text)] = (text, build(text))
+        return kept[1]
 
     def first_close(self, text: str, close: str, start: int, stop: int, find) -> int:
         """`find(text, close, start, stop)` for the walk of one text, which asks for
@@ -860,6 +869,10 @@ class _RawAlign(_ViewEnds):
         self._record = record
         self._moved = {}
         _ViewEnds.__init__(self)
+
+    @property
+    def raw(self) -> str:
+        return self._raw
 
     def moved(self, view: str, pos: int) -> bool:
         """Whether view[pos] stands in a reversed view: a view behind the plain one that
@@ -1361,13 +1374,20 @@ class SunglassesEngine:
     # illustratively (quoted/backticked); a bare imperative after a label is NOT
     # downgraded. This closes the Jul-12 "label it an example" bypass without
     # re-blocking genuine security docs.
+    # Plain negations. They are everyday words that also open idioms ("without further ado",
+    # "no longer", "cannot wait to"), so they reach one word before the payload, not two.
+    PLAIN_NEGATIONS = (
+        "no", "not", "does not", "did not", "cannot", "will not", "is not", "are not", "without",
+        "doesn't", "didn't", "can't", "won't", "isn't", "aren't",
+        "doesn\u2019t", "didn\u2019t", "can\u2019t", "won\u2019t", "isn\u2019t", "aren\u2019t",
+    )
     TRUE_NEGATIONS = [
         "do not", "don't", "don't", "dont",
         "never", "avoid", "be careful", "watch out for",
         "beware of", "not run", "not execute", "not use",
         "should not", "shouldn't", "shouldn't",
         "must not", "must never",
-    ]
+    ] + list(PLAIN_NEGATIONS)
     FRAMING_LABELS = [
         "warning:", "warning -", "example of", "example:",
         "for example", "caution:", "note:",
@@ -1394,15 +1414,39 @@ class SunglassesEngine:
     # them. A framing label downgrades only a quoted payload, with the same
     # closing-quote rule as a negation (_quoted_gap_holds).
     NEGATION_GAP_WORDS = 2
+    NEGATION_PLAIN_GAP_WORDS = 1  # the reach of a plain negation (PLAIN_NEGATIONS)
+    _PLAIN_NEGATION_SET = frozenset(PLAIN_NEGATIONS)
     _NEGATION_CLAUSE_WORDS = frozenset(("then", "now", "but", "so", "instead", "and", "or"))
     # A run of plain spaces between two words of the gap, read as the one space it would be in
     # a view that collapses blanks. A run next to the cue or next to the match is not between
     # two words of the gap, and a longer run (more than _Walk.BLANK_RUN) is kept as it is; both
     # fail the allowlist.
     _GAP_SPACES_RX = re.compile("(?<=[a-z0-9]) {2,%d}(?=[a-z0-9])" % _Walk.BLANK_RUN)
-    _NEGATION_FLIP_WORDS = frozenset(("hesitate", "fail", "forget", "refuse", "neglect", "omit", "skip", "miss"))
+    # A word that turns the thing after a negation into an order or a grant: "do not hesitate to
+    # X", "no problem, X", "without further ado X", "not only X", "cannot wait to X". One of
+    # these ANYWHERE in the gap means the negation does not govern. The list is finite; an
+    # idiom outside it is read as a negation (a stated limit of this reading).
+    _NEGATION_FLIP_WORDS = frozenset((
+        "hesitate", "hesitates", "hesitated", "hesitating", "hesitation", "hesitations",
+        "fail", "fails", "failed", "failing", "forget", "forgets", "forgetting", "refuse",
+        "refuses", "refusing", "neglect", "neglecting", "omit", "omitting", "skip", "skipping",
+        "miss", "missing",
+        "problem", "problems", "worry", "worries", "matter", "matters", "doubt", "doubts",
+        "question", "questions", "delay", "delays", "ado", "further", "more", "only", "just",
+        "merely", "simply", "longer", "need", "needs", "wait", "waiting", "afraid", "shy",
+        "reluctant", "hurry", "exception", "exceptions", "reservation", "reservations",
+        "objection", "objections", "complaint", "complaints", "pause", "fear", "ceremony",
+        "thought", "choice", "stop", "cease"))
+    # These four read as plain modifiers of a negated clause after the existing cues
+    # ("Do not just run rm -rf", "Do not stop the job") and are pinned that way; they turn
+    # the next thing into an order only after a new cue, which has no such history.
+    _NEGATION_FLIP_PLAIN_ONLY = frozenset(("just", "wait", "waiting", "stop"))
+    _NEGATION_FLIP_OLD_CUES = _NEGATION_FLIP_WORDS - _NEGATION_FLIP_PLAIN_ONLY
+    # Longest phrase first so "does not" is read before "no". A cue that follows a hyphen is
+    # the end of a longer word ("pre-no"), not a cue.
     _NEGATION_RX = re.compile(
-        r"(?<![\w'’])(?:" + "|".join(re.escape(p) for p in TRUE_NEGATIONS) + r")(?![\w'’])")
+        r"(?<![\w'’-])(?:" + "|".join(
+            re.escape(p) for p in sorted(TRUE_NEGATIONS, key=len, reverse=True)) + r")(?![\w'’])")
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
     # A framing label asks for a quoted payload, so the gap after a label is one
@@ -2147,7 +2191,8 @@ class SunglassesEngine:
         at = text[match_start:match_start + 1]
         return at if at in self._LEADIN_BREAKS else ""
 
-    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None) -> bool:
+    def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
+                        refusal_ok: bool = False) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -2165,6 +2210,8 @@ class SunglassesEngine:
         them from, so a negation built by decoding, erasing or folding characters
         never downgrades. The text is lowercased for ASCII letters only.
         """
+        if refusal_ok and self._refusal_string(text, match_start, match_end, align):
+            return True
         window_start = max(0, match_start - self.NEGATION_WINDOW)
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
@@ -2178,7 +2225,24 @@ class SunglassesEngine:
             # A rule whose lead-in consumed the sentence break starts its match ON the
             # break, so the gap above stops short of it. The break is part of what
             # lies between the cue and the payload and ends the clause.
-            if not (self._negation_governs(gap + self._leadin_break(text, match_start))
+            plain = m.group(0) in self._PLAIN_NEGATION_SET
+            gap_words = self.NEGATION_PLAIN_GAP_WORDS if plain else self.NEGATION_GAP_WORDS
+            # A new cue governs a plain run only. In front of a list (or a second clause) it
+            # would lower the first item alone, a half-reading of the list, so it governs
+            # nothing and every item keeps the severity it has on main. And a new cue never
+            # lowers a hit inside the string of a one-line refusal: an injection phrase there
+            # blocks.
+            if plain:
+                if self._sentence_is_a_list(
+                        text, window_start + m.start(), gap,
+                        match_end if match_end is not None else match_start):
+                    continue
+                if align is not None and self._raw_sentence_is_a_list(
+                        text, window_start + m.start(), m.end() - m.start(), match_start, match_end, align):
+                    continue
+                if self._refusal_literal(text, match_start, match_end, align):
+                    continue
+            if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
                     or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
                 continue
             if align is None or align.holds(
@@ -2195,6 +2259,148 @@ class SunglassesEngine:
             if align is None or align.holds(text, window_start + pos, hit_end):
                 return True
         return False
+
+    # What ends the plain run a new cue governs. A cue governs a payload only when the rest of
+    # its sentence is a plain run: no comma, semicolon, colon, solidus or ampersand (in any of
+    # the forms below), no "and", "or" or "nor", and no line break with text after it, from the
+    # cue to the end of the sentence. Anything else is a list (or two clauses), which is not
+    # read here, so the cue governs nothing and the finding keeps the severity it has on main.
+    # The marks: every punctuation or symbol character (not a currency sign) whose Unicode name
+    # holds COMMA, SEMICOLON, COLON, SOLIDUS or AMPERSAND, except the reverse solidus family (a backslash is not a list mark),
+    # plus U+201A (single low-9 quotation mark, a comma in some type). A fixed set, so a new
+    # look-alike is not covered until it is added.
+    _LIST_MARKS = frozenset(
+        "\u0026\u002c\u002f\u003a\u003b\u02f8\u055d\u060c\u061b\u06fd"
+        "\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u07f8\u1363\u1364"
+        "\u1365\u1366\u1802\u1804\u1808\u201a\u204f\u205d\u214b\u2254"
+        "\u2255\u2360\u236a\u236e\u275b\u275c\u275d\u275e\u275f\u2760"
+        "\u27c9\u2982\u29f6\u29f8\u2a29\u2a74\u2af6\u2afb\u2afd\u2e32"
+        "\u2e34\u2e35\u2e41\u2e49\u2e4a\u2e4c\u3001\ua4fe\ua60d\ua6f4"
+        "\ua6f5\ua6f6\ua789\ufe10\ufe11\ufe13\ufe14\ufe50\ufe51\ufe54"
+        "\ufe55\ufe60\uff06\uff0c\uff0f\uff1a\uff1b\uff64\U0001144d"
+        "\U0001145a\U00012471\U00012472\U00012473\U00012474\U00016e97"
+        "\U0001da87\U0001da89\U0001da8a\U0001f674\U0001f675\U0001f676"
+        "\U0001f677\U0001f678\U0001f67c"
+        # the characters whose name holds COMMA that are not punctuation: letters with a comma,
+        # combining commas, a comma in a digit, the tag comma
+        "\u0218\u0219\u021a\u021b\u02bb\u02bd\u0312\u0313\u0314\u0315\u0326\ua72e"
+        "\ua72f\U0001f101\U0001f102\U0001f103\U0001f104\U0001f105\U0001f106\U0001f107"
+        "\U0001f108\U0001f109\U0001f10a\U000e002c"
+    )
+    # A joining word is delimited by anything that is not a LETTER: a digit, an underscore and a
+    # numeric character (a superscript, a fraction) are boundaries, so "or7", "and_" and "7or"
+    # join, and "brand", "nord" and "xandx" do not. Found as a plain word and checked on its
+    # neighbours (str.isalpha), because a regex has no class for exactly the letters.
+    _JOINING_WORD_RX = re.compile(r"and|or|nor", re.I)
+    _LINE_BREAK_CHARS = "\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+    # A full stop, "!" or "?" followed by white space, a quote, a bracket, or the end of the text
+    # closes a sentence.
+    _SENTENCE_END_RX = re.compile(r"[.!?](?=[\s\"'\u2018\u2019\u201c\u201d)\]}]|\Z)")
+    # What a sentence is scanned for, once per text: the list marks, the joining words, the line
+    # breaks.
+    _JOIN_RX = re.compile("[" + re.escape("".join(sorted(_LIST_MARKS))) + "]|and|or|nor", re.I)
+    # A paragraph start: what stands between a sentence end and the first word of the next
+    # sentence (closing quotes and brackets, then white space). An OPENING quote (U+2018,
+    # U+201C) is not part of it: a quote that opens the next sentence is no part of this one.
+    _PARAGRAPH_LEAD_RX = re.compile("[\"'\u2019\u201d)\\]}]*\\s*")
+    _BREAK_RX = re.compile("[" + re.escape(_LINE_BREAK_CHARS) + "]")
+    NEGATION_SENTENCE_SCAN = 200
+
+    @staticmethod
+    def _is_a_word_edge(text: str, m) -> bool:
+        """Whether the joining word found at ``m`` is a word of its own: no LETTER stands next to
+        it. A digit, an underscore, a numeric character and the edge of the text are boundaries."""
+        a, b = m.start(), m.end()
+        return not (a > 0 and text[a - 1].isalpha()) and not (b < len(text) and text[b].isalpha())
+
+    @classmethod
+    def _joins_items(cls, run: str, payload_follows: bool = False) -> bool:
+        """Whether ``run`` (text inside one sentence) holds a list mark, a joining word, or a
+        line break with text after it. A break that only trails the run is a paragraph end,
+        unless the payload follows the run (the gap between the cue and the payload): then any
+        break in it separates the cue from the payload."""
+        if any(c in cls._LIST_MARKS for c in run):
+            return True
+        if any(cls._is_a_word_edge(run, m) for m in cls._JOINING_WORD_RX.finditer(run)):
+            return True
+        return cls._BREAK_RX.search(run if payload_follows else run.rstrip()) is not None
+
+    @classmethod
+    def _index_sentences(cls, text: str):
+        """Where the sentences of ``text`` end, and where a list mark or joining word, and a line
+        break, stand: three sorted lists of offsets."""
+        return (
+            [m.start() for m in cls._SENTENCE_END_RX.finditer(text)],
+            [m.start() for m in cls._JOIN_RX.finditer(text)
+             if len(m.group()) == 1 or cls._is_a_word_edge(text, m)],
+            [m.start() for m in cls._BREAK_RX.finditer(text)],
+        )
+
+    @classmethod
+    def _joins_in_front(cls, text: str, cue_start: int) -> bool:
+        """Whether a list mark, a joining word, or a line break (with text in the stretch)
+        stands between the end of the previous sentence and the cue: back to that end, however
+        far."""
+        ends = getattr(_SCAN_LOCAL, "ends", None)
+        ends_at, joins_at, breaks_at = (
+            cls._index_sentences(text) if ends is None else ends.sentence_index(text, cls._index_sentences))
+        k = bisect.bisect_left(ends_at, cue_start)
+        start = ends_at[k - 1] + 1 if k else 0
+        j = bisect.bisect_left(joins_at, start)
+        if j < len(joins_at) and joins_at[j] < cue_start:
+            return True
+        if k:
+            # A line break right after a sentence end opens a new paragraph: the sentence of the
+            # cue starts after that break (and after any closing quote or bracket before it), and
+            # the words between there and the cue are ordinary words, never separators. At the
+            # start of the text there is no sentence end to follow: a break there counts.
+            start = cls._PARAGRAPH_LEAD_RX.match(text, start, cue_start).end()
+        b = bisect.bisect_left(breaks_at, start)
+        return b < len(breaks_at) and breaks_at[b] < cue_start
+
+    @classmethod
+    def _raw_sentence_is_a_list(cls, view: str, cue_start: int, cue_len: int, match_start: int,
+                                match_end: Optional[int], align) -> bool:
+        """_sentence_is_a_list asked of the raw input, for a cue of a view. The view can have
+        lost what makes a sentence a list (a leading line break, a line separator read as a
+        space); the raw text has it. Asked only when the cue and the start of the match are
+        placed in the raw input; otherwise the view is all there is, and this is False."""
+        raw = align.raw
+        cue = align.origin(view, cue_start)
+        start = align.origin(view, match_start)
+        if cue is None or start is None or start < cue + cue_len:
+            return False
+        end = start + 1
+        if match_end is not None and match_end - 1 > match_start:
+            last = align.origin(view, match_end - 1)
+            end = last + 1 if last is not None and last - start == match_end - 1 - match_start else start + 1
+        return cls._sentence_is_a_list(raw, cue, raw[cue + cue_len:start].lower(), end)
+
+    @classmethod
+    def _sentence_is_a_list(cls, text: str, cue_start: int, gap: str, match_end: int) -> bool:
+        """Whether a new cue does NOT govern, because its sentence is anything but a plain run.
+        The cue governs only when no list mark, joining word or line break with text after it
+        stands between the previous sentence end (see _SENTENCE_END_RX; the start of the text is
+        one) and the cue, however far back; none stands between the cue and the payload (the gap,
+        which the cue window keeps short, and which is read as on main if it is longer than
+        NEGATION_SENTENCE_SCAN); and the sentence reaches a sentence end, or the end of
+        the text, within NEGATION_SENTENCE_SCAN characters of the payload's end with none of them
+        in between. The payload itself is neither scanned nor counted (a URL has a colon and
+        solidi). Anything else is read as on main."""
+        reach = cls.NEGATION_SENTENCE_SCAN
+        if cls._joins_in_front(text, cue_start):
+            return True
+        if len(gap) > reach or cls._joins_items(gap, True):
+            return True
+        tail = text[match_end:match_end + reach + 2]
+        end = cls._SENTENCE_END_RX.search(tail)
+        if end is not None and end.start() <= reach:
+            tail = tail[:end.start()]
+        elif len(text) - match_end <= reach:
+            tail = text[match_end:]
+        else:
+            return True
+        return cls._joins_items(tail)
 
     @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
@@ -2427,24 +2633,27 @@ class SunglassesEngine:
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None):
+    def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None,
+                         refusal_ok: bool = False):
         """Offset of the first word-bounded occurrence of `keyword` at or after
         `begin` that is not negated, or None. `align` is the walk of the views
         against the raw input (see _check_negation)."""
         at = normalized.find(keyword, begin)
         while at != -1:
             if self._word_bounded(normalized, at, keyword) and \
-                    not self._negated_here(normalized, at, align, at + len(keyword)):
+                    not self._negated_here(normalized, at, align, at + len(keyword), refusal_ok):
                 return at
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _negated_here(self, view: str, pos: int, align, end: int) -> bool:
+    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
         one that does not keep the offsets never is."""
         if align is not None and align.moved(view, pos):
             return False
-        return self._check_negation(view, pos, self._align_at(view, pos, align), end)
+        if refusal_ok and self._refusal_in_shape_copy(view, pos, end, align):
+            return True
+        return self._check_negation(view, pos, self._align_at(view, pos, align), end, refusal_ok)
 
     def _framed_here(self, view: str, pos: int, align, end: int) -> bool:
         """Whether the hit at view[pos:end] sits in a clause that describes the attack.
@@ -2637,22 +2846,103 @@ class SunglassesEngine:
             pos = text.find(close, pos + 1, stop)
         return -1
 
-    def _negation_governs(self, gap: str) -> bool:
+    def _negation_governs(self, gap: str, max_words: Optional[int] = None) -> bool:
         """True if the text between a TRUE_NEGATION and the match keeps the
         match inside the negated clause. The gap is accepted only when it is
         plain ASCII words (letters, digits, hyphens) joined by single spaces,
-        within NEGATION_GAP_WORDS, with no clause word and no leading verb of
-        omission. A run of up to _Walk.BLANK_RUN spaces between two words of the gap counts
-        as one space. Anything else in the gap means it does not govern."""
+        within max_words (NEGATION_GAP_WORDS unless the cue is a plain one), with no
+        clause word and no word that turns the next thing into an order, in any place of
+        the gap ("do not hesitate to X", "without any hesitation X"). A run of up to
+        _Walk.BLANK_RUN spaces between two words of the gap counts as one space.
+        Anything else in the gap means it does not govern."""
         gap = self._GAP_SPACES_RX.sub(" ", gap)
         if not self._NEGATION_GAP_RX.fullmatch(gap):
             return False
         words = gap.split()
-        if len(words) > self.NEGATION_GAP_WORDS:
+        if len(words) > (self.NEGATION_GAP_WORDS if max_words is None else max_words):
             return False
-        if words and words[0] in self._NEGATION_FLIP_WORDS:
+        flips = (self._NEGATION_FLIP_WORDS if max_words == self.NEGATION_PLAIN_GAP_WORDS
+                 else self._NEGATION_FLIP_OLD_CUES)
+        if any(w in flips for w in words):
             return False
         return not any(w in self._NEGATION_CLAUSE_WORDS for w in words)
+
+    # A source file that REFUSES with a sentence is not a source file that is told something:
+    #     raise RuntimeError("model checksum mismatch: refusing to load")
+    # GLS-RP-250 is a keyword-only rule that reads the words "checksum mismatch" next to a
+    # retrieved document, so a program's own error message trips it. For the rules named
+    # here, in a file or code channel, a hit that sits wholly inside the string of a line that
+    # is EXACTLY that form (indent, raise, a name, one plain quoted string, the closing
+    # parenthesis, nothing else) is a review. Every other line, call or string keeps the
+    # severity it has on main, and every other rule keeps reading such a string: a prompt
+    # injection inside a raise string is still a prompt injection.
+    _REFUSAL_STRING_RULES = frozenset(("GLS-RP-250",))
+    _SOURCE_CHANNELS = frozenset(("file", "code"))
+    _REFUSAL_LINE_RX = re.compile(
+        r"[ \t]*raise[ \t]+(?P<n>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\([ \t]*"
+        r"(?P<q>[\"'])(?P<s>(?:(?!(?P=q))[^\n\r\\])*)(?P=q)[ \t]*\)[ \t]*")
+    _REFUSAL_BREAKS = frozenset("\n\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029")
+    REFUSAL_LINE_SPAN = 400  # characters either side of the hit in which the line must start and end
+
+    def _refusal_in_shape_copy(self, view: str, pos: int, end: int, align=None) -> bool:
+        """A hit in the shape-confusion view is the hit at the same offset of the plain view.
+        That view is the last one: a copy of everything before it (the separators too), with a
+        standalone "l" written as "i" (preprocessor.normalize_with_length). The hit is read as
+        the one it copies, and only once the whole view is shown to be exactly that copy; any
+        other later view (ROT13, reversed, shadow) is not."""
+        sep = " " + VIEW_SEP + " "
+        size, odd = divmod(len(view) - len(sep), 2)
+        start = size + len(sep)
+        if odd or size <= 0 or view[size:start] != sep or pos < start or end > len(view):
+            return False
+        offset = pos - start
+        first_end = view.find(sep)
+        if offset + (end - pos) > first_end or view[start:] != self._SHAPE_RX.sub("i", view[:size]):
+            return False
+        return self._refusal_string(view, offset, offset + (end - pos), align)
+
+    _SHAPE_RX = re.compile(r"\bl(?=[a-z])")
+
+    def _refusal_string(self, text: str, match_start: int, match_end: Optional[int], align=None) -> bool:
+        """Whether text[match_start:match_end] sits wholly inside the string of a line of the
+        raw input that is exactly _REFUSAL_LINE_RX (see _REFUSAL_STRING_RULES). The hit has to
+        be the same characters at the same place in the raw input (a view that holds a copy of
+        it, written backwards or in ROT13, is never vouched for). The line is the raw text
+        between two line breaks, REFUSAL_LINE_SPAN characters or fewer either side of the hit."""
+        if getattr(_SCAN_LOCAL, "channel", None) not in self._SOURCE_CHANNELS:
+            return False
+        return self._refusal_literal(text, match_start, match_end, align)
+
+    def _refusal_literal(self, text: str, match_start: int, match_end: Optional[int], align=None) -> bool:
+        """_refusal_string on any channel: whether the hit sits wholly inside such a string. A new
+        cue never lowers a hit there, on any channel; only the rule exception reads the channel."""
+        if match_end is None or match_end <= match_start:
+            return False
+        if match_end > self._view_end(text, match_start, align):
+            return False
+        if align is None:
+            raw, first, last = text, match_start, match_end - 1
+        else:
+            first, last = align.origin(text, match_start), align.origin(text, match_end - 1)
+            if first is None or last is None or not align.holds(text, match_start, match_end):
+                return False
+            raw = align.raw
+        breaks = self._REFUSAL_BREAKS
+        lo = first
+        while lo > 0 and raw[lo - 1] not in breaks:
+            lo -= 1
+            if first - lo > self.REFUSAL_LINE_SPAN:
+                return False
+        hi = last + 1
+        while hi < len(raw) and raw[hi] not in breaks:
+            hi += 1
+            if hi - last > self.REFUSAL_LINE_SPAN:
+                return False
+        m = self._REFUSAL_LINE_RX.fullmatch(raw, lo, hi)
+        if m is None or not (m.start("s") <= first and last < m.end("s")):
+            return False
+        # a name is a dotted run of identifiers: no component is a reserved word or a constant
+        return not any(keyword.iskeyword(part) for part in m.group("n").split("."))
 
     @property
     def pattern_count(self) -> int:
@@ -2722,11 +3012,14 @@ class SunglassesEngine:
                 nothing and returning a clean allow.
         """
         previous = getattr(_SCAN_LOCAL, "ends", None)
+        previous_channel = getattr(_SCAN_LOCAL, "channel", None)
         _SCAN_LOCAL.ends = _ViewEnds()
+        _SCAN_LOCAL.channel = channel
         try:
             return self._scan(text, channel)
         finally:
             _SCAN_LOCAL.ends = previous
+            _SCAN_LOCAL.channel = previous_channel
 
     def _scan(self, text: str, channel: str) -> ScanResult:
         """The scan itself (see scan)."""
@@ -2774,7 +3067,8 @@ class SunglassesEngine:
                     held = negated_kw.get(pattern["id"])
                     if held is not None:
                         here = end_idx - len(keyword) + 1
-                        if not self._negated_here(normalized, here, align, end_idx + 1):
+                        if not self._negated_here(normalized, here, align, end_idx + 1,
+                                                  pattern["id"] in self._REFUSAL_STRING_RULES):
                             self._restore_live(held, self._excerpt(normalized, here, end_idx + 1))
                             del negated_kw[pattern["id"]]
                         continue
@@ -2794,7 +3088,8 @@ class SunglassesEngine:
                     # Negation context check (skipped for negation_immune patterns —
                     # e.g. emotional-coercion jailbreaks where "don't" is part of the
                     # attack template itself, not a warning context)
-                    if not pattern.get("negation_immune") and self._check_negation(normalized, kw_start, align, end_idx + 1):
+                    if not pattern.get("negation_immune") and self._check_negation(
+                            normalized, kw_start, align, end_idx + 1, pattern["id"] in self._REFUSAL_STRING_RULES):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
@@ -2810,7 +3105,8 @@ class SunglassesEngine:
                             continue
                         held = negated_kw.get(pattern["id"])
                         if held is not None:
-                            live = self._live_occurrence(normalized, keyword, 0, align)
+                            live = self._live_occurrence(normalized, keyword, 0, align,
+                                                         pattern["id"] in self._REFUSAL_STRING_RULES)
                             if live is not None:
                                 self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
                                 del negated_kw[pattern["id"]]
@@ -2826,11 +3122,13 @@ class SunglassesEngine:
                             **pattern,
                             "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
                         }
-                        if not pattern.get("negation_immune") and self._check_negation(normalized, idx, align, idx + len(keyword)):
+                        refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
+                        if not pattern.get("negation_immune") and self._check_negation(
+                                normalized, idx, align, idx + len(keyword), refusal_ok):
                             finding["severity"] = "review"
                             finding["negation_context"] = True
                             finding["original_severity"] = pattern["severity"]
-                            live = self._live_occurrence(normalized, keyword, idx + 1, align)
+                            live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
                             if live is not None:
                                 self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
                             else:
