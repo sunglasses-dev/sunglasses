@@ -1039,6 +1039,18 @@ class Route:
         if selector.zero_leaves_is_complete(method, message):
             self._release(raw, NO_ID)  # attempt-exempt: a notification has no id and gets no response, so admission is never called and there is no attempt
             return
+        # AR09 on the notification side. `_client_request` refuses a frame over
+        # the content bound before any scan; this path went straight to
+        # `_inspect`, so an oversized notification was scanned and forwarded
+        # (ASTRA's #393 r1 measured all 14 admitted no-id shapes). It has no
+        # response to give, so it is dropped like an unknown notification above:
+        # one receipt carrying the budget, nothing to either side.
+        over = bounds.check_content(
+            selector.content_bytes(selector.client_surface(method, message)))
+        if over:
+            self._record("SETTLED", reason_code=over.reason, rule=over.rule,
+                         budget=over.budget, forwarded=False)
+            return
         self._inspect(raw, message, method, request_id=NO_ID)  # attempt-exempt: same, a notification has no id to answer
 
     def _cancel(self, message):
