@@ -202,6 +202,24 @@ def client_surface(method, message):
     return params if isinstance(params, (dict, list)) else {}
 
 
+def bound_surface(method, message):
+    """What the content bound counts of a CLIENT frame: the scan surface, and
+    every other member beside the envelope.
+
+    `client_surface` is what a scan reads and is left as it was: `params` only,
+    but for the two zero-leaf methods. The bound has to count more than that. A
+    top-level member other than `params` is not scanned for most methods, and
+    counting only what is scanned meant an oversized one crossed past the very
+    bound that exists to stop it. Counted here, not scanned: that is a separate
+    question and is not changed.
+    """
+    extras = {key: value for key, value in message.items()
+              if key not in _CLIENT_ENVELOPE}
+    if set(extras) - {"params"}:
+        return extras
+    return client_surface(method, message)
+
+
 def zero_leaves_is_complete(method, message, *, surface_only=False):
     """T2.R14. Three shapes, and each has a condition attached.
 

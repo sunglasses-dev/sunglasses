@@ -836,7 +836,7 @@ class Route:
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         over = bounds.check_content(
-            selector.content_bytes(selector.client_surface(method, message)))
+            selector.content_bytes(selector.bound_surface(method, message)))
         if over:
             # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
             # existed, so it was the one `_withhold` in this method that did not
@@ -1046,7 +1046,7 @@ class Route:
         # response to give, so it is dropped like an unknown notification above:
         # one receipt carrying the budget, nothing to either side.
         over = bounds.check_content(
-            selector.content_bytes(selector.client_surface(method, message)))
+            selector.content_bytes(selector.bound_surface(method, message)))
         if over:
             self._record("SETTLED", reason_code=over.reason, rule=over.rule,
                          budget=over.budget, forwarded=False)
