@@ -449,23 +449,18 @@ refusing a link, and keeps that one handle for the whole run; every folder and f
 opened relative to the step before, refusing a link at every step, and the scan remembers each
 folder's identity (device and inode) so a folder that was swapped for another one, or for a link,
 while the scan ran is named as changed and not read. Each file (at most 1 MB) is read once
-through those handles and the scan judges that copy of its bytes; the findings carry the file's
-path in the tree. A file that changes after it was read is judged as it was when it was read.
-
-The copies go to a private temporary folder that is not inside the scanned folder. The candidates
-(`TMPDIR`, `TEMP`, `TMP`, `/tmp`, `/var/tmp`, your home folder) are only looked at, never written
-to, until one is chosen; a candidate is used only if the folder it opens to, and every folder above
-that, is neither the folder the scan holds nor the folder its path names now (compared by device
-and inode, not by path text). The temporary folder is then created, written and emptied through a
-handle on that checked parent, so a path swapped afterwards is not followed. If no candidate
-passes, or looking for one fails, the scan is refused (exit `2`, one document, nothing scanned)
-and asks you to point `TMPDIR` elsewhere. A temporary folder that cannot be removed is reported on
-stderr, and one that was being set up when the scan was interrupted is removed. A file that cannot
-be copied or routed is named as not inspected.
+through those handles, and the scan judges exactly those bytes: they are held in memory and go
+straight to content routing and extraction, so the scan writes no copy of any file, anywhere
+(no temporary file or folder, nothing inside the scanned folder), and no path in the tree is
+opened a second time. The findings carry the file's path in the tree. A file that changes after
+it was read is judged as it was when it was read. Only one file's bytes are held at a time, and
+the 1 MB cap is what bounds that. One caveat outside the scan itself: reading text out of an
+image with the optional OCR extra runs the OCR library, which makes its own short-lived
+temporary file in your `TMPDIR`, as `--file` does for the same image; if you use that extra,
+keep `TMPDIR` outside a folder you scan.
 
 Where the platform has no such handles (Windows) the scan checks for a link and for a path that
-leaves the tree before it reads and again against the file it opened, and checks the temporary
-folder by identity before it creates it but writes to it by path. That is a weaker guarantee
+leaves the tree before it reads and again against the file it opened. That is a weaker guarantee
 against a tree that changes while the scan runs, and it has not been exercised on Windows.
 In a `--repo` scan a link inside the clone is a named skip, so a repository that holds one and
 used to come back clean (exit `0`) now exits `3`.

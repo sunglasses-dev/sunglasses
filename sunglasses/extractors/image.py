@@ -28,6 +28,8 @@ import json
 import struct
 from typing import List, Tuple
 
+from .member import Member, display_name
+
 
 def _check_deps():
     """Check that image scanning dependencies are installed."""
@@ -96,7 +98,7 @@ class ImageExtractor:
         Returns list of (source_label, extracted_text) tuples.
         Each text chunk should be scanned separately through SUNGLASSES.
         """
-        if not os.path.exists(image_path):
+        if not isinstance(image_path, Member) and not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
         results = []
@@ -298,7 +300,8 @@ class ImageExtractor:
         import io
 
         if isinstance(source, (bytes, bytearray)):
-            head, target, label = bytes(source[:32]), io.BytesIO(source), "image bytes"
+            head, target = bytes(source[:32]), io.BytesIO(source)
+            label = repr(display_name(source)) if isinstance(source, Member) else "image bytes"
         else:
             with open(source, "rb") as fh:
                 head = fh.read(32)
@@ -476,7 +479,7 @@ class ImageExtractor:
         except Exception as exc:
             self.failures.append(f"image could not be opened for OCR: {exc}")
             return []
-        return self._ocr_frames_of(img, source=os.path.basename(image_path))
+        return self._ocr_frames_of(img, source=display_name(image_path))
 
     def _ocr_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
         """OCR each frame. Complete only if EVERY frame reached OCR."""
@@ -657,7 +660,7 @@ class ImageExtractor:
                 f"image metadata not read ({exc.__class__.__name__}: {exc})")
             return []
 
-        return self._metadata_frames_of(img, source=os.path.basename(image_path))
+        return self._metadata_frames_of(img, source=display_name(image_path))
 
     def _metadata_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
         """EXIF and embedded text from every frame of an ALREADY-OPEN image.

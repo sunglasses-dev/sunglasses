@@ -26,6 +26,7 @@ import time
 from . import __version__
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
+from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .sarif import to_sarif
 
@@ -209,8 +210,6 @@ _CHANGED_SKIP_REASON = ("changed while the scan ran (replaced by a link, or remo
 # link check plus a containment check, a weaker guarantee that the documentation says so.
 _POSIX = sys.platform != "win32"
 _FD_SAFE = _POSIX and os.open in os.supports_dir_fd and os.scandir in os.supports_fd
-# The copies are made, written and removed through descriptors too, where the platform allows.
-_FD_SCRATCH = _FD_SAFE and all(f in os.supports_dir_fd for f in (os.mkdir, os.rmdir, os.unlink))
 _OPEN_FLAGS = os.O_CLOEXEC if _POSIX else 0
 _NONBLOCK = os.O_NONBLOCK if _POSIX else 0
 _ESTALE = errno.ESTALE if _POSIX else errno.EINVAL
@@ -335,199 +334,6 @@ def _read_member(root, rel, root_fd=None, idents=None):
     if len(data) > _READ_LIMIT:
         raise OSError(errno.EFBIG, "grew past the repo-scan limit while the scan ran", rel)
     return data
-
-
-_SCRATCH_PREFIX = "sunglasses-read-"
-
-
-def _temp_bases():
-    """Where the copies may go, in the order `tempfile` tries them, without touching any.
-
-    `tempfile.gettempdir()` writes a probe file into each candidate it tries, so a TMPDIR
-    inside the scanned folder would be written to before any check could run. This is only the
-    list of names (TMPDIR, TEMP, TMP, the platform's usual folders, the current folder);
-    `_scratch_outside` decides which one is used, and the current folder or any other
-    candidate that is inside the scanned tree is not.
-    """
-    try:
-        bases = list(tempfile._candidate_tempdir_list())
-    except Exception:
-        bases = ["/tmp", "/var/tmp"] if _POSIX else [r"c:\temp", r"c:\tmp", r"\temp", r"\tmp"]
-    bases.append(os.path.expanduser("~"))
-    seen, out = set(), []
-    for base in bases:
-        if base not in seen:
-            seen.add(base)
-            out.append(base)
-    return out
-
-
-def _known_ident(st):
-    # An inode of 0 is "unknown" on some filesystems; it must not make two folders equal.
-    return _ident(st) if st.st_ino else None
-
-
-def _fd_inside(fd, forbidden):
-    """True when the folder `fd` holds, or any folder above it, is one of `forbidden` (dev, ino).
-
-    Walks upward through ".." from the descriptor, so the answer is about the folder that is
-    held, not about whatever a path names a moment later. A walk that cannot finish counts as
-    inside (the caller moves on to the next candidate).
-    """
-    cur = os.dup(fd)
-    try:
-        for _ in range(4096):
-            here = os.fstat(cur)
-            if _known_ident(here) in forbidden:
-                return True
-            parent = os.open("..", os.O_RDONLY | os.O_DIRECTORY | _OPEN_FLAGS, dir_fd=cur)
-            if _ident(os.fstat(parent)) == _ident(here):
-                os.close(parent)
-                return False
-            os.close(cur)
-            cur = parent
-        return True
-    finally:
-        os.close(cur)
-
-
-def _path_inside(path, forbidden):
-    """The same question for a path, where there are no descriptors (Windows)."""
-    cur = os.path.realpath(path)
-    for _ in range(4096):
-        if _known_ident(os.stat(cur)) in forbidden:
-            return True
-        parent = os.path.dirname(cur)
-        if parent == cur:
-            return False
-        cur = parent
-    return True
-
-
-class _Scratch:
-    """The private folder the copies are made in: `.name` is its path, `.write` makes a copy.
-
-    Where the platform allows it the folder is created inside a parent that was opened and
-    checked once, and every copy is written and removed through descriptors, so what is
-    checked is what is written to, whatever the paths do afterwards. `.cleanup()` removes the
-    folder and raises OSError when it cannot.
-    """
-
-    def __init__(self, name, base_fd=None, fd=None, leaf=None):
-        self.name, self._base_fd, self._fd, self._leaf = name, base_fd, fd, leaf
-
-    def write(self, basename, data):
-        path = os.path.join(self.name, basename)
-        if self._fd is None:
-            with open(path, "wb") as fh:
-                fh.write(data)
-            return path
-        fd = os.open(basename, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | _OPEN_FLAGS,
-                     0o600, dir_fd=self._fd)
-        try:
-            view = memoryview(data)
-            while view:
-                view = view[os.write(fd, view):]
-        finally:
-            os.close(fd)
-        return path
-
-    def drop(self, path):
-        if self._fd is None:
-            _drop(path)
-            return
-        try:
-            os.unlink(os.path.basename(path), dir_fd=self._fd)
-        except OSError:
-            pass
-
-    def cleanup(self):
-        if self._fd is None:
-            shutil.rmtree(self.name)
-            return
-        fd, base_fd, self._fd, self._base_fd = self._fd, self._base_fd, None, None
-        try:
-            for entry in os.listdir(fd):
-                try:
-                    os.unlink(entry, dir_fd=fd)
-                except OSError:
-                    pass
-            os.rmdir(self._leaf, dir_fd=base_fd)
-        finally:
-            os.close(fd)
-            os.close(base_fd)
-
-
-def _scratch_in_fd(base, forbidden):
-    base_fd = os.open(base, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | _OPEN_FLAGS)
-    leaf = fd = None
-    try:
-        if _fd_inside(base_fd, forbidden):
-            os.close(base_fd)
-            return None
-        for _ in range(100):
-            leaf = _SCRATCH_PREFIX + os.urandom(6).hex()
-            try:
-                os.mkdir(leaf, 0o700, dir_fd=base_fd)
-                break
-            except FileExistsError:
-                leaf = None
-        else:
-            raise FileExistsError(errno.EEXIST, "no unused name for the temporary folder")
-        fd = os.open(leaf, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | _OPEN_FLAGS, dir_fd=base_fd)
-        return _Scratch(os.path.join(base, leaf), base_fd, fd, leaf)
-    except BaseException:
-        # Whatever was made is removed before the failure (or an interrupt) goes on.
-        if leaf is not None:
-            try:
-                os.rmdir(leaf, dir_fd=base_fd)
-            except OSError:
-                pass
-        for handle in (fd, base_fd):
-            if handle is not None:
-                try:
-                    os.close(handle)
-                except OSError:
-                    pass
-        raise
-
-
-def _scratch_in_path(base, forbidden):
-    if _path_inside(base, forbidden):
-        return None
-    return _Scratch(tempfile.mkdtemp(prefix=_SCRATCH_PREFIX, dir=base))
-
-
-def _scratch_outside(root, root_fd=None):
-    """A private temporary folder that is NOT inside `root`, or None if none can be made.
-
-    The scan copies each file it reads into scratch space, and a scan of a folder must not
-    write into that folder. A candidate is used only if the folder it opens to, and every
-    folder above that, is neither the folder the scan holds (`root_fd`) nor the folder `root`
-    names now; the check is by (device, inode), not by path text, and nothing is created
-    inside a candidate that fails it. A candidate that cannot be opened or written is skipped.
-    """
-    forbidden = set()
-    if root_fd is not None:
-        forbidden.add(_known_ident(os.fstat(root_fd)))
-    try:
-        forbidden.add(_known_ident(os.stat(root)))
-    except OSError:
-        pass
-    forbidden.discard(None)
-    real_root = os.path.realpath(root).rstrip(os.sep) + os.sep
-    for base in _temp_bases():
-        try:
-            real_base = os.path.realpath(base)
-            if (real_base.rstrip(os.sep) + os.sep).startswith(real_root):
-                continue
-            made = (_scratch_in_fd(real_base, forbidden) if _FD_SCRATCH
-                    else _scratch_in_path(real_base, forbidden))
-        except OSError:
-            continue
-        if made is not None:
-            return made
-    return None
 
 
 _BINARY_EXTENSIONS = {
@@ -736,14 +542,6 @@ def _progress_line(index, total, started, rel_path):
     _note(f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}")
 
 
-def _drop(path):
-    """Remove a private copy right away; a copy that stays is removed with its folder."""
-    try:
-        os.unlink(path)
-    except OSError:
-        pass
-
-
 def _scan_dir(args, engine):
     """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
     _check_max_files(args)
@@ -809,42 +607,24 @@ def _scan_repo(args, engine):
 def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
 
-    Sets up what the scan holds for its whole length, then hands over: one no-follow
-    handle on the root (see `_open_root`) and a temporary folder that is not inside the
-    tree. Both are set up before anything is scanned, so a failure here is a refusal
-    (exit 2, one document), never a half scan; both are released on every way out.
+    The scan holds one no-follow handle on the root (see `_open_root`) for its whole
+    length and releases it on every way out. A root that cannot be opened that way is a
+    refusal (exit 2, one document), never a half scan.
     """
     try:
         root_fd = _open_root(tmp_dir)
     except OSError as exc:
         _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
                      "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
-    scratch = None
     try:
-        # Looking for the temporary folder happens inside the cleanup, and a failure of any
-        # kind while looking is the same refusal as finding none.
-        try:
-            scratch = _scratch_outside(tmp_dir, root_fd)
-        except Exception:
-            scratch = None
-        if scratch is None:
-            _usage_error(args, "No temporary folder outside the folder being scanned could be created.",
-                         "Nothing was scanned. The scan copies each file it reads to a temporary "
-                         "folder and never writes into the tree. Point TMPDIR at a folder outside it.")
-        return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scratch)
+        return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
     finally:
-        if scratch is not None:
-            try:
-                scratch.cleanup()
-            except OSError as exc:
-                _note(f"  Could not remove the scan's temporary folder {_printable(scratch.name)} "
-                      f"({exc.__class__.__name__}); remove it by hand.")
         if root_fd is not None:
             os.close(root_fd)
 
 
-def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scratch):
-    """The scan itself; `root_fd` and `scratch` (a `_Scratch`) belong to the caller.
+def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
+    """The scan itself; `root_fd` belongs to the caller.
 
     `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
     `source` is its path). Everything after the clone is the same code on purpose:
@@ -886,9 +666,11 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scra
         rel_path = os.path.relpath(filepath, tmp_dir)
         _progress_line(index, total_files, start, rel_path)
 
-        # The tree can change between the walk and the read. Read the file through the
-        # directory descriptors (no link at any step) and scan that private copy: the
-        # bytes we judged are the bytes we opened, whatever the tree does next.
+        # The tree can change between the walk and the read. Read the file once, through
+        # the directory descriptors (no link at any step), and judge those bytes: they go
+        # to routing and extraction as they are, in memory. Nothing is written anywhere and
+        # no path is opened a second time, so the bytes we judged are the bytes we read,
+        # whatever the tree does next.
         try:
             data = _read_member(tmp_dir, rel_path, root_fd, idents)
         except OSError as exc:
@@ -897,16 +679,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scra
                       else f"could not be read ({exc.__class__.__name__}) — not inspected")
             walker_skips.append((rel_path, reason))
             continue
-        snapshot = os.path.join(scratch.name, os.path.basename(filepath))
-        try:
-            snapshot = scratch.write(os.path.basename(filepath), data)
-        except OSError as exc:
-            # The copy is ours, not the tree's: a full disk or a denied write is a file
-            # we could not inspect, named, never a crash that ends the run without a document.
-            scratch.drop(snapshot)
-            walker_skips.append(
-                (rel_path, f"could not be copied for inspection ({exc.__class__.__name__}) — not inspected"))
-            continue
+        snapshot = Member(data, rel_path)
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
@@ -916,12 +689,10 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scra
         try:
             route, label = identify(snapshot)
         except (OSError, UnreadableFile) as exc:
-            scratch.drop(snapshot)
             walker_skips.append(
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
         if route in ("opaque", "media"):
-            scratch.drop(snapshot)
             walker_skips.append((
                 rel_path,
                 f"{label} — not inspected. Scan it directly to look inside: "
@@ -944,8 +715,6 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scra
             walker_skips.append(
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
-        finally:
-            scratch.drop(snapshot)
 
         files_scanned += 1
         scan_result.source = rel_path
