@@ -22,6 +22,7 @@ Every derivation rule errs toward extracting LESS. An empty requirement means
 "no prefilter, evaluate as before", which is always correct.
 """
 import functools
+import hashlib
 import re
 
 try:
@@ -40,6 +41,17 @@ except ImportError:                                # pragma: no cover
 _CASEFOLD = str.maketrans({"İ": "i", "ı": "i", "K": "k", "ſ": "s"})
 
 MIN_LITERAL = 4       # below this a literal is not selective enough to pay for
+
+
+def table_key(source: str) -> str:
+    """Key of one regex source in `_prefilter_table.TABLE` (sha256 of the source)."""
+    return hashlib.sha256(source.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def file_digest(raw: bytes) -> str:
+    """sha256 of this file's bytes, line endings normalised so a Windows checkout
+    hashes like the wheel. `_prefilter_table.PREFILTER_SHA256` is this digest."""
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def fold(text: str) -> str:
