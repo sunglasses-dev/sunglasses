@@ -1447,6 +1447,38 @@ class SunglassesEngine:
     _NEGATION_RX = re.compile(
         r"(?<![\w'’-])(?:" + "|".join(
             re.escape(p) for p in sorted(TRUE_NEGATIONS, key=len, reverse=True)) + r")(?![\w'’])")
+    # A negation also covers a short list of plain words ("do not log, store, or transmit
+    # X"; "do not change provider, model, or render path"). The list is read by
+    # _negation_reach. These words end it: a clause word, a word that turns the next item
+    # into an order, or a word that joins another sentence onto this one.
+    _NEGATION_LIST_STOPS = frozenset((
+        "then", "now", "but", "so", "instead", "else", "otherwise", "unless", "if", "because",
+        "however", "yet", "still", "rather", "you", "your", "yours", "yourself", "we", "i",
+        "just", "simply", "please", "also", "go", "ahead", "feel", "free", "can", "could",
+        "should", "would", "will", "may", "might", "must", "shall", "let", "to")) | _NEGATION_FLIP_WORDS
+    # A trailing phrase may say "to anyone" or "your key"; it may not open another clause.
+    _LIST_TRAIL_STOPS = _NEGATION_LIST_STOPS - frozenset(("to", "your", "yours", "yourself"))
+    NEGATION_LIST_COMMAS = 3
+    NEGATION_LIST_WORDS = 8  # the whole list: items, the conjunction, the last item
+    NEGATION_LIST_ITEM_WORDS = 3
+    # What may follow the last item of a list: nothing, or a trailing phrase of at most
+    # NEGATION_LIST_TRAIL_WORDS plain words that starts with a word of _LIST_TRAIL_STARTS
+    # ("to anyone", "anywhere other than the API itself"), then the end of the text, a
+    # sentence-ending mark, a closing bracket or a line end. A comma, a colon, a clause word or a
+    # longer run of words means the item goes on or another clause starts.
+    NEGATION_LIST_TRAIL_WORDS = 8
+    NEGATION_LIST_FINAL_WORDS = 5  # the last item of a closed list (the match), blank-separated
+    _LIST_TRAIL_STARTS = frozenset((
+        "to", "anywhere", "anyone", "anybody", "elsewhere", "without", "outside", "beyond",
+        "except", "other", "for", "from", "with", "in", "on", "at", "by", "into", "about",
+        "before", "after", "during", "while"))
+    _LIST_TRAIL_RX = re.compile(r"((?: [a-z0-9]+(?:-[a-z0-9]+)*)*)")
+    _LIST_END_RX = re.compile(r"[ \t]*(?:\Z|[.!?;)\]]|\n|\x1e)")
+    _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
+    _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+    _LIST_WORD_RX = re.compile(_LIST_WORD)
+    _LIST_OPEN_TAIL_RX = re.compile(
+        r"(" + _LIST_WORD + r"(?: " + _LIST_WORD + r"){0,%d}),? (?:and|or) " % (NEGATION_LIST_ITEM_WORDS - 1))
     _NEGATION_GAP_RX = re.compile(
         r" ?(?:[a-z0-9]+(?:-[a-z0-9]+)*(?: [a-z0-9]+(?:-[a-z0-9]+)*)* ?)?")
     # A framing label asks for a quoted payload, so the gap after a label is one
@@ -2192,7 +2224,7 @@ class SunglassesEngine:
         return at if at in self._LEADIN_BREAKS else ""
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
-                        refusal_ok: bool = False) -> bool:
+                        refusal_ok: bool = False, raw_frame: bool = False) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -2215,8 +2247,11 @@ class SunglassesEngine:
         window_start = max(0, match_start - self.NEGATION_WINDOW)
         before_text = _ascii_lower(text[window_start:match_start])
         hit_end = match_start
+        view_end = None
         if align is not None:
-            hit_end = min(match_start + _RawAlign.HIT, align.end_of_view(text, match_start))
+            view_end = align.end_of_view(text, match_start)
+            hit_end = min(match_start + _RawAlign.HIT, view_end)
+        tail = None
         for m in self._NEGATION_RX.finditer(before_text):
             # A window that starts inside a word would read a word fragment as a cue.
             if m.start() == 0 and window_start > 0 and text[window_start - 1].isalnum():
@@ -2227,26 +2262,51 @@ class SunglassesEngine:
             # lies between the cue and the payload and ends the clause.
             plain = m.group(0) in self._PLAIN_NEGATION_SET
             gap_words = self.NEGATION_PLAIN_GAP_WORDS if plain else self.NEGATION_GAP_WORDS
-            # A new cue governs a plain run only. In front of a list (or a second clause) it
-            # would lower the first item alone, a half-reading of the list, so it governs
+            # A new cue governs a plain sentence, or a bounded negated list (_negation_reach)
+            # whose sentence has the shape _sentence_shape names. Anything else (a list the
+            # reach does not accept, a second clause, a list mark in front of the cue) governs
             # nothing and every item keeps the severity it has on main. And a new cue never
             # lowers a hit inside the string of a one-line refusal: an injection phrase there
             # blocks.
+            shape = "plain"
             if plain:
-                if self._sentence_is_a_list(
-                        text, window_start + m.start(), gap,
-                        match_end if match_end is not None else match_start):
-                    continue
-                if align is not None and self._raw_sentence_is_a_list(
-                        text, window_start + m.start(), m.end() - m.start(), match_start, match_end, align):
+                view = None
+                if not raw_frame:
+                    # A normalized text holds several views joined by " VIEW_SEP " (a planted
+                    # separator is stripped from the input first), and a sentence stays
+                    # inside its view. The raw input has no such frame.
+                    lo = text.rfind(" " + VIEW_SEP + " ", 0, match_start)
+                    hi = text.find(" " + VIEW_SEP + " ", match_start)
+                    view = (0 if lo == -1 else lo + 3, len(text) if hi == -1 else hi)
+                shape = self._sentence_shape(
+                    text, window_start + m.start(), gap,
+                    match_end if match_end is not None else match_start, view)
+                if shape != "other" and align is not None:
+                    raw_shape = self._raw_sentence_shape(
+                        text, window_start + m.start(), m.end() - m.start(), match_start, match_end, align)
+                    if raw_shape == "other" or shape == "plain":
+                        shape = raw_shape
+                if shape == "other":
                     continue
                 if self._refusal_literal(text, match_start, match_end, align):
                     continue
-            if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
-                    or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
-                continue
+            gap_end = hit_end
+            leadin = self._leadin_break(text, match_start)
+            if shape == "list" or not self._negation_governs(gap + leadin, gap_words):
+                if tail is None:
+                    tail = _ascii_lower(text[match_start:match_start + self.NEGATION_LIST_TAIL])
+                hit = None if match_end is None else text[match_start:match_end]
+                reach = self._negation_reach(gap + leadin, tail, hit)
+                if reach is not None:
+                    # A list read through the words after the match start: the raw input
+                    # must say the same there too.
+                    gap_end = max(hit_end, match_start + reach)
+                    if view_end is not None:
+                        gap_end = min(gap_end, view_end)
+                elif shape == "list" or not self._quoted_gap_holds(gap, text, match_start, match_end, align):
+                    continue
             if align is None or align.holds(
-                    text, max(0, window_start + m.start() - 1), hit_end,
+                    text, max(0, window_start + m.start() - 1), gap_end,
                     self._spaced_inside(text, window_start + m.end(), match_start)):
                 return True
         for phrase in self.FRAMING_LABELS:
@@ -2337,70 +2397,76 @@ class SunglassesEngine:
         )
 
     @classmethod
-    def _joins_in_front(cls, text: str, cue_start: int) -> bool:
+    def _joins_in_front(cls, text: str, cue_start: int, lo: int = 0) -> bool:
         """Whether a list mark, a joining word, or a line break (with text in the stretch)
         stands between the end of the previous sentence and the cue: back to that end, however
-        far."""
+        far, and no further back than ``lo``, the start of the view that holds the cue."""
         ends = getattr(_SCAN_LOCAL, "ends", None)
         ends_at, joins_at, breaks_at = (
             cls._index_sentences(text) if ends is None else ends.sentence_index(text, cls._index_sentences))
         k = bisect.bisect_left(ends_at, cue_start)
-        start = ends_at[k - 1] + 1 if k else 0
+        prev = ends_at[k - 1] + 1 if k else 0
+        start = max(prev, lo)
         j = bisect.bisect_left(joins_at, start)
         if j < len(joins_at) and joins_at[j] < cue_start:
             return True
-        if k:
-            # A line break right after a sentence end opens a new paragraph: the sentence of the
-            # cue starts after that break (and after any closing quote or bracket before it), and
-            # the words between there and the cue are ordinary words, never separators. At the
-            # start of the text there is no sentence end to follow: a break there counts.
+        # A line break right after a sentence end opens a new paragraph: the sentence of the cue
+        # starts after that break (and after any closing quote or bracket before it), and the
+        # words between there and the cue are ordinary words, never separators. At the start of
+        # the text (or of a view) there is no sentence end to follow: a break there counts.
+        if prev > lo:
             start = cls._PARAGRAPH_LEAD_RX.match(text, start, cue_start).end()
         b = bisect.bisect_left(breaks_at, start)
         return b < len(breaks_at) and breaks_at[b] < cue_start
 
     @classmethod
-    def _raw_sentence_is_a_list(cls, view: str, cue_start: int, cue_len: int, match_start: int,
-                                match_end: Optional[int], align) -> bool:
-        """_sentence_is_a_list asked of the raw input, for a cue of a view. The view can have
+    def _raw_sentence_shape(cls, view: str, cue_start: int, cue_len: int, match_start: int,
+                            match_end: Optional[int], align) -> str:
+        """_sentence_shape asked of the raw input, for a cue of a view. The view can have
         lost what makes a sentence a list (a leading line break, a line separator read as a
         space); the raw text has it. Asked only when the cue and the start of the match are
-        placed in the raw input; otherwise the view is all there is, and this is False."""
+        placed in the raw input; otherwise the view is all there is, and this is "plain"."""
         raw = align.raw
         cue = align.origin(view, cue_start)
         start = align.origin(view, match_start)
         if cue is None or start is None or start < cue + cue_len:
-            return False
+            return "plain"
         end = start + 1
         if match_end is not None and match_end - 1 > match_start:
             last = align.origin(view, match_end - 1)
             end = last + 1 if last is not None and last - start == match_end - 1 - match_start else start + 1
-        return cls._sentence_is_a_list(raw, cue, raw[cue + cue_len:start].lower(), end)
+        return cls._sentence_shape(raw, cue, raw[cue + cue_len:start].lower(), end)
 
     @classmethod
-    def _sentence_is_a_list(cls, text: str, cue_start: int, gap: str, match_end: int) -> bool:
-        """Whether a new cue does NOT govern, because its sentence is anything but a plain run.
-        The cue governs only when no list mark, joining word or line break with text after it
-        stands between the previous sentence end (see _SENTENCE_END_RX; the start of the text is
-        one) and the cue, however far back; none stands between the cue and the payload (the gap,
-        which the cue window keeps short, and which is read as on main if it is longer than
-        NEGATION_SENTENCE_SCAN); and the sentence reaches a sentence end, or the end of
-        the text, within NEGATION_SENTENCE_SCAN characters of the payload's end with none of them
-        in between. The payload itself is neither scanned nor counted (a URL has a colon and
-        solidi). Anything else is read as on main."""
+    def _sentence_shape(cls, text: str, cue_start: int, gap: str, match_end: int,
+                        view: Optional[tuple] = None) -> str:
+        """The shape of the sentence a new cue stands in. "plain": no list mark, joining word or
+        line break with text after it stands between the previous sentence end (see
+        _SENTENCE_END_RX; the start of the text is one) and the payload's sentence end, so the
+        cue governs as any cue does. "list": the front is clean, but the gap or the rest of the
+        sentence holds one; the cue governs only if the bounded list reading of _negation_reach
+        accepts it. "other": a mark, word or break stands in front of the cue, however far
+        back, or the sentence reaches no sentence end, or the end of the text, within
+        NEGATION_SENTENCE_SCAN characters of the payload's end; the cue governs nothing and the
+        finding is read as on main. The payload itself is neither scanned nor counted (a URL has
+        a colon and solidi). ``view`` is the (start, end) of the view of a multi-view text that
+        holds the cue: the sentence stays inside it, and the end of a view that is not the last
+        is not the end of a sentence."""
         reach = cls.NEGATION_SENTENCE_SCAN
-        if cls._joins_in_front(text, cue_start):
-            return True
-        if len(gap) > reach or cls._joins_items(gap, True):
-            return True
-        tail = text[match_end:match_end + reach + 2]
+        lo, hi = view if view is not None else (0, len(text))
+        if cls._joins_in_front(text, cue_start, lo):
+            return "other"
+        if len(gap) > reach:
+            return "other"
+        tail = text[match_end:min(hi, match_end + reach + 2)]
         end = cls._SENTENCE_END_RX.search(tail)
         if end is not None and end.start() <= reach:
             tail = tail[:end.start()]
-        elif len(text) - match_end <= reach:
-            tail = text[match_end:]
+        elif hi - match_end <= reach and hi == len(text):
+            tail = text[match_end:hi]
         else:
-            return True
-        return cls._joins_items(tail)
+            return "other"
+        return "list" if cls._joins_items(gap, True) or cls._joins_items(tail) else "plain"
 
     @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
@@ -2488,7 +2554,7 @@ class SunglassesEngine:
                     stop = None
                     if last is not None and last - at == match.end() - 1 - position:
                         stop = last + 1
-                    return self._check_negation(raw, at, None, stop)
+                    return self._check_negation(raw, at, None, stop, raw_frame=True)
                 return copied(position, match.end())
             return False
 
@@ -2867,6 +2933,8 @@ class SunglassesEngine:
             return False
         return not any(w in self._NEGATION_CLAUSE_WORDS for w in words)
 
+    NEGATION_LIST_TAIL = 80  # characters from the match start read when a list is open
+
     # A source file that REFUSES with a sentence is not a source file that is told something:
     #     raise RuntimeError("model checksum mismatch: refusing to load")
     # GLS-RP-250 is a keyword-only rule that reads the words "checksum mismatch" next to a
@@ -2943,6 +3011,132 @@ class SunglassesEngine:
             return False
         # a name is a dotted run of identifiers: no component is a reserved word or a constant
         return not any(keyword.iskeyword(part) for part in m.group("n").split("."))
+
+    def _negation_reach(self, gap: str, tail: str, hit: Optional[str] = None):
+        """A negation covers a short LIST of plain words: "do not log, store, or transmit X",
+        "do not change provider, model, or render path". Returns None when the gap is not
+        such a list, else the number of characters from the match start that the reading
+        relied on (0 when the list closed before the match).
+
+        The gap is plain ASCII words (letters, digits, hyphens) in items of at most
+        NEGATION_LIST_ITEM_WORDS words, joined by a comma and one space. The whole list, as
+        written, has at most NEGATION_LIST_COMMAS commas and NEGATION_LIST_WORDS words in the
+        gap, the conjunction counted as a word. The last item is followed by at most
+        NEGATION_LIST_TRAIL_WORDS plain words and then the end of the text, a sentence-ending
+        mark or a line end (_list_ends); a comma, a colon, a clause word or a longer run means
+        the list goes on and is not read. It has to end the list one of two ways:
+          closed: the gap ends with "and " or "or " after a comma ("log, store, or "), so the
+                  match is the last item: on one line, at most NEGATION_LIST_FINAL_WORDS
+                  blank-separated words;
+          open:   the gap ends with a comma ("change provider, ") and the match itself is an
+                  item of plain words that the list goes on from (", or ", " and "), then one
+                  more word. A list with no "and"/"or" in it is not a list ("Do not worry,
+                  stay calm, X"). The comma of the conjunction counts.
+        A clause word, a word of omission, a word that turns the next item into an order
+        (you, just, please, go...) or any other character ends the list."""
+        gap = self._GAP_SPACES_RX.sub(" ", gap)
+        if not self._LIST_GAP_CHARS_RX.fullmatch(gap):
+            return None
+        commas = gap.count(",")
+        reach = 0
+        if gap.endswith(", "):
+            m = self._LIST_OPEN_TAIL_RX.match(tail)
+            if m is None:
+                return None
+            commas += m.group(0).count(",")
+            # The item after the conjunction is one to NEGATION_LIST_ITEM_WORDS plain words;
+            # the shortest one that ends the list (or leads into its trailing phrase) is read.
+            last = None
+            at = m.end()
+            final_item = []
+            for n in range(1, self.NEGATION_LIST_ITEM_WORDS + 1):
+                w = self._LIST_WORD_RX.match(tail, at)
+                if w is None:
+                    break
+                at = w.end()
+                final_item.append(w.group(0))
+                end = self._list_end(tail, at)
+                if end is not None:
+                    last = (n, end)
+                    break
+                if tail[at:at + 1] != " ":
+                    break
+                at += 1
+            if last is None:
+                return None
+            reach = last[1]  # through the trailing phrase and the mark that ends the list
+            words = m.group(1).split(" ")
+            # the item after the conjunction is held to the stop list like any other item
+            if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in final_item):
+                return None
+            final_words = last[0] + 1  # the item after the conjunction, and the conjunction
+            body = gap[1:-2]
+        else:
+            body = None
+            for conj in (", and ", ", or ", " and ", " or "):
+                if gap.endswith(conj):
+                    body = gap[1:-len(conj)]
+                    if not (conj.startswith(",") or "," in body):
+                        return None
+                    break
+            if body is None:
+                return None
+            # The last item is the match. It is read whole, on one line, and it ends the list.
+            if hit is None or not hit:
+                return None
+            # the match is the last item: plain words in single spaces, held to the stop list of
+            # a trailing phrase (it is the rule's own phrase, "transmit your API key", and may
+            # say "your" or "to"; it may not open another clause)
+            final_item = _ascii_lower(hit).split(" ")
+            if len(final_item) > self.NEGATION_LIST_FINAL_WORDS or not all(
+                    self._LIST_WORD_RX.fullmatch(w) for w in final_item):
+                return None
+            if any(w in self._LIST_TRAIL_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in final_item):
+                return None
+            words = []
+            final_words = len(final_item) + 1  # the last item, and the conjunction
+            reach = self._list_end(tail, len(hit))
+            if reach is None:
+                return None
+        if commas > self.NEGATION_LIST_COMMAS:
+            return None
+        for item in body.split(", "):
+            item_words = item.split(" ")
+            if len(item_words) > self.NEGATION_LIST_ITEM_WORDS or not all(
+                    self._LIST_WORD_RX.fullmatch(w) for w in item_words):
+                return None
+            words.extend(item_words)
+        # the conjunction is a word of the list, and so is the last item
+        if len(words) + final_words > self.NEGATION_LIST_WORDS:
+            return None
+        if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
+            return None
+        return reach
+
+    def _list_ends(self, tail: str, at: int) -> bool:
+        return self._list_end(tail, at) is not None
+
+    def _list_end(self, tail: str, at: int) -> Optional[int]:
+        """Where the list that was read up to tail[at] ends, or None when it does not end
+        within NEGATION_LIST_TRAIL_WORDS plain words after it: the text itself ends, or a
+        sentence-ending mark, a closing bracket or a line end follows. The offset returned is
+        the end of everything that was relied on (the trailing phrase and the mark), so the raw
+        input can be asked to say the same over all of it."""
+        rest = tail[at:]
+        if not rest:
+            return at if len(tail) < self.NEGATION_LIST_TAIL else None  # a full tail may hide what follows
+        trail = self._LIST_TRAIL_RX.match(rest)
+        words = trail.group(1).split()
+        if words and words[0] not in self._LIST_TRAIL_STARTS:
+            return None
+        if len(words) > self.NEGATION_LIST_TRAIL_WORDS or any(
+                w in self._LIST_TRAIL_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in words):
+            return None
+        after = rest[trail.end():]
+        if not after:
+            return at + trail.end() if len(tail) < self.NEGATION_LIST_TAIL else None
+        mark = self._LIST_END_RX.match(after)
+        return None if mark is None else at + trail.end() + mark.end()
 
     @property
     def pattern_count(self) -> int:
