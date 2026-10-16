@@ -37,11 +37,13 @@ def test_every_pattern_has_a_name():
 
 
 def test_pattern_id_format():
-    """All pattern IDs follow GLS-<PREFIX>(-<SUBPREFIX>)?-<NNN>.
+    """All pattern IDs follow GLS-<PREFIX>(-<SUBPREFIX>)?-<NNN>, with an optional `-API` sibling suffix.
 
     Accepts 3-segment IDs (GLS-EX-001) and 4-segment multilingual IDs (GLS-ML-RU-001).
+    A sibling of a parent that already has a subprefix (GLS-TP-ITDP-219-API) is five segments.
+    The suffix is stated rather than the segment count raised, so GLS-TP-ITDP-219-XYZ is still rejected.
     """
     import re
-    pattern = re.compile(r"^GLS(-[A-Z0-9]+){2,3}$")
+    pattern = re.compile(r"^GLS(-[A-Z0-9]+){2,3}(-API)?$")
     bad = [p["id"] for p in PATTERNS if not pattern.match(p.get("id", ""))]
     assert not bad, f"{len(bad)} pattern ID(s) violate GLS-<PREFIX>-...-<NNN> shape. First 10: {bad[:10]}"
