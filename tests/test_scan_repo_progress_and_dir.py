@@ -13,8 +13,8 @@ shares the walker, the skips and the incomplete rules with `--repo`:
 2. A total file cap, `--max-files N`. A file left out by the cap is counted in `skipped` with a
    reason that names the cap, so it is never silent, and the scan is then incomplete.
 3. Lockfiles (package-lock.json, yarn.lock, pnpm-lock.yaml, poetry.lock, Cargo.lock, go.sum) are
-   left out and NAMED in `skipped` as lockfiles. Whether a lockfile skip alone makes a scan exit
-   as incomplete is not pinned here.
+   scanned like any file; `--skip-lockfiles` leaves them out, NAMES them in `skipped`, and the scan
+   is then incomplete like it is for any unread file.
 4. `scan --dir PATH` reads a local tree the way `--repo` reads a clone: same files, same skips,
    same exit codes, and it refuses a path that is not a directory before scanning anything.
 
@@ -229,11 +229,21 @@ def test_the_help_names_the_cap():
     assert "--max-files" in out
 
 
-# ── 3. lockfiles are skipped and named ─────────────────────────────────────
+# ── 3. lockfiles: scanned by default, `--skip-lockfiles` leaves them out and names them ─
 
 @MODES
-def test_lockfiles_are_skipped_and_named_as_lockfiles(work, mode):
-    doc = _doc(_scan(work, mode, "lock", "-o", "json"))
+def test_lockfiles_are_scanned_by_default(work, mode):
+    proc = _scan(work, mode, "lock", "-o", "json")
+    doc = _doc(proc)
+    assert doc["files_scanned"] == 9        # ok.txt, lockfile-notes.txt, six lockfiles, one nested
+    assert not any("lockfile" in reason for reason in _skipped(doc).values())
+    assert proc.returncode == EXIT_CLEAN
+    assert len(_progress(proc.stderr)) == 9
+
+
+@MODES
+def test_skip_lockfiles_leaves_them_out_and_names_them(work, mode):
+    doc = _doc(_scan(work, mode, "lock", "-o", "json", "--skip-lockfiles"))
     skipped = _skipped(doc)
     expected = set(LOCKFILES) | {"web/package-lock.json"}
     assert expected <= set(skipped), sorted(set(skipped))
@@ -243,29 +253,26 @@ def test_lockfiles_are_skipped_and_named_as_lockfiles(work, mode):
 
 
 @MODES
-def test_lockfiles_get_no_progress_line(work, mode):
-    lines = _progress(_scan(work, mode, "lock", "-o", "json").stderr)
+def test_skipped_lockfiles_get_no_progress_line(work, mode):
+    lines = _progress(_scan(work, mode, "lock", "-o", "json", "--skip-lockfiles").stderr)
     assert len(lines) == 2
     assert not any(any(name in line for name in LOCKFILES) for line in lines)
 
 
 @MODES
-def test_skipped_lockfiles_are_counted_on_stderr_never_silent(work, mode):
-    proc = _scan(work, mode, "lock", "-o", "json")
-    assert re.search(r"skipped 7 lockfiles", proc.stderr), proc.stderr
-    assert "skipped" not in proc.stderr.lower() or "lockfile" in proc.stderr.lower()
-    json.loads(proc.stdout)                 # stdout is still one document
+def test_skipping_lockfiles_makes_the_scan_incomplete_like_any_unread_file(work, mode):
+    proc = _scan(work, mode, "lock", "-o", "json", "--skip-lockfiles")
+    doc = _doc(proc)
+    assert proc.returncode == EXIT_INCOMPLETE
+    assert doc["inspection_complete"] is False and doc["is_clean"] is False
 
 
 @MODES
-def test_a_tree_without_lockfiles_prints_no_lockfile_line(work, mode):
-    assert "lockfile" not in _scan(work, mode, "five", "-o", "json").stderr
-
-
-@MODES
-def test_lockfile_only_skips_leave_the_exit_code_alone(work, mode):
-    # the lock tree holds two ordinary clean files: lockfiles alone must not turn it into exit 3
-    assert _scan(work, mode, "lock", "-o", "json").returncode == EXIT_CLEAN
+def test_skipped_lockfiles_are_named_in_sarif(work, mode):
+    sarif = json.loads(_scan(work, mode, "lock", "-o", "sarif", "--skip-lockfiles").stdout)
+    props = sarif["runs"][0]["properties"]
+    assert props["inspectionComplete"] is False
+    assert any("package-lock.json" in item for item in props["notInspected"])
 
 
 # ── 4. the local tree mode ─────────────────────────────────────────────────
@@ -337,12 +344,23 @@ def test_the_local_mode_agrees_with_the_clone_mode(work, tree):
     assert sorted(_skipped(b)) == sorted(_skipped(a))
 
 
+def _snapshot(root):
+    import hashlib
+    out = {}
+    for path in sorted(root.rglob("*")):
+        if ".git" in path.parts or path.is_dir():
+            continue
+        st = path.stat()
+        out[str(path.relative_to(root))] = (hashlib.sha256(path.read_bytes()).hexdigest(), st.st_mode, st.st_mtime_ns)
+    return out
+
+
 def test_the_local_mode_does_not_touch_the_tree(work):
     root = _tree(work, "five")
-    before = sorted(str(p.relative_to(root)) for p in root.rglob("*") if ".git" not in p.parts)
-    assert _doc(_scan(work, "dir", "five", "-o", "json"))["files_scanned"] == 5
-    after = sorted(str(p.relative_to(root)) for p in root.rglob("*") if ".git" not in p.parts)
-    assert before == after
+    before = _snapshot(root)
+    proc = _run_dir(work, root, "-o", "json")          # a fresh scan, not a cached one
+    assert _doc(proc)["files_scanned"] == 5
+    assert _snapshot(root) == before
 
 
 # ── controls: what must not change ─────────────────────────────────────────
@@ -396,7 +414,7 @@ def test_a_closed_stderr_does_not_put_progress_on_stdout(work):
 
 def test_a_closed_stderr_with_lockfiles_keeps_stdout_a_document(work):
     root = _local(work, "closed_lock", {"a.md": CLEAN, "yarn.lock": "# yarn lockfile v1\n"})
-    assert _doc(_run_dir(work, root, "-o", "json", close_stderr=True))["files_scanned"] == 1
+    assert _doc(_run_dir(work, root, "-o", "json", "--skip-lockfiles", close_stderr=True))["files_scanned"] == 1
 
 
 @MODES
@@ -474,21 +492,67 @@ def test_dir_refuses_a_second_input_instead_of_ignoring_it(work, extra):
     assert "--dir" in proc.stdout + proc.stderr
 
 
-def test_a_lockfile_look_alike_is_still_read(work):
+def test_only_exact_lockfile_names_are_left_out(work):
     root = _local(work, "lookalike", {
-        "ok.md": CLEAN, "my-package-lock.json": THREAT, "Yarn.lock": CLEAN, "yarn.lock.bak": CLEAN})
-    doc = _doc(_run_dir(work, root, "-o", "json"))
+        "ok.md": CLEAN, "my-package-lock.json": THREAT, "go.sum.bak": CLEAN, "yarn.lock.bak": CLEAN,
+        "yarn.lock": CLEAN})
+    doc = _doc(_run_dir(work, root, "-o", "json", "--skip-lockfiles"))
     assert doc["files_scanned"] == 4 and doc["total_threats"] >= 1
-    assert not any("lockfile" in reason for reason in _skipped(doc).values())
+    assert [name for name, reason in _skipped(doc).items() if "lockfile" in reason] == ["yarn.lock"]
 
 
-def test_a_lockfile_is_not_read_even_when_it_holds_an_attack(work):
+def test_a_lockfile_with_an_attack_is_found_by_default_and_flagged_unread_when_skipped(work):
     root = _local(work, "hostile_lock", {"ok.md": CLEAN, "package-lock.json": THREAT})
+    found = _run_dir(work, root, "-o", "json")
+    assert found.returncode == EXIT_THREAT and _doc(found)["files_scanned"] == 2
+    skipped = _run_dir(work, root, "-o", "json", "--skip-lockfiles")
+    doc = _doc(skipped)
+    assert doc["total_threats"] == 0 and doc["files_scanned"] == 1
+    assert skipped.returncode == EXIT_INCOMPLETE and doc["inspection_complete"] is False
+
+
+def test_folders_the_walk_does_not_enter_are_named(work):
+    root = _local(work, "pruned", {"ok.md": CLEAN, "node_modules/dep/x.md": THREAT,
+                                   "src/build/y.md": THREAT, ".git/HEAD": "ref: refs/heads/main\n"})
     proc = _run_dir(work, root, "-o", "json")
     doc = _doc(proc)
-    assert doc["total_threats"] == 0 and doc["files_scanned"] == 1
-    assert "lockfile" in _skipped(doc)["package-lock.json"]
-    assert proc.returncode == EXIT_CLEAN
+    assert doc["excluded_folders"] == ["node_modules", os.path.join("src", "build")]
+    assert doc["files_scanned"] == 1 and proc.returncode == EXIT_CLEAN
+    human = _run_dir(work, root).stdout
+    assert "node_modules" in human and "Folders not entered" in human
+    props = json.loads(_run_dir(work, root, "-o", "sarif").stdout)["runs"][0]["properties"]
+    assert props["excludedFolders"] == doc["excluded_folders"]
+
+
+def test_an_empty_tree_is_incomplete_in_sarif(work):
+    root = _local(work, "empty_sarif", {})
+    proc = _run_dir(work, root, "-o", "sarif")
+    props = json.loads(proc.stdout)["runs"][0]["properties"]
+    assert proc.returncode == EXIT_INCOMPLETE
+    assert props["inspectionComplete"] is False and "no file was inspected" in props["notInspected"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_a_file_swapped_for_a_link_after_the_walk_is_not_read(work, monkeypatch):
+    from sunglasses import cli
+    outside = work / "swap_target"
+    outside.mkdir(exist_ok=True)
+    (outside / "secret.txt").write_text(THREAT)
+    root = _local(work, "swap", {"ok.md": CLEAN, "victim.md": CLEAN})
+    real_walk = cli._walk_repo_files_with_skips
+
+    def walk_then_swap(*a, **kw):
+        result = real_walk(*a, **kw)
+        (root / "victim.md").unlink()
+        (root / "victim.md").symlink_to(outside / "secret.txt")
+        return result
+
+    monkeypatch.setattr(cli, "_walk_repo_files_with_skips", walk_then_swap)
+    args = cli.argparse.Namespace(json=True, output="json", verbose=False, max_files=None, directory=str(root),
+                                  skip_lockfiles=False, channel="file")
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(args, cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    assert stop.value.code == EXIT_INCOMPLETE
 
 
 def test_the_walk_order_is_sorted_whatever_order_the_filesystem_gives(tmp_path, monkeypatch):

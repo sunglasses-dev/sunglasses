@@ -427,20 +427,23 @@ sunglasses scan --repo https://github.com/org/repo       # clone, then the same 
 sunglasses scan --dir ./my-project --max-files 500       # read at most 500 files
 ```
 
-`scan --dir` reads a local directory exactly the way `--repo` reads a clone: the same
-files, the same skips, the same exit codes. It does not change anything in the tree.
-One progress line per file (`[3/120]`, the time spent, the file) goes to stderr, so
-`-o json` and `-o sarif` still leave stdout as one document. What the scan leaves out is
-listed in `skipped` with the reason: files over 1 MB, binary types, symbolic links
-(never followed, since a link can point outside the tree), a directory that cannot be
-listed, lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
-`Cargo.lock`, `go.sum`, matched by exact file name), and every file past `--max-files N`.
-Build and dependency folders (`.git`, `node_modules`, `venv`, `dist`, `build` and the like)
-are not entered and are not listed. A lockfile on its own does
-not turn the exit code to `3` (a `skipped N lockfiles` line goes to stderr so it is never
-silent); any other skipped file does. A path that is not a
-directory is refused with exit `2`. `--file` still refuses a directory: scanning a tree
-is a different claim from scanning one file, and `--dir` is where it is made.
+`scan --dir` reads a local directory the way `--repo` reads a clone: the same walker, the
+same skips, the same exit codes (a local tree can hold files a clone does not, such as
+untracked ones). It does not change anything in the tree. One progress line per file
+(`[3/120]`, the time spent, the file) goes to stderr, so `-o json` and `-o sarif` still
+leave stdout as one document.
+
+Files the scan does not read are listed in `skipped` with the reason, and the scan is then
+incomplete (exit `3`, `inspection_complete: false`): files over 1 MB, binary types, symbolic
+links (never followed, since a link can point outside the tree), a directory that cannot be
+listed, and every file past `--max-files N`. `--skip-lockfiles` adds `package-lock.json`,
+`yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `Cargo.lock` and `go.sum` (matched by exact
+file name) to that list; without it they are scanned. Dependency and build folders
+(`node_modules`, `venv`, `dist`, `build` and the like) are not entered; they are named in
+`excluded_folders` (and under `excludedFolders` in SARIF) but are not counted as skipped
+files. A path that is not a directory is refused with exit `2`, and so is `--dir` together
+with `--file`, `--text`, `--stdin` or text to scan. `--file` still refuses a directory:
+scanning a tree is a different claim from scanning one file, and `--dir` is where it is made.
 
 ### Deep Scan Setup (Audio & Video)
 

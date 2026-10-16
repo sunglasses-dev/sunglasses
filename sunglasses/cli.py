@@ -181,24 +181,19 @@ _SKIP_DIRS = {
 }
 
 # Generated dependency lists. Thousands of lines of hashes and URLs, no prose an agent
-# would read, and the biggest single cost of scanning a JavaScript repo. They are left
-# out the way node_modules is, but NAMED in `skipped` (a skip must not vanish); a
-# lockfile on its own does not make a scan incomplete, see `_is_lockfile_skip`.
+# would read, and the biggest single cost of scanning a JavaScript repo. They are scanned
+# like any other file unless `--skip-lockfiles` is given; then each one is NAMED in
+# `skipped` and, being unread, makes the scan incomplete like every other skip.
 _LOCKFILES = {
     'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
     'poetry.lock', 'Cargo.lock', 'go.sum',
 }
-_LOCKFILE_SKIP_REASON = "lockfile (generated dependency list) — not inspected"
-
+_LOCKFILE_SKIP_REASON = "lockfile (generated dependency list), left out by --skip-lockfiles — not inspected"
 
 # A link is not followed: its target may sit outside the tree being scanned (a local
 # `--dir` would read whatever it points at) and the scan would report the target's path
 # as if it were part of the tree.
 _SYMLINK_SKIP_REASON = "symbolic link — not followed, not inspected"
-
-
-def _is_lockfile_skip(reason):
-    return reason == _LOCKFILE_SKIP_REASON
 
 
 _BINARY_EXTENSIONS = {
@@ -224,7 +219,7 @@ def _walk_repo_files(repo_dir):
         yield filepath
 
 
-def _walk_repo_files_with_skips(repo_dir):
+def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
     """Return (files, skips). `skips` is [(relpath, reason)], and it is the point.
 
     v0.5.6: this walker silently `continue`d past three whole classes of file —
@@ -234,6 +229,10 @@ def _walk_repo_files_with_skips(repo_dir):
     repo looks clean". The unread document did not appear anywhere in the
     output, which is the contract's merge stop condition in one sentence:
     skipped content must not vanish.
+
+    `excluded`, when given, collects the folders the walk does not enter (dependency,
+    build and VCS folders, see `_SKIP_DIRS`): not files, so not in `skips`, but named.
+    `.git` is left out of that list, it is metadata of the tree and not part of it.
 
     This is NOT the walker rewrite (fstat, symlink policy, caps) — that stays
     v0.6. It counts what it already decided to skip, and says so.
@@ -248,7 +247,11 @@ def _walk_repo_files_with_skips(repo_dir):
 
     for root, dirs, filenames in os.walk(repo_dir, onerror=_walk_error):
         # Prune skip dirs in-place
-        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.endswith('.egg-info')]
+        pruned = [d for d in dirs if d in _SKIP_DIRS or d.endswith('.egg-info')]
+        if excluded is not None:
+            excluded.extend(os.path.relpath(os.path.join(root, d), repo_dir)
+                            for d in pruned if d != '.git')
+        dirs[:] = [d for d in dirs if d not in pruned]
         # A link to a directory is never entered (it can point outside the tree, or loop);
         # name it instead of letting it vanish.
         kept = []
@@ -265,7 +268,7 @@ def _walk_repo_files_with_skips(repo_dir):
             if os.path.islink(filepath):
                 skips.append((rel, _SYMLINK_SKIP_REASON))
                 continue
-            if f in _LOCKFILES:
+            if skip_lockfiles and f in _LOCKFILES:
                 skips.append((rel, _LOCKFILE_SKIP_REASON))
                 continue
             if ext in _BINARY_EXTENSIONS:
@@ -287,6 +290,8 @@ def _walk_repo_files_with_skips(repo_dir):
     # file cap leaves out the same files on every run and every machine.
     files.sort()
     skips.sort()
+    if excluded is not None:
+        excluded.sort()
     return files, skips
 
 
@@ -440,7 +445,10 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     # through the same path as `--file` instead of falling through to the human screen.
     repo_results = []
 
-    walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
+    excluded_folders = []
+    walked, walker_skips = _walk_repo_files_with_skips(
+        tmp_dir, excluded=excluded_folders,
+        skip_lockfiles=bool(getattr(args, "skip_lockfiles", False)))
     # The total cap. A file left out by it is a skip with the flag's name in the reason,
     # never a silent drop, and the scan is incomplete because of it.
     max_files = getattr(args, "max_files", None)
@@ -454,6 +462,12 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     for index, (filepath, _reason) in enumerate(walked, 1):
         rel_path = os.path.relpath(filepath, tmp_dir)
         _progress_line(index, total_files, start, rel_path)
+
+        # The walk checked for a link, and the tree can change between the walk and the
+        # read: look again, so a file swapped for a link is not read through it.
+        if os.path.islink(filepath):
+            walker_skips.append((rel_path, _SYMLINK_SKIP_REASON))
+            continue
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
@@ -557,14 +571,6 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 
-    # Lockfiles do not change the exit code, so they must not pass in silence either:
-    # a count on stderr, the names in `skipped`.
-    lockfile_count = sum(1 for _f, r in walker_skips if _is_lockfile_skip(r))
-    if lockfile_count:
-        noun = "lockfile" if lockfile_count == 1 else "lockfiles"
-        _note(f"  skipped {lockfile_count} {noun} (named in the skipped list; "
-              f"they do not change the exit code)")
-
     # Clean up
     if cleanup:
         cleanup()
@@ -593,6 +599,8 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     # declined, with the reason it declined it.
     summary["files_skipped"] = len(walker_skips)
     summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
+    # The folders the walk does not enter: named, so a consumer can see what "clean" left out.
+    summary["excluded_folders"] = excluded_folders
     # Same fact, same names, in the machine document: a consumer keeping only the
     # JSON could previously see the COUNT of partly-read members and never learn
     # which they were.
@@ -600,9 +608,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
-    # A lockfile skip is a stated policy, listed in `skipped`, and by itself it does not
-    # turn a scan incomplete (else every npm repo would exit 3). Every other skip does.
-    unread_skips = [(f, r) for f, r in walker_skips if not _is_lockfile_skip(r)]
+    unread_skips = list(walker_skips)
     incomplete = bool(files_incomplete or unread_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
@@ -635,6 +641,10 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
             f"{r.source}: not fully inspected"
             for r in repo_results if not getattr(r, "inspection_complete", True)
         ]
+        if nothing_inspected:
+            not_inspected.append("no file was inspected")
+        if sarif_doc.get("runs"):
+            sarif_doc["runs"][0].setdefault("properties", {})["excludedFolders"] = excluded_folders
         if not_inspected and sarif_doc.get("runs"):
             # Without this a repo where nothing could be read emits results:[] --
             # which a SARIF consumer reads as "scanned, nothing there". The empty
@@ -670,6 +680,10 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
             print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(partially_read) > 10:
             print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
+    if excluded_folders:
+        shown = ", ".join(_printable(name) for name in excluded_folders[:10])
+        more = f" and {len(excluded_folders) - 10} more" if len(excluded_folders) > 10 else ""
+        print(f"  {DIM}Folders not entered (dependency/build): {shown}{more}{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
@@ -2654,6 +2668,10 @@ def main():
     scan_parser.add_argument("--max-files", dest="max_files", type=int, metavar="N",
                              help="With --repo or --dir: read at most N files; the rest are listed "
                                   "as skipped and the scan is incomplete (default: no cap)")
+    scan_parser.add_argument("--skip-lockfiles", dest="skip_lockfiles", action="store_true",
+                             help="With --repo or --dir: leave package-lock.json, yarn.lock, pnpm-lock.yaml, "
+                                  "poetry.lock, Cargo.lock and go.sum unread. They are named as skipped and "
+                                  "the scan is incomplete (default: they are scanned)")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
                              choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
