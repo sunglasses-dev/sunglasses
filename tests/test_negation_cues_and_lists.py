@@ -993,6 +993,69 @@ def test_a_break_that_is_not_right_after_a_sentence_end_still_counts(engine, cue
         assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
 
 
+OPENING_QUOTES = ["\u2018", "\u201c"]
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_an_opening_quote_before_the_break_is_no_part_of_the_paragraph_start(engine, cue, br, channel):
+    """Only closing quotes and brackets belong to a sentence end. A quote that OPENS (U+2018,
+    U+201C) after the end, before the break, does not close the sentence, so the break stays a
+    separator and the cue governs nothing (the result is the one on main)."""
+    for q in OPENING_QUOTES:
+        for front in (f"Done.{q}{br}The plugin ", f"Done.{q}{q}{br}The plugin ",
+                      f"Done.){q}{br}The plugin ", f"Done.{q} {br}The plugin "):
+            got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
+            assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
+
+
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_an_opening_quote_after_the_break_starts_the_new_paragraph(engine, cue, br):
+    """The paragraph start is the break itself: a quote that opens the next paragraph stands
+    after it and is an ordinary character of the sentence the cue is in."""
+    for q in OPENING_QUOTES:
+        front = f"Done.{br}{q}The plugin "
+        governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
+        assert governed, repr(front)
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_line_break_between_the_cue_and_the_payload_counts_even_at_the_end_of_the_gap(
+        engine, cue, br, channel):
+    for gap in (br, f"{br} ", f" {br}", f"{br}{br}"):
+        got = _sev(engine, f"We {cue}{gap}{LIST_FIRST}.", channel)
+        assert got and got == _sev(engine, f"We xx{gap}{LIST_FIRST}.", channel), repr(gap)
+
+
+@pytest.mark.parametrize("br", BREAKS)
+def test_the_sentence_check_reads_a_break_at_the_end_of_the_gap_but_not_at_the_end_of_the_tail(engine, br):
+    """Asked directly (the scan can hide it): a break that ends the gap separates the cue from
+    the payload, so the sentence is not a plain run; a break that ends the tail is a paragraph end."""
+    text = f"no{br}payload"
+    assert engine._sentence_is_a_list(text, 0, br, len(text)) is True
+    assert engine._sentence_is_a_list(text, 0, f" {br}", len(text)) is True
+    assert engine._sentence_is_a_list("no payload", 0, " ", len("no payload")) is False
+    tail_text = f"no payload{br}"
+    assert engine._sentence_is_a_list(tail_text, 0, " ", len("no payload")) is False
+    assert engine._sentence_is_a_list(f"no payload{br}x", 0, " ", len("no payload")) is True
+
+
+@pytest.mark.parametrize("br", BREAKS)
+def test_the_helper_counts_a_trailing_break_only_when_the_payload_follows(engine, br):
+    assert engine._joins_items(f"x{br}x")
+    assert not engine._joins_items(f"x{br}")
+    assert not engine._joins_items(f"x {br}{br}")
+    assert engine._joins_items(f"x{br}", True)
+    assert engine._joins_items(br, True)
+    assert engine._joins_items(f" {br} ", True)
+    assert not engine._joins_items("x ", True)
+    assert not engine._joins_items("", True)
+
+
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
 @pytest.mark.parametrize("br", BREAKS)
 @pytest.mark.parametrize("cue", NEW_CUES)

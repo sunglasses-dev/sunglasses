@@ -2295,8 +2295,9 @@ class SunglassesEngine:
     # breaks.
     _JOIN_RX = re.compile("[" + re.escape("".join(sorted(_LIST_MARKS))) + "]|and|or|nor", re.I)
     # A paragraph start: what stands between a sentence end and the first word of the next
-    # sentence (closing quotes and brackets, then white space).
-    _PARAGRAPH_LEAD_RX = re.compile("[\"'\u2018\u2019\u201c\u201d)\\]}]*\\s*")
+    # sentence (closing quotes and brackets, then white space). An OPENING quote (U+2018,
+    # U+201C) is not part of it: a quote that opens the next sentence is no part of this one.
+    _PARAGRAPH_LEAD_RX = re.compile("[\"'\u2019\u201d)\\]}]*\\s*")
     _BREAK_RX = re.compile("[" + re.escape(_LINE_BREAK_CHARS) + "]")
     NEGATION_SENTENCE_SCAN = 200
 
@@ -2308,14 +2309,16 @@ class SunglassesEngine:
         return not (a > 0 and text[a - 1].isalpha()) and not (b < len(text) and text[b].isalpha())
 
     @classmethod
-    def _joins_items(cls, run: str) -> bool:
+    def _joins_items(cls, run: str, payload_follows: bool = False) -> bool:
         """Whether ``run`` (text inside one sentence) holds a list mark, a joining word, or a
-        line break with text after it (a break that only trails the run is a paragraph end)."""
+        line break with text after it. A break that only trails the run is a paragraph end,
+        unless the payload follows the run (the gap between the cue and the payload): then any
+        break in it separates the cue from the payload."""
         if any(c in cls._LIST_MARKS for c in run):
             return True
         if any(cls._is_a_word_edge(run, m) for m in cls._JOINING_WORD_RX.finditer(run)):
             return True
-        return cls._BREAK_RX.search(run.rstrip()) is not None
+        return cls._BREAK_RX.search(run if payload_follows else run.rstrip()) is not None
 
     @classmethod
     def _index_sentences(cls, text: str):
@@ -2382,7 +2385,7 @@ class SunglassesEngine:
         reach = cls.NEGATION_SENTENCE_SCAN
         if cls._joins_in_front(text, cue_start):
             return True
-        if len(gap) > reach or cls._joins_items(gap):
+        if len(gap) > reach or cls._joins_items(gap, True):
             return True
         tail = text[match_end:match_end + reach + 2]
         end = cls._SENTENCE_END_RX.search(tail)
