@@ -448,14 +448,25 @@ typed it are resolved by the operating system as usual). The scan opens the root
 refusing a link, and keeps that one handle for the whole run; every folder and file below it is
 opened relative to the step before, refusing a link at every step, and the scan remembers each
 folder's identity (device and inode) so a folder that was swapped for another one, or for a link,
-while the scan ran is named as changed and not read. The bytes the scan judges are the bytes it
-read: each file (at most 1 MB) is copied into a private temporary folder outside the scanned
-tree, the findings carry the file's path in the tree, and the copy is removed right after; if a
-temporary folder cannot be removed the scan says so on stderr. If no temporary folder outside the
-tree can be created the scan is refused (exit `2`, nothing scanned) and asks you to point
-`TMPDIR` elsewhere. A file that cannot be copied or routed is named as not inspected. Where the
-platform has no such opens (Windows), the scan checks for a link and for a path that leaves the
-tree before it reads, which is a weaker guarantee against a tree that changes during the scan.
+while the scan ran is named as changed and not read. Each file (at most 1 MB) is read once
+through those handles and the scan judges that copy of its bytes; the findings carry the file's
+path in the tree. A file that changes after it was read is judged as it was when it was read.
+
+The copies go to a private temporary folder that is not inside the scanned folder. The candidates
+(`TMPDIR`, `TEMP`, `TMP`, `/tmp`, `/var/tmp`, your home folder) are only looked at, never written
+to, until one is chosen; a candidate is used only if the folder it opens to, and every folder above
+that, is neither the folder the scan holds nor the folder its path names now (compared by device
+and inode, not by path text). The temporary folder is then created, written and emptied through a
+handle on that checked parent, so a path swapped afterwards is not followed. If no candidate
+passes, or looking for one fails, the scan is refused (exit `2`, one document, nothing scanned)
+and asks you to point `TMPDIR` elsewhere. A temporary folder that cannot be removed is reported on
+stderr, and one that was being set up when the scan was interrupted is removed. A file that cannot
+be copied or routed is named as not inspected.
+
+Where the platform has no such handles (Windows) the scan checks for a link and for a path that
+leaves the tree before it reads and again against the file it opened, and checks the temporary
+folder by identity before it creates it but writes to it by path. That is a weaker guarantee
+against a tree that changes while the scan runs, and it has not been exercised on Windows.
 In a `--repo` scan a link inside the clone is a named skip, so a repository that holds one and
 used to come back clean (exit `0`) now exits `3`.
 

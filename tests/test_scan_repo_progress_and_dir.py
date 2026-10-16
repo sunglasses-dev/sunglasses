@@ -812,7 +812,7 @@ def test_the_temporary_copies_never_land_inside_the_scanned_tree(work, monkeypat
     root = _local(work, "scratch_inside", {"ok.md": CLEAN})
     inside = root / "tmp_inside"
     inside.mkdir(exist_ok=True)
-    monkeypatch.setattr(cli.tempfile, "tempdir", str(inside))
+    monkeypatch.setenv("TMPDIR", str(inside))
     scratch = cli._scratch_outside(str(root))
     try:
         assert scratch is not None
@@ -827,7 +827,7 @@ def test_the_temporary_copies_never_land_inside_the_scanned_tree(work, monkeypat
 def test_no_usable_scratch_folder_is_a_refusal_with_one_document(work, monkeypatch, capsys):
     from sunglasses import cli
     root = _local(work, "scratch_none", {"ok.md": CLEAN})
-    monkeypatch.setattr(cli, "_scratch_outside", lambda _root: None)
+    monkeypatch.setattr(cli, "_scratch_outside", lambda *_a: None)
     with pytest.raises(SystemExit) as stop:
         cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
     doc = json.loads(capsys.readouterr().out)
@@ -837,14 +837,14 @@ def test_no_usable_scratch_folder_is_a_refusal_with_one_document(work, monkeypat
 def test_a_failed_copy_names_the_file_and_still_emits_one_document(work, monkeypatch, capsys):
     from sunglasses import cli
     root = _local(work, "copy_fail", {"ok.md": CLEAN, "bad.md": CLEAN})
-    real_open = open
+    real_write = cli._Scratch.write
 
-    def open_fail_in_scratch(path, *a, **kw):
-        if "sunglasses-read-" in str(path) and str(path).endswith("bad.md"):
+    def write_fail(self, basename, data):
+        if basename == "bad.md":
             raise OSError(28, "No space left on device")
-        return real_open(path, *a, **kw)
+        return real_write(self, basename, data)
 
-    monkeypatch.setattr(cli, "open", open_fail_in_scratch, raising=False)
+    monkeypatch.setattr(cli._Scratch, "write", write_fail)
     code, doc = _scan_tree_doc(root, capsys)
     assert code == EXIT_INCOMPLETE and doc["files_scanned"] == 1
     assert "bad.md" in _skipped(doc)
@@ -877,17 +877,206 @@ def test_the_final_skipped_list_is_sorted_whoever_found_the_skip(work):
 def test_a_scratch_folder_that_cannot_be_removed_is_reported_on_stderr(work, monkeypatch, capsys):
     from sunglasses import cli
     root = _local(work, "cleanup_report", {"ok.md": CLEAN})
-    real = cli._scratch_outside
+    real_cleanup = cli._Scratch.cleanup
 
-    class Stuck:
-        def __init__(self, inner):
-            self._inner, self.name = inner, inner.name
+    def stuck(self):
+        real_cleanup(self)
+        raise PermissionError("denied")
 
-        def cleanup(self):
-            self._inner.cleanup()
-            raise PermissionError("denied")
-
-    monkeypatch.setattr(cli, "_scratch_outside", lambda r: Stuck(real(r)))
+    monkeypatch.setattr(cli._Scratch, "cleanup", stuck)
     with pytest.raises(SystemExit):
         cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
     assert "Could not remove the scan's temporary folder" in capsys.readouterr().err
+
+
+# ── where the copies go (round 5): chosen without writing, checked by identity, made by handle ──
+
+def _state(root):
+    """Everything about a tree that a stray write would change: names, kinds and times."""
+    out = []
+    for path in sorted(Path(root).rglob("*")):
+        st = path.lstat()
+        out.append((str(path.relative_to(root)), st.st_mode, st.st_mtime_ns))
+    st = Path(root).lstat()
+    out.append((".", st.st_mode, st.st_mtime_ns))
+    return out
+
+
+def _args_for(root, output):
+    from sunglasses import cli
+    return cli.argparse.Namespace(json=(output == "json"), output=output, verbose=False, max_files=None,
+                                  directory=str(root), skip_lockfiles=False, channel="file")
+
+
+def _scan_tree_out(root, output, capsys):
+    from sunglasses import cli
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(_args_for(root, output), cli.SunglassesEngine(), str(root),
+                       source=str(root), kind="directory")
+    return stop.value.code, json.loads(capsys.readouterr().out)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX temporary-folder handling")
+@pytest.mark.parametrize("output", ["json", "sarif"])
+def test_a_tmpdir_inside_the_tree_is_not_written_to_even_for_a_probe(work, output):
+    root = _local(work, f"tmpdir_in_tree_{output}", {"ok.md": CLEAN, "tmpin/keep.txt": CLEAN})
+    before = _state(root)
+    env = {**os.environ, "PYTHONPATH": str(REPO), "NO_COLOR": "1", "TMPDIR": str(root / "tmpin")}
+    for var in ("TEMP", "TMP"):
+        env.pop(var, None)
+    proc = subprocess.run([sys.executable, "-m", "sunglasses", "scan", "--dir", str(root), "-o", output],
+                          cwd=work, env=env, capture_output=True, text=True, timeout=300)
+    assert proc.returncode == EXIT_CLEAN, proc.stderr
+    assert json.loads(proc.stdout)
+    assert _state(root) == before
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX temporary-folder handling")
+@pytest.mark.parametrize("held", [True, False])
+@pytest.mark.parametrize("output", ["json", "sarif"])
+def test_a_root_replaced_before_the_temporary_folder_is_chosen_gets_no_copies(work, monkeypatch, capsys, held, output):
+    from sunglasses import cli
+    name = f"root_swap_{held}_{output}"
+    root = _local(work, name, {"ok.md": CLEAN, "inner/keep.txt": CLEAN})
+    moved = work / "local" / (name + "_moved")
+    real = cli._scratch_outside
+
+    def swap_then_choose(path, root_fd=None):
+        os.rename(root, moved)
+        root.mkdir()
+        (root / "inner").mkdir()
+        return real(path, root_fd)
+
+    # The copies are removed when the scan ends, so look at where they are WHILE they exist.
+    real_write = cli._Scratch.write
+    homes = []
+
+    def watch(self, basename, data):
+        homes.append(os.path.realpath(self.name))
+        return real_write(self, basename, data)
+
+    # TMPDIR names a folder inside the root: the held (now moved) one, or the one the path names now.
+    monkeypatch.setenv("TMPDIR", str((moved if held else root) / "inner"))
+    monkeypatch.setattr(cli, "_scratch_outside", swap_then_choose)
+    monkeypatch.setattr(cli._Scratch, "write", watch)
+    code, doc = _scan_tree_out(root, output, capsys)
+    assert doc and homes
+    for home in homes:
+        for tree in (root, moved):
+            assert not (home + os.sep).startswith(os.path.realpath(tree) + os.sep)
+    assert [p.name for p in (root / "inner").iterdir()] == []
+    assert sorted(p.name for p in (moved / "inner").iterdir()) == ["keep.txt"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX temporary-folder handling")
+@pytest.mark.parametrize("output", ["json", "sarif"])
+def test_a_temporary_base_turned_into_a_link_into_the_tree_after_the_check_is_not_followed(work, monkeypatch, capsys, output):
+    from sunglasses import cli
+    root = _local(work, f"base_swap_{output}", {"ok.md": CLEAN, "inner/keep.txt": CLEAN})
+    base = work / f"base_{output}"
+    base.mkdir()
+    away = work / f"base_{output}_away"
+    real_inside = cli._fd_inside
+
+    def check_then_swap(fd, forbidden):
+        answer = real_inside(fd, forbidden)
+        if not answer and not away.exists():
+            os.rename(base, away)
+            os.symlink(root / "inner", base)
+        return answer
+
+    real_write = cli._Scratch.write
+    seen = []
+
+    def watch(self, basename, data):
+        seen.append(sorted(p.name for p in (root / "inner").iterdir()))
+        return real_write(self, basename, data)
+
+    monkeypatch.setenv("TMPDIR", str(base))
+    monkeypatch.setattr(cli, "_fd_inside", check_then_swap)
+    monkeypatch.setattr(cli._Scratch, "write", watch)
+    code, doc = _scan_tree_out(root, output, capsys)
+    assert doc and away.exists() and seen
+    assert all(names == ["keep.txt"] for names in seen)
+    assert sorted(p.name for p in (root / "inner").iterdir()) == ["keep.txt"]
+    assert [p.name for p in away.iterdir()] == []
+
+
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="needs a folder we cannot write to")
+@pytest.mark.parametrize("output", ["json", "sarif"])
+@pytest.mark.parametrize("how", ["unwritable", "full", "error"])
+def test_a_failure_finding_the_temporary_folder_is_a_refusal_with_one_document(work, monkeypatch, capsys, how, output):
+    from sunglasses import cli
+    root = _local(work, f"discovery_{how}_{output}", {"ok.md": CLEAN})
+    base = work / f"discovery_base_{how}_{output}"
+    base.mkdir(exist_ok=True)
+    if how == "unwritable":
+        base.chmod(0o500)
+        monkeypatch.setattr(cli, "_temp_bases", lambda: [str(base)])
+    elif how == "full":
+        monkeypatch.setattr(cli, "_temp_bases", lambda: [str(base)])
+        real_mkdir = os.mkdir
+
+        def full(path, mode=0o777, *, dir_fd=None):
+            if dir_fd is not None:
+                raise OSError(28, "No space left on device")
+            return real_mkdir(path, mode)
+
+        monkeypatch.setattr(cli.os, "mkdir", full)
+    else:
+        def broken():
+            raise RuntimeError("discovery failed")
+
+        monkeypatch.setattr(cli, "_temp_bases", broken)
+    try:
+        code, doc = _scan_tree_out(root, output, capsys)
+    finally:
+        base.chmod(0o700)
+    assert code == EXIT_USAGE
+    assert doc and "temporary folder" in json.dumps(doc)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX temporary-folder handling")
+def test_an_interrupt_while_the_temporary_folder_is_being_set_up_leaves_nothing_behind(work, monkeypatch):
+    from sunglasses import cli
+    root = _local(work, "interrupt_setup", {"ok.md": CLEAN})
+    base = work / "interrupt_base"
+    base.mkdir(exist_ok=True)
+    real_open = os.open
+
+    def interrupt_on_leaf(path, flags, mode=0o777, *, dir_fd=None):
+        if dir_fd is not None and str(path).startswith(cli._SCRATCH_PREFIX):
+            raise KeyboardInterrupt
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setenv("TMPDIR", str(base))
+    monkeypatch.setattr(cli.os, "open", interrupt_on_leaf)
+    with pytest.raises(KeyboardInterrupt):
+        cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    assert list(base.iterdir()) == []
+
+
+@needs_symlinks
+def test_the_fallback_read_refuses_a_link_put_in_place_after_its_check(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "fallback_swap", {"ok.md": CLEAN, "sub/a.md": CLEAN})
+    outside = _outside(work, "fallback_swap_outside")
+    (outside / "a.md").write_text(THREAT)
+    real_open = open
+    swapped = []
+
+    def open_after_swap(path, *a, **kw):
+        if str(path).endswith(os.path.join("sub", "a.md")) and not swapped:
+            swapped.append(True)
+            os.rename(root / "sub", root / "sub_away")
+            os.symlink(outside, root / "sub")
+        return real_open(path, *a, **kw)
+
+    monkeypatch.setattr(cli, "_FD_SAFE", False)
+    monkeypatch.setattr(cli, "_FD_SCRATCH", False)
+    monkeypatch.setattr(cli, "open", open_after_swap, raising=False)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert swapped
+    assert code == EXIT_INCOMPLETE
+    assert os.path.join("sub", "a.md") in _skipped(doc)
+    assert "previous instructions" not in json.dumps(doc)
