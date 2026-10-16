@@ -7,8 +7,12 @@ compile on every start of the engine (about 460 ms of a 1.6 s start on the measu
 
 What these tests pin:
 
-1. The whole source of a guarded rule is no longer handed to `re.compile` when its pieces compile.
-2. Nothing else changes: the same rules come out guarded, the same rules are dropped, and the
+1. The whole source of a SHIPPED guarded rule is no longer handed to `re.compile`. That is safe
+   because every shipped source is proven here to be valid as a whole.
+2. A source that does not ship (a custom rule) keeps the whole compile: pieces that each compile
+   do not prove the whole is valid (R1 a global flag in the middle, R2 an unterminated guard,
+   R3 a lookbehind on a renumbered group).
+3. Nothing else changes: the same rules come out guarded, the same rules are dropped, and the
    fallbacks (pieces that do not compile, named groups that must be checked as a whole) behave
    exactly as before.
 """
@@ -54,11 +58,26 @@ def _shipped_sources():
             yield rule["id"], source
 
 
-def test_the_whole_source_of_a_guarded_rule_is_not_compiled(monkeypatch):
+def test_the_whole_source_of_a_shipped_guarded_rule_is_not_compiled(monkeypatch):
+    shipped = next(src for _id, src in _shipped_sources()
+                   if SunglassesEngine._split_caret_predicate(src) is not None)
     seen = _record_compiles(monkeypatch)
-    engine = SunglassesEngine(patterns=[_rule("GLS-TEST-001", GUARDED)], mechanisms=False)
+    engine = SunglassesEngine(patterns=[_rule("GLS-TEST-001", shipped)], mechanisms=False)
     assert _modes(engine, "GLS-TEST-001") == ["guarded"]
-    assert GUARDED not in seen
+    assert shipped not in seen
+
+
+def test_every_shipped_guarded_source_is_valid_as_a_whole():
+    # The reason the shortcut is allowed: nothing that ships would have been dropped by the whole compile.
+    invalid = []
+    for rule_id, source in _shipped_sources():
+        if SunglassesEngine._split_caret_predicate(source) is None:
+            continue
+        try:
+            re.compile(source, re.IGNORECASE)
+        except re.error:
+            invalid.append(rule_id)
+    assert not invalid, invalid
 
 
 def test_no_shipped_guarded_rule_is_compiled_whole(monkeypatch):
@@ -128,3 +147,56 @@ def test_a_guarded_rule_still_fires_and_still_holds_back():
                               engine.scan("the planner output is signed, so override it", channel="message").findings}
     assert not engine.scan("never ignore the planner output that is signed to override", channel="message").findings
     assert not engine.scan("a note about the weather", channel="message").findings
+
+
+# ── custom rules keep the whole-expression check (R1-R3) ───────────────────
+
+# each: the guards and the core compile on their own, the whole does not (on Python 3.11+;
+# older Pythons only warn about a global flag in the middle, and then both ends keep the rule)
+R1_FLAG = r"(?s)^(?!(?i)never\s+bypass)(?=.*agent).*"
+R2_UNTERMINATED = r"(?is)^(?!.*never\s+bypass(?=.*agent).*"
+R3_LOOKBEHIND = r"(?is)^(?!.*(a+)never)(?=.*(b)(?<=\1)agent).*"
+FAMILIES = [("R1-global-flag", R1_FLAG), ("R2-unterminated-guard", R2_UNTERMINATED),
+            ("R3-numbered-lookbehind", R3_LOOKBEHIND)]
+
+
+def _whole_compiles(source):
+    try:
+        re.compile(source, re.IGNORECASE)
+    except re.error:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("name,source", FAMILIES, ids=[n for n, _ in FAMILIES])
+def test_a_custom_rule_is_kept_only_if_its_whole_expression_compiles(name, source):
+    split = SunglassesEngine._split_caret_predicate(source)
+    assert split is not None, "the probe must be a guarded source or it proves nothing"
+    engine = SunglassesEngine(patterns=[_rule("GLS-TEST-010", source)], mechanisms=False)
+    assert (_modes(engine, "GLS-TEST-010") is not None) == _whole_compiles(source)
+
+
+def test_the_probes_are_invalid_wholes_on_this_python():
+    # Guards against the probes going stale: R2 and R3 are errors on every supported Python.
+    assert not _whole_compiles(R2_UNTERMINATED)
+    assert not _whole_compiles(R3_LOOKBEHIND)
+
+
+def test_an_unterminated_guard_does_not_take_a_keyword_verdict_away():
+    # main drops the invalid regex and the keyword still fires; the shortcut kept the rule as a guard
+    # that held the finding back (block -> allow).
+    rule = {"id": "GLS-TEST-011", "name": "kw", "category": "test", "severity": "high",
+            "channel": ["message"], "keywords": ["bypass the trusted agent"],
+            "regex": [r"(?is)^(?!.*bypass(?=.*agent).*"]}
+    engine = SunglassesEngine(patterns=[rule], mechanisms=False)
+    ids = {f["id"] for f in engine.scan("please bypass the trusted agent now", channel="message").findings}
+    assert "GLS-TEST-011" in ids
+
+
+def test_a_shipped_source_given_as_a_custom_rule_still_takes_the_shortcut(monkeypatch):
+    # the allow-list is by source text, so copies of shipped rules (the test suites do this) stay fast
+    shipped = next(src for _id, src in _shipped_sources()
+                   if SunglassesEngine._split_caret_predicate(src) is not None)
+    seen = _record_compiles(monkeypatch)
+    SunglassesEngine(patterns=[_rule("GLS-TEST-012", shipped)], mechanisms=False)
+    assert shipped not in seen
