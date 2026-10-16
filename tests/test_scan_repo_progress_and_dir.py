@@ -25,6 +25,7 @@ driven through a local `file://` repository, so nothing touches the network.
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -375,11 +376,14 @@ def test_file_still_refuses_a_directory(work):
 
 
 def test_the_readme_says_what_a_directory_scan_claims():
-    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    readme = " ".join((REPO / "README.md").read_text(encoding="utf-8").split())   # line wrapping is not the claim
     assert "scan --dir" in readme
-    # What the scan does with the bytes it reads: no copy is written, none is opened twice.
+    # What the scan does with the bytes it reads: no copy is written, no file's content is
+    # opened twice, and the bytecode cache is not written into the scanned folder.
     assert "writes no copy of any file" in readme
-    assert "opened a second time" in readme
+    assert "no file's content is opened a second time" in readme
+    assert "bytecode-cache writing is switched off" in readme
+    assert "does not report the later change" in readme
 
 
 # ── 5. review round 1: the edges of a local tree, stderr, names, links ─────
@@ -925,6 +929,78 @@ def test_the_scan_makes_no_write_of_any_kind(work, monkeypatch, capsys):
     code, doc = _scan_tree_out(root, "json", capsys)
     assert not made, made
     assert code == EXIT_THREAT and doc["files_scanned"] == 3
+
+
+def _tree_listing(top):
+    return sorted((str(p.relative_to(top)), p.stat().st_mtime_ns) for p in top.rglob("*"))
+
+
+@pytest.mark.parametrize("output", ["json", "sarif"])
+def test_scanning_the_packages_own_folder_writes_no_bytecode_cache_into_it(work, output):
+    """The default Python settings, not the test-friendly ones.
+
+    An extractor is imported the first time a file needs one, in the middle of the walk.
+    Python then writes a cache file next to the module, which is a write inside the folder
+    being scanned when that folder is the package itself. A PDF in the folder is what makes
+    the scan reach for the PDF extractor, so the scan is the first thing to import it.
+    """
+    pkg = work / f"selfscan_{output}"
+    shutil.copytree(REPO / "sunglasses", pkg / "sunglasses",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    target = pkg / "sunglasses" / "extractors"
+    (target / "report.txt").write_bytes(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    env.update(PYTHONPATH=str(pkg), NO_COLOR="1")
+    cwd = work / "cwd"
+    cwd.mkdir(exist_ok=True)
+    # Let the ordinary start-up imports write their caches first, so that anything new in
+    # the folder afterwards was written by the scan itself.
+    warm = subprocess.run([sys.executable, "-c", "import sunglasses.cli"], cwd=cwd, env=env,
+                          capture_output=True, text=True, timeout=300)
+    assert warm.returncode == 0, warm.stderr
+    before = _tree_listing(target)
+    proc = subprocess.run([sys.executable, "-m", "sunglasses", "scan", "--dir", str(target), "-o", output],
+                          cwd=cwd, env=env, capture_output=True, text=True, timeout=300)
+    assert proc.returncode in (EXIT_CLEAN, EXIT_THREAT, EXIT_INCOMPLETE), proc.stderr
+    assert json.loads(proc.stdout)
+    assert _tree_listing(target) == before
+
+
+def test_the_previous_files_bytes_are_let_go_before_the_next_file_is_read(work, monkeypatch, capsys):
+    import gc
+    from sunglasses import cli
+    root = _local(work, "lifetime", {"a.md": CLEAN, "b.md": CLEAN, "c.md": THREAT, "d.md": CLEAN})
+    live, alive_at_read = [0], []
+
+    class Tracked(cli.Member):
+        def __del__(self):
+            live[0] -= 1
+
+    def make(data, name):
+        live[0] += 1
+        return Tracked(data, name)
+
+    real_read = cli._read_member
+
+    def read_and_count(*a, **kw):
+        gc.collect()
+        alive_at_read.append(live[0])
+        return real_read(*a, **kw)
+
+    monkeypatch.setattr(cli, "Member", make)
+    monkeypatch.setattr(cli, "_read_member", read_and_count)
+    code, doc = _scan_tree_out(root, "json", capsys)
+    assert doc["files_scanned"] == 4 and len(alive_at_read) == 4
+    assert alive_at_read == [0, 0, 0, 0], alive_at_read
+
+
+def test_the_bytecode_setting_is_put_back_after_the_scan(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "bytecode_restore", {"ok.md": CLEAN})
+    for start in (False, True):
+        monkeypatch.setattr(sys, "dont_write_bytecode", start)
+        _scan_tree_out(root, "json", capsys)
+        assert sys.dont_write_bytecode is start
 
 
 @pytest.mark.parametrize("name,before,after,threats", [

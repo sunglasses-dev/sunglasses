@@ -616,9 +616,17 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     except OSError as exc:
         _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
                      "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
+    # Extractors are imported the first time a file needs one, which happens in the middle
+    # of the walk. Python writes a bytecode cache next to the module it imports, and when
+    # the folder being scanned holds that module (scanning the package's own source, or a
+    # site-packages folder) that cache would be a write inside the scanned tree. Switch the
+    # cache writing off for the length of the scan, then put the setting back.
+    keep_bytecode_setting = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
     try:
         return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
     finally:
+        sys.dont_write_bytecode = keep_bytecode_setting
         if root_fd is not None:
             os.close(root_fd)
 
@@ -671,6 +679,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
         # to routing and extraction as they are, in memory. Nothing is written anywhere and
         # no path is opened a second time, so the bytes we judged are the bytes we read,
         # whatever the tree does next.
+        data = snapshot = None   # let go of the previous file's bytes before reading the next
         try:
             data = _read_member(tmp_dir, rel_path, root_fd, idents)
         except OSError as exc:
@@ -680,6 +689,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
             walker_skips.append((rel_path, reason))
             continue
         snapshot = Member(data, rel_path)
+        data = None
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix

@@ -446,18 +446,24 @@ whatever it is called (a link named `node_modules` included), and `--dir` refuse
 itself a link, naming the real directory to use instead (the parent folders of the path as you
 typed it are resolved by the operating system as usual). The scan opens the root folder once,
 refusing a link, and keeps that one handle for the whole run; every folder and file below it is
-opened relative to the step before, refusing a link at every step, and the scan remembers each
-folder's identity (device and inode) so a folder that was swapped for another one, or for a link,
-while the scan ran is named as changed and not read. Each file (at most 1 MB) is read once
-through those handles, and the scan judges exactly those bytes: they are held in memory and go
-straight to content routing and extraction, so the scan writes no copy of any file, anywhere
-(no temporary file or folder, nothing inside the scanned folder), and no path in the tree is
-opened a second time. The findings carry the file's path in the tree. A file that changes after
-it was read is judged as it was when it was read. Only one file's bytes are held at a time, and
-the 1 MB cap is what bounds that. One caveat outside the scan itself: reading text out of an
-image with the optional OCR extra runs the OCR library, which makes its own short-lived
-temporary file in your `TMPDIR`, as `--file` does for the same image; if you use that extra,
-keep `TMPDIR` outside a folder you scan.
+opened relative to the step before, refusing a link at every step, and the scan checks each
+folder's identity (device and inode) when it opens it and when it lists it, so a folder that was
+swapped for another one, or for a link, before one of those steps is named as changed and not
+read. A folder replaced after the scan has already opened it is still the one the scan holds, and
+the scan judges what it read from that handle; it does not report the later change. Each file (at
+most 1 MB) is read once through those handles, and the scan judges exactly those bytes: they are
+held in memory and go straight to content routing and extraction, so the scan writes no copy of
+any file, anywhere (no temporary file or folder, nothing inside the scanned folder; Python's
+bytecode-cache writing is switched off for the length of the scan, so loading an extractor in
+the middle of a scan leaves nothing next to its source either), and no file's content is opened
+a second time by routing or extraction (the folders on the way down are opened again to list
+them and to read the next file). The findings carry the file's path in the tree. A file that
+changes after it was read is judged as it was when it was read. The previous file's bytes are
+let go before the next file is read, and the 1 MB cap bounds each read; it is not a limit on the
+process's total memory. One caveat outside the scan itself: reading text out of an image with
+the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
+your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside
+a folder you scan.
 
 Where the platform has no such handles (Windows) the scan checks for a link and for a path that
 leaves the tree before it reads and again against the file it opened. That is a weaker guarantee
