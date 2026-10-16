@@ -114,7 +114,7 @@ INVENTORY = {
         "live file.",
     "_adopt_standby: orphan.rename(bytes_path)":
         "Half-promoted pair, keyed on the digest the canonical record carries.",
-    "_adopt_standby: record_path.write_text(json.dumps(\n                    {**claim, \"failed_bytes_name\": failed_name,\n                     \"failed_bytes_sha256\": failed_sha}, indent=2),\n                    encoding=\"utf-8\")":
+    "_adopt_standby: record_path.write_text(json.dumps(\n                    {**claim, \"failed_bytes_name\": failed_name,\n                     \"failed_bytes_sha256\": failed_sha}, indent=2,\n                    allow_nan=False), encoding=\"utf-8\")":
         "A standby record we still hold privately, before it is promoted.",
     "_discard: q.unlink()":
         "Records and journals, removed by the transaction that owns them; "
@@ -131,16 +131,16 @@ INVENTORY = {
         "pair is read back from disk.",
     "_install_locked: spare_bytes.rename(bytes_path)":
         "Promotion, bytes second.",
-    "_install_locked: spare_record.write_text(json.dumps(\n                        {**record, \"file_sha_after\": _digest_bytes(wrapped_bytes),\n                         \"original_bytes_path\": str(bytes_path),\n                         \"failed_bytes_name\": failed_name,\n                         \"failed_bytes_sha256\": failed_sha,\n                         \"state\": \"complete\"},\n                        indent=2), encoding=\"utf-8\")":
+    "_install_locked: spare_record.write_text(json.dumps(\n                        {**record, \"file_sha_after\": _digest_bytes(wrapped_bytes),\n                         \"original_bytes_path\": str(bytes_path),\n                         \"failed_bytes_name\": failed_name,\n                         \"failed_bytes_sha256\": failed_sha,\n                         \"state\": \"complete\"},\n                        indent=2, allow_nan=False), encoding=\"utf-8\")":
         "A standby record we still hold privately, before promotion.",
     "_install_locked.render_again: bytes_path.write_bytes(current)":
         "Re-derivation under the writer lock; the inverse is rewritten to "
         "describe the bytes actually being overwritten.",
-    "_install_locked.render_again: pending_path.write_text(\n                json.dumps({**record, \"state\": \"pending\"}, indent=2),\n                encoding=\"utf-8\")":
+    "_install_locked.render_again: pending_path.write_text(\n                json.dumps({**record, \"state\": \"pending\"}, indent=2, allow_nan=False),\n                encoding=\"utf-8\")":
         "Same, for the journal.",
     "_install_locked.stand_by: spare_bytes.write_bytes(original)":
         "The standby copy, written before the wrapper it is the inverse of.",
-    "_install_locked.stand_by: spare_record.write_text(json.dumps(\n            {**record, \"file_sha_after\": _digest_bytes(published),\n             \"original_bytes_path\": str(bytes_path), \"state\": \"complete\"},\n            indent=2), encoding=\"utf-8\")":
+    "_install_locked.stand_by: spare_record.write_text(json.dumps(\n            {**record, \"file_sha_after\": _digest_bytes(published),\n             \"original_bytes_path\": str(bytes_path), \"state\": \"complete\"},\n            indent=2, allow_nan=False), encoding=\"utf-8\")":
         "Same, for its record.",
     "_uninstall_locked: canonical.rename(kept)":
         "Setting aside a copy that failed its digest; nothing claims that name.",
