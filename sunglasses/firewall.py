@@ -1347,8 +1347,9 @@ def _describe_node(mode) -> str:
 def load_policy(path) -> dict:
     """Read policy.yaml, or raise PolicyDown naming the state it is in.
 
-    Returns `{}` only for the one honest empty case: no home directory, meaning
-    nothing was ever installed.
+    Returns `{}` only for the one honest empty case: there is no policy file and
+    nothing positively says one was installed, meaning no install marker. A
+    missing file WITH the marker is a dead control and raises PolicyDown("missing").
     """
     import pathlib
     p = pathlib.Path(path)
@@ -2214,8 +2215,32 @@ HOOK_MARKER = "sunglasses.firewall"
 
 _HOOK_TIMEOUT = 10
 
+# The warn lane's OWN wall-clock budget, in seconds. The harness kills a hook at
+# `_HOOK_TIMEOUT` and the kill gives the host no verdict (and leaves an in_flight
+# receipt with no terminal partner), so an advisory lane must stop itself first.
+# Measured (Oct 2026 bench, 1 MiB call): with the lane on, a ~1 MiB call takes 11-13 s. It
+# is a clock, not a size cap: scan cost depends on the SHAPE of the input as much
+# as its size. The 3 s left under the installed 10 s timeout is the INTENDED
+# reserve for interpreter start, the deterministic lanes and the receipts. It is a
+# reserve, not a guarantee: a stalled disk or a busy machine can still use it up,
+# and a host that shortens its own timeout gets no protection from this number.
+_WARN_LANE_BUDGET_S = 7
 
-def build_hook_entry(interpreter: str = None) -> dict:
+
+def _check_warn_budget(budget, timeout):
+    """The budget must sit strictly below the harness timeout, and above zero:
+    `setitimer(0)` CANCELS the timer, so a zero budget would be no budget.
+    An explicit raise, not `assert`, so `python -O` cannot strip it."""
+    if not (0 < budget < timeout):
+        raise AssertionError(
+            f"warn-lane budget {budget!r} must satisfy 0 < budget < hook "
+            f"timeout {timeout!r}")
+
+
+_check_warn_budget(_WARN_LANE_BUDGET_S, _HOOK_TIMEOUT)
+
+
+def build_hook_entry(interpreter: str = None, fail_open: bool = False) -> dict:
     """The PreToolUse entry we write into settings.json.
 
     `interpreter` defaults to the ABSOLUTE `sys.executable` of whatever python is
@@ -2223,6 +2248,11 @@ def build_hook_entry(interpreter: str = None) -> dict:
     time, which under pipx/venv/conda can be a different interpreter with no
     `sunglasses` installed — the hook then fails on every call, invisibly, and
     the firewall is off while looking on.
+
+    The entry asks the host to block the tool call when the hook itself fails (a
+    timeout, a command that cannot start, output the host cannot read). The host's
+    own default lets the call go ahead, which is the same silent "off while looking
+    on". `fail_open=True` leaves the key out and so keeps that default.
     """
     import shlex
     import sys as _sys
@@ -2232,26 +2262,33 @@ def build_hook_entry(interpreter: str = None) -> dict:
     # for anyone whose username has a space) would otherwise be split into two
     # words, breaking both the hook and its own self-test.
     interpreter = shlex.quote(interpreter)
+    hook = {
+        "type": "command",
+        "command": f"{interpreter} -m {HOOK_MARKER}",
+        # The schema default is 600s. A hook that can hang for ten minutes
+        # on every tool call is a worse outage than the attacks it prevents.
+        "timeout": _HOOK_TIMEOUT,
+    }
+    if not fail_open:
+        hook["onFailure"] = "block"
     return {
         # Everything, not just egress tools: policy `blocked_paths` has to cover
         # Read/Edit as well, and the module filters in ~0.2ms anyway.
         "matcher": ".*",
-        "hooks": [{
-            "type": "command",
-            "command": f"{interpreter} -m {HOOK_MARKER}",
-            # The schema default is 600s. A hook that can hang for ten minutes
-            # on every tool call is a worse outage than the attacks it prevents.
-            "timeout": _HOOK_TIMEOUT,
-        }],
+        "hooks": [hook],
     }
 
 
-def self_test_hook(command: str) -> "tuple":
+def self_test_hook(command: str, timeout: float = 30) -> "tuple":
     """Spawn the exact command we are about to write and check it answers.
 
     Returns (ok, detail). This is the difference between finding a broken wire
     at install time and finding it at 3am — a misconfigured hook fails open, so
     without this check the failure mode is completely silent.
+
+    With `onFailure: block` the same broken wire refuses every tool call instead,
+    so the install judges the command by the host's own time limit: pass
+    `timeout=_HOOK_TIMEOUT` and a hook the host would kill fails here.
     """
     import json as _json
     import subprocess
@@ -2264,7 +2301,7 @@ def self_test_hook(command: str) -> "tuple":
     })
     try:
         proc = subprocess.run(command, shell=True, input=probe,
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, timeout=timeout)
     except Exception as exc:  # noqa: BLE001
         return False, f"could not run the hook command: {exc}"
     if proc.returncode != 0:
@@ -2336,7 +2373,7 @@ def _strip_our_hooks(pre_tool_use: list) -> list:
     return kept
 
 
-def install_hook(settings_path, interpreter: str = None) -> dict:
+def install_hook(settings_path, interpreter: str = None, fail_open: bool = False) -> dict:
     """Add (or refresh) our PreToolUse hook. Idempotent, merging, backed up."""
     data = _read_settings(settings_path)
     hooks = data.setdefault("hooks", {})
@@ -2345,7 +2382,7 @@ def install_hook(settings_path, interpreter: str = None) -> dict:
     # Strip first, then append: a re-run after the user moved their venv must
     # FIX the stale interpreter, not add a second entry pointing at a dead one.
     pre = _strip_our_hooks(pre)
-    pre.append(build_hook_entry(interpreter))
+    pre.append(build_hook_entry(interpreter, fail_open=fail_open))
     hooks["PreToolUse"] = pre
     _write_settings(settings_path, data)
     return data
@@ -2381,9 +2418,10 @@ STARTER_POLICY_PATHS: tuple = (
 
 _POLICY_HEADER = """\
 # SUNGLASSES policy — your rules, enforced as HARD BLOCKS.
-# Written by `sunglasses init`. Edit it freely. No file at all enforces
-# nothing, and a file with only comments enforces nothing. An empty file is
-# treated as a broken policy and asks before each tool call.
+# Written by `sunglasses init`. Edit it freely. Detected secret material in
+# outbound tool calls is denied even without this file. This file adds your
+# path and host rules. An empty file is treated as a broken policy, and a tool
+# call that nothing else settles asks until the file is repaired.
 #
 # blocked_paths — any tool call that touches one of these paths is denied.
 #   Matching is boundary-aware: `~/.ssh/id_rsa` does NOT cover `id_rsa.pub`,
@@ -2398,6 +2436,213 @@ _POLICY_HOSTS_TAIL = """
 #   - api.github.com
 #   - pypi.org
 """
+
+
+# sha256 of the starter text each earlier release wrote, kept as a hash so the old text is not
+# repeated here. `write_starter_policy` enables a disabled starter only when the bytes of the file
+# are a starter this project wrote, and the header was reworded between releases, so the running
+# code's own text is not the only one such a file can hold. The tags that wrote each text are in
+# the comment beside it. When the header or the path list changes, add the hash of the text being
+# replaced here. `provenance.py` in the review packet rebuilds both sets from the release tags.
+_EARLIER_DISABLED_STARTER_SHA256: frozenset = frozenset({
+    "47b9fe35d84b6af69b60cc89078fdcd025019b4149e6d18622474e67af0e5b4a",  # v0.4.1 to v0.6.5
+    "bb68349c8fd83ce2d4422d9b4fdc61c737b8c6785c0711fa22c453e460950bb8",  # v0.6.6
+})
+_EARLIER_ENABLED_STARTER_SHA256: frozenset = frozenset({
+    "cf4af074e20e6a2d2c5d62eade67ae6c31b8a03aeb360b8f38583032f5e11b68",  # v0.4.1 to v0.6.5
+    "971ce41b7e2cdee9408517905ef417e26ed85c508034ea2267715f5a2467477a",  # v0.6.6
+})
+
+# The two open flags below are missing on some systems, so each is read from the os module in a
+# try and falls back to 0 where it is missing.
+try:
+    _O_NOFOLLOW = _os.O_NOFOLLOW
+except AttributeError:
+    _O_NOFOLLOW = 0
+try:
+    _O_NONBLOCK = _os.O_NONBLOCK
+except AttributeError:
+    _O_NONBLOCK = 0
+
+# A starter is a little over a kilobyte. A file past this size is read only far enough to see it
+# is not one.
+_POLICY_READ_CAP = 1 << 20
+
+
+def _is_our_untouched_disabled_starter(data: bytes) -> bool:
+    """True when the bytes are the disabled starter this code writes or one an earlier release wrote."""
+    if data == starter_policy_text(enabled=False).encode("utf-8"):
+        return True
+    return hashlib.sha256(data).hexdigest() in _EARLIER_DISABLED_STARTER_SHA256
+
+
+def _is_our_enabled_starter(data: bytes) -> bool:
+    """True when the bytes are the enabled starter this code writes or one an earlier release wrote."""
+    if data == starter_policy_text(enabled=True).encode("utf-8"):
+        return True
+    return hashlib.sha256(data).hexdigest() in _EARLIER_ENABLED_STARTER_SHA256
+
+
+def _file_identity(st):
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+
+
+def _read_policy_file(path):
+    """Read policy.yaml as raw bytes without following a link or waiting on anything that is not a file.
+
+    Returns (kind, data, mode, identity). kind is "absent", "unsafe" or "file". "unsafe" is a link, a
+    folder, a fifo, a file that cannot be opened or read, a path that did not name the same file
+    from the first look to the last, or a file that changed while it was read. A path that
+    already looks like a fifo or a folder is not opened. A node put there between the first look
+    and the open is opened without waiting and then refused. identity is (device, inode, size,
+    modification time) of the file the bytes came from.
+    """
+    try:
+        st = _os.lstat(path)
+    except FileNotFoundError:
+        return "absent", None, None, None
+    except OSError:
+        return "unsafe", None, None, None
+    if not _stat.S_ISREG(st.st_mode):
+        return "unsafe", None, None, None
+    try:
+        fd = _os.open(path, _os.O_RDONLY | _O_NOFOLLOW | _O_NONBLOCK)
+    except OSError:
+        return "unsafe", None, None, None
+    try:
+        before = _os.fstat(fd)
+        if not _stat.S_ISREG(before.st_mode) or (before.st_dev, before.st_ino) != (st.st_dev, st.st_ino):
+            return "unsafe", None, None, None
+        chunks, size = [], 0
+        while size <= _POLICY_READ_CAP:
+            chunk = _os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        after = _os.fstat(fd)
+        now = _os.lstat(path)
+        if not _stat.S_ISREG(now.st_mode) or len({_file_identity(before), _file_identity(after), _file_identity(now)}) != 1:
+            return "unsafe", None, None, None
+        return "file", b"".join(chunks), _stat.S_IMODE(before.st_mode), _file_identity(now)
+    except OSError:
+        return "unsafe", None, None, None
+    finally:
+        _os.close(fd)
+
+
+def _write_all(fd, data: bytes) -> None:
+    view = memoryview(data)
+    while view:
+        view = view[_os.write(fd, view):]
+
+
+def _sync_folder(folder) -> None:
+    """Best effort. Some systems cannot open a folder for this."""
+    try:
+        fd = _os.open(folder, _os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        _os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        _os.close(fd)
+
+
+def _remove_own_file(path) -> None:
+    """Remove a file this process made. It is called on staging files and not on the policy path."""
+    try:
+        _os.unlink(path)
+    except OSError:
+        pass
+
+
+def _create_policy_file(path, data: bytes) -> bool:
+    """Create policy.yaml without replacing or removing anything. False when the name is taken.
+
+    The bytes are written and synced to a private file in the same folder. Then os.link gives that
+    finished file the name policy.yaml, which fails when something already has the name, and the
+    private file is removed. So policy.yaml is not seen part written, and a policy someone saved
+    there is not replaced or removed. When a call fails with an exception, only the private file is
+    removed, as best effort. A process that dies mid write (killed, power lost) cannot run that cleanup, so it can
+    leave one private file named `.policy.yaml.<hex>.tmp` in the folder. It does not leave a partial
+    policy.yaml.
+    """
+    folder = _os.path.dirname(path) or "."
+    staging = _os.path.join(folder, ".policy.yaml." + _os.urandom(8).hex() + ".tmp")
+    fd = _os.open(staging, _os.O_WRONLY | _os.O_CREAT | _os.O_EXCL | _O_NOFOLLOW, 0o666)
+    try:
+        try:
+            _write_all(fd, data)
+            _os.fsync(fd)
+        finally:
+            _os.close(fd)
+        try:
+            _os.link(staging, path)
+        except FileExistsError:
+            return False
+    finally:
+        _remove_own_file(staging)
+    _sync_folder(folder)
+    return True
+
+
+def _replace_policy_file_if_unchanged(path, expected: bytes, identity, data: bytes, mode: int) -> bool:
+    """Swap policy.yaml for `data` through a file in the same folder, only if it is still the file that was read.
+
+    The new bytes are written and synced to a staging file first. Then policy.yaml is read again and
+    must be the same file as before (same device, inode, size and modification time) holding the same
+    bytes, with the path still naming the file that was read. If not, nothing is replaced, which keeps a
+    policy saved in the meantime, including one saved over the path while it was being read. A call that
+    fails with an exception before the rename leaves the old file in place and tries to remove the
+    staging file, which is best effort. A process that
+    dies in the middle (killed, power lost) can leave the staging file behind and does not leave a half
+    written policy.
+
+    One window stays. A save that lands after that last check and before os.replace runs is replaced.
+    Reading a file and renaming over it are two calls, and the system offers no single call that
+    renames over a file only when it is unchanged, so this cannot be closed here. It is the time
+    between those two calls.
+    """
+    import tempfile
+    folder = _os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(prefix=".policy.yaml.", suffix=".tmp", dir=folder)
+    try:
+        try:
+            _write_all(fd, data)
+            _os.fchmod(fd, mode)
+            _os.fsync(fd)
+        finally:
+            _os.close(fd)
+        kind, now, _mode, now_identity = _read_policy_file(path)
+        if kind != "file" or now != expected or now_identity != identity:
+            return False
+        _os.replace(tmp, path)
+        tmp = None
+        _sync_folder(folder)
+        return True
+    finally:
+        if tmp is not None:
+            _remove_own_file(tmp)
+
+
+def existing_policy_kind(home=None) -> str:
+    """What sits at policy.yaml. "absent", "disabled_starter", "enabled_starter" or "other".
+
+    The starter kinds are decided on the raw bytes, so a changed line ending is "other".
+    """
+    home = home or sunglasses_home()
+    kind, data, _mode, _identity = _read_policy_file(home / "policy.yaml")
+    if kind == "absent":
+        return "absent"
+    if kind == "file":
+        if _is_our_untouched_disabled_starter(data):
+            return "disabled_starter"
+        if _is_our_enabled_starter(data):
+            return "enabled_starter"
+    return "other"
 
 
 def starter_policy_text(enabled: bool = True) -> str:
@@ -2420,11 +2665,17 @@ def write_starter_policy(home=None, enabled: bool = True):
     file is theirs, and silently rewriting the one control they hand-tuned would
     be worse than the gap this closes.
 
-    One exception (0.4.3): if the existing file is byte-identical to OUR OWN
-    commented-out starter (a non-interactive first run), `enabled=True` may
-    upgrade it in place. Before 0.4.3 that run printed "re-run with --policy"
-    and the re-run then hit this exists-guard and changed nothing — a dead end.
-    A file the user has edited in any way is still never touched.
+    One exception (0.4.3): if the existing file holds the bytes of a disabled
+    starter this project wrote, now or in an earlier release (a non-interactive
+    first run), `enabled=True` replaces it. Before 0.4.3 that run printed "re-run
+    with --policy" and the re-run then hit this exists-guard and left the file as it
+    was, a dead end. The compare is on raw bytes, a link or a file that is not a plain
+    file is left as it is, and the replace goes through a staging file in the same
+    folder. It is dropped when policy.yaml is no longer the file that was read. A save
+    landing between the last check and the rename is the one case that is not caught,
+    see `_replace_policy_file_if_unchanged`. A new file is made through a staging file
+    and a link that fails when the name is taken, so it is not seen part written and
+    a policy saved there meanwhile is neither replaced nor removed.
     """
     home = home or sunglasses_home()
     path = home / "policy.yaml"
@@ -2449,17 +2700,22 @@ def write_starter_policy(home=None, enabled: bool = True):
             "is down and the firewall will ask rather than fall through silently.\n",
             encoding="utf-8")
 
-    if path.exists():
-        is_our_untouched_disabled = (
-            path.read_text(encoding="utf-8") == starter_policy_text(enabled=False))
-        if enabled and is_our_untouched_disabled:
-            path.write_text(starter_policy_text(enabled=True), encoding="utf-8")
-            _mark_enrolled()
-            return path
+    kind, data, mode, identity = _read_policy_file(path)
+    if kind == "file":
+        if enabled and _is_our_untouched_disabled_starter(data):
+            text = starter_policy_text(enabled=True).encode("utf-8")
+            if _replace_policy_file_if_unchanged(path, data, identity, text, mode):
+                _mark_enrolled()
+                return path
+        _mark_enrolled()
+        return None
+    if kind == "unsafe":
         _mark_enrolled()
         return None
     home.mkdir(parents=True, exist_ok=True)
-    path.write_text(starter_policy_text(enabled), encoding="utf-8")
+    if not _create_policy_file(path, starter_policy_text(enabled).encode("utf-8")):
+        _mark_enrolled()
+        return None
     _mark_enrolled()
     return path
 
@@ -2554,20 +2810,133 @@ def fuzzy_enabled(home=None) -> bool:
     return (home / "warn-lane").exists()
 
 
+class _WarnBudgetExceeded(BaseException):
+    """Raised by the budget timer. A BaseException on purpose: the engine has
+    `except Exception` blocks, and a stop that one of them could swallow is not
+    a stop."""
+
+
+def _run_within_budget(fn, budget_s):
+    """Run `fn()` and stop it after `budget_s` wall-clock seconds.
+
+    Returns `(True, value)`, `(False, None)` when the budget ran out, or
+    `(None, None)` when no budget can be enforced here, in which case `fn` is
+    NOT run. Uses SIGALRM: CPython's regex engine checks for signals while it
+    matches, so this interrupts one long C-level match as well as a Python loop.
+
+    The timer is taken only when it is free: a POSIX process, the main thread,
+    SIGALRM not blocked, no ITIMER_REAL already running and SIGALRM at its
+    default. Anything else belongs to the host (an embedding library caller),
+    so it is left exactly as found and the answer is "unavailable", never an
+    unbudgeted run.
+    An exception from `fn` propagates.
+    """
+    import signal
+    import threading
+    if not (hasattr(signal, "setitimer") and hasattr(signal, "getitimer")
+            and hasattr(signal, "SIGALRM") and hasattr(signal, "pthread_sigmask")):
+        return None, None
+    if threading.current_thread() is not threading.main_thread():
+        return None, None
+    if signal.SIGALRM in signal.pthread_sigmask(signal.SIG_BLOCK, ()):
+        return None, None          # blocked by the host: the alarm could never fire
+    if any(signal.getitimer(signal.ITIMER_REAL)):
+        return None, None          # a host timer is running: not ours to cancel
+    previous = signal.getsignal(signal.SIGALRM)
+    if previous != signal.SIG_DFL:
+        return None, None          # a host handler (None = set from C, unrestorable)
+
+    armed = [True]
+
+    def _expired(signum, frame):
+        # Disarmed before the timer is cancelled, so an alarm that was already
+        # pending when the call finished is a no-op instead of an escape.
+        if armed[0]:
+            raise _WarnBudgetExceeded()
+
+    try:
+        signal.signal(signal.SIGALRM, _expired)
+    except ValueError:  # not the main thread after all
+        return None, None
+    finished, value = False, None
+    try:
+        # The restore is the OUTER finally, entered before the timer is armed, so
+        # an alarm raised anywhere inside (even at the first line of the inner
+        # cleanup) still puts the host's handler back. The catch is outside both.
+        try:
+            try:
+                signal.setitimer(signal.ITIMER_REAL, budget_s)
+                value = fn()
+                finished = True
+            finally:
+                armed[0] = False
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                # A mask set during the call can hold a SIGALRM pending, and the
+                # default handler restored below would then kill the process when
+                # the mask is lifted. Its source is not checked: this assumes
+                # exclusive use of SIGALRM, nothing else in the process uses it
+                # while the lane runs. Setting SIG_IGN discards a pending signal,
+                # never waits, and does nothing when none is pending.
+                signal.signal(signal.SIGALRM, signal.SIG_IGN)
+        finally:
+            signal.signal(signal.SIGALRM, previous)
+    except _WarnBudgetExceeded:
+        finished, value = False, None
+    return finished, value
+
+
 def check_fuzzy(tool_name: str, tool_input: dict) -> "Decision | None":
     """Pattern-engine pass. Escalates to the human; never decides for them."""
-    global _FUZZY_ENGINE
     text = egress_surface_text(tool_name, tool_input)
     if not text:
         return None
 
-    # Imported here, not at module scope: the deterministic path must never pay
-    # for the pattern DB, and the hot-path import test enforces that.
-    if _FUZZY_ENGINE is None:
-        from .engine import SunglassesEngine
-        _FUZZY_ENGINE = SunglassesEngine()
+    def _scan():
+        global _FUZZY_ENGINE
+        # Imported here, not at module scope: the deterministic path must never
+        # pay for the pattern DB, and the hot-path import test enforces that.
+        if _FUZZY_ENGINE is None:
+            from .engine import SunglassesEngine
+            _FUZZY_ENGINE = SunglassesEngine()
+        return _FUZZY_ENGINE.scan(text, channel="message")
 
-    result = _FUZZY_ENGINE.scan(text, channel="message")
+    # Building the engine and scanning both count against the budget: that is
+    # the lane's whole wall-clock cost, and the harness's clock covers all of it.
+    finished, result = _run_within_budget(_scan, _WARN_LANE_BUDGET_S)
+    if finished is None:
+        # No timer this process can own, so the scan never started: running it
+        # unbudgeted could outlive the harness and orphan the in_flight receipt.
+        # Same terminal ask and rule as a budget hit, with its own reason.
+        return Decision(
+            action="ask",
+            lane="fuzzy",
+            rule_id="GLS-FW-FUZZY-BUDGET",
+            reason=(
+                f"SUNGLASSES firewall: warn-lane budget unavailable, "
+                f"{len(text.encode('utf-8', 'replace'))} bytes. This process "
+                f"cannot give the pattern scan its own timer, so the scan did "
+                f"not run and this call was NOT pattern-checked. Approve only if "
+                f"you would have approved it unchecked. Turn this lane off by "
+                f"deleting ~/.sunglasses/warn-lane."
+            ),
+        )
+    if not finished:
+        # TERMINAL, and an ask: the lane never denies, and it must never leave the
+        # host waiting on a verdict that is not coming. The caller writes the
+        # decision receipt as for any other answer, so no in_flight is orphaned.
+        return Decision(
+            action="ask",
+            lane="fuzzy",
+            rule_id="GLS-FW-FUZZY-BUDGET",
+            reason=(
+                f"SUNGLASSES firewall: warn-lane budget exceeded, "
+                f"{len(text.encode('utf-8', 'replace'))} bytes. The pattern scan "
+                f"was stopped after {_WARN_LANE_BUDGET_S:g} s, so this call was "
+                f"NOT pattern-checked. Approve only if you would have approved "
+                f"it unchecked. Turn this lane off by deleting "
+                f"~/.sunglasses/warn-lane."
+            ),
+        )
     # `threat_found`, NOT `is_clean` (v0.5.6). `is_clean` is now False for an
     # oversized command that merely got truncated, and this lane reads `findings[0]`
     # two lines down — on `is_clean` that is an IndexError on a benign long command,

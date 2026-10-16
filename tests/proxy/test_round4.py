@@ -510,8 +510,10 @@ def orphan_stdout_peer():
         assert leader.wait(timeout=3)==0
         yield leader
     finally:
+        # A group whose members were just killed but not yet reaped answers
+        # EPERM on macOS; it is as good as gone, like ESRCH.
         try:os.killpg(leader.pid,signal.SIGKILL)
-        except ProcessLookupError:pass
+        except (ProcessLookupError,PermissionError):pass
         leader.wait(timeout=3)
         leader.stdout.close()
 
@@ -540,7 +542,8 @@ def test_F21_actual_exit_observed_while_descendant_holds_stdout():
             done.wait(.5)
             assert s.closed_with()==('MALFORMED_UPSTREAM','S5')
         finally:
-            os.killpg(leader.pid,signal.SIGKILL)
+            try:os.killpg(leader.pid,signal.SIGKILL)
+            except (ProcessLookupError,PermissionError):pass
             thread.join(timeout=3)
 
 
@@ -616,7 +619,7 @@ def test_W21_group_resolved_from_nonleader(tmp_path):
         assert leader.returncode is not None
     finally:
         try:os.killpg(leader.pid,signal.SIGKILL)
-        except ProcessLookupError:pass
+        except (ProcessLookupError,PermissionError):pass
         leader.wait(timeout=3)
 
 

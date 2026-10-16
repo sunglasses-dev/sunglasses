@@ -26,7 +26,7 @@
     "pull from rss and auto-publish"
   ],
   "regex": [
-    "(?i)(fetch|crawl|scrape|read)\\s+(?:this|the)?\\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+    "(?i)(fetch|crawl|scrape|read)\\s+(?:(?:this|the)\\s*)?(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
     "(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)"
   ],
   "examples": {

@@ -1,12 +1,12 @@
 {
   "metrics": {
-    "engine_version": "0.5.0",
+    "engine_version": "0.6.5",
     "positives": 38,
-    "negatives": 76,
+    "negatives": 77,
     "true_positives": 37,
     "false_negatives": 1,
     "false_positives": 6,
-    "true_negatives": 70,
+    "true_negatives": 71,
     "precision": 0.8605,
     "recall": 0.9737,
     "f1": 0.9136,
@@ -22,7 +22,7 @@
         "recall": 0.875
       }
     },
-    "sha256": "763d095f91af640d482063840c61a1f009876cc501eb9dca66ab2cece0a95492"
+    "sha256": "caece69e3f271a1af310e28a16b20035b725b582639fce2aab4300589d22b02d"
   },
   "misses": [
     {

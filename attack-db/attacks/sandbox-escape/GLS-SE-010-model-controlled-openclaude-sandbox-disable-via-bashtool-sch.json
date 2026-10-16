@@ -12,7 +12,7 @@
   "description": "A tool schema exposes dangerouslyDisableSandbox as model-controlled input so an injected model can set the flag in its own BashTool call and, with a permissive unsandboxed default, execute commands on the host.",
   "keywords": [],
   "regex": [
-    "(?is)^\\s*(?!.*\\b(?:defensive|documentation|unit\\s+test|benign|simulation|fixture|safe|must\\s+(?:reject|ignore|forbid)|do\\s+not|never|blocked|quarantined|fail[- ]closed|prevent)\\b)(?=.*\\b(?:bash|shell|command)\\w*\\b)(?=.*\\b(?:bash\\s*tool|tool(?:_use)?|function)\\w*\\b)(?=.*\\b(?:dangerouslyDisableSandbox|disable(?:d|s)?\\s+sandbox|sandbox\\s*(?:off|false|disabled))\\b)(?=.*\\b(?:true|yes|1)\\b)(?=.*\\b(?:allowUnsandboxedCommands|unsandboxed|host[- ]level|host execution)\\b)(?=.*\\b(?:execut\\w*|run\\w*|dispatch\\w*|invoke\\w*)\\b).*$"
+    "(?is)^(?:(?=(\\s*))\\1)(?!.*\\b(?:defensive|documentation|unit\\s+test|benign|simulation|fixture|safe|must\\s+(?:reject|ignore|forbid)|do\\s+not|never|blocked|quarantined|fail[- ]closed|prevent)\\b)(?=.*\\b(?:bash|shell|command)\\w*\\b)(?=.*\\b(?:bash\\s*tool|tool(?:_use)?|function)\\w*\\b)(?=.*\\b(?:dangerouslyDisableSandbox|disable(?:d|s)?\\s+sandbox|sandbox\\s*(?:off|false|disabled))\\b)(?=.*\\b(?:true|yes|1)\\b)(?=.*\\b(?:allowUnsandboxedCommands|unsandboxed|host[- ]level|host execution)\\b)(?=.*\\b(?:execut\\w*|run\\w*|dispatch\\w*|invoke\\w*)\\b).*$"
   ],
   "examples": {
     "malicious": [],

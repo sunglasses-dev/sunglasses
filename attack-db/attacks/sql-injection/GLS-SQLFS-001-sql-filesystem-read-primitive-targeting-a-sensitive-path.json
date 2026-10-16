@@ -20,7 +20,7 @@
     "pg_read_file .env"
   ],
   "regex": [
-    "(?i)\\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\\s*(?:/\\*.*?\\*/)?\\s*\\(\\s*(?:BULK\\s+)?['\\\"]?[^'\\\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\\.conf|/root/|/proc/self|\\.ssh/|\\.aws/credentials|\\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\\.pem\\b|\\.env\\b|private[_-]?key)",
+    "(?i)\\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\\s*(?:/\\*.*?\\*/\\s*)?\\((?:\\s*BULK(?=\\s))?(?:\\s*['\\\"])?[^'\\\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\\.conf|/root/|/proc/self|\\.ssh/|\\.aws/credentials|\\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\\.pem\\b|\\.env\\b|private[_-]?key)",
     "(?i)\\bATTACH\\s+(?:DATABASE\\s+)?['\\\"][^'\\\"]*(?:\\.ssh/|id_rsa|\\.pem|\\.env|/etc/|credentials)"
   ],
   "examples": {

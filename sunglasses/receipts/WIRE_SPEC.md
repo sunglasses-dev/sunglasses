@@ -550,6 +550,11 @@ record before a verifier prints it.
   when the proxy revokes authority, with its cause in `reason_code` and no new
   field; it is not paired, and a verifier that predates it reads it as
   `UNKNOWN_EVENT` under lifecycle, never an integrity failure.
+- **A declined probe is a record.** `PROBE_DECLINED` is written when the proxy
+  answers a client's `server/discover` probe with JSON-RPC "Method not found"
+  (0.6.9). It carries `id_type` and nothing else, is not paired, and a verifier
+  that predates it reads it as `UNKNOWN_EVENT` under lifecycle, never an
+  integrity failure.
 - **The target is unchanged, and not yet judged.** Freeze vector 15, "proxy
   `ADMITTED` without `SETTLED` → lifecycle failure; `FORWARD_SUPPRESSED` +
   `SETTLED REQUEST_CANCELLED` → lifecycle ok", stays the requirement. It is

@@ -1269,44 +1269,76 @@ _CLI_CELLS = [(s, st, M.outcome_for(s, st)) for s, g, _l, _f, st, o in M.cells()
               if g == "cli" and not M.is_na(o)]
 
 
-@pytest.mark.parametrize("surface,state,outcome",
-                         _CLI_CELLS, ids=[f"{s}-{st}" for s, st, _o in _CLI_CELLS])
-def test_cli_cell(surface, state, outcome, space, repos):
-    formats = dict((s[0], s[3]) for s in M.SURFACES)[surface]
+# One test id per (surface, state, format) leg. The json leg carries the three
+# axes and the equivalence twin, so it is the one every run keeps. The human and
+# sarif legs are marked `full_matrix`: they re-run the same cell through another
+# renderer, and a run that wants the quick lane can deselect them by marker.
+# Nothing here deselects anything; the default `pytest` still runs every leg.
+_CLI_LEGS = [
+    pytest.param(s, st, M.outcome_for(s, st), fmt, id=f"{s}-{st}-{fmt}",
+                 marks=[] if fmt == "json" else [pytest.mark.full_matrix])
+    for s, g, _l, formats, st, o in M.cells()
+    if g == "cli" and not M.is_na(o)
+    for fmt in formats
+]
 
-    for fmt in formats:
-        where = f"{surface}/{state}/{fmt}"
-        argv, stdin, env = _cli_args(surface, state, space, repos, fmt)
 
-        if surface == "cli_deep" and state == "later_component":
-            proc = _run_track_seam(argv)
-        elif surface == "cli_deep" and M.outcome_state(surface, state) in _SEAM:
-            proc = _run_seam(M.outcome_state(surface, state), argv)
-        else:
-            proc = _run(argv, env_extra=env, stdin=stdin,
-                        console=(surface == "cli_console"))
+@pytest.mark.parametrize("surface,state,outcome,fmt", _CLI_LEGS)
+def test_cli_cell(surface, state, outcome, fmt, space, repos):
+    where = f"{surface}/{state}/{fmt}"
+    argv, stdin, env = _cli_args(surface, state, space, repos, fmt)
 
-        stdout, stderr = proc.stdout, proc.stderr
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode("utf-8", "replace")
-            stderr = stderr.decode("utf-8", "replace")
+    if surface == "cli_deep" and state == "later_component":
+        proc = _run_track_seam(argv)
+    elif surface == "cli_deep" and M.outcome_state(surface, state) in _SEAM:
+        proc = _run_seam(M.outcome_state(surface, state), argv)
+    else:
+        proc = _run(argv, env_extra=env, stdin=stdin,
+                    console=(surface == "cli_console"))
 
-        doc = _assert_cli_cell(proc.returncode, stdout, stderr, outcome, fmt, where)
+    stdout, stderr = proc.stdout, proc.stderr
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode("utf-8", "replace")
+        stderr = stderr.decode("utf-8", "replace")
 
-        # Equivalence, proven by execution rather than named.
-        twin = M.EQUIVALENCE.get((surface, state))
-        if twin and fmt == "json" and doc is not None:
-            targv, tstdin, tenv = _cli_args(twin, state, space, repos, fmt)
-            tproc = _run(targv, env_extra=tenv, stdin=tstdin)
-            tdoc = _one_json_doc(tproc.stdout, f"{twin}/{state}/{fmt}")
-            assert tproc.returncode == proc.returncode, (
-                f"{where}: exit {proc.returncode} but {twin} exits "
-                f"{tproc.returncode} on the same input — a wrapper that disagrees "
-                f"with what it wraps is a second implementation")
-            for axis in ("threat_found", "inspection_complete", "is_clean"):
-                assert doc.get(axis) == tdoc.get(axis), (
-                    f"{where}: {axis}={doc.get(axis)!r} but {twin} says "
-                    f"{tdoc.get(axis)!r} on the same input")
+    doc = _assert_cli_cell(proc.returncode, stdout, stderr, outcome, fmt, where)
+
+    # Equivalence, proven by execution rather than named.
+    twin = M.EQUIVALENCE.get((surface, state))
+    if twin and fmt == "json" and doc is not None:
+        targv, tstdin, tenv = _cli_args(twin, state, space, repos, fmt)
+        tproc = _run(targv, env_extra=tenv, stdin=tstdin)
+        tdoc = _one_json_doc(tproc.stdout, f"{twin}/{state}/{fmt}")
+        assert tproc.returncode == proc.returncode, (
+            f"{where}: exit {proc.returncode} but {twin} exits "
+            f"{tproc.returncode} on the same input — a wrapper that disagrees "
+            f"with what it wraps is a second implementation")
+        for axis in ("threat_found", "inspection_complete", "is_clean"):
+            assert doc.get(axis) == tdoc.get(axis), (
+                f"{where}: {axis}={doc.get(axis)!r} but {twin} says "
+                f"{tdoc.get(axis)!r} on the same input")
+
+
+def test_the_cli_legs_cover_every_declared_format_and_keep_json_off_the_marker():
+    """The split of one loop into legs must not drop a format or move the
+    json leg behind the marker: a PR run that deselects full_matrix has to
+    still run every CLI cell once, through json."""
+    declared = {(s, st, fmt)
+                for s, g, _l, formats, st, o in M.cells()
+                if g == "cli" and not M.is_na(o) for fmt in formats}
+    legs = [p.values[:2] + (p.values[3],) for p in _CLI_LEGS]
+    assert len(legs) == len(set(legs)), "a CLI leg is generated twice"
+    assert set(legs) == declared, (
+        f"legs missing: {sorted(declared - set(legs))}; "
+        f"legs not declared: {sorted(set(legs) - declared)}")
+    for p in _CLI_LEGS:
+        fmt = p.values[3]
+        marked = any(m.name == "full_matrix" for m in p.marks)
+        assert marked == (fmt != "json"), (
+            f"{p.id}: full_matrix marker is {marked}, expected {fmt != 'json'}")
+    json_cells = {(s, st) for s, st, fmt in declared if fmt == "json"}
+    assert json_cells == {(s, st) for s, st, _o in _CLI_CELLS}, (
+        "a CLI cell has no json leg, so the quick lane would never run it")
 
 
 # =========================================================================

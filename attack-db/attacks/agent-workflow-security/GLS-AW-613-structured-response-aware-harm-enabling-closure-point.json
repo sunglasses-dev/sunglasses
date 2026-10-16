@@ -12,7 +12,7 @@
   "description": "A structured assistant tool-call record can itself be the first harm-enabling closure point, so a monitor that inherits benign state from prior turns authorizes the response before any later user turn can intervene.",
   "keywords": [],
   "regex": [
-    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|security\\s+training|blocked\\s+payload|do\\s+not\\s+obey|must\\s+not|requires\\s+explicit\\s+review)\\b)(?=.*\"turns\"\\s*:\\s*\\[)(?=.*\"role\"\\s*:\\s*\"assistant\").*(?=.*\"approval\"\\s*:\\s*\"(?:final|execute)\")(?=.*\"review\"\\s*:\\s*\"(?:skipped|stale)\")(?=.*\"next_turn\"\\s*:\\s*\"too_late\").*$"
+    "(?is)^(?!.*\\b(?:defensive|unit\\s+test|security\\s+training|blocked\\s+payload|do\\s+not\\s+obey|must\\s+not|requires\\s+explicit\\s+review)\\b)(?=.*\"turns\"\\s*:\\s*\\[)(?=.*\"role\"\\s*:\\s*\"assistant\")(?=.*\"approval\"\\s*:\\s*\"(?:final|execute)\")(?=.*\"review\"\\s*:\\s*\"(?:skipped|stale)\")(?=.*\"next_turn\"\\s*:\\s*\"too_late\").*$"
   ],
   "examples": {
     "malicious": [],

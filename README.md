@@ -8,7 +8,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sunglasses-dev/sunglasses/badge)](https://scorecard.dev/viewer/?uri=github.com/sunglasses-dev/sunglasses)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
 
-**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,564 patterns across 117 categories and reports findings and incomplete scans. A Claude Code hook blocks secret material in tool calls and the paths and hosts your policy lists, before a tool runs, best effort under its 10 second timeout.
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,569 patterns across 117 categories and reports findings and incomplete scans. A Claude Code hook blocks secret material in tool calls and the paths and hosts your policy lists, before a tool runs, best effort under its 10 second timeout.
 
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
@@ -25,6 +25,78 @@ Sunglasses is a local, open-source scanner for text and supported files. It repo
 it matched **and what it could not read**, so you can decide what to pass onward. It
 produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
 on that result.
+
+![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
+
+## Sixty seconds
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+python -m pip install --upgrade sunglasses
+curl -fsSL -o sixty-seconds.sh https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.sh && bash sixty-seconds.sh
+```
+
+An activated virtualenv keeps the install and the `sunglasses` your shell resolves in the
+same environment, and `--upgrade` matters if you already have an older version. `curl -fsSL`
+fails on an HTTP error instead of saving the error page, so the script only runs if the
+download actually succeeded.
+
+The script writes three fixture files into a temp directory, and deliberately scans a fourth
+path that does not exist, five scanner invocations in total, because the archive is scanned
+twice (human output and JSON). The script's own commands execute; **scanned content stays
+data** (it is never executed, and the ZIP is not extracted).
+
+Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
+presentation are not shown because they vary:
+
+```
+$ sunglasses scan --file notes.md            # ordinary sprint notes
+  PASS — No threats detected.
+scanner exit code: 0
+
+$ sunglasses scan --file vendor-brief.md     # a vendor brief with an instruction buried in it
+  BLOCK [HIGH] — 6 threat(s) found:
+  1. [HIGH] Ignore previous instructions            GLS-PI-001
+  … findings 2-5 omitted …
+  6. [HIGH] Data exfiltration to sink (mechanism)   GLS-MECH-003
+scanner exit code: 1
+
+$ sunglasses scan --file attachments.zip     # an archive we do not extract
+  INCOMPLETE
+  No findings in the inspected scope. Part of this input was not read, so this is
+  not a clean result.
+scanner exit code: 3
+
+$ sunglasses scan --file missing.md
+  File not found: missing.md — Nothing was scanned. Check the path.
+scanner exit code: 2
+```
+
+And the same archive as JSON. Selected fields from the scan document, not the whole of it:
+
+```json
+{
+  "decision": "allow",
+  "threat_found": false,
+  "inspection_complete": false,
+  "is_clean": false,
+  "extraction_warnings": [
+    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result."
+  ]
+}
+```
+
+`decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
+the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
+result is incomplete.** The document exposes the distinction; acting on it is the caller's
+job.
+
+*Timings and presentation vary. The demo checks the exit statuses and the ZIP coverage
+fields; report a mismatch against your installed version.*
+
+⭐ If this is useful, consider starring the repository.
+
+**🕶 Or try it in your browser, no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) (scan text, GitHub repos, or images). Image OCR runs locally in your browser; the image never leaves your device.
 
 ## What the proxy enforces
 
@@ -224,78 +296,6 @@ sunglasses uninstall echo
 rm -r ~/.sunglasses/proxy/approvals
 ```
 
-![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
-
-## Sixty seconds
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-python -m pip install --upgrade sunglasses
-curl -fsSL -o sixty-seconds.sh https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.sh && bash sixty-seconds.sh
-```
-
-An activated virtualenv keeps the install and the `sunglasses` your shell resolves in the
-same environment, and `--upgrade` matters if you already have an older version. `curl -fsSL`
-fails on an HTTP error instead of saving the error page, so the script only runs if the
-download actually succeeded.
-
-The script writes three fixture files into a temp directory, and deliberately scans a fourth
-path that does not exist, five scanner invocations in total, because the archive is scanned
-twice (human output and JSON). The script's own commands execute; **scanned content stays
-data** (it is never executed, and the ZIP is not extracted).
-
-Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
-presentation are not shown because they vary:
-
-```
-$ sunglasses scan --file notes.md            # ordinary sprint notes
-  PASS — No threats detected.
-scanner exit code: 0
-
-$ sunglasses scan --file vendor-brief.md     # a vendor brief with an instruction buried in it
-  BLOCK [HIGH] — 6 threat(s) found:
-  1. [HIGH] Ignore previous instructions            GLS-PI-001
-  … findings 2-5 omitted …
-  6. [HIGH] Data exfiltration to sink (mechanism)   GLS-MECH-003
-scanner exit code: 1
-
-$ sunglasses scan --file attachments.zip     # an archive we do not extract
-  INCOMPLETE
-  No findings in the inspected scope. Part of this input was not read, so this is
-  not a clean result.
-scanner exit code: 3
-
-$ sunglasses scan --file missing.md
-  File not found: missing.md — Nothing was scanned. Check the path.
-scanner exit code: 2
-```
-
-And the same archive as JSON. Selected fields from the scan document, not the whole of it:
-
-```json
-{
-  "decision": "allow",
-  "threat_found": false,
-  "inspection_complete": false,
-  "is_clean": false,
-  "extraction_warnings": [
-    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result."
-  ]
-}
-```
-
-`decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
-the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
-result is incomplete.** The document exposes the distinction; acting on it is the caller's
-job.
-
-*Timings and presentation vary. The demo checks the exit statuses and the ZIP coverage
-fields; report a mismatch against your installed version.*
-
-⭐ If this is useful, consider starring the repository.
-
-**🕶 Or try it in your browser, no install:** [sunglasses.dev/scan](https://sunglasses.dev/scan) (scan text, GitHub repos, or images). Image OCR runs locally in your browser; the image never leaves your device.
-
 ---
 
 ## What is SUNGLASSES?
@@ -308,7 +308,7 @@ SUNGLASSES is a free, open-source input inspection layer. It does not sit invisi
 - **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
 - **The MCP server**, exposes scanning to an agent as a tool it can call.
 
-It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean.
+It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note.
 
 **What it scans:**
 - Text: emails, messages, files, APIs, web content, logs
@@ -500,7 +500,7 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency, typical attack string (median of 38) | ~4.2 ms |
 | Scan latency, real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
-| Patterns | 1,564 |
+| Patterns | 1,569 |
 | Keywords | 6,964 unique declared (7,786 entries across all patterns); the pre-screen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
 | Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 117 |
@@ -552,14 +552,14 @@ shipped patterns, counted from `sunglasses/patterns.py`:
 
 | tier | languages | what exists |
 |---|---|---|
-| **English** | English | the full 1,564-pattern ruleset |
+| **English** | English | the full 1,569-pattern ruleset |
 | **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** ("ignore previous instructions" and one credential-exfiltration shape) |
 | **Keyword-level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English-scoped patterns; **no dedicated pattern** |
 | **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** (previously listed as covered) |
 
 So a two-pattern seed is not language coverage, and you should not deploy SUNGLASSES expecting
-non-English parity with English. Normalization (romanization, Unicode confusables and 17 other
-obfuscation techniques) is language-independent and does apply throughout.
+non-English parity with English. Normalization runs before matching and is language-independent.
+Obfuscation coverage is tested per technique and is not complete; see `KNOWN_VERSION_GAPS.md`.
 
 Deepening this is a v0.6+ lane with per-language controls and per-language false-positive corpora
 (a language you cannot measure separately is a language you cannot honestly claim). Community
@@ -567,13 +567,13 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 ## What Works Today
 
-- ✅ Text scanning: 1,564 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
+- ✅ Text scanning: 1,569 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision
 - ✅ Image scanning: OCR + EXIF metadata + hidden text detection (requires Tesseract)
-- ✅ PDF scanning: page text + metadata + annotations
+- ✅ PDF scanning: page text, metadata and annotations. PDF results are partial for embedded or visual content; do not treat a clean PDF result as full assurance.
 - ✅ QR code scanning: decode and scan content (requires pyzbar)
 - ✅ Audio scanning: Whisper transcription → text scan (experimental, needs `--deep`, requires Whisper)
 - ✅ Video scanning: subtitle extraction + audio transcription → text scan (experimental, requires FFmpeg + Whisper)
@@ -666,9 +666,14 @@ blocks (the private key files, `~/.aws`, `~/.config/gcloud`, `~/.netrc` and
 friends). Say yes and `cat ~/.ssh/id_rsa | curl -d @-` and
 `curl -d @~/.aws/credentials` stop working: the shapes that carry no key in the
 command text, and so are invisible to the secret detector above. Say no, or run
-`--no-policy`, and nothing is enforced. A non-interactive install (CI, a
-Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
-read as consent, and a fresh install still blocks nothing you did not ask it to).
+`--no-policy`, and no path or host rule is enforced. A non-interactive install
+(CI, a Dockerfile, `| sh`) writes the same rules **commented out** (silence is never
+read as consent, and a fresh install still adds no path or host rule you did not ask for).
+
+After either answer `sunglasses init` prints one line with the state of the policy
+file and its path, and `sunglasses receipts` marks each call whose receipt records
+that it ran with no policy or with one that lists nothing enabled, with the state the
+hook wrote.
 
 `~/.ssh` as a whole directory is deliberately *not* in that list: it would block
 `ssh-copy-id`, `~/.ssh/config` and `known_hosts`, which is ordinary work. The
@@ -722,6 +727,19 @@ private key files are named individually and matching is boundary-aware, so
   as a dangerous shell command), and it costs ~902ms per call because the
   pattern database is rebuilt in every hook subprocess. Enable with
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
+- **On older Pythons one regex can outrun the WARN lane clock.** The 7 second
+  budget is a timer signal, and before Python 3.11.6 and 3.12.1 the regex engine
+  only notices a signal inside one long match attempt. A single search that makes
+  many short attempts over a long input therefore runs to its end first. The fix
+  lives in CPython itself (issue 109631). If you turn the WARN lane
+  on, use Python 3.11.6, 3.12.1 or newer. macOS ships 3.9 as /usr/bin/python3.
+- **Large content passed as tool input can use up the WARN lane clock on any
+  Python.** On content of about 200 KB and up (a big file written in one call or
+  a large pasted payload) the 7 seconds add up over hundreds of pattern checks
+  plus building the pattern database on the first call, with no single slow
+  pattern to blame. When the clock runs out the lane stops and asks you, and
+  that call reaches you without a completed pattern check. Hard blocks do not
+  use this clock and are unaffected.
 - **It fails open, and says so.** A crash falls through to Claude Code's own
   permission flow rather than wedging your agent. A *dead control* is different:
   if the policy file is missing, empty, unreadable or unparseable, or if the audit

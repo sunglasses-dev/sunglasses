@@ -16,7 +16,7 @@
     "disabled tools"
   ],
   "regex": [
-    "(?i)(?:--allowed-tools\\s*[\\\"']?\\s*[\\\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)"
+    "(?i)(?:--allowed-tools\\s*(?:[\\\"']\\s*)?[\\\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)"
   ],
   "examples": {
     "malicious": [],

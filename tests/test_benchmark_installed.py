@@ -53,6 +53,15 @@ def _json(out):
     return json.loads(out.stdout)
 
 
+@pytest.fixture(scope="module")
+def checkout_json(tmp_path_factory):
+    """The default `--json` run with no PYTHONPATH, the plain checkout leg.
+
+    Two tests read this same document, so it runs once. The runs with a stub site on the path or with the
+    plain report differ from it on purpose, which is what those tests prove, and they keep their own runs."""
+    return _run(["--json"], tmp_path_factory.mktemp("bench_checkout"))
+
+
 def test_installed_flag_measures_the_installed_package_not_the_checkout(tmp_path):
     site = _stub_site(tmp_path)
     got = _json(_run(["--installed", "--json"], tmp_path, pythonpath=site))
@@ -62,12 +71,12 @@ def test_installed_flag_measures_the_installed_package_not_the_checkout(tmp_path
     assert got["engine"]["path"].startswith(str(site)), got["engine"]
 
 
-def test_installed_leg_still_uses_the_checkout_dataset(tmp_path):
+def test_installed_leg_still_uses_the_checkout_dataset(tmp_path, checkout_json):
     site = _stub_site(tmp_path)
     ran = _json(_run(["--installed", "--json"], tmp_path, pythonpath=site))
     assert ran["engine"]["source"] == "installed"
     inst = ran["metrics"]
-    default = _json(_run(["--json"], tmp_path))["metrics"]
+    default = _json(checkout_json)["metrics"]
     assert (inst["positives"], inst["negatives"]) == (default["positives"], default["negatives"])
 
 
@@ -101,8 +110,8 @@ def test_an_unknown_flag_is_an_error_not_a_silent_fallback_to_the_checkout(tmp_p
     assert out.stdout.strip() == ""
 
 
-def test_the_metrics_block_is_unchanged_so_the_published_hash_still_means_the_same(tmp_path):
-    keys = set(_json(_run(["--json"], tmp_path))["metrics"])
+def test_the_metrics_block_is_unchanged_so_the_published_hash_still_means_the_same(checkout_json):
+    keys = set(_json(checkout_json)["metrics"])
     assert keys == {"engine_version", "positives", "negatives", "true_positives", "false_negatives",
                     "false_positives", "true_negatives", "precision", "recall", "f1",
                     "recall_by_segment", "sha256"}

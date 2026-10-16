@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,6 @@ from . import __version__
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .reporter import ProtectedEngine, generate_report
-from .mailer import set_email, get_email, send_report
 from .sarif import to_sarif
 
 
@@ -1723,6 +1723,8 @@ def cmd_receipts(args):
             if row.get("lane") == "error":
                 note = _display(row.get("error", "error"), limit=44)
             tool = _display(row.get("tool_name"), limit=24) or "-"
+            if row.get("policy_state"):
+                note = f"{note} {_display(row['policy_state'], limit=16)}"
             print(f"  {DIM}{stamp}{RESET}  {color}{decision:<6}{RESET} "
                   f"{DIM}{_display(row.get('lane', ''), limit=13):<13}{RESET} "
                   f"{tool:<24} {DIM}{note}{RESET}")
@@ -1734,6 +1736,11 @@ def cmd_receipts(args):
                             for k, v in sorted(counts.items(), key=lambda kv: str(kv[0])))
         print(f"  {DIM}{'─' * 74}{RESET}")
         print(f"  {summary}")
+        unprotected = sum(1 for r in rows
+                          if r.get("policy_state") in ("none_configured", "inert"))
+        if unprotected:
+            print(f"  {YELLOW}{unprotected} of these calls ran with no path or host "
+                  f"rules loaded{RESET} {DIM}(policy_state none_configured or inert){RESET}")
         # An audit trail that only reports blocks cannot answer "was it even
         # running?", so the quiet calls are counted here on purpose.
         print(f"  {DIM}'defer' = checked, nothing provable found. Every call is "
@@ -1748,6 +1755,37 @@ def cmd_receipts(args):
         return _path_unreadable(unreadable)
 
 
+def _policy_state_line(home=None) -> str:
+    """One line naming the state the policy file is in and where it lives.
+
+    The words are the ones the hook writes on its receipt (`policy_state`), so
+    what `init` says and what `sunglasses receipts` shows can be matched by eye.
+    A policy that lists something carries no state on the receipt; it is called
+    `active` here because the person reading init needs a word for it.
+    """
+    from .firewall import (POLICY_STATES, PolicyDown, PolicyError, _POLICY_LIST_KEYS,
+                           load_policy, sunglasses_home)
+
+    path = (home or sunglasses_home()) / "policy.yaml"
+    off = "and the secret check on outbound calls runs as before"
+    try:
+        policy = load_policy(path)
+    except PolicyDown as down:
+        return (f"Policy state {down.state} for {path}. "
+                f"{POLICY_STATES.get(down.state, down.state).capitalize()}, so the "
+                f"firewall asks on any tool call that no other check settles, until you repair it.")
+    except PolicyError:
+        return (f"Policy state invalid for {path}. The file holds a rule the parser "
+                f"does not accept, so path and host rules did not load.")
+    if not path.exists():
+        return (f"Policy state none_configured for {path}. There is no policy file, "
+                f"so path and host rules are off, {off}.")
+    if not any(policy.get(k) for k in _POLICY_LIST_KEYS):
+        return (f"Policy state inert for {path}. The file lists no enabled rules, "
+                f"so path and host rules are off, {off}.")
+    return f"Policy state active for {path}. Its rules are checked on a tool call before it runs, unless the secret check has already denied it."
+
+
 def _offer_starter_policy(args):
     """Offer the recommended credential-path blocks — by asking, never by default.
 
@@ -1755,26 +1793,30 @@ def _offer_starter_policy(args):
     | curl` work, and ship switched off, because the default policy is empty and
     the file is undiscoverable. The gap is not the engine, it is the default.
 
-    But "a fresh install blocks nothing you did not ask for" is a spec rule, so
+    But "a fresh install adds no path or host rule you did not ask for" is a spec rule, so
     this asks rather than assumes, and a non-interactive run (CI, a Dockerfile,
     a `| sh` install) writes the same rules COMMENTED OUT — discoverable,
     enforcing nothing. Silence is never read as consent.
     """
-    from .firewall import STARTER_POLICY_PATHS, sunglasses_home, write_starter_policy
+    from .firewall import (STARTER_POLICY_PATHS, existing_policy_kind, sunglasses_home,
+                           write_starter_policy)
 
     existing = sunglasses_home() / "policy.yaml"
-    if existing.exists():
+    if existing.exists() or existing.is_symlink():
         if args.policy:
             # The advertised "re-run with --policy" path. write_starter_policy
-            # upgrades ONLY our own untouched commented-out starter file.
+            # enables only a disabled starter this project wrote, and does not say
+            # who changed a file it leaves alone.
             upgraded = write_starter_policy(enabled=True)
             if upgraded:
                 print(f"\n  {GREEN}Starter policy ENABLED{RESET} "
                       f"{DIM}-> {upgraded} (was commented out){RESET}")
+            elif existing_policy_kind() == "enabled_starter":
+                print(f"\n  {DIM}Your {existing} is already enabled. Left untouched.{RESET}")
             else:
-                print(f"\n  {DIM}Your {existing} has your own edits — left "
-                      f"untouched. Uncomment the blocked_paths lines to "
-                      f"enable the starter blocks.{RESET}")
+                print(f"\n  {DIM}Your {existing} is not an unchanged disabled starter, "
+                      f"so it was left untouched. Add or uncomment the blocked_paths "
+                      f"lines yourself to enable those blocks.{RESET}")
         else:
             print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
         return
@@ -1810,15 +1852,15 @@ def _offer_starter_policy(args):
         return
     if enabled:
         print(f"  {GREEN}Enabled{RESET} {DIM}-> {written}{RESET}")
-        print(f"  {DIM}Edit or delete that file to change it. "
-              f"Deleting it enforces nothing.{RESET}")
+        print(f"  {DIM}Edit that file to change it. If you delete it, the firewall "
+              f"asks on any tool call that no other check settles, until you restore it.{RESET}")
     else:
         print(f"  {DIM}Written commented-out -> {written}{RESET}")
 
 
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
-    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+    from .firewall import (_HOOK_TIMEOUT, build_hook_entry, install_hook, self_test_hook,
                            settings_path_for, uninstall_hook)
 
     path = settings_path_for(args.scope_global)
@@ -1830,13 +1872,21 @@ def cmd_init(args):
               f"sits next to the file.{RESET}\n")
         return 0
 
-    entry = build_hook_entry()
+    fail_open = bool(getattr(args, "fail_open", False))
+    # The commands printed below must act on the file just written: a global install
+    # needs --global, a project install needs the directory it was run in.
+    scope = " --global" if args.scope_global else ""
+    where = "" if args.scope_global else f"cd {shlex.quote(str(path.parent.parent))} && "
+    entry = build_hook_entry(fail_open=fail_open)
     command = entry["hooks"][0]["command"]
 
     # Self-test BEFORE writing. A hook that fails, fails open — so a broken
     # wire would leave the firewall silently off. Better to refuse to install.
     print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
-    ok, detail = self_test_hook(command)
+    # A blocking hook turns "cannot answer" into "every tool call refused", so it
+    # is judged by the time limit the host will apply. The fail-open entry keeps
+    # the longer one.
+    ok, detail = self_test_hook(command) if fail_open else self_test_hook(command, timeout=_HOOK_TIMEOUT)
     if not ok:
         print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
         print(f"  {DIM}Command tried: {command}{RESET}")
@@ -1848,15 +1898,26 @@ def cmd_init(args):
     print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
 
     try:
-        install_hook(path)
+        install_hook(path, fail_open=fail_open)
     except Exception as exc:
         print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
         return 1
 
     print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
     print(f"  {DIM}{command}{RESET}")
+    if fail_open:
+        print(f"  {DIM}Failure policy: Claude Code's default. A hook that fails opens "
+              f"(the tool call goes ahead).{RESET}")
+    else:
+        print(f"  {DIM}Failure policy: \"onFailure\": \"block\". A hook that times out or cannot "
+              f"start refuses the tool call. Claude Code reads this key from v2.1.295; "
+              f"`{where}sunglasses init{scope} --fail-open` leaves it out.{RESET}")
+        print(f"  {DIM}If the hook ever cannot start, every tool call is refused until you remove "
+              f"its entry from {path} or run `{where}sunglasses init{scope} --uninstall` "
+              f"in a terminal.{RESET}")
 
     _offer_starter_policy(args)
+    print(f"\n  {DIM}{_policy_state_line()}{RESET}")
 
     print(f"\n  {BOLD}What it blocks{RESET} {DIM}(deterministic facts only){RESET}")
     print(f"    - secret material leaving in an outbound tool call")
@@ -2414,6 +2475,16 @@ class _MachineAwareParser(argparse.ArgumentParser):
 
 
 def main():
+    # `sunglasses mcp …` hands everything after the word to the MCP server's own
+    # main(), whole, for the same reason as `proxy`: the server answers --help and
+    # --version itself and must see argv exactly as `python -m sunglasses.mcp` does.
+    # It runs first, before the colour policy and the parsers, and this module no
+    # longer imports the mailer (and its optional `resend` import) at load time.
+    # Imports the server shares with the CLI, such as the scanner engine's, still
+    # run before this point. Its exit status is the server's own.
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        from .mcp import main as mcp_main
+        sys.exit(mcp_main(sys.argv[2:]))
     _apply_color_policy()
     parser = _MachineAwareParser(
         prog="sunglasses",
@@ -2441,7 +2512,7 @@ def main():
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
-                             choices=["message", "file", "api_response", "web_content", "log_memory"],
+                             choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
                              help="Where the content came from, not what the attack is. "
                                   "Patterns are scoped by channel, so this changes which "
                                   "rules apply (default: message)")
@@ -2509,6 +2580,9 @@ def main():
     init_parser.add_argument(
         "--no-policy", action="store_true",
         help="Do not write ~/.sunglasses/policy.yaml at all")
+    init_parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Leave onFailure out of the hook entry, so a hook that fails lets the tool call go ahead")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts
@@ -2614,6 +2688,13 @@ def main():
              "snapshot (sunglasses proxy approve <server_id> --snapshot <sha>)",
         add_help=False)
 
+    # Listed so `sunglasses --help` shows it. Like `proxy`, the word never
+    # reaches this parser; see the interception at the top of main().
+    subparsers.add_parser(
+        "mcp",
+        help="Run the SUNGLASSES MCP server on stdio (same as python -m sunglasses.mcp)",
+        add_help=False)
+
     # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
     # 0.6.0 beta's product surface is this command, and everything it does
     # lives in sunglasses.proxy.commands. It is intercepted rather than made a
@@ -2642,6 +2723,7 @@ def main():
 
 def cmd_report(args):
     """Generate daily protection report."""
+    from .mailer import get_email, send_report
     if args.send:
         html = generate_report(date=args.date, as_html=True)
         email = get_email()
@@ -2935,6 +3017,7 @@ def cmd_doctor(args, _run=None):
 
 def cmd_config(args):
     """Configure SUNGLASSES."""
+    from .mailer import get_email, set_email
     if args.email:
         set_email(args.email)
         print(f"\n  {GREEN}Email saved:{RESET} {args.email}")
