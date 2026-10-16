@@ -434,16 +434,30 @@ untracked ones). It does not change anything in the tree. One progress line per 
 leave stdout as one document.
 
 Files the scan does not read are listed in `skipped` with the reason, and the scan is then
-incomplete (exit `3`, `inspection_complete: false`): files over 1 MB, binary types, symbolic
-links (never followed, since a link can point outside the tree), a directory that cannot be
-listed, and every file past `--max-files N`. `--skip-lockfiles` adds `package-lock.json`,
-`yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `Cargo.lock` and `go.sum` (matched by exact
-file name) to that list; without it they are scanned. Dependency and build folders
-(`node_modules`, `venv`, `dist`, `build` and the like) are not entered; they are named in
-`excluded_folders` (and under `excludedFolders` in SARIF) but are not counted as skipped
-files. A path that is not a directory is refused with exit `2`, and so is `--dir` together
-with `--file`, `--text`, `--stdin` or text to scan. `--file` still refuses a directory:
-scanning a tree is a different claim from scanning one file, and `--dir` is where it is made.
+incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
+exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
+cannot be listed, anything that changed while the scan ran, and every file past `--max-files N`.
+`--skip-lockfiles` adds `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+`Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
+scanned.
+
+A link is never followed, because it can point outside the tree: a link is named as skipped
+whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
+itself a link, naming the real directory to use instead. Each file is opened through directory
+handles that refuse a link at every step and the scan judges a private copy of what it read, so
+a file or folder swapped for a link while the scan runs is named as changed, not read. (Where the
+platform has no such opens, as on Windows, the scan checks for a link and for a path that leaves
+the tree before it reads, which is a weaker guarantee.)
+
+Dependency and build folders (`node_modules`, `venv`, `dist`, `build` and the like) are not
+entered. Their files are neither scanned nor listed one by one; the folders are named in
+`excluded_folders` (and under `excludedFolders` in SARIF; the human report shows the first ten)
+and are not counted as skipped files. SARIF `notInspected` lists every file in `skipped`.
+Results are sorted by path. File names shown to a person (progress lines, results, the banner)
+have control characters escaped. A path that is not a directory is refused with exit `2`, and so
+is `--dir` together with `--file` (even an empty value), `--text`, `--stdin` or text to scan.
+`--file` still refuses a directory: scanning a tree is a different claim from scanning one file,
+and `--dir` is where it is made.
 
 ### Deep Scan Setup (Audio & Video)
 

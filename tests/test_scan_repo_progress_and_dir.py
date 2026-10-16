@@ -272,7 +272,9 @@ def test_skipped_lockfiles_are_named_in_sarif(work, mode):
     sarif = json.loads(_scan(work, mode, "lock", "-o", "sarif", "--skip-lockfiles").stdout)
     props = sarif["runs"][0]["properties"]
     assert props["inspectionComplete"] is False
-    assert any("package-lock.json" in item for item in props["notInspected"])
+    named = {item.split(": ")[0] for item in props["notInspected"]}
+    assert named == {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "Cargo.lock",
+                     "go.sum", "web/package-lock.json"}
 
 
 # ── 4. the local tree mode ─────────────────────────────────────────────────
@@ -557,10 +559,181 @@ def test_a_file_swapped_for_a_link_after_the_walk_is_not_read(work, monkeypatch)
 
 def test_the_walk_order_is_sorted_whatever_order_the_filesystem_gives(tmp_path, monkeypatch):
     from sunglasses import cli
-    names = ["z.md", "b.md", "a.md"]
-    monkeypatch.setattr(cli.os, "walk", lambda top, **kw: iter([(str(tmp_path), [], names)]))
-    monkeypatch.setattr(cli.os.path, "getsize", lambda p: 1)
-    monkeypatch.setattr(cli.os.path, "isfile", lambda p: True)
-    monkeypatch.setattr(cli.os.path, "islink", lambda p: False)
+    for name in ("z.md", "b.md", "a.md"):
+        (tmp_path / name).write_text(CLEAN)
+    real = cli._list_dir
+    monkeypatch.setattr(cli, "_list_dir", lambda root, parts: sorted(real(root, parts), reverse=True))
     files, _skips = cli._walk_repo_files_with_skips(str(tmp_path))
     assert [os.path.basename(path) for path, _ in files] == ["a.md", "b.md", "z.md"]
+
+
+# ── 5. the tree changes while the scan runs, and links in odd places ────────────
+
+def _tree_args(root, **extra):
+    from sunglasses import cli
+    return cli.argparse.Namespace(json=True, output="json", verbose=False, max_files=None,
+                                  directory=str(root), skip_lockfiles=False, channel="file", **extra)
+
+
+def _scan_tree_doc(root, capsys):
+    from sunglasses import cli
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    return stop.value.code, json.loads(capsys.readouterr().out)
+
+
+def _outside(work, name):
+    outside = work / name
+    outside.mkdir(exist_ok=True)
+    (outside / "secret.txt").write_text(THREAT)
+    return outside
+
+
+needs_symlinks = pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+
+
+@needs_symlinks
+def test_a_parent_directory_swapped_for_a_link_after_the_walk_is_not_read(work, monkeypatch, capsys):
+    from sunglasses import cli
+    outside = _outside(work, "parent_swap_target")
+    root = _local(work, "parent_swap", {"ok.md": CLEAN, "sub/secret.txt": CLEAN})
+    real_walk = cli._walk_repo_files_with_skips
+
+    def walk_then_swap(*a, **kw):
+        result = real_walk(*a, **kw)
+        (root / "sub" / "secret.txt").unlink()
+        (root / "sub").rmdir()
+        (root / "sub").symlink_to(outside, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(cli, "_walk_repo_files_with_skips", walk_then_swap)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert code == EXIT_INCOMPLETE and doc["total_threats"] == 0
+    assert "sub/secret.txt" in _skipped(doc)
+
+
+@needs_symlinks
+def test_a_file_swapped_for_a_link_after_it_was_opened_is_still_the_file_that_was_judged(work, monkeypatch, capsys):
+    from sunglasses import cli
+    outside = _outside(work, "late_swap_target")
+    root = _local(work, "late_swap", {"victim.md": CLEAN})
+    real_read = cli._read_member
+
+    def read_then_swap(base, rel):
+        data = real_read(base, rel)
+        (root / rel).unlink()
+        (root / rel).symlink_to(outside / "secret.txt")
+        return data
+
+    monkeypatch.setattr(cli, "_read_member", read_then_swap)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert code == EXIT_CLEAN and doc["total_threats"] == 0 and doc["files_scanned"] == 1
+
+
+@needs_symlinks
+def test_a_directory_that_becomes_a_link_while_the_walk_runs_is_named(work, monkeypatch):
+    from sunglasses import cli
+    outside = _outside(work, "walk_swap_target")
+    root = _local(work, "walk_swap", {"ok.md": CLEAN, "sub/inner.md": CLEAN})
+    real_list = cli._list_dir
+
+    def list_then_swap(base, parts):
+        result = real_list(base, parts)
+        if parts == () and (root / "sub").is_dir() and not (root / "sub").is_symlink():
+            (root / "sub" / "inner.md").unlink()
+            (root / "sub").rmdir()
+            (root / "sub").symlink_to(outside, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(cli, "_list_dir", list_then_swap)
+    files, skips = cli._walk_repo_files_with_skips(str(root))
+    assert [os.path.basename(path) for path, _ in files] == ["ok.md"]
+    assert [item[0] for item in skips] == ["sub"]
+
+
+@needs_symlinks
+def test_a_link_called_node_modules_is_a_skipped_link_not_an_excluded_folder(work):
+    outside = _outside(work, "policy_link_target")
+    root = _local(work, "policy_link", {"ok.md": CLEAN})
+    if not (root / "node_modules").exists():
+        (root / "node_modules").symlink_to(outside, target_is_directory=True)
+    proc = _run_dir(work, root, "-o", "json")
+    doc = _doc(proc)
+    assert proc.returncode == EXIT_INCOMPLETE
+    assert "link" in _skipped(doc)["node_modules"]
+    assert "node_modules" not in doc["excluded_folders"]
+
+
+@needs_symlinks
+def test_dir_refuses_a_link_as_the_root_and_names_the_real_directory(work):
+    root = _local(work, "root_target", {"ok.md": CLEAN})
+    link = work / "local" / "root_link"
+    if not link.is_symlink():
+        link.symlink_to(root, target_is_directory=True)
+    proc = _run_dir(work, link, "-o", "json")
+    _refused_by_the_scan(proc)
+    assert "symbolic link" in proc.stdout + proc.stderr and str(root.resolve()) in proc.stdout + proc.stderr
+
+
+def test_dir_refuses_an_empty_file_value_like_any_other_second_input(work):
+    root = _local(work, "empty_file_flag", {"ok.md": CLEAN})
+    proc = _run_dir(work, root, "--file", "", "-o", "json")
+    _refused_by_the_scan(proc)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a control character cannot be a file name on Windows")
+def test_a_directory_name_with_a_control_character_is_escaped_in_the_banner_and_the_refusal(work):
+    name = "weird\x1b[31mred"
+    root = _local(work, name, {"ok.md": CLEAN})
+    human = _run_dir(work, root)
+    assert "\x1b[31m" not in human.stdout and "\\x1b" in human.stdout
+    missing = _run_dir(work, work / ("gone\x1b[31m"), "-o", "json")
+    _refused_by_the_scan(missing)
+    assert "\x1b" not in missing.stdout + missing.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a control character cannot be a file name on Windows")
+def test_a_file_name_with_a_control_character_is_escaped_in_the_skip_hint_too(work):
+    import zipfile
+    root = _local(work, "hint_escape", {"ok.md": CLEAN})
+    archive = root / "arch\x1b[31mive.bin"
+    if not archive.exists():
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("inner.txt", "hello")
+    proc = _run_dir(work, root)
+    assert proc.returncode == EXIT_INCOMPLETE
+    assert "\x1b[31m" not in proc.stdout and "\\x1b" in proc.stdout
+
+
+def test_the_old_abbreviation_for_deep_still_means_deep(work):
+    neutral = work / "cwd"
+    neutral.mkdir(exist_ok=True)
+    proc = _cli("--text", "hello", "--d", cwd=neutral)
+    assert "ambiguous" not in proc.stderr and proc.returncode == EXIT_CLEAN
+
+
+def test_the_old_abbreviation_for_stdin_still_means_stdin(work):
+    neutral = work / "cwd"
+    neutral.mkdir(exist_ok=True)
+    env = {**os.environ, "PYTHONPATH": str(REPO), "NO_COLOR": "1"}
+    proc = subprocess.run([sys.executable, "-m", "sunglasses", "scan", "--s"], cwd=neutral, env=env,
+                          input=CLEAN, capture_output=True, text=True, timeout=120)
+    assert "ambiguous" not in proc.stderr and proc.returncode == EXIT_CLEAN
+
+
+def test_read_member_refuses_a_link_in_any_step_and_a_non_regular_file(work):
+    from sunglasses import cli
+    root = _local(work, "read_member", {"d/f.md": CLEAN})
+    assert cli._read_member(str(root), os.path.join("d", "f.md")).startswith(b"Quarterly")
+    if sys.platform != "win32":
+        outside = _outside(work, "read_member_target")
+        link = root / "l"
+        if not link.is_symlink():
+            link.symlink_to(outside, target_is_directory=True)
+        with pytest.raises(OSError):
+            cli._read_member(str(root), os.path.join("l", "secret.txt"))
+        fifo = root / "pipe"
+        if not fifo.exists():
+            os.mkfifo(fifo)
+        with pytest.raises(OSError):
+            cli._read_member(str(root), "pipe")
