@@ -1565,6 +1565,24 @@ class SunglassesEngine:
             if "regex" in pattern:
                 compiled = []
                 for index, r in enumerate(pattern["regex"]):
+                    # A guarded rule is stored as its pieces (see below), and the
+                    # whole expression used to be compiled first and then thrown
+                    # away: 781 rules, about 460 ms of every engine start. When the
+                    # pieces compile, the whole is not built. Two cases still need
+                    # the whole, and keep the old path: pieces that do not compile
+                    # (the rule falls back to the whole), and any named group or
+                    # group reference ("(?P"), which can be valid in every piece and
+                    # invalid together (the same name in a guard and in the core).
+                    split = self._split_caret_predicate(r)
+                    if split is not None and "(?P" not in r:
+                        try:
+                            guard_rx = [re.compile(g, re.IGNORECASE) for g in split[0]]
+                            core_rx = re.compile(split[1], re.IGNORECASE)
+                        except re.error:
+                            pass
+                        else:
+                            compiled.append(("guarded", core_rx, guard_rx))
+                            continue
                     try:
                         rx = re.compile(r, re.IGNORECASE)
                     except re.error:
@@ -1582,7 +1600,6 @@ class SunglassesEngine:
                     #              matched per co-occurrence window
                     #   windowed — lookahead-led predicate: matched per window
                     #   plain    — everything else: ordinary .search()
-                    split = self._split_caret_predicate(r)
                     if split is not None:
                         guards, core = split
                         try:
