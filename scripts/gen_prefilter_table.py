@@ -6,8 +6,12 @@ Why this exists
 `SunglassesEngine()` asks `_prefilter.requirement()` for the literals each of its
 ~1,650 regexes cannot match without. That re-parses every regex source and costs
 about 440 ms of the 1.6 s a fresh `sunglasses scan` spends starting up. The answer
-only depends on the regex source and on `_prefilter.py`, so it is computed here
-once and shipped as data.
+depends on the regex source, on `_prefilter.py`, and on the interpreter's regex
+parser and Unicode tables (it reads `re`'s parse tree and folds characters). It is
+computed here once and shipped as data. A table made on one Python must therefore
+hold on every Python the project supports: tests/test_prefilter_table.py compares
+every entry with a live derivation, and CI runs that test on each version, so a
+version that parses a regex differently fails there instead of skipping documents.
 
 The table is a SPEED-UP, never a source of truth:
   * it is keyed by the sha256 of the regex source, so a source the table does not

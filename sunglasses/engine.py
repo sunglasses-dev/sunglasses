@@ -17,6 +17,7 @@ import html
 import keyword
 import re
 import threading
+import types
 import unicodedata
 
 from . import _prefilter
@@ -237,17 +238,43 @@ def _requirement_table():
             from . import _prefilter_table
             with open(_prefilter.__file__, "rb") as handle:
                 if _prefilter.file_digest(handle.read()) == _prefilter_table.PREFILTER_SHA256:
-                    table = _prefilter_table.TABLE
+                    table = types.MappingProxyType(_prefilter_table.TABLE)
         except Exception:
             table = {}
         _REQUIREMENT_TABLE = table
     return _REQUIREMENT_TABLE
 
 
+def _fresh_requirement(requirement):
+    """A copy of a table entry that shares no mutable object with the table.
+
+    `requirement()` builds new `Clause` / `ClassClause` objects on every call, and
+    those objects have assignable attributes. The table holds ONE set of them for
+    the whole process, so handing them out as they are would let a caller that
+    changes a clause change what every later engine skips. What the copies share
+    (frozensets, tuples of numbers and strings) cannot be changed in place.
+    """
+    fresh = []
+    for clause in requirement:
+        if isinstance(clause, _prefilter.Clause):
+            copy = _prefilter.Clause.__new__(_prefilter.Clause)
+            copy.literals = clause.literals
+            copy.classes = tuple(_fresh_requirement((c,))[0] for c in clause.classes)
+            fresh.append(copy)
+        elif isinstance(clause, _prefilter.ClassClause):
+            copy = _prefilter.ClassClause.__new__(_prefilter.ClassClause)
+            copy.ranges = clause.ranges
+            copy.pages = clause.pages
+            fresh.append(copy)
+        else:
+            fresh.append(clause)
+    return tuple(fresh)
+
+
 def _requirement_for(source):
     """`_prefilter.requirement(source)`, from the shipped table when it holds it."""
     hit = _requirement_table().get(_prefilter.table_key(source))
-    return hit if hit is not None else _prefilter.requirement(source)
+    return _fresh_requirement(hit) if hit is not None else _prefilter.requirement(source)
 
 
 _ENTITY_RX = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);?")

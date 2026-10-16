@@ -107,7 +107,9 @@ def test_at_least_one_entry_is_a_real_requirement():
 
 def test_the_engine_uses_the_table_while_it_matches_the_prefilter_file(monkeypatch):
     monkeypatch.setattr(engine_module, "_REQUIREMENT_TABLE", None)
-    assert engine_module._requirement_table() is _prefilter_table.TABLE
+    table = engine_module._requirement_table()
+    assert dict(table) == _prefilter_table.TABLE
+    assert len(table) > 1000
 
 
 def test_the_engine_ignores_a_table_made_from_another_prefilter_file(monkeypatch):
@@ -165,3 +167,94 @@ def test_the_table_is_decided_once_per_process(monkeypatch):
     monkeypatch.setattr(engine_module, "_REQUIREMENT_TABLE", None)
     assert engine_module._requirement_table() is engine_module._requirement_table()
     assert engine_module._REQUIREMENT_TABLE is not None     # remembered, not re-read from disk
+
+
+def test_the_table_the_engine_reads_cannot_be_written_to():
+    table = engine_module._requirement_table()
+    key = next(iter(table))
+    with pytest.raises(TypeError):
+        table[key] = ()
+    with pytest.raises(TypeError):
+        table["new"] = ()
+    with pytest.raises(TypeError):
+        del table[key]
+
+
+def _objects(requirement):
+    """Every mutable clause object a requirement holds, however deep."""
+    for clause in requirement:
+        if isinstance(clause, _prefilter.Clause):
+            yield clause
+            yield from _objects(clause.classes)
+        elif isinstance(clause, _prefilter.ClassClause):
+            yield clause
+
+
+def test_a_looked_up_requirement_shares_no_object_with_the_table(sources):
+    seen = 0
+    for source in sources:
+        held = _prefilter_table.TABLE[_prefilter.table_key(source)]
+        got = engine_module._requirement_for(source)
+        assert GEN.encode(got) == GEN.encode(held)
+        table_ids = {id(o) for o in _objects(held)}
+        for obj in _objects(got):
+            assert id(obj) not in table_ids
+            seen += 1
+    assert seen >= 2, "no clause objects were compared (few rules carry one, so the bar is low)"
+
+
+def test_a_caller_changing_a_clause_does_not_change_the_next_engine():
+    """The shared-table mutant: hand out the table's own objects and this fails."""
+    first = SunglassesEngine()
+    target = next(rx for _p, rs in first._regex_patterns for _m, rx, _g in rs
+                  if any(isinstance(c, _prefilter.Clause) for c in first._regex_requirement[id(rx)]))
+    source = target.pattern
+    before = GEN.encode(first._regex_requirement[id(target)])
+    clause = next(c for c in first._regex_requirement[id(target)] if isinstance(c, _prefilter.Clause))
+    saved = (clause.literals, clause.classes)
+    try:
+        clause.literals = frozenset({"caller_mutation_marker"})
+        clause.classes = ()
+        second = SunglassesEngine()
+        again = next(rx for _p, rs in second._regex_patterns for _m, rx, _g in rs if rx.pattern == source)
+        assert GEN.encode(second._regex_requirement[id(again)]) == before
+        assert GEN.encode(engine_module._requirement_for(source)) == before
+    finally:
+        clause.literals, clause.classes = saved
+
+
+def test_a_caller_changing_a_class_clause_does_not_change_the_next_engine():
+    found = None
+    for source in GEN.rule_sources():
+        held = _prefilter_table.TABLE[_prefilter.table_key(source)]
+        if any(isinstance(o, _prefilter.ClassClause) for o in _objects(held)):
+            found = source
+            break
+    assert found is not None, "no rule regex carries a class clause"
+    held = _prefilter_table.TABLE[_prefilter.table_key(found)]
+    before = GEN.encode(held)
+    victim = next(o for o in _objects(engine_module._requirement_for(found))
+                  if isinstance(o, _prefilter.ClassClause))
+    victim.ranges = ((0x41, 0x41),)
+    victim.pages = frozenset()
+    assert GEN.encode(engine_module._requirement_for(found)) == before
+    assert GEN.encode(held) == before
+
+
+def test_a_looked_up_requirement_decides_like_the_table_entry():
+    """The copy keeps every behaviour: a document the entry skips, the copy skips."""
+    engine = SunglassesEngine()
+    documents = []
+    for text in SAMPLES:
+        folded = _prefilter.fold(text)
+        documents.append(_prefilter.Presence(None, folded, _prefilter.pages_of(folded)))
+    skipped = 0
+    for _p, regexes in engine._regex_patterns:
+        for _m, rx, _g in regexes:
+            got = engine._regex_requirement[id(rx)]
+            held = _prefilter_table.TABLE[_prefilter.table_key(rx.pattern)]
+            for present in documents:
+                a, b = _prefilter.can_skip(got, present), _prefilter.can_skip(held, present)
+                assert a == b
+                skipped += a
+    assert skipped > 1000, "the sample documents skipped almost nothing; the comparison proved little"
