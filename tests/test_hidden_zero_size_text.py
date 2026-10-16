@@ -52,6 +52,10 @@ ZERO_SIZE_OR_OPACITY = [
     '<span style="font-size:0 /* x */ !important">%s</span>' % TEXT,
     '<span style="opacity:0%%">%s</span>' % TEXT,
     '<span style="opacity:0.00">%s</span>' % TEXT,
+    # the declaration is the last thing in the text, so the end of the text completes it
+    "the hidden part is font-size:0",
+    "the hidden part is opacity: 0",
+    "div { font-size: 0px",
 ]
 # Values that are not zero, and names that only end in the word, are ordinary style.
 ORDINARY_STYLE = [
@@ -67,6 +71,10 @@ ORDINARY_STYLE = [
     '<p style="opacity:.9">%s</p>' % TEXT,
     '<p style="--tw-bg-opacity:0">%s</p>' % TEXT,
     '<p style="--tw-text-opacity: 0">%s</p>' % TEXT,
+    '<p style="max-font-size:0">%s</p>' % TEXT,
+    '<p style="--font-size:0">%s</p>' % TEXT,
+    '<p style="xfont-size:0">%s</p>' % TEXT,
+    '<p style="line-height:0">%s</p>' % TEXT,
     '<p style="background-opacity:0">%s</p>' % TEXT,
     "<p>Set the font size to zero and the opacity to zero to hide it.</p>",
     "<p>the font-size property and the opacity property</p>",
