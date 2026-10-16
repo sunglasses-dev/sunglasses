@@ -191,6 +191,12 @@ _LOCKFILES = {
 _LOCKFILE_SKIP_REASON = "lockfile (generated dependency list) — not inspected"
 
 
+# A link is not followed: its target may sit outside the tree being scanned (a local
+# `--dir` would read whatever it points at) and the scan would report the target's path
+# as if it were part of the tree.
+_SYMLINK_SKIP_REASON = "symbolic link — not followed, not inspected"
+
+
 def _is_lockfile_skip(reason):
     return reason == _LOCKFILE_SKIP_REASON
 
@@ -233,13 +239,32 @@ def _walk_repo_files_with_skips(repo_dir):
     v0.6. It counts what it already decided to skip, and says so.
     """
     files, skips = [], []
-    for root, dirs, filenames in os.walk(repo_dir):
+
+    def _walk_error(exc):
+        # os.walk drops a directory it cannot list without a word. Name it.
+        name = getattr(exc, "filename", None) or repo_dir
+        skips.append((os.path.relpath(name, repo_dir),
+                      f"directory could not be read ({exc.__class__.__name__}) — not inspected"))
+
+    for root, dirs, filenames in os.walk(repo_dir, onerror=_walk_error):
         # Prune skip dirs in-place
         dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.endswith('.egg-info')]
+        # A link to a directory is never entered (it can point outside the tree, or loop);
+        # name it instead of letting it vanish.
+        kept = []
+        for d in dirs:
+            if os.path.islink(os.path.join(root, d)):
+                skips.append((os.path.relpath(os.path.join(root, d), repo_dir), _SYMLINK_SKIP_REASON))
+            else:
+                kept.append(d)
+        dirs[:] = kept
         for f in filenames:
             filepath = os.path.join(root, f)
             rel = os.path.relpath(filepath, repo_dir)
             ext = os.path.splitext(f)[1].lower()
+            if os.path.islink(filepath):
+                skips.append((rel, _SYMLINK_SKIP_REASON))
+                continue
             if f in _LOCKFILES:
                 skips.append((rel, _LOCKFILE_SKIP_REASON))
                 continue
@@ -306,11 +331,34 @@ def _check_max_files(args):
     return cap
 
 
+def _printable(name):
+    """A file name is data, not terminal input: escape control characters before showing it."""
+    return "".join(
+        ch if (ch.isprintable() or ch == " ") else (
+            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else f"\\u{ord(ch):04x}")
+        for ch in name)
+
+
+def _note(text):
+    """A line for the person at the terminal, on STDERR so stdout stays the one document.
+
+    With stderr closed (`2>&-`) Python starts with `sys.stderr = None`, and a print to it
+    would land on stdout and break `--json`. No stderr, no note.
+    """
+    stream = sys.stderr
+    if stream is None:
+        return
+    try:
+        print(text, file=stream, flush=True)
+    except (OSError, ValueError):
+        pass
+
+
 def _progress_line(index, total, started, rel_path):
     """One line per file, on STDERR: stdout stays the one document a pipe expects."""
     elapsed = time.perf_counter() - started
     stamp = f"{elapsed * 1000:.0f}ms" if elapsed < 1 else f"{elapsed:.1f}s"
-    print(f"  [{index}/{total}] {stamp:>7}  {rel_path}", file=sys.stderr, flush=True)
+    _note(f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}")
 
 
 def _scan_dir(args, engine):
@@ -412,8 +460,8 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
         # at all — used to be read as text here and counted as inspected, which
         # is the original bug one level up.
         from .extractors.dispatch import identify
-        kind, label = identify(filepath)
-        if kind in ("opaque", "media"):
+        route, label = identify(filepath)
+        if route in ("opaque", "media"):
             walker_skips.append((
                 rel_path,
                 f"{label} — not inspected. Scan it directly to look inside: "
@@ -501,11 +549,11 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
                 ],
             })
 
-        if not args.json and args.verbose:
+        if args.verbose and not _wants_machine_output(args):
             status = (f"{GREEN}PASS{RESET}" if scan_result.is_clean
                       else f"{RED}THREAT{RESET}" if scan_result.threat_found
                       else f"{YELLOW}INCOMPLETE{RESET}")
-            print(f"  {status}  {rel_path}")
+            print(f"  {status}  {_printable(rel_path)}")
 
     elapsed_ms = (time.perf_counter() - start) * 1000
 
@@ -514,8 +562,8 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     lockfile_count = sum(1 for _f, r in walker_skips if _is_lockfile_skip(r))
     if lockfile_count:
         noun = "lockfile" if lockfile_count == 1 else "lockfiles"
-        print(f"  skipped {lockfile_count} {noun} (named in the skipped list; "
-              f"they do not change the exit code)", file=sys.stderr, flush=True)
+        _note(f"  skipped {lockfile_count} {noun} (named in the skipped list; "
+              f"they do not change the exit code)")
 
     # Clean up
     if cleanup:
@@ -605,7 +653,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     # Human-readable output
     print(f"\n  {BOLD}SCAN COMPLETE{RESET}")
     print(f"  {DIM}{'─' * 50}{RESET}")
-    print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{repo_name}{RESET} ({repo_url})")
+    print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{_printable(repo_name)}{RESET} ({_printable(repo_url)})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
     if files_incomplete or unread_skips:
@@ -619,13 +667,13 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
         for name, reason in partially_read[:10]:
-            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(partially_read) > 10:
             print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
-            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(walker_skips) > 10:
             print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
@@ -653,7 +701,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
             f = item["finding"]
             sev_color = RED if f["severity"] in ("critical", "high") else YELLOW if f["severity"] == "medium" else CYAN
             print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}")
-            print(f"      {DIM}File: {item['file']}{RESET}")
+            print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
             if f.get("matched_text"):
                 print(f"      {DIM}Match: \"{f['matched_text']}\"{RESET}")
             if len(shown) >= 20:
@@ -875,6 +923,12 @@ def cmd_scan(args):
         _usage_error(args, "--dir and --repo cannot be used together.",
                      "Nothing was scanned. Scan a clone with --repo, or a local tree with --dir.")
     if getattr(args, "directory", None) is not None:
+        extra = [flag for flag, given in (
+            ("--file", args.file), ("--text", getattr(args, "explicit_text", None) is not None),
+            ("--stdin", args.stdin), ("text to scan", bool(args.text))) if given]
+        if extra:
+            _usage_error(args, f"--dir cannot be combined with {', '.join(extra)}.",
+                         "Nothing was scanned. One input per run: a directory, a file, or text.")
         _scan_dir(args, engine)
         return
 

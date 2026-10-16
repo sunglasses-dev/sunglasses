@@ -357,3 +357,146 @@ def test_file_still_refuses_a_directory(work):
 def test_the_readme_says_what_a_directory_scan_claims():
     readme = (REPO / "README.md").read_text(encoding="utf-8")
     assert "scan --dir" in readme
+
+
+# ── 5. review round 1: the edges of a local tree, stderr, names, links ─────
+
+def _local(work, name, files=None):
+    root = work / "local" / name
+    if not root.exists():
+        root.mkdir(parents=True)
+        _write(root, files or {})
+    return root
+
+
+def _run_dir(work, root, *extra, close_stderr=False):
+    neutral = work / "cwd"
+    neutral.mkdir(exist_ok=True)
+    env = {**os.environ, "PYTHONPATH": str(REPO), "NO_COLOR": "1"}
+    cmd = [sys.executable, "-m", "sunglasses", "scan", "--dir", str(root), *extra]
+    if close_stderr:
+        return subprocess.run(["sh", "-c", 'exec "$@" 2>&-', "sh", *cmd],
+                              cwd=neutral, env=env, capture_output=True, text=True, timeout=300)
+    return subprocess.run(cmd, cwd=neutral, env=env, capture_output=True, text=True, timeout=300)
+
+
+@MODES
+def test_a_clone_keeps_its_repo_key_and_a_local_tree_gets_directory(work, mode):
+    doc = _doc(_scan(work, mode, "five", "-o", "json"))
+    assert ("repo" in doc) == (mode == "repo")
+    assert ("directory" in doc) == (mode == "dir")
+
+
+def test_a_closed_stderr_does_not_put_progress_on_stdout(work):
+    root = _local(work, "closed", {"a.md": CLEAN, "b.md": CLEAN})
+    proc = _run_dir(work, root, "-o", "json", close_stderr=True)
+    assert proc.returncode == EXIT_CLEAN, proc.stdout
+    assert _doc(proc)["files_scanned"] == 2         # json.loads fails on any stray progress line
+
+
+def test_a_closed_stderr_with_lockfiles_keeps_stdout_a_document(work):
+    root = _local(work, "closed_lock", {"a.md": CLEAN, "yarn.lock": "# yarn lockfile v1\n"})
+    assert _doc(_run_dir(work, root, "-o", "json", close_stderr=True))["files_scanned"] == 1
+
+
+@MODES
+@pytest.mark.parametrize("fmt", ["json", "sarif"])
+def test_verbose_leaves_stdout_a_single_document(work, mode, fmt):
+    proc = _scan(work, mode, "five", "-o", fmt, "--verbose")
+    json.loads(proc.stdout)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="control characters are not legal in Windows names")
+def test_control_characters_in_a_file_name_are_escaped_everywhere_a_person_reads_them(work):
+    nasty = "evil\x1b[31m\nname.md"
+    root = _local(work, "nasty", {nasty: CLEAN, "ok.md": CLEAN})
+    for extra in (["-o", "json"], ["--verbose"]):
+        proc = _run_dir(work, root, *extra)
+        assert "\x1b" not in proc.stderr and "\x1b" not in (proc.stdout if extra[0] != "-o" else "")
+        assert len(_progress(proc.stderr)) == 2, proc.stderr
+        assert len(proc.stderr.strip().splitlines()) == 2, "an embedded newline made a third line"
+        assert "\\x1b" in proc.stderr and "\\x0a" in proc.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_a_link_to_a_file_outside_the_tree_is_named_not_read(work):
+    outside = work / "outside_target"
+    outside.mkdir(exist_ok=True)
+    (outside / "secret.txt").write_text(THREAT)
+    root = _local(work, "filelink", {"ok.md": CLEAN})
+    if not (root / "link.txt").is_symlink():
+        (root / "link.txt").symlink_to(outside / "secret.txt")
+    proc = _run_dir(work, root, "-o", "json")
+    doc = _doc(proc)
+    assert doc["files_scanned"] == 1 and doc["total_threats"] == 0
+    assert "symbolic link" in _skipped(doc)["link.txt"]
+    assert proc.returncode == EXIT_INCOMPLETE
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need privileges on Windows")
+def test_links_to_directories_are_named_and_a_loop_does_not_hang(work):
+    outside = work / "outside_dir"
+    outside.mkdir(exist_ok=True)
+    (outside / "deep.txt").write_text(THREAT)
+    root = _local(work, "dirlink", {"ok.md": CLEAN, "sub/x.md": CLEAN})
+    if not (root / "out").is_symlink():
+        (root / "out").symlink_to(outside, target_is_directory=True)
+        (root / "sub" / "loop").symlink_to(root, target_is_directory=True)
+    doc = _doc(_run_dir(work, root, "-o", "json"))
+    assert doc["files_scanned"] == 2 and doc["total_threats"] == 0
+    skipped = _skipped(doc)
+    assert "symbolic link" in skipped["out"]
+    assert "symbolic link" in skipped[os.path.join("sub", "loop")]
+
+
+@pytest.mark.skipif(sys.platform == "win32" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+                    reason="needs a user the permission bits apply to")
+def test_a_directory_that_cannot_be_listed_is_named(work):
+    root = _local(work, "denied", {"ok.md": CLEAN, "locked/inside.md": THREAT})
+    (root / "locked").chmod(0o000)
+    try:
+        proc = _run_dir(work, root, "-o", "json")
+    finally:
+        (root / "locked").chmod(0o755)
+    doc = _doc(proc)
+    assert doc["files_scanned"] == 1
+    assert "could not be read" in _skipped(doc)["locked"]
+    assert proc.returncode == EXIT_INCOMPLETE
+
+
+@pytest.mark.parametrize("extra", [
+    ["--file", "x.md"], ["--text", "hello"], ["--stdin"], ["hello", "there"],
+], ids=["file", "text", "stdin", "positional"])
+def test_dir_refuses_a_second_input_instead_of_ignoring_it(work, extra):
+    root = _local(work, "conflict", {"ok.md": CLEAN})
+    proc = _run_dir(work, root, *extra)
+    _refused_by_the_scan(proc)
+    assert "--dir" in proc.stdout + proc.stderr
+
+
+def test_a_lockfile_look_alike_is_still_read(work):
+    root = _local(work, "lookalike", {
+        "ok.md": CLEAN, "my-package-lock.json": THREAT, "Yarn.lock": CLEAN, "yarn.lock.bak": CLEAN})
+    doc = _doc(_run_dir(work, root, "-o", "json"))
+    assert doc["files_scanned"] == 4 and doc["total_threats"] >= 1
+    assert not any("lockfile" in reason for reason in _skipped(doc).values())
+
+
+def test_a_lockfile_is_not_read_even_when_it_holds_an_attack(work):
+    root = _local(work, "hostile_lock", {"ok.md": CLEAN, "package-lock.json": THREAT})
+    proc = _run_dir(work, root, "-o", "json")
+    doc = _doc(proc)
+    assert doc["total_threats"] == 0 and doc["files_scanned"] == 1
+    assert "lockfile" in _skipped(doc)["package-lock.json"]
+    assert proc.returncode == EXIT_CLEAN
+
+
+def test_the_walk_order_is_sorted_whatever_order_the_filesystem_gives(tmp_path, monkeypatch):
+    from sunglasses import cli
+    names = ["z.md", "b.md", "a.md"]
+    monkeypatch.setattr(cli.os, "walk", lambda top, **kw: iter([(str(tmp_path), [], names)]))
+    monkeypatch.setattr(cli.os.path, "getsize", lambda p: 1)
+    monkeypatch.setattr(cli.os.path, "isfile", lambda p: True)
+    monkeypatch.setattr(cli.os.path, "islink", lambda p: False)
+    files, _skips = cli._walk_repo_files_with_skips(str(tmp_path))
+    assert [os.path.basename(path) for path, _ in files] == ["a.md", "b.md", "z.md"]

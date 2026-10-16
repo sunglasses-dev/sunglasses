@@ -431,9 +431,12 @@ sunglasses scan --dir ./my-project --max-files 500       # read at most 500 file
 files, the same skips, the same exit codes. It does not change anything in the tree.
 One progress line per file (`[3/120]`, the time spent, the file) goes to stderr, so
 `-o json` and `-o sarif` still leave stdout as one document. What the scan leaves out is
-listed in `skipped` with the reason, never dropped silently: files over 1 MB, binary
-types, lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
-`Cargo.lock`, `go.sum`), and every file past `--max-files N`. A lockfile on its own does
+listed in `skipped` with the reason: files over 1 MB, binary types, symbolic links
+(never followed, since a link can point outside the tree), a directory that cannot be
+listed, lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+`Cargo.lock`, `go.sum`, matched by exact file name), and every file past `--max-files N`.
+Build and dependency folders (`.git`, `node_modules`, `venv`, `dist`, `build` and the like)
+are not entered and are not listed. A lockfile on its own does
 not turn the exit code to `3` (a `skipped N lockfiles` line goes to stderr so it is never
 silent); any other skipped file does. A path that is not a
 directory is refused with exit `2`. `--file` still refuses a directory: scanning a tree
