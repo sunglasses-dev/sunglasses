@@ -806,3 +806,12 @@ def test_a_line_break_at_the_start_of_the_view_of_a_cue_is_in_front_of_it(engine
         cue = text.index("do not")
         lo = text.index(" \x1e ") + 3
         assert engine._joins_in_front(text, cue, lo) is True
+
+
+def test_the_item_bound_after_the_conjunction_is_not_only_the_total_bound(engine):
+    """With a one-word payload and one earlier item the total (payload item, earlier items, this
+    item and the conjunction) stays inside eight words for a four-word item, so only the item
+    bound can stop it."""
+    assert engine._negation_reach(" log, ", "rest, or one two three.", "rest") == len("rest, or one two three.")
+    assert engine._negation_reach(" log, ", "rest, or one two three four.", "rest") is None
+    assert engine._negation_reach(" log, ", "rest, or one.", "rest") == len("rest, or one.")
