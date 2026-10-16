@@ -22,6 +22,8 @@ Every derivation rule errs toward extracting LESS. An empty requirement means
 "no prefilter, evaluate as before", which is always correct.
 """
 import functools
+import hashlib
+import json
 import re
 
 try:
@@ -421,6 +423,93 @@ def requirement(pattern_source: str):
             seen.add(f)
             folded.append(f)
     return tuple(folded)
+
+
+# ── the shipped requirement table ───────────────────────────────────────────
+#
+# `requirement()` parses each rule source a second time (the first parse is `re.compile`'s)
+# and walks it for the literals it cannot match without: 454 ms of the 1.2 s it takes to
+# start the engine, for 1,609 sources that do not change between runs. The result is a pure
+# function of the source text, so the package ships it: `_requirements_data.py`, written by
+# `tools/gen_requirements.py` and checked against the live derivation by
+# `tests/test_engine_requirement_table.py` on every supported Python.
+#
+# `shipped_requirement(source)` answers from the table when the source is in it, and from
+# `requirement()` when it is not (a custom rule, a rule newer than the table), so anything
+# the table does not know behaves exactly as before. The key is a digest of the FULL source
+# text, never of a rule id or an object, so a custom rule reaches a shipped entry only if
+# its source is character for character the shipped one. A table in an unknown format, with
+# the wrong number of entries, or one that cannot be read at all is not used.
+TABLE_FORMAT = 1
+
+
+def _digest(source: str) -> str:
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:32]
+
+
+def encode_requirement(req) -> list:
+    """A requirement as plain JSON data: a list of clauses, in order.
+
+    A literal clause is a sorted list of strings; a clause that also holds character
+    classes is {"l": [literals], "c": [[[lo, hi], ...], ...]}.
+    """
+    out = []
+    for clause in req:
+        if isinstance(clause, Clause):
+            out.append({"l": sorted(clause.literals),
+                        "c": [[list(r) for r in c.ranges] for c in clause.classes]})
+        else:
+            out.append(sorted(clause))
+    return out
+
+
+def decode_requirement(encoded) -> tuple:
+    out = []
+    for item in encoded:
+        if isinstance(item, dict):
+            out.append(Clause(item["l"], [ClassClause([(lo, hi) for lo, hi in ranges])
+                                          for ranges in item["c"]]))
+        else:
+            out.append(frozenset(item))
+    return tuple(out)
+
+
+def build_table(sources) -> dict:
+    """{digest: encoded requirement} for every source, derived live."""
+    table = {}
+    for source in sources:
+        table[_digest(source)] = encode_requirement(requirement(source))
+    return table
+
+
+_TABLE = None
+
+
+def _shipped_table() -> dict:
+    global _TABLE
+    if _TABLE is None:
+        table = {}
+        try:
+            from . import _requirements_data as data
+            if data.FORMAT == TABLE_FORMAT:
+                loaded = json.loads("{" + ",".join(data.LINES) + "}")
+                if len(loaded) == data.COUNT:
+                    table = loaded
+        except Exception:
+            table = {}
+        _TABLE = table
+    return _TABLE
+
+
+def shipped_requirement(source: str):
+    """`requirement(source)`, read from the shipped table when the source is in it."""
+    entry = _shipped_table().get(_digest(source))
+    if entry is not None:
+        try:
+            return decode_requirement(entry)
+        except Exception:
+            pass
+    return requirement(source)
 
 
 # Opcodes that consume exactly one character.

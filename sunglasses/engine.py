@@ -1688,10 +1688,12 @@ class SunglassesEngine:
         # Patterns with NO regex keep keyword-verdict behavior (their keywords
         # are their whole definition, e.g. multi-word attack phrases).
         self._regex_bearing_ids = {p["id"] for p, _ in self._regex_patterns}
-        # Step-3 prefilter: the literals each regex cannot match without. Built
-        # once at load (sub-second for 1,578 regexes), consulted per scan.
+        # Step-3 prefilter: the literals each regex cannot match without. Consulted per
+        # scan. A source that ships with the package is read from the shipped table
+        # (deriving all of them took 454 ms of every start); any other source is
+        # derived here, as it always was.
         self._regex_requirement = {
-            id(rx): _prefilter.requirement(rx.pattern)
+            id(rx): _prefilter.shipped_requirement(rx.pattern)
             for _p, rxs in self._regex_patterns for _m, rx, _g in rxs
         }
         self._literal_index = _prefilter.LiteralIndex(
