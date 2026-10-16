@@ -108,7 +108,8 @@ def test_at_least_one_entry_is_a_real_requirement():
 def test_the_engine_uses_the_table_while_it_matches_the_prefilter_file(monkeypatch):
     monkeypatch.setattr(engine_module, "_REQUIREMENT_TABLE", None)
     table = engine_module._requirement_table()
-    assert dict(table) == _prefilter_table.TABLE
+    assert {key: GEN.encode(engine_module._thaw_requirement(value)) for key, value in table.items()} == \
+        {key: GEN.encode(value) for key, value in _prefilter_table.TABLE.items()}
     assert len(table) > 1000
 
 
@@ -178,6 +179,39 @@ def test_the_table_the_engine_reads_cannot_be_written_to():
         table["new"] = ()
     with pytest.raises(TypeError):
         del table[key]
+
+
+_LEAVES = (str, int, bool)
+
+
+def _only_immutable(value):
+    """True when value is built from tuples and frozensets of strings and ints and nothing else."""
+    if isinstance(value, _LEAVES):
+        return True
+    if isinstance(value, (tuple, frozenset)):
+        return all(_only_immutable(v) for v in value)
+    return False
+
+
+def test_every_value_the_engine_holds_is_made_of_tuples_and_frozensets_only():
+    table = engine_module._requirement_table()
+    assert len(table) > 1000
+    assert [k for k, v in table.items() if not _only_immutable(v)] == []
+
+
+def test_the_frozen_table_holds_no_clause_object_to_assign_to():
+    table = engine_module._requirement_table()
+    for value in table.values():
+        assert not list(_objects(value))
+
+
+def test_a_check_for_immutability_can_fail():
+    """Mutant: the leaf check must reject a list, a set, a dict and a clause object."""
+    assert not _only_immutable([1])
+    assert not _only_immutable({1})
+    assert not _only_immutable({"a": 1})
+    assert not _only_immutable((_prefilter.ClassClause([(65, 66)]),))
+    assert _only_immutable((("C", frozenset({"a"}), ()),))
 
 
 def _objects(requirement):
@@ -258,3 +292,108 @@ def test_a_looked_up_requirement_decides_like_the_table_entry():
                 assert a == b
                 skipped += a
     assert skipped > 1000, "the sample documents skipped almost nothing; the comparison proved little"
+
+
+def _held_with_a_class_clause():
+    """(source, the module's own requirement object) for a rule that carries a class clause."""
+    for source in GEN.rule_sources():
+        held = _prefilter_table.TABLE[_prefilter.table_key(source)]
+        if any(isinstance(o, _prefilter.ClassClause) for o in _objects(held)):
+            return source, held
+    raise AssertionError("no rule regex carries a class clause")
+
+
+def test_changing_the_generated_modules_own_clause_after_load_changes_nothing():
+    """The engine's table is its own copy: assigning to the module's objects cannot reach it."""
+    engine_module._requirement_table()                       # the snapshot is taken here
+    source, held = _held_with_a_class_clause()
+    before = GEN.encode(engine_module._requirement_for(source))
+    victim = next(o for o in _objects(held) if isinstance(o, _prefilter.ClassClause))
+    saved = victim.ranges, victim.pages
+    try:
+        victim.ranges = ((0x41, 0x41),)
+        victim.pages = frozenset()
+        assert GEN.encode(engine_module._requirement_for(source)) == before
+        again = SunglassesEngine()
+        rx = next(rx for _p, rs in again._regex_patterns for _m, rx, _g in rs if rx.pattern == source)
+        assert GEN.encode(again._regex_requirement[id(rx)]) == before
+    finally:
+        victim.ranges, victim.pages = saved
+
+
+def test_replacing_an_entry_in_the_generated_modules_table_after_load_changes_nothing(sources):
+    engine_module._requirement_table()
+    source = next(s for s in sources if _prefilter.requirement(s))
+    key = _prefilter.table_key(source)
+    before = GEN.encode(engine_module._requirement_for(source))
+    saved = _prefilter_table.TABLE[key]
+    try:
+        _prefilter_table.TABLE[key] = ()
+        assert GEN.encode(engine_module._requirement_for(source)) == before
+        assert GEN.encode(_prefilter.requirement(source)) == before
+    finally:
+        _prefilter_table.TABLE[key] = saved
+
+
+def test_an_entry_removed_from_the_generated_modules_table_after_load_changes_nothing(sources):
+    engine_module._requirement_table()
+    source = next(s for s in sources if _prefilter.requirement(s))
+    key = _prefilter.table_key(source)
+    before = GEN.encode(engine_module._requirement_for(source))
+    saved = _prefilter_table.TABLE.pop(key)
+    try:
+        assert GEN.encode(engine_module._requirement_for(source)) == before
+    finally:
+        _prefilter_table.TABLE[key] = saved
+
+
+def test_the_empty_fallback_cannot_be_written_to_and_so_cannot_override_a_live_derivation(monkeypatch):
+    source = r"(?:ignore|bypass)\b.{0,40}\b(previous|prior)"
+    monkeypatch.setattr(engine_module, "_REQUIREMENT_TABLE", None)
+    monkeypatch.setattr(_prefilter, "__file__", str(ROOT / "no" / "such" / "_prefilter.py"))
+    table = engine_module._requirement_table()
+    assert len(table) == 0
+    with pytest.raises(TypeError):
+        table[_prefilter.table_key(source)] = ()
+    with pytest.raises(AttributeError):
+        table.update({})
+    assert GEN.encode(engine_module._requirement_for(source)) == GEN.encode(_prefilter.requirement(source))
+    assert engine_module._requirement_for(source)
+
+
+def test_freezing_and_thawing_a_requirement_gives_back_the_same_requirement(sources):
+    checked = clauses = 0
+    for source in sources:
+        live = _prefilter.requirement(source)
+        thawed = engine_module._thaw_requirement(engine_module._freeze_requirement(live))
+        assert GEN.encode(thawed) == GEN.encode(live)
+        assert [type(c) for c in thawed] == [type(c) for c in live]
+        checked += 1
+        clauses += len(live)
+    assert checked > 1000 and clauses > 1000
+
+
+def _shape(requirement):
+    """Everything a requirement decides with, types included (encode() leaves out the pages)."""
+    out = []
+    for c in requirement:
+        if isinstance(c, _prefilter.Clause):
+            out.append((type(c), type(c.literals), c.literals, type(c.classes), _shape(c.classes)))
+        elif isinstance(c, _prefilter.ClassClause):
+            out.append((type(c), type(c.ranges), c.ranges, type(c.pages), c.pages))
+        else:
+            out.append((type(c), c))
+    return (type(requirement), tuple(out))
+
+
+def test_every_looked_up_requirement_matches_a_live_derivation_in_type_order_and_value(sources):
+    for source in sources:
+        assert _shape(engine_module._requirement_for(source)) == _shape(_prefilter.requirement(source))
+
+
+def test_a_thawed_requirement_is_new_objects_every_time(sources):
+    source = next(s for s in sources if any(isinstance(o, _prefilter.Clause)
+                                           for o in _objects(_prefilter.requirement(s))))
+    one, two = engine_module._requirement_for(source), engine_module._requirement_for(source)
+    ids_one = {id(o) for o in _objects(one)}
+    assert ids_one and not ids_one & {id(o) for o in _objects(two)}
