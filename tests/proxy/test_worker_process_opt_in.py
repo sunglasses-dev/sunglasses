@@ -155,12 +155,13 @@ def test_process_mode_hands_route_a_ProcessScan_and_close_kills_the_spare(tmp_pa
 # ── startup is never charged to the deadline (MEASURED) ──────────────────
 
 def test_a_budget_that_kills_the_cold_path_is_met_by_the_warm_one():
-    """500 ms: the cold spawn-per-scan pays the ~1.5 s engine build inside it
-    and dies; the warm spare built the engine before the clock started."""
-    cold = worker_process.run(PAYLOAD, binding=BINDING, argv=REAL, timeout_ms=500)
+    """50 ms: the cold spawn-per-scan pays interpreter start and the engine
+    build (about 100 ms measured) inside it and dies; the warm spare built the
+    engine before the clock started and scans in a few ms."""
+    cold = worker_process.run(PAYLOAD, binding=BINDING, argv=REAL, timeout_ms=50)
     assert cold["status"] == "deadline", cold
 
-    scan = worker_process.ProcessScan(argv=REAL, timeout_ms=500)
+    scan = worker_process.ProcessScan(argv=REAL, timeout_ms=50)
     try:
         started = time.monotonic()
         warm = scan(PAYLOAD["params"], channel="tool_output", binding=BINDING,
@@ -168,7 +169,7 @@ def test_a_budget_that_kills_the_cold_path_is_met_by_the_warm_one():
         total = time.monotonic() - started
         assert warm["status"] == "complete" and warm["accepted"] is True, warm
         # The first call waited for readiness (startup budget), then scanned
-        # inside 500 ms. The whole call is allowed to exceed 500 ms; the scan
+        # inside 50 ms. The whole call is allowed to exceed 50 ms; the scan
         # was not.
         assert total < worker_process.STARTUP_MS / 1000.0
     finally:
