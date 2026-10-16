@@ -443,17 +443,28 @@ scanned.
 
 A link is never followed, because it can point outside the tree: a link is named as skipped
 whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
-itself a link, naming the real directory to use instead. Each file is opened through directory
-handles that refuse a link at every step and the scan judges a private copy of what it read, so
-a file or folder swapped for a link while the scan runs is named as changed, not read. (Where the
-platform has no such opens, as on Windows, the scan checks for a link and for a path that leaves
-the tree before it reads, which is a weaker guarantee.)
+itself a link, naming the real directory to use instead (the parent folders of the path as you
+typed it are resolved by the operating system as usual). The scan opens the root folder once,
+refusing a link, and keeps that one handle for the whole run; every folder and file below it is
+opened relative to the step before, refusing a link at every step, and the scan remembers each
+folder's identity (device and inode) so a folder that was swapped for another one, or for a link,
+while the scan ran is named as changed and not read. The bytes the scan judges are the bytes it
+read: each file (at most 1 MB) is copied into a private temporary folder outside the scanned
+tree, the findings carry the file's path in the tree, and the copy is removed right after; if a
+temporary folder cannot be removed the scan says so on stderr. If no temporary folder outside the
+tree can be created the scan is refused (exit `2`, nothing scanned) and asks you to point
+`TMPDIR` elsewhere. A file that cannot be copied or routed is named as not inspected. Where the
+platform has no such opens (Windows), the scan checks for a link and for a path that leaves the
+tree before it reads, which is a weaker guarantee against a tree that changes during the scan.
+In a `--repo` scan a link inside the clone is a named skip, so a repository that holds one and
+used to come back clean (exit `0`) now exits `3`.
 
 Dependency and build folders (`node_modules`, `venv`, `dist`, `build` and the like) are not
 entered. Their files are neither scanned nor listed one by one; the folders are named in
 `excluded_folders` (and under `excludedFolders` in SARIF; the human report shows the first ten)
 and are not counted as skipped files. SARIF `notInspected` lists every file in `skipped`.
-Results are sorted by path. File names shown to a person (progress lines, results, the banner)
+The files that were read, the results and the skipped list are sorted by path (the order the
+folders are visited in is not part of that promise). File names shown to a person (progress lines, results, the banner)
 have control characters escaped. A path that is not a directory is refused with exit `2`, and so
 is `--dir` together with `--file` (even an empty value), `--text`, `--stdin` or text to scan.
 `--file` still refuses a directory: scanning a tree is a different claim from scanning one file,

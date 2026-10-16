@@ -562,7 +562,7 @@ def test_the_walk_order_is_sorted_whatever_order_the_filesystem_gives(tmp_path, 
     for name in ("z.md", "b.md", "a.md"):
         (tmp_path / name).write_text(CLEAN)
     real = cli._list_dir
-    monkeypatch.setattr(cli, "_list_dir", lambda root, parts: sorted(real(root, parts), reverse=True))
+    monkeypatch.setattr(cli, "_list_dir", lambda root, parts, *a, **kw: sorted(real(root, parts, *a, **kw), reverse=True))
     files, _skips = cli._walk_repo_files_with_skips(str(tmp_path))
     assert [os.path.basename(path) for path, _ in files] == ["a.md", "b.md", "z.md"]
 
@@ -619,8 +619,8 @@ def test_a_file_swapped_for_a_link_after_it_was_opened_is_still_the_file_that_wa
     root = _local(work, "late_swap", {"victim.md": CLEAN})
     real_read = cli._read_member
 
-    def read_then_swap(base, rel):
-        data = real_read(base, rel)
+    def read_then_swap(base, rel, *a, **kw):
+        data = real_read(base, rel, *a, **kw)
         (root / rel).unlink()
         (root / rel).symlink_to(outside / "secret.txt")
         return data
@@ -637,8 +637,8 @@ def test_a_directory_that_becomes_a_link_while_the_walk_runs_is_named(work, monk
     root = _local(work, "walk_swap", {"ok.md": CLEAN, "sub/inner.md": CLEAN})
     real_list = cli._list_dir
 
-    def list_then_swap(base, parts):
-        result = real_list(base, parts)
+    def list_then_swap(base, parts, *a, **kw):
+        result = real_list(base, parts, *a, **kw)
         if parts == () and (root / "sub").is_dir() and not (root / "sub").is_symlink():
             (root / "sub" / "inner.md").unlink()
             (root / "sub").rmdir()
@@ -737,3 +737,157 @@ def test_read_member_refuses_a_link_in_any_step_and_a_non_regular_file(work):
             os.mkfifo(fifo)
         with pytest.raises(OSError):
             cli._read_member(str(root), "pipe")
+
+
+# ── 6. the root is held, folders keep their identity, scratch stays outside, errors stay documents ──
+
+@needs_symlinks
+def test_a_root_swapped_for_a_link_while_the_scan_runs_is_never_read_through(work, monkeypatch, capsys):
+    from sunglasses import cli
+    outside = _outside(work, "root_swap_target")
+    (outside / "ok.md").write_text(THREAT)
+    root = _local(work, "root_swap", {"ok.md": CLEAN})
+    moved = work / "root_swap_moved"
+    real_walk = cli._walk_repo_files_with_skips
+
+    def walk_then_swap(*a, **kw):
+        result = real_walk(*a, **kw)
+        os.rename(root, moved)
+        root.symlink_to(outside, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(cli, "_walk_repo_files_with_skips", walk_then_swap)
+    try:
+        code, doc = _scan_tree_doc(root, capsys)
+    finally:
+        if root.is_symlink():
+            root.unlink()
+        if moved.exists() and not root.exists():
+            os.rename(moved, root)
+    # The bytes judged are the original folder's, held by the descriptor, not the outside ones.
+    assert doc["total_threats"] == 0 and code == EXIT_CLEAN
+
+
+@needs_symlinks
+def test_a_folder_replaced_by_another_empty_folder_while_the_walk_runs_is_named(work, monkeypatch):
+    from sunglasses import cli
+    root = _local(work, "dir_identity", {"ok.md": CLEAN, "sub/hostile.md": THREAT})
+    real_list = cli._list_dir
+    state = {"done": False}
+
+    def list_then_replace(base, parts, *a, **kw):
+        result = real_list(base, parts, *a, **kw)
+        if parts == () and not state["done"]:
+            state["done"] = True
+            os.rename(root / "sub", root / "sub_moved_away")
+            (root / "sub").mkdir()
+        return result
+
+    monkeypatch.setattr(cli, "_list_dir", list_then_replace)
+    files, skips = cli._walk_repo_files_with_skips(str(root))
+    assert "sub" in [item[0] for item in skips]
+    assert all("hostile" not in path for path, _ in files)
+
+
+def test_a_folder_replaced_by_another_folder_after_the_walk_is_named_not_read(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "dir_identity_late", {"ok.md": CLEAN, "sub/a.md": THREAT})
+    real_walk = cli._walk_repo_files_with_skips
+
+    def walk_then_replace(*a, **kw):
+        result = real_walk(*a, **kw)
+        os.rename(root / "sub", root / "sub_moved_away")
+        (root / "sub").mkdir()
+        (root / "sub" / "a.md").write_text(CLEAN)
+        return result
+
+    monkeypatch.setattr(cli, "_walk_repo_files_with_skips", walk_then_replace)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert code == EXIT_INCOMPLETE
+    assert os.path.join("sub", "a.md") in _skipped(doc)
+
+
+def test_the_temporary_copies_never_land_inside_the_scanned_tree(work, monkeypatch):
+    from sunglasses import cli
+    root = _local(work, "scratch_inside", {"ok.md": CLEAN})
+    inside = root / "tmp_inside"
+    inside.mkdir(exist_ok=True)
+    monkeypatch.setattr(cli.tempfile, "tempdir", str(inside))
+    scratch = cli._scratch_outside(str(root))
+    try:
+        assert scratch is not None
+        real_root = os.path.realpath(root) + os.sep
+        assert not (os.path.realpath(scratch.name) + os.sep).startswith(real_root)
+    finally:
+        if scratch is not None:
+            scratch.cleanup()
+    assert list(inside.iterdir()) == []
+
+
+def test_no_usable_scratch_folder_is_a_refusal_with_one_document(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "scratch_none", {"ok.md": CLEAN})
+    monkeypatch.setattr(cli, "_scratch_outside", lambda _root: None)
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    doc = json.loads(capsys.readouterr().out)
+    assert stop.value.code == 2 and doc["scanned"] is False and "temporary folder" in doc["error"]
+
+
+def test_a_failed_copy_names_the_file_and_still_emits_one_document(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "copy_fail", {"ok.md": CLEAN, "bad.md": CLEAN})
+    real_open = open
+
+    def open_fail_in_scratch(path, *a, **kw):
+        if "sunglasses-read-" in str(path) and str(path).endswith("bad.md"):
+            raise OSError(28, "No space left on device")
+        return real_open(path, *a, **kw)
+
+    monkeypatch.setattr(cli, "open", open_fail_in_scratch, raising=False)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert code == EXIT_INCOMPLETE and doc["files_scanned"] == 1
+    assert "bad.md" in _skipped(doc)
+
+
+def test_a_failure_while_routing_the_copy_names_the_file_and_still_emits_one_document(work, monkeypatch, capsys):
+    from sunglasses import cli
+    from sunglasses.extractors import dispatch
+    root = _local(work, "route_fail", {"ok.md": CLEAN, "bad.md": CLEAN})
+    real_identify = dispatch.identify
+
+    def identify_fail(path, *a, **kw):
+        if str(path).endswith("bad.md"):
+            raise OSError(5, "Input/output error")
+        return real_identify(path, *a, **kw)
+
+    monkeypatch.setattr(dispatch, "identify", identify_fail)
+    code, doc = _scan_tree_doc(root, capsys)
+    assert code == EXIT_INCOMPLETE and doc["files_scanned"] == 1
+    assert "bad.md" in _skipped(doc)
+
+
+def test_the_final_skipped_list_is_sorted_whoever_found_the_skip(work):
+    root = _local(work, "skip_order", {"a.md": CLEAN, "b.md": CLEAN, "z.png": "x"})
+    proc = _run_dir(work, root, "-o", "json", "--max-files", "1")
+    names = [item["file"] for item in _doc(proc)["skipped"]]
+    assert names == sorted(names) and len(names) == 2
+
+
+def test_a_scratch_folder_that_cannot_be_removed_is_reported_on_stderr(work, monkeypatch, capsys):
+    from sunglasses import cli
+    root = _local(work, "cleanup_report", {"ok.md": CLEAN})
+    real = cli._scratch_outside
+
+    class Stuck:
+        def __init__(self, inner):
+            self._inner, self.name = inner, inner.name
+
+        def cleanup(self):
+            self._inner.cleanup()
+            raise PermissionError("denied")
+
+    monkeypatch.setattr(cli, "_scratch_outside", lambda r: Stuck(real(r)))
+    with pytest.raises(SystemExit):
+        cli._scan_tree(_tree_args(root), cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    assert "Could not remove the scan's temporary folder" in capsys.readouterr().err

@@ -12,7 +12,6 @@ Usage:
 """
 
 import argparse
-import atexit
 import errno
 import hashlib
 import json
@@ -200,43 +199,79 @@ _SYMLINK_SKIP_REASON = "symbolic link — not followed, not inspected"
 _CHANGED_SKIP_REASON = ("changed while the scan ran (replaced by a link, or removed) — "
                         "not followed, not inspected")
 
-# The tree is read through directory descriptors: every step from the scan root down is
-# opened relative to the one before it and refuses a link (O_NOFOLLOW). Checking "is this a
-# link?" and then opening the path is two looks at a tree that may change between them, and
-# a swapped parent directory is followed by the second one. Where the platform has no such
-# opens (Windows) the walk and the read fall back to a link check plus a containment check.
+# The tree is read through directory descriptors. The scan root is opened ONCE, refusing a
+# link, and that one descriptor is held for the whole scan: every listing and every read
+# starts from it and opens each step relative to the one before it, refusing a link
+# (O_NOFOLLOW). Re-opening the root by its path would follow a link swapped in for it. The
+# walk also records each folder's device and inode, and an open that finds a different
+# folder than the one the walk listed names it as changed instead of listing what it holds
+# now. Where the platform has no such opens (Windows) the walk and the read fall back to a
+# link check plus a containment check, a weaker guarantee that the documentation says so.
 _POSIX = sys.platform != "win32"
 _FD_SAFE = _POSIX and os.open in os.supports_dir_fd and os.scandir in os.supports_fd
 _OPEN_FLAGS = os.O_CLOEXEC if _POSIX else 0
 _NONBLOCK = os.O_NONBLOCK if _POSIX else 0
+_ESTALE = errno.ESTALE if _POSIX else errno.EINVAL
 _READ_LIMIT = 1_000_000
+_CHANGED_ERRNOS = (errno.ELOOP, errno.ENOTDIR, errno.ENOENT, _ESTALE)
 
 
-def _open_chain(root, parts, leaf_flags):
-    """File descriptor for root/parts, no link followed below `root`. Raises OSError."""
-    fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | _OPEN_FLAGS)
+def _open_root(root):
+    """The one no-follow descriptor for the scan root (None where there are no safe opens).
+
+    Raises OSError when the root is a link, is gone, or is not a directory.
+    """
+    if not _FD_SAFE:
+        return None
+    return os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | _OPEN_FLAGS)
+
+
+def _ident(st):
+    return (st.st_dev, st.st_ino)
+
+
+def _open_chain(root_fd, parts, leaf_flags, idents=None):
+    """File descriptor for parts below the held root, no link followed. Raises OSError.
+
+    With `idents` ({parts: (dev, ino)} recorded by the walk) every folder on the way must
+    still be the folder the walk saw, or the open fails with ESTALE.
+    """
+    fd = os.dup(root_fd)
     try:
+        if idents is not None and idents.get(()) not in (None, _ident(os.fstat(fd))):
+            raise OSError(_ESTALE, "scan root is not the folder the walk listed")
         for i, part in enumerate(parts):
             last = i == len(parts) - 1
             flags = (leaf_flags if last else os.O_RDONLY | os.O_DIRECTORY) | os.O_NOFOLLOW | _OPEN_FLAGS
             nfd = os.open(part, flags, dir_fd=fd)
             os.close(fd)
             fd = nfd
+            known = idents.get(tuple(parts[:i + 1])) if idents is not None else None
+            if known is not None and (not last or leaf_flags & os.O_DIRECTORY) \
+                    and known != _ident(os.fstat(fd)):
+                raise OSError(_ESTALE, "folder is not the one the walk listed", part)
         return fd
     except BaseException:
         os.close(fd)
         raise
 
 
-def _list_dir(root, parts):
+def _list_dir(root, parts, root_fd=None, idents=None):
     """[(name, lstat result or the OSError)] for root/parts, without following a link."""
     if _FD_SAFE:
-        fd = _open_chain(root, parts, os.O_RDONLY | os.O_DIRECTORY)
+        own = root_fd is None
+        if own:
+            root_fd = _open_root(root)
         try:
-            with os.scandir(fd) as it:
-                return [(e.name, _entry_stat(e)) for e in it]
+            fd = _open_chain(root_fd, parts, os.O_RDONLY | os.O_DIRECTORY, idents)
+            try:
+                with os.scandir(fd) as it:
+                    return [(e.name, _entry_stat(e)) for e in it]
+            finally:
+                os.close(fd)
         finally:
-            os.close(fd)
+            if own:
+                os.close(root_fd)
     path = os.path.join(root, *parts)
     if os.path.islink(path):
         raise OSError(errno.ELOOP, "is a symbolic link", path)
@@ -251,22 +286,30 @@ def _entry_stat(entry):
         return exc
 
 
-def _read_member(root, rel):
+def _read_member(root, rel, root_fd=None, idents=None):
     """The bytes of the regular file root/rel, read through no link at any step.
 
-    Raises OSError when a step is a link, was removed, or is not a regular file; the
-    caller names the file as skipped. At most one byte over the limit is read.
+    Raises OSError when a step is a link, was removed, was replaced by another folder, or
+    is not a regular file; the caller names the file as skipped. At most one byte over the
+    limit is read.
     """
     parts = rel.split(os.sep)
     if _FD_SAFE:
-        fd = _open_chain(root, parts, os.O_RDONLY | _NONBLOCK)
+        own = root_fd is None
+        if own:
+            root_fd = _open_root(root)
         try:
-            if not stat.S_ISREG(os.fstat(fd).st_mode):
-                raise OSError(errno.EINVAL, "not a regular file", rel)
-            with os.fdopen(fd, "rb", closefd=False) as fh:
-                data = fh.read(_READ_LIMIT + 1)
+            fd = _open_chain(root_fd, parts, os.O_RDONLY | _NONBLOCK, idents)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise OSError(errno.EINVAL, "not a regular file", rel)
+                with os.fdopen(fd, "rb", closefd=False) as fh:
+                    data = fh.read(_READ_LIMIT + 1)
+            finally:
+                os.close(fd)
         finally:
-            os.close(fd)
+            if own:
+                os.close(root_fd)
     else:
         path = os.path.join(root, rel)
         real_root = os.path.realpath(root)
@@ -277,6 +320,27 @@ def _read_member(root, rel):
     if len(data) > _READ_LIMIT:
         raise OSError(errno.EFBIG, "grew past the repo-scan limit while the scan ran", rel)
     return data
+
+
+def _scratch_outside(root):
+    """A private temporary folder that is NOT inside `root`, or None if none can be made.
+
+    The scan copies each file it reads into scratch space. A scan of a folder must not write
+    into that folder, so a temporary folder that resolves inside it is not used.
+    """
+    real_root = os.path.realpath(root).rstrip(os.sep) + os.sep
+    candidates = [tempfile.gettempdir()]
+    if _POSIX:
+        candidates.append("/var/tmp")
+    candidates.append(os.path.expanduser("~"))
+    for base in candidates:
+        if (os.path.realpath(base).rstrip(os.sep) + os.sep).startswith(real_root):
+            continue
+        try:
+            return tempfile.TemporaryDirectory(prefix="sunglasses-read-", dir=base)
+        except OSError:
+            continue
+    return None
 
 
 _BINARY_EXTENSIONS = {
@@ -302,7 +366,8 @@ def _walk_repo_files(repo_dir):
         yield filepath
 
 
-def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
+def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False,
+                                root_fd=None, idents=None):
     """Return (files, skips). `skips` is [(relpath, reason)], and it is the point.
 
     v0.5.6: this walker silently `continue`d past three whole classes of file —
@@ -317,8 +382,9 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
     build and VCS folders, see `_SKIP_DIRS`): not files, so not in `skips`, but named.
     `.git` is left out of that list, it is metadata of the tree and not part of it.
 
-    This is NOT the walker rewrite (fstat, symlink policy, caps) — that stays
-    v0.6. It counts what it already decided to skip, and says so.
+    `root_fd` is the held descriptor of the scan root (opened here when not given) and
+    `idents`, when given, is filled with each listed folder's (device, inode) so the
+    reads that follow can tell a replaced folder from the one that was walked.
     """
     files, skips = [], []
 
@@ -327,7 +393,7 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
 
     def _lost(parts, exc):
         # A step that was a directory a moment ago and is a link, or gone, now.
-        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+        if exc.errno in _CHANGED_ERRNOS:
             _skip(parts, _CHANGED_SKIP_REASON)
         else:
             _skip(parts, f"directory could not be read ({exc.__class__.__name__}) — not inspected")
@@ -335,11 +401,43 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
     # Our own walk, not os.walk: os.walk drops a directory that stopped being one between
     # the listing and the descent, and a walker that cannot say what it did not enter
     # cannot call a scan complete.
+    own_fd = None
+    if _FD_SAFE:
+        if idents is None:
+            idents = {}
+        if root_fd is None:
+            try:
+                own_fd = root_fd = _open_root(repo_dir)
+            except OSError as exc:
+                _lost((), exc)
+                return files, skips
+        try:
+            idents[()] = _ident(os.fstat(root_fd))
+        except OSError as exc:
+            _lost((), exc)
+            if own_fd is not None:
+                os.close(own_fd)
+            return files, skips
+    try:
+        _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, skips, _skip, _lost)
+    finally:
+        if own_fd is not None:
+            os.close(own_fd)
+    # os.walk order is the filesystem's. The same tree must give the same order, so a
+    # file cap leaves out the same files on every run and every machine.
+    files.sort()
+    skips.sort()
+    if excluded is not None:
+        excluded.sort()
+    return files, skips
+
+
+def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, skips, _skip, _lost):
     pending = [()]
     while pending:
         parts = pending.pop()
         try:
-            entries = _list_dir(repo_dir, parts)
+            entries = _list_dir(repo_dir, parts, root_fd, idents)
         except OSError as exc:
             _lost(parts, exc)
             continue
@@ -360,6 +458,8 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
                     if excluded is not None and name != '.git':
                         excluded.append(rel)
                 else:
+                    if idents is not None:
+                        idents[child] = _ident(st)
                     pending.append(child)
                 continue
             ext = os.path.splitext(name)[1].lower()
@@ -376,13 +476,6 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False):
                 skips.append((rel, "not a regular file — not inspected"))
                 continue
             files.append((os.path.join(repo_dir, rel), None))
-    # os.walk order is the filesystem's. The same tree must give the same order, so a
-    # file cap leaves out the same files on every run and every machine.
-    files.sort()
-    skips.sort()
-    if excluded is not None:
-        excluded.sort()
-    return files, skips
 
 
 def _deep_dict_to_sarif(result_dict, source):
@@ -456,6 +549,14 @@ def _progress_line(index, total, started, rel_path):
     _note(f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}")
 
 
+def _drop(path):
+    """Remove a private copy right away; a copy that stays is removed with its folder."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
 def _scan_dir(args, engine):
     """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
     _check_max_files(args)
@@ -521,6 +622,38 @@ def _scan_repo(args, engine):
 def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
 
+    Sets up what the scan holds for its whole length, then hands over: one no-follow
+    handle on the root (see `_open_root`) and a temporary folder that is not inside the
+    tree. Both are set up before anything is scanned, so a failure here is a refusal
+    (exit 2, one document), never a half scan; both are released on every way out.
+    """
+    try:
+        root_fd = _open_root(tmp_dir)
+    except OSError as exc:
+        _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
+                     "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
+    scratch = _scratch_outside(tmp_dir)
+    if scratch is None:
+        if root_fd is not None:
+            os.close(root_fd)
+        _usage_error(args, "No temporary folder outside the folder being scanned could be created.",
+                     "Nothing was scanned. The scan copies each file it reads to a temporary "
+                     "folder and never writes into the tree. Point TMPDIR at a folder outside it.")
+    try:
+        return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scratch.name)
+    finally:
+        try:
+            scratch.cleanup()
+        except OSError as exc:
+            _note(f"  Could not remove the scan's temporary folder {_printable(scratch.name)} "
+                  f"({exc.__class__.__name__}); remove it by hand.")
+        if root_fd is not None:
+            os.close(root_fd)
+
+
+def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd, scratch):
+    """The scan itself; `root_fd` and `scratch` belong to the caller.
+
     `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
     `source` is its path). Everything after the clone is the same code on purpose:
     a local tree and its clone must come back with the same files, skips and exit.
@@ -542,9 +675,11 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     repo_results = []
 
     excluded_folders = []
+    idents = {}
     walked, walker_skips = _walk_repo_files_with_skips(
         tmp_dir, excluded=excluded_folders,
-        skip_lockfiles=bool(getattr(args, "skip_lockfiles", False)))
+        skip_lockfiles=bool(getattr(args, "skip_lockfiles", False)),
+        root_fd=root_fd, idents=idents)
     # The total cap. A file left out by it is a skip with the flag's name in the reason,
     # never a silent drop, and the scan is incomplete because of it.
     max_files = getattr(args, "max_files", None)
@@ -555,7 +690,6 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
                 f"over the --max-files {max_files} limit — not inspected"))
         walked = walked[:max_files]
     total_files = len(walked)
-    scratch = None
     for index, (filepath, _reason) in enumerate(walked, 1):
         rel_path = os.path.relpath(filepath, tmp_dir)
         _progress_line(index, total_files, start, rel_path)
@@ -564,28 +698,39 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
         # directory descriptors (no link at any step) and scan that private copy: the
         # bytes we judged are the bytes we opened, whatever the tree does next.
         try:
-            data = _read_member(tmp_dir, rel_path)
+            data = _read_member(tmp_dir, rel_path, root_fd, idents)
         except OSError as exc:
             reason = (_SYMLINK_SKIP_REASON if exc.errno == errno.ELOOP and not _FD_SAFE
-                      else _CHANGED_SKIP_REASON if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.ENOENT)
+                      else _CHANGED_SKIP_REASON if exc.errno in _CHANGED_ERRNOS
                       else f"could not be read ({exc.__class__.__name__}) — not inspected")
             walker_skips.append((rel_path, reason))
             continue
-        if scratch is None:
-            scratch = tempfile.mkdtemp(prefix="sunglasses-read-")
-            atexit.register(shutil.rmtree, scratch, ignore_errors=True)
         snapshot = os.path.join(scratch, os.path.basename(filepath))
-        with open(snapshot, "wb") as fh:
-            fh.write(data)
+        try:
+            with open(snapshot, "wb") as fh:
+                fh.write(data)
+        except OSError as exc:
+            # The copy is ours, not the tree's: a full disk or a denied write is a file
+            # we could not inspect, named, never a crash that ends the run without a document.
+            _drop(snapshot)
+            walker_skips.append(
+                (rel_path, f"could not be copied for inspection ({exc.__class__.__name__}) — not inspected"))
+            continue
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
         # at all — used to be read as text here and counted as inspected, which
         # is the original bug one level up.
         from .extractors.dispatch import identify
-        route, label = identify(snapshot)
+        try:
+            route, label = identify(snapshot)
+        except (OSError, UnreadableFile) as exc:
+            _drop(snapshot)
+            walker_skips.append(
+                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
+            continue
         if route in ("opaque", "media"):
-            os.unlink(snapshot)
+            _drop(snapshot)
             walker_skips.append((
                 rel_path,
                 f"{label} — not inspected. Scan it directly to look inside: "
@@ -609,10 +754,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
         finally:
-            try:
-                os.unlink(snapshot)
-            except OSError:
-                pass
+            _drop(snapshot)
 
         files_scanned += 1
         scan_result.source = rel_path
@@ -685,6 +827,9 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
             print(f"  {status}  {_printable(rel_path)}")
 
     elapsed_ms = (time.perf_counter() - start) * 1000
+    # Skips were appended from three places (the walk, the cap, the reads): one sort, so the
+    # list a consumer sees is ordered by path whatever found the skip first.
+    walker_skips.sort()
 
     # Clean up
     if cleanup:
