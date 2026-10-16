@@ -2214,12 +2214,18 @@ class SunglassesEngine:
             # lies between the cue and the payload and ends the clause.
             plain = m.group(0) in self._PLAIN_NEGATION_SET
             gap_words = self.NEGATION_PLAIN_GAP_WORDS if plain else self.NEGATION_GAP_WORDS
-            # A plain cue whose clause goes on with a comma after the payload is the front of
-            # a list. Lists are not read here, so it does not govern: the first item gets the
-            # severity the rest of the list gets.
-            if plain and self._comma_ends_clause_later(text, match_end if match_end is not None
-                                                       else match_start):
-                continue
+            # A new cue governs a plain run only. In front of a list (or a second clause) it
+            # would lower the first item alone, a half-reading of the list, so it governs
+            # nothing and every item keeps the severity it has on main. And a new cue never
+            # lowers a hit inside the string of a one-line refusal: an injection phrase there
+            # blocks.
+            if plain:
+                if self._sentence_is_a_list(
+                        text, window_start + m.start(), gap,
+                        match_end if match_end is not None else match_start):
+                    continue
+                if self._refusal_string(text, match_start, match_end, align):
+                    continue
             if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
                     or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
                 continue
@@ -2238,21 +2244,78 @@ class SunglassesEngine:
                 return True
         return False
 
-    # Where a clause ends, and how far past the payload a comma still counts as part of it.
-    _CLAUSE_END_RX = re.compile(r"[.;!?\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
-    NEGATION_COMMA_LOOKAHEAD = 200
-    _COMMAS = ",\uff0c\u3001\ufe50\ufe51\uff64\u060c"
+    # What ends the plain run a new cue governs. A cue governs a payload only when the rest of
+    # its sentence is a plain run: no comma, semicolon, colon, solidus or ampersand (in any of
+    # the forms below), no "and", "or" or "nor", and no line break with text after it, from the
+    # cue to the end of the sentence. Anything else is a list (or two clauses), which is not
+    # read here, so the cue governs nothing and the finding keeps the severity it has on main.
+    # The marks: every punctuation or symbol character (not a currency sign) whose Unicode name
+    # holds COMMA, SEMICOLON, COLON, SOLIDUS or AMPERSAND, except the reverse solidus family (a backslash is not a list mark),
+    # plus U+201A (single low-9 quotation mark, a comma in some type). A fixed set, so a new
+    # look-alike is not covered until it is added.
+    _LIST_MARKS = frozenset(
+        "\u0026\u002c\u002f\u003a\u003b\u02f8\u055d\u060c\u061b\u06fd"
+        "\u0703\u0704\u0705\u0706\u0707\u0708\u0709\u07f8\u1363\u1364"
+        "\u1365\u1366\u1802\u1804\u1808\u201a\u204f\u205d\u214b\u2254"
+        "\u2255\u2360\u236a\u236e\u275b\u275c\u275d\u275e\u275f\u2760"
+        "\u27c9\u2982\u29f6\u29f8\u2a29\u2a74\u2af6\u2afb\u2afd\u2e32"
+        "\u2e34\u2e35\u2e41\u2e49\u2e4a\u2e4c\u3001\ua4fe\ua60d\ua6f4"
+        "\ua6f5\ua6f6\ua789\ufe10\ufe11\ufe13\ufe14\ufe50\ufe51\ufe54"
+        "\ufe55\ufe60\uff06\uff0c\uff0f\uff1a\uff1b\uff64\U0001144d"
+        "\U0001145a\U00012471\U00012472\U00012473\U00012474\U00016e97"
+        "\U0001da87\U0001da89\U0001da8a\U0001f674\U0001f675\U0001f676"
+        "\U0001f677\U0001f678\U0001f67c"
+    )
+    _LIST_WORD_RX = re.compile(r"(?<![a-z0-9_])(?:and|or|nor)(?![a-z0-9_])", re.I)
+    _LINE_BREAK_RX = re.compile(r"[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
+    # A full stop, "!" or "?" that closes the sentence: followed by white space, a quote, a
+    # bracket, or the end of the text.
+    _SENTENCE_END_RX = re.compile(r"[.!?](?=[\s\"'\u2018\u2019\u201c\u201d)\]}]|\Z)")
+    NEGATION_SENTENCE_SCAN = 200
 
     @classmethod
-    def _comma_ends_clause_later(cls, text: str, start: int) -> bool:
-        """Whether a comma stands between ``start`` and the end of the clause that
-        runs on from it (the next sentence mark or line break, at most
-        NEGATION_COMMA_LOOKAHEAD characters on)."""
-        tail = text[start:start + cls.NEGATION_COMMA_LOOKAHEAD]
-        end = cls._CLAUSE_END_RX.search(tail)
-        if end is not None:
+    def _joins_items(cls, run: str, before: bool = False) -> bool:
+        """Whether ``run`` (text inside one sentence) holds a list mark, a joining word, or a
+        line break with text on both sides of it (after it for a run that follows the cue, before
+        it for a run that stands in front of the cue)."""
+        if any(c in cls._LIST_MARKS for c in run):
+            return True
+        if cls._LIST_WORD_RX.search(run):
+            return True
+        body = run.lstrip() if before else run.rstrip()
+        return cls._LINE_BREAK_RX.search(body) is not None
+
+    @classmethod
+    def _sentence_is_a_list(cls, text: str, cue_start: int, gap: str, match_end: int) -> bool:
+        """Whether a new cue does NOT govern, because its sentence is anything but a plain run.
+        The cue governs only when, within NEGATION_SENTENCE_SCAN characters of it, its sentence
+        reaches a sentence end (see _SENTENCE_END_RX) or the end of the text; there is no list
+        mark, joining word or line break between the cue and that end; and none stands in front
+        of the cue since the previous sentence end. The payload itself is left out (a URL has a
+        colon and solidi). Anything else is read as on main."""
+        reach = cls.NEGATION_SENTENCE_SCAN
+        # In front of the cue, back to the previous sentence end.
+        front = text[max(0, cue_start - reach):cue_start]
+        ends = list(cls._SENTENCE_END_RX.finditer(front))
+        if ends:
+            front = front[ends[-1].end():]
+        if cls._joins_items(front, before=True):
+            return True
+        # From the cue to the end of its sentence, the payload excluded.
+        if cls._joins_items(gap):
+            return True
+        limit = cue_start + reach
+        if match_end > limit:
+            return True
+        tail = text[match_end:limit + 2]
+        end = cls._SENTENCE_END_RX.search(tail)
+        if end is not None and match_end + end.start() <= limit:
             tail = tail[:end.start()]
-        return any(c in tail for c in cls._COMMAS)
+        elif end is None and len(text) <= limit:
+            tail = text[match_end:]
+        else:
+            return True
+        return cls._joins_items(tail)
 
     @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
