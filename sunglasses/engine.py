@@ -2282,17 +2282,30 @@ class SunglassesEngine:
         "\ua72f\U0001f101\U0001f102\U0001f103\U0001f104\U0001f105\U0001f106\U0001f107"
         "\U0001f108\U0001f109\U0001f10a\U000e002c"
     )
-    _JOINING_WORD_RX = re.compile(r"(?<!\w)(?:and|or|nor)(?!\w)", re.I)
+    # A joining word is delimited by anything that is not a LETTER: a digit, an underscore and a
+    # numeric character (a superscript, a fraction) are boundaries, so "or7", "and_" and "7or"
+    # join, and "brand", "nord" and "xandx" do not. Found as a plain word and checked on its
+    # neighbours (str.isalpha), because a regex has no class for exactly the letters.
+    _JOINING_WORD_RX = re.compile(r"and|or|nor", re.I)
     _LINE_BREAK_CHARS = "\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
     # A full stop, "!" or "?" followed by white space, a quote, a bracket, or the end of the text
     # closes a sentence.
     _SENTENCE_END_RX = re.compile(r"[.!?](?=[\s\"'\u2018\u2019\u201c\u201d)\]}]|\Z)")
     # What a sentence is scanned for, once per text: the list marks, the joining words, the line
     # breaks.
-    _JOIN_RX = re.compile(
-        "[" + re.escape("".join(sorted(_LIST_MARKS))) + "]|(?<!\\w)(?:and|or|nor)(?!\\w)", re.I)
+    _JOIN_RX = re.compile("[" + re.escape("".join(sorted(_LIST_MARKS))) + "]|and|or|nor", re.I)
+    # A paragraph start: what stands between a sentence end and the first word of the next
+    # sentence (closing quotes and brackets, then white space).
+    _PARAGRAPH_LEAD_RX = re.compile("[\"'\u2018\u2019\u201c\u201d)\\]}]*\\s*")
     _BREAK_RX = re.compile("[" + re.escape(_LINE_BREAK_CHARS) + "]")
     NEGATION_SENTENCE_SCAN = 200
+
+    @staticmethod
+    def _is_a_word_edge(text: str, m) -> bool:
+        """Whether the joining word found at ``m`` is a word of its own: no LETTER stands next to
+        it. A digit, an underscore, a numeric character and the edge of the text are boundaries."""
+        a, b = m.start(), m.end()
+        return not (a > 0 and text[a - 1].isalpha()) and not (b < len(text) and text[b].isalpha())
 
     @classmethod
     def _joins_items(cls, run: str) -> bool:
@@ -2300,7 +2313,7 @@ class SunglassesEngine:
         line break with text after it (a break that only trails the run is a paragraph end)."""
         if any(c in cls._LIST_MARKS for c in run):
             return True
-        if cls._JOINING_WORD_RX.search(run):
+        if any(cls._is_a_word_edge(run, m) for m in cls._JOINING_WORD_RX.finditer(run)):
             return True
         return cls._BREAK_RX.search(run.rstrip()) is not None
 
@@ -2310,7 +2323,8 @@ class SunglassesEngine:
         break, stand: three sorted lists of offsets."""
         return (
             [m.start() for m in cls._SENTENCE_END_RX.finditer(text)],
-            [m.start() for m in cls._JOIN_RX.finditer(text)],
+            [m.start() for m in cls._JOIN_RX.finditer(text)
+             if len(m.group()) == 1 or cls._is_a_word_edge(text, m)],
             [m.start() for m in cls._BREAK_RX.finditer(text)],
         )
 
@@ -2327,13 +2341,14 @@ class SunglassesEngine:
         j = bisect.bisect_left(joins_at, start)
         if j < len(joins_at) and joins_at[j] < cue_start:
             return True
+        if k:
+            # A line break right after a sentence end opens a new paragraph: the sentence of the
+            # cue starts after that break (and after any closing quote or bracket before it), and
+            # the words between there and the cue are ordinary words, never separators. At the
+            # start of the text there is no sentence end to follow: a break there counts.
+            start = cls._PARAGRAPH_LEAD_RX.match(text, start, cue_start).end()
         b = bisect.bisect_left(breaks_at, start)
-        # A break counts when there is text in the stretch at all, before it or after it; the
-        # break that only follows a sentence end, with nothing else in front of the cue, does
-        # not. At the start of the text there is no sentence end to follow: a break there counts.
-        if b >= len(breaks_at) or breaks_at[b] >= cue_start:
-            return False
-        return k == 0 or text[start:cue_start].strip() != ""
+        return b < len(breaks_at) and breaks_at[b] < cue_start
 
     @classmethod
     def _raw_sentence_is_a_list(cls, view: str, cue_start: int, cue_len: int, match_start: int,
@@ -2359,14 +2374,15 @@ class SunglassesEngine:
         The cue governs only when no list mark, joining word or line break with text after it
         stands between the previous sentence end (see _SENTENCE_END_RX; the start of the text is
         one) and the cue, however far back; none stands between the cue and the payload (the gap,
-        which the cue window keeps short); and the sentence reaches a sentence end, or the end of
+        which the cue window keeps short, and which is read as on main if it is longer than
+        NEGATION_SENTENCE_SCAN); and the sentence reaches a sentence end, or the end of
         the text, within NEGATION_SENTENCE_SCAN characters of the payload's end with none of them
         in between. The payload itself is neither scanned nor counted (a URL has a colon and
         solidi). Anything else is read as on main."""
         reach = cls.NEGATION_SENTENCE_SCAN
         if cls._joins_in_front(text, cue_start):
             return True
-        if cls._joins_items(gap):
+        if len(gap) > reach or cls._joins_items(gap):
             return True
         tail = text[match_end:match_end + reach + 2]
         end = cls._SENTENCE_END_RX.search(tail)

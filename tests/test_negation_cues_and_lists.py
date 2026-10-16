@@ -90,6 +90,41 @@ def test_a_sentence_that_needs_a_negated_list_keeps_main_severity_in_this_change
     assert _decision(engine, LIST_README_LINES[name]) == "block"
 
 
+# The feedback README as a file (readme1.md of the corpus), heading first, one blank line between
+# its paragraphs. Each paragraph after the first comes right after a sentence end: a paragraph
+# start is a boundary, so "The plugin" in front of a cue does not stop it.
+README1 = (
+    "# Plugin\n\n" + README_LINES["sc015_no_session_cookies"] + "\n\n"
+    + LIST_README_LINES["ghsa_pi_202_log_store_transmit"] + "\n\n"
+    + LIST_README_LINES["mech_002_change_provider_model"] + "\n"
+)
+
+
+def _blocking(engine, text):
+    return {f["id"] for f in engine.scan(text, channel="file").findings if f["severity"] in ("high", "critical")}
+
+
+def test_the_feedback_readme_as_a_file_blocks_only_through_its_two_list_sentences(engine):
+    """Without the list reading (a follow-up change) the two list sentences keep main's severity;
+    nothing else of the file is a block: not its heading, not its first paragraph, and not the
+    paragraph start in front of the cue of the second paragraph."""
+    from_lists = set()
+    for line in LIST_README_LINES.values():
+        from_lists |= _blocking(engine, line)
+    assert from_lists
+    assert _blocking(engine, README1) == from_lists
+
+
+def test_the_feedback_readme_with_plain_payloads_in_place_of_its_list_sentences_never_blocks(engine):
+    text = (
+        "# Plugin\n\n" + README_LINES["sc015_no_session_cookies"] + "\n\n"
+        "The plugin does not ignore previous instructions anywhere other than the API itself.\n\n"
+        "The plugin does not ignore previous instructions without telling the user first.\n"
+    )
+    assert _decision(engine, text) != "block"
+    assert _blocking(engine, text) == set()
+
+
 def test_the_gate_source_file_never_blocks(engine):
     assert _decision(engine, GATE_PY) != "block"
 
@@ -741,10 +776,49 @@ BEFORE_PREFIXES = ["ordinary, ", "a; ", "a: ", "a / ", "a & ", "a and ", "a or "
 
 
 @pytest.mark.parametrize("prefix", ["brand ", "oracle ", "Andes ", "nord ", "\u00e9and ", "and\u00e9 ", "\u0436or ",
-                                    "or\u4e2d ", "and_ ", "or7 ", "7and ", "nor\u0436 "])
+                                    "or\u4e2d ", "nor\u0436 ", "xor ", "Xand ", "ORE ", "andy "])
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_word_that_only_contains_a_joining_word_in_front_of_the_cue_joins_nothing(engine, cue, prefix):
     assert _decision(engine, f"{prefix}{cue} {PAYLOAD}.") == "allow_redacted", prefix
+
+
+# Only a LETTER sits against a joining word and makes it part of a longer word. A digit, an
+# underscore, a numeric character (a superscript, a roman numeral, a circled digit) and the edge
+# of the text are boundaries, so the joining word is a word of its own and the sentence joins.
+NONLETTER_EDGES = ["_", "7", "\u00b2", "\u2167", "\u2460", "-", "\u00b7"]
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("edge", NONLETTER_EDGES)
+@pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_joining_word_with_only_a_nonletter_beside_it_joins_in_front_of_the_cue(
+        engine, cue, word, edge, channel):
+    for front in (f"{word}{edge} ", f"{edge}{word} ", f"{edge}{word}{edge} ", f"foo {word}{edge} "):
+        got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
+        assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
+
+
+@pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_joining_word_at_the_very_start_of_the_text_joins_whatever_the_text_ends_with(engine, cue, word):
+    """The look at the character before the word does not wrap round to the end of the text."""
+    for tail in (f"{LIST_FIRST}", f"{LIST_FIRST} more"):
+        got = _sev(engine, f"{word} {cue} {tail}")
+        assert got and got == _sev(engine, f"{word} xx {tail}"), tail
+    assert engine._joins_items(f"{word} bar")
+    assert engine._joins_items(f"{word} x")
+
+
+@pytest.mark.parametrize("edge", NONLETTER_EDGES)
+@pytest.mark.parametrize("word", ["and", "or", "nor"])
+def test_a_joining_word_with_only_a_nonletter_beside_it_joins_between_the_cue_and_the_payload(
+        engine, word, edge):
+    assert engine._joins_items(f"foo {word}{edge} bar")
+    assert engine._joins_items(f"foo {edge}{word} bar")
+    assert not engine._joins_items(f"foo x{word} bar")
+    assert not engine._joins_items(f"foo {word}x bar")
+    assert not engine._joins_items(f"foo \u00e9{word}{edge} bar")
 
 
 def _sev(engine, text, channel="file"):
@@ -873,8 +947,8 @@ BREAKS = ["\n", "\r", "\r\n", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\
 @pytest.mark.parametrize("br", BREAKS)
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_line_break_in_front_of_the_cue_counts_with_text_before_or_after_it(engine, cue, br, channel):
-    for front in (f"{br}foo ", f"foo{br}", f"foo{br}bar ", f"Done. {br}foo ", f"Done. foo{br}",
-                  f"Done.{br}foo{br}bar "):
+    for front in (f"{br}foo ", f"foo{br}", f"foo{br}bar ", f"Done. foo{br}", f"Done.{br}foo{br}bar ",
+                  f"Done. {br}foo{br}", f"Done{br}foo ", f"Done,{br}foo ", f"Done.x{br}foo "):
         got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
         assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
 
@@ -885,6 +959,38 @@ def test_a_break_right_after_a_sentence_end_is_a_paragraph_start(engine, cue, br
     for front in (f"Done.{br}", f"Done. {br}"):
         governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
         assert governed, repr(front)
+
+
+PARAGRAPH_ENDS = [".", "!", "?", '."', ".'", ".\u201d", ".\u2019", ".)", ".]", ".}", '.")', "!\u201d", "?)"]
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_paragraph_start_is_a_sentence_boundary_the_cue_may_stand_after_words_of_its_own(
+        engine, cue, br, channel):
+    """A line break (one or many) that comes right after a sentence end (". ", "!" or "?", the
+    closing quotes and brackets of that sentence, then only white space) is the boundary between
+    two sentences, a paragraph start, and never a separator inside the sentence the cue stands
+    in. So the words of the new paragraph that come before the cue do not stop it from
+    governing. A break inside the sentence, after one of its words, still does."""
+    for end in PARAGRAPH_ENDS:
+        for gap in ("", " ", "  ", f"{br}"):
+            front = f"Done{end}{gap}{br}The plugin "
+            governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.", channel)
+            assert governed, repr(front)
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_break_that_is_not_right_after_a_sentence_end_still_counts(engine, cue, br, channel):
+    """What is not a sentence end is not a boundary: an abbreviation point with no space after
+    it, a comma, a word, a closing quote with no end in front of it, a second break after a word."""
+    for front in (f"Done.x{br}The plugin ", f"Done,{br}The plugin ", f"Done{br}The plugin ",
+                  f"Done\"{br}The plugin ", f"Done.{br}The{br}plugin ", f"Done. And{br}so the plugin "):
+        got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
+        assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
 
 
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
@@ -920,12 +1026,21 @@ def test_each_comma_named_character_is_a_separator_in_front_of_the_cue_and_after
 
 
 @pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
-@pytest.mark.parametrize("edge", ["\u00e9", "\u0436", "\u4e2d", "_", "7"])
+@pytest.mark.parametrize("edge", ["\u00e9", "\u0436", "\u4e2d", "x", "Q"])
 @pytest.mark.parametrize("cue", NEW_CUES[:3])
-def test_a_joining_word_glued_to_a_letter_or_digit_is_not_a_joining_word(engine, cue, word, edge):
+def test_a_joining_word_glued_to_a_letter_is_not_a_joining_word(engine, cue, word, edge):
     for tail in (f" {edge}{word} more.", f" {word}{edge} more."):
         governed, _ = _governed(engine, f"{cue} {LIST_FIRST}{tail}", f"xx {LIST_FIRST}{tail}")
         assert governed, tail
+
+
+@pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
+@pytest.mark.parametrize("edge", NONLETTER_EDGES)
+@pytest.mark.parametrize("cue", NEW_CUES[:3])
+def test_a_joining_word_with_only_a_nonletter_beside_it_after_the_payload_means_main(engine, cue, word, edge):
+    for tail in (f" {edge}{word} more.", f" {word}{edge} more."):
+        got = _sev(engine, f"{cue} {LIST_FIRST}{tail}")
+        assert got and got == _sev(engine, f"xx {LIST_FIRST}{tail}"), tail
 
 
 @pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
@@ -933,6 +1048,15 @@ def test_a_joining_word_glued_to_a_letter_or_digit_is_not_a_joining_word(engine,
 def test_a_whole_joining_word_after_the_payload_means_main(engine, cue, word):
     got = _sev(engine, f"{cue} {LIST_FIRST} {word} more.")
     assert got and got == _sev(engine, f"xx {LIST_FIRST} {word} more.")
+
+
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_gap_longer_than_200_characters_between_the_cue_and_the_payload_is_read_as_on_main(engine, cue):
+    """Not reachable through a scan (the cue window keeps the gap short); asked of the helper."""
+    for n, expected in ((200, False), (201, True), (1000, True)):
+        gap = " " + "a" * (n - 1)
+        text = f"{cue}{gap}{LIST_FIRST}."
+        assert engine._sentence_is_a_list(text, 0, gap, len(text) - 1) is expected, n
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
