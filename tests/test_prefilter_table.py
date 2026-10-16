@@ -17,6 +17,8 @@ Regenerate with `python3 scripts/gen_prefilter_table.py`.
 import importlib.util
 import pathlib
 import sys
+import threading
+import time
 
 import pytest
 
@@ -397,3 +399,78 @@ def test_a_thawed_requirement_is_new_objects_every_time(sources):
     one, two = engine_module._requirement_for(source), engine_module._requirement_for(source)
     ids_one = {id(o) for o in _objects(one)}
     assert ids_one and not ids_one & {id(o) for o in _objects(two)}
+
+
+def _first_loads_in_flight(monkeypatch, threads=3):
+    """Start `threads` first loads while the first one is held inside the digest check.
+
+    Returns (results, digest_calls). The first reader is parked until the others have had
+    time to arrive, so any reader that is allowed past the sentinel gets a chance to take
+    a second snapshot.
+    """
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+    real = _prefilter.file_digest
+
+    def slow_digest(raw):
+        calls.append(1)
+        if len(calls) == 1:
+            entered.set()
+            assert release.wait(10), "the held reader was never released"
+        return real(raw)
+
+    monkeypatch.setattr(engine_module, "_REQUIREMENT_TABLE", None)
+    monkeypatch.setattr(_prefilter, "file_digest", slow_digest)
+    results, errors = [], []
+
+    def load():
+        try:
+            results.append(engine_module._requirement_table())
+        except Exception as error:                           # noqa: BLE001
+            errors.append(error)
+
+    workers = [threading.Thread(target=load) for _ in range(threads)]
+    workers[0].start()
+    assert entered.wait(10)
+    for w in workers[1:]:
+        w.start()
+    time.sleep(0.3)                                          # let the others reach the sentinel
+    release.set()
+    for w in workers:
+        w.join(30)
+    assert errors == [] and len(results) == threads
+    return results, calls
+
+
+def test_overlapping_first_loads_take_one_snapshot(monkeypatch):
+    results, calls = _first_loads_in_flight(monkeypatch)
+    assert len(calls) == 1, "a second reader took its own snapshot"
+    assert all(r is results[0] for r in results)
+
+
+def test_overlapping_first_loads_cannot_replace_a_published_snapshot(monkeypatch, sources):
+    results, _calls = _first_loads_in_flight(monkeypatch)
+    published = engine_module._requirement_table()
+    assert published is results[0]
+    source = next(s for s in sources if _prefilter.requirement(s))
+    key = _prefilter.table_key(source)
+    before = GEN.encode(engine_module._requirement_for(source))
+    saved = _prefilter_table.TABLE[key]
+    try:
+        _prefilter_table.TABLE[key] = ()
+        assert engine_module._requirement_table() is published
+        assert GEN.encode(engine_module._requirement_for(source)) == before
+    finally:
+        _prefilter_table.TABLE[key] = saved
+
+
+def test_a_published_table_is_read_without_taking_the_lock():
+    """Every lookup of every engine goes through here; only the first load may wait."""
+    published = engine_module._requirement_table()
+    seen = []
+    worker = threading.Thread(target=lambda: seen.append(engine_module._requirement_table()))
+    with engine_module._REQUIREMENT_LOCK:
+        worker.start()
+        worker.join(5)
+        assert not worker.is_alive(), "a lookup waited for the lock after the table was published"
+    assert seen == [published]

@@ -219,6 +219,7 @@ class ScanResult:
 
 
 _REQUIREMENT_TABLE = None
+_REQUIREMENT_LOCK = threading.Lock()
 
 
 def _freeze_requirement(requirement):
@@ -269,22 +270,29 @@ def _requirement_table():
     slower and never different.
 
     What is returned is the engine's OWN frozen copy, taken once per process
-    (`_freeze_requirement`): a read-only mapping of values that hold no assignable
-    object, with no link to `_prefilter_table.TABLE`. Changing the generated
-    module, or any object read from it, after this point changes nothing.
+    under a lock (`_freeze_requirement`): a read-only mapping of values that hold
+    no assignable object, with no link to `_prefilter_table.TABLE`. Changing the
+    generated module, or any object read from it, after the first call has
+    returned changes nothing. (The `Clause` objects `_requirement_for` rebuilds
+    for each engine are assignable on purpose; they are that engine's own.)
     """
     global _REQUIREMENT_TABLE
     if _REQUIREMENT_TABLE is None:
-        table = {}
-        try:
-            from . import _prefilter_table
-            with open(_prefilter.__file__, "rb") as handle:
-                if _prefilter.file_digest(handle.read()) == _prefilter_table.PREFILTER_SHA256:
-                    table = {key: _freeze_requirement(value)
-                             for key, value in _prefilter_table.TABLE.items()}
-        except Exception:
-            table = {}
-        _REQUIREMENT_TABLE = types.MappingProxyType(table)
+        # Two engines built at once must not each take a snapshot: the second would
+        # publish a copy of whatever the module held by then, replacing the first.
+        # The sentinel is checked again inside the lock for the same reason.
+        with _REQUIREMENT_LOCK:
+            if _REQUIREMENT_TABLE is None:
+                table = {}
+                try:
+                    from . import _prefilter_table
+                    with open(_prefilter.__file__, "rb") as handle:
+                        if _prefilter.file_digest(handle.read()) == _prefilter_table.PREFILTER_SHA256:
+                            table = {key: _freeze_requirement(value)
+                                     for key, value in _prefilter_table.TABLE.items()}
+                except Exception:
+                    table = {}
+                _REQUIREMENT_TABLE = types.MappingProxyType(table)
     return _REQUIREMENT_TABLE
 
 
