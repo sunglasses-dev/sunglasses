@@ -205,7 +205,7 @@ INVENTORY = {
     "_open_nofollow: os.open(str(path),\n                       os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,\n                       0o600)":
         "O_NOFOLLOW is the whole point: a symlink arriving at one of our names "
         "after the early check fails with ELOOP rather than being followed.",
-    "_read_regular_bytes: os.open(path, os.O_RDONLY | no_follow | getattr(os, \"O_NONBLOCK\", 0))":
+    "_read_regular_bytes: os.open(path, os.O_RDONLY | no_follow | non_block)":
         "Read-only, no-follow, nonblocking: it creates nothing and cannot "
         "hang on a FIFO. The type is checked on the descriptor, not the name.",
     "_write_private: os.write(fd, data[written:])":

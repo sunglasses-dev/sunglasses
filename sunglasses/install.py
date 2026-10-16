@@ -168,6 +168,21 @@ def _strict_loads(raw, what):
         raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
 
 
+def _optional_open_flags():
+    """The two open flags a platform may lack, read when called (the tests take
+    either away) and as plain attribute reads: the environment audit in
+    test_repair_v056 refuses a computed `getattr(os, name, 0)`."""
+    try:
+        no_follow = os.O_NOFOLLOW
+    except AttributeError:
+        no_follow = 0
+    try:
+        non_block = os.O_NONBLOCK
+    except AttributeError:
+        non_block = 0
+    return no_follow, non_block
+
+
 def _read_regular_bytes(path):
     """The bytes of a regular file, read through ONE descriptor whose type was
     checked on the descriptor itself.
@@ -193,8 +208,8 @@ def _read_regular_bytes(path):
     seen = os.lstat(path)                       # FileNotFoundError = absent
     if not stat.S_ISREG(seen.st_mode):
         raise ValueError(f"{path} is not a regular file")
-    no_follow = getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(path, os.O_RDONLY | no_follow | getattr(os, "O_NONBLOCK", 0))
+    no_follow, non_block = _optional_open_flags()
+    fd = os.open(path, os.O_RDONLY | no_follow | non_block)
     try:
         opened = os.fstat(fd)
         if not stat.S_ISREG(opened.st_mode):
