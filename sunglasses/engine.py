@@ -1155,6 +1155,13 @@ class _ReadBudget:
         self.left -= self._cost(resume, self.size if found_at is None else found_at)
 
 
+@functools.lru_cache(maxsize=1)
+def _shipped_regex_sources():
+    """Every regex source that ships with the package: known valid as a whole expression."""
+    return frozenset(src for rule in (*PATTERNS, *MECHANISM_PATTERNS)
+                     for src in rule.get("regex", ()))
+
+
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
@@ -1609,6 +1616,26 @@ class SunglassesEngine:
             if "regex" in pattern:
                 compiled = []
                 for index, r in enumerate(pattern["regex"]):
+                    # A guarded rule is stored as its pieces (see below), and the
+                    # whole expression used to be compiled first and then thrown
+                    # away: 781 rules, about 460 ms of every engine start. The
+                    # whole is skipped ONLY for a source that ships with the package,
+                    # which `tests/test_engine_guarded_rules_skip_discarded_compile.py`
+                    # proves valid as a whole. Any other source (a custom rule) keeps
+                    # the whole compile: pieces that each compile are not proof that
+                    # the whole is valid (a global flag in the middle, an unterminated
+                    # guard that parses as a guard plus an empty core, a lookbehind
+                    # that refers to a renumbered group, the same group name twice).
+                    split = self._split_caret_predicate(r)
+                    if split is not None and r in _shipped_regex_sources():
+                        try:
+                            guard_rx = [re.compile(g, re.IGNORECASE) for g in split[0]]
+                            core_rx = re.compile(split[1], re.IGNORECASE)
+                        except re.error:
+                            pass
+                        else:
+                            compiled.append(("guarded", core_rx, guard_rx))
+                            continue
                     try:
                         rx = re.compile(r, re.IGNORECASE)
                     except re.error:
@@ -1626,7 +1653,6 @@ class SunglassesEngine:
                     #              matched per co-occurrence window
                     #   windowed — lookahead-led predicate: matched per window
                     #   plain    — everything else: ordinary .search()
-                    split = self._split_caret_predicate(r)
                     if split is not None:
                         guards, core = split
                         try:
