@@ -291,3 +291,595 @@ def test_readme_says_init_and_receipts_name_the_policy_state():
     text = re.sub(r"\s+", " ", (REPO / "README.md").read_text(encoding="utf-8"))
     assert "sunglasses init` prints one line with the state of the policy file and its path" in text
     assert "`sunglasses receipts` marks each call whose receipt records that it ran with no policy" in text
+
+
+# ── a starter written by an earlier release ─────────────────────────────────
+# `write_starter_policy` turns a disabled starter on only when the file is a starter this project
+# wrote and the user has not changed. The header was reworded between releases, so the running
+# code's own text is not the only text such a file can hold. Each earlier text is kept as a
+# sha256, and the comparison reads and hashes the raw bytes of the file.
+
+# The lines above the first rule in each release's starter. The rules below them were the same
+# text, so an earlier starter is these lines plus the current body. The path list is not repeated
+# here so no literal credential path sits in this file.
+V065_HEAD = (
+    "# SUNGLASSES policy — your rules, enforced as HARD BLOCKS.\n"
+    "# Written by `sunglasses init`. Edit or delete freely: an empty file (or no\n"
+    "# file at all) enforces nothing.\n"
+)
+V066_HEAD = (
+    "# SUNGLASSES policy — your rules, enforced as HARD BLOCKS.\n"
+    "# Written by `sunglasses init`. Edit it freely. No file at all enforces\n"
+    "# nothing, and a file with only comments enforces nothing. An empty file is\n"
+    "# treated as a broken policy, and a tool call that nothing else settles asks\n"
+    "# until the file is repaired.\n"
+)
+# sha256 of the starter each of those releases wrote, read from the release tags themselves.
+EARLIER = {
+    "v0.6.5": (V065_HEAD, False, "47b9fe35d84b6af69b60cc89078fdcd025019b4149e6d18622474e67af0e5b4a"),
+    "v0.6.6": (V066_HEAD, False, "bb68349c8fd83ce2d4422d9b4fdc61c737b8c6785c0711fa22c453e460950bb8"),
+}
+EARLIER_ENABLED = {
+    "v0.6.5": (V065_HEAD, True, "cf4af074e20e6a2d2c5d62eade67ae6c31b8a03aeb360b8f38583032f5e11b68"),
+    "v0.6.6": (V066_HEAD, True, "971ce41b7e2cdee9408517905ef417e26ed85c508034ea2267715f5a2467477a"),
+}
+BODY_START = "#\n# blocked_paths"
+
+
+def _earlier(head, enabled=False):
+    from sunglasses.firewall import starter_policy_text
+    body = starter_policy_text(enabled=enabled).split(BODY_START, 1)[1]
+    return (head + BODY_START + body).encode("utf-8")
+
+
+def _sha(data):
+    import hashlib
+    return hashlib.sha256(data).hexdigest()
+
+
+def _home(tmp_path, name="h"):
+    sh = tmp_path / name / ".sunglasses"
+    sh.mkdir(parents=True)
+    return sh
+
+
+def _put(sh, data):
+    (sh / "policy.yaml").write_bytes(data)
+    return sh / "policy.yaml"
+
+
+def _leftovers(sh):
+    return sorted(p.name for p in sh.iterdir() if p.name.endswith(".tmp"))
+
+
+@pytest.mark.parametrize("tag", sorted(EARLIER))
+def test_the_earlier_starter_texts_used_here_are_the_ones_that_shipped(tag):
+    """If this fails the rules under the header changed. Add the hash of the text being replaced to the
+    kept sets in firewall.py, then rebuild the head and body here from that release's tag."""
+    for table in (EARLIER, EARLIER_ENABLED):
+        head, enabled, digest = table[tag]
+        assert _sha(_earlier(head, enabled)) == digest
+
+
+def test_the_kept_hashes_are_the_hashes_of_the_releases_listed_here():
+    from sunglasses.firewall import _EARLIER_DISABLED_STARTER_SHA256 as dis, _EARLIER_ENABLED_STARTER_SHA256 as en
+    assert dis == {d for _, _, d in EARLIER.values()}
+    assert en == {d for _, _, d in EARLIER_ENABLED.values()}
+
+
+@pytest.mark.parametrize("tag", sorted(EARLIER))
+def test_an_unchanged_disabled_starter_from_an_earlier_release_is_enabled_by_the_policy_rerun(tmp_path, tag):
+    from sunglasses.firewall import starter_policy_text, write_starter_policy
+    sh = _home(tmp_path)
+    policy = _put(sh, _earlier(EARLIER[tag][0]))
+    assert write_starter_policy(home=sh, enabled=True) == policy
+    assert policy.read_bytes() == starter_policy_text(enabled=True).encode("utf-8")
+    assert _leftovers(sh) == []
+
+
+def test_a_current_disabled_starter_is_still_enabled_by_the_policy_rerun(tmp_path):
+    """Control for the table above: the road that worked before still works."""
+    from sunglasses.firewall import starter_policy_text, write_starter_policy
+    sh = _home(tmp_path)
+    write_starter_policy(home=sh, enabled=False)
+    assert write_starter_policy(home=sh, enabled=True) == sh / "policy.yaml"
+    assert (sh / "policy.yaml").read_bytes() == starter_policy_text(enabled=True).encode("utf-8")
+
+
+def _crlf(b):
+    return b.replace(b"\n", b"\r\n")
+
+
+def _lone_cr(b):
+    return b.replace(b"\n", b"\r")
+
+
+def _one_crlf(b):
+    return b.replace(b"\n", b"\r\n", 1)
+
+
+def _bom(b):
+    return b"\xef\xbb\xbf" + b
+
+
+def _no_final_newline(b):
+    return b.rstrip(b"\n")
+
+
+def _extra_final_newline(b):
+    return b + b"\n"
+
+
+def _appended(b):
+    return b + b"# mine\n"
+
+
+def _leading_space(b):
+    return b" " + b
+
+
+def _one_line_uncommented(b):
+    return b.replace(b"# allowed_hosts:\n", b"allowed_hosts:\n", 1)
+
+
+def _a_word_changed(b):
+    return b.replace(b"HARD BLOCKS", b"HARD BLOCKED", 1)
+
+
+def _utf16(b):
+    return b.decode("utf-8").encode("utf-16")
+
+
+EDITS = [_crlf, _lone_cr, _one_crlf, _bom, _no_final_newline, _extra_final_newline, _appended,
+         _leading_space, _one_line_uncommented, _a_word_changed, _utf16]
+
+
+@pytest.mark.parametrize("edit", EDITS, ids=[e.__name__ for e in EDITS])
+@pytest.mark.parametrize("which", ["current", "v0.6.5", "v0.6.6"])
+def test_a_disabled_starter_whose_bytes_differ_is_left_as_it_is(tmp_path, which, edit):
+    from sunglasses.firewall import starter_policy_text, write_starter_policy
+    base = (starter_policy_text(enabled=False).encode("utf-8") if which == "current"
+            else _earlier(EARLIER[which][0]))
+    data = edit(base)
+    assert data != base
+    sh = _home(tmp_path)
+    policy = _put(sh, data)
+    assert write_starter_policy(home=sh, enabled=True) is None
+    assert policy.read_bytes() == data
+    assert _leftovers(sh) == []
+
+
+@pytest.mark.parametrize("data_name", ["disabled_starter", "edited_file"])
+def test_a_symlinked_policy_file_is_not_followed_or_replaced(tmp_path, data_name):
+    from sunglasses.firewall import starter_policy_text, write_starter_policy
+    sh = _home(tmp_path)
+    real = tmp_path / "elsewhere.yaml"
+    data = (starter_policy_text(enabled=False).encode("utf-8") if data_name == "disabled_starter"
+            else b"blocked_paths: []\n")
+    real.write_bytes(data)
+    (sh / "policy.yaml").symlink_to(real)
+    assert write_starter_policy(home=sh, enabled=True) is None
+    assert (sh / "policy.yaml").is_symlink()
+    assert real.read_bytes() == data
+    assert _leftovers(sh) == []
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_a_dangling_symlink_does_not_get_its_target_created(tmp_path, enabled):
+    from sunglasses.firewall import write_starter_policy
+    sh = _home(tmp_path)
+    target = tmp_path / "not-there.yaml"
+    (sh / "policy.yaml").symlink_to(target)
+    assert write_starter_policy(home=sh, enabled=enabled) is None
+    assert not target.exists()
+    assert (sh / "policy.yaml").is_symlink()
+
+
+def _within(fn, seconds, unblock):
+    """Run fn on a thread. True and its result when it finishes, False when it is still blocked."""
+    import threading
+    box = {}
+
+    def go():
+        try:
+            box["v"] = fn()
+        except BaseException as e:  # noqa: BLE001 - reported by the caller
+            box["e"] = e
+
+    t = threading.Thread(target=go, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        unblock()
+        t.join(5)
+        return False, None
+    return True, box
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs a POSIX fifo")
+def test_a_fifo_in_place_of_the_policy_file_is_not_read_or_replaced(tmp_path):
+    from sunglasses.firewall import write_starter_policy
+    sh = _home(tmp_path)
+    fifo = sh / "policy.yaml"
+    os.mkfifo(fifo)
+
+    def unblock():
+        fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)
+        os.close(fd)
+
+    finished, box = _within(lambda: write_starter_policy(home=sh, enabled=True), 5, unblock)
+    assert finished, "the call blocked reading a fifo"
+    assert "e" not in box, box
+    assert box["v"] is None
+    import stat
+    assert stat.S_ISFIFO(os.lstat(fifo).st_mode)
+
+
+def test_a_folder_in_place_of_the_policy_file_is_left_as_it_is(tmp_path):
+    from sunglasses.firewall import write_starter_policy
+    sh = _home(tmp_path)
+    (sh / "policy.yaml").mkdir()
+    assert write_starter_policy(home=sh, enabled=True) is None
+    assert (sh / "policy.yaml").is_dir()
+
+
+def test_a_file_changed_after_it_was_read_is_not_replaced(tmp_path, monkeypatch):
+    """The user saves their own policy over the starter between the read and the replace."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = _put(sh, _earlier(V065_HEAD))
+    mine = b"blocked_paths:\n  - /opt/mine\n"
+    real_fsync = os.fsync
+    calls = []
+
+    def fsync_then_the_user_saves(fd):
+        real_fsync(fd)
+        if not calls:
+            calls.append(1)
+            policy.write_bytes(mine)
+
+    monkeypatch.setattr(os, "fsync", fsync_then_the_user_saves)
+    assert firewall.write_starter_policy(home=sh, enabled=True) is None
+    assert calls == [1]
+    assert policy.read_bytes() == mine
+    assert _leftovers(sh) == []
+
+
+def test_a_failed_replace_leaves_the_file_and_no_temporary_file(tmp_path, monkeypatch):
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    before = _earlier(V066_HEAD)
+    policy = _put(sh, before)
+
+    def boom(*a, **k):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(os, "replace", boom)
+    with pytest.raises(OSError):
+        firewall.write_starter_policy(home=sh, enabled=True)
+    assert policy.read_bytes() == before
+    assert _leftovers(sh) == []
+
+
+def test_a_failed_first_write_leaves_no_policy_file(tmp_path, monkeypatch):
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+
+    def boom(fd):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(os, "fsync", boom)
+    with pytest.raises(OSError):
+        firewall.write_starter_policy(home=sh, enabled=True)
+    assert not (sh / "policy.yaml").exists()
+    assert _leftovers(sh) == []
+
+
+def _the_user_saves(policy, data):
+    """An editor's save: write beside the file, then rename over it."""
+    side = policy.with_name("user-save.yaml")
+    side.write_bytes(data)
+    os.replace(side, policy)
+
+
+def _removed_paths(monkeypatch):
+    """Record each path handed to os.unlink while the test runs."""
+    removed = []
+    real_unlink = os.unlink
+
+    def watch(path, *a, **k):
+        removed.append(pathlib.Path(path))
+        return real_unlink(path, *a, **k)
+
+    monkeypatch.setattr(os, "unlink", watch)
+    return removed
+
+
+def test_a_policy_file_created_by_someone_else_during_the_first_write_is_kept(tmp_path, monkeypatch):
+    """The name is taken after the new file is finished and before it is published."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = sh / "policy.yaml"
+    mine = b"blocked_paths:\n  - /opt/mine\n"
+    real_link = os.link
+
+    def link_after_the_user_saves(src, dst, *a, **k):
+        if pathlib.Path(dst) == policy:
+            policy.write_bytes(mine)
+        return real_link(src, dst, *a, **k)
+
+    removed = _removed_paths(monkeypatch)
+    monkeypatch.setattr(os, "link", link_after_the_user_saves)
+    assert firewall.write_starter_policy(home=sh, enabled=True) is None
+    assert policy.read_bytes() == mine
+    assert policy not in removed
+    assert _leftovers(sh) == []
+
+
+def test_a_policy_saved_before_a_failed_first_write_is_not_removed(tmp_path, monkeypatch):
+    """The user saves over the path while the new file is being synced, and the sync then fails.
+    The cleanup removes the file this call made and nothing else."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = sh / "policy.yaml"
+    mine = b"blocked_paths:\n  - /opt/mine\n"
+
+    def save_then_fail(fd):
+        _the_user_saves(policy, mine)
+        raise OSError(5, "Input/output error")
+
+    removed = _removed_paths(monkeypatch)
+    monkeypatch.setattr(os, "fsync", save_then_fail)
+    with pytest.raises(OSError):
+        firewall.write_starter_policy(home=sh, enabled=True)
+    assert policy.read_bytes() == mine
+    assert policy not in removed
+    assert _leftovers(sh) == []
+
+
+def test_a_new_policy_file_is_not_seen_part_written(tmp_path, monkeypatch):
+    """While the bytes are being written the policy name does not exist yet."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = sh / "policy.yaml"
+    seen = []
+    real_write = os.write
+
+    def look_then_write(fd, data):
+        seen.append(policy.exists())
+        return real_write(fd, data[:100] if len(data) > 100 else data)
+
+    monkeypatch.setattr(os, "write", look_then_write)
+    assert firewall.write_starter_policy(home=sh, enabled=True) == policy
+    assert len(seen) > 1 and not any(seen)
+    assert policy.read_bytes() == firewall.starter_policy_text(enabled=True).encode("utf-8")
+    assert _leftovers(sh) == []
+
+
+def test_a_save_during_the_final_read_is_not_overwritten(tmp_path, monkeypatch):
+    """The user saves over the starter while the second read of it is in progress, after the first
+    chunk was read. The second read still reaches the end of the old file, so its bytes match."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = _put(sh, _earlier(V065_HEAD))
+    mine = b"blocked_paths:\n  - /opt/mine\n"
+    real_read_policy = firewall._read_policy_file
+    real_read = os.read
+    state = {"calls": 0, "saved": False}
+
+    def save_after_the_first_chunk(fd, n):
+        data = real_read(fd, n)
+        if data and not state["saved"]:
+            state["saved"] = True
+            _the_user_saves(policy, mine)
+        return data
+
+    def second_read_with_a_save(path):
+        state["calls"] += 1
+        if state["calls"] != 2:
+            return real_read_policy(path)
+        monkeypatch.setattr(os, "read", save_after_the_first_chunk)
+        try:
+            return real_read_policy(path)
+        finally:
+            monkeypatch.setattr(os, "read", real_read)
+
+    monkeypatch.setattr(firewall, "_read_policy_file", second_read_with_a_save)
+    assert firewall.write_starter_policy(home=sh, enabled=True) is None
+    assert state["saved"]
+    assert policy.read_bytes() == mine
+    assert _leftovers(sh) == []
+
+
+def test_a_file_saved_with_the_same_bytes_but_as_a_new_file_is_not_replaced(tmp_path, monkeypatch):
+    """Same bytes is not the same file. A save that rewrites the starter text as a new file during the
+    staging is the user's file now, and it is kept."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    before = _earlier(V066_HEAD)
+    policy = _put(sh, before)
+    real_fsync = os.fsync
+    saved_inodes = []
+
+    def fsync_then_the_user_saves_the_same_text(fd):
+        real_fsync(fd)
+        if not saved_inodes:
+            _the_user_saves(policy, before)
+            saved_inodes.append(os.stat(policy).st_ino)
+
+    monkeypatch.setattr(os, "fsync", fsync_then_the_user_saves_the_same_text)
+    assert firewall.write_starter_policy(home=sh, enabled=True) is None
+    assert len(saved_inodes) == 1
+    assert policy.read_bytes() == before
+    assert os.stat(policy).st_ino == saved_inodes[0]
+    assert _leftovers(sh) == []
+
+
+def test_a_file_changed_while_it_is_being_read_is_refused(tmp_path, monkeypatch):
+    """An in place save during the read gives a mix of old and new bytes at best, so it is not
+    read as a starter."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    policy = _put(sh, _earlier(V065_HEAD))
+    real_read = os.read
+    state = {"done": False}
+
+    def rewrite_in_place_after_the_first_chunk(fd, n):
+        data = real_read(fd, n)
+        if data and not state["done"]:
+            state["done"] = True
+            with open(policy, "r+b") as f:
+                f.write(b"# edited\n")
+        return data
+
+    monkeypatch.setattr(os, "read", rewrite_in_place_after_the_first_chunk)
+    kind, data, _mode, _identity = firewall._read_policy_file(policy)
+    assert state["done"]
+    assert kind == "unsafe" and data is None
+
+
+_DIES_AFTER_A_SHORT_WRITE = r"""
+import os, pathlib, signal, sys
+sys.path.insert(0, sys.argv[1])
+from sunglasses import firewall as f
+def short_write_then_die(fd, data):
+    os.write(fd, data[:data.index(b"\n") + 1])
+    os.kill(os.getpid(), signal.SIGKILL)
+f._write_all = short_write_then_die
+f.write_starter_policy(home=pathlib.Path(sys.argv[2]), enabled=True)
+"""
+
+_DIES_AFTER_A_FULL_STAGING_WRITE = r"""
+import os, pathlib, signal, sys
+sys.path.insert(0, sys.argv[1])
+from sunglasses import firewall as f
+def write_then_die(fd, data):
+    os.write(fd, data)
+    os.kill(os.getpid(), signal.SIGKILL)
+f._write_all = write_then_die
+f.write_starter_policy(home=pathlib.Path(sys.argv[2]), enabled=True)
+"""
+
+
+def _run_until_killed(code, sh):
+    return subprocess.run([sys.executable, "-B", "-c", code, str(REPO), str(sh)], capture_output=True).returncode
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="needs a POSIX signal")
+def test_a_writer_killed_after_a_short_write_leaves_no_partial_policy(tmp_path):
+    """Process death cannot run cleanup. It may leave one staging file. It must not leave a
+    policy.yaml holding the first comment line, which would load as an empty policy."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    assert _run_until_killed(_DIES_AFTER_A_SHORT_WRITE, sh) == -9
+    assert not (sh / "policy.yaml").exists()
+    assert len(_leftovers(sh)) <= 1
+    # the rerun is not blocked by what the killed run left, and writes the whole enabled starter
+    assert firewall.write_starter_policy(home=sh, enabled=True) == sh / "policy.yaml"
+    assert (sh / "policy.yaml").read_bytes() == firewall.starter_policy_text(enabled=True).encode("utf-8")
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="needs a POSIX signal")
+def test_a_writer_killed_during_an_upgrade_leaves_the_old_file_whole(tmp_path):
+    before = _earlier(V065_HEAD)
+    sh = _home(tmp_path)
+    policy = _put(sh, before)
+    assert _run_until_killed(_DIES_AFTER_A_FULL_STAGING_WRITE, sh) == -9
+    assert policy.read_bytes() == before
+    assert len(_leftovers(sh)) <= 1
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs a POSIX fifo")
+def test_a_fifo_at_the_policy_path_is_not_passed_to_open(tmp_path, monkeypatch):
+    """The first look at the path refuses a fifo before an open is tried on it."""
+    from sunglasses import firewall
+    sh = _home(tmp_path)
+    fifo = sh / "policy.yaml"
+    os.mkfifo(fifo)
+    opened = []
+    real_open = os.open
+
+    def watch(path, *a, **k):
+        opened.append(pathlib.Path(path))
+        return real_open(path, *a, **k)
+
+    monkeypatch.setattr(os, "open", watch)
+    assert firewall.existing_policy_kind(home=sh) == "other"
+    assert firewall.write_starter_policy(home=sh, enabled=True) is None
+    assert fifo not in opened
+
+
+def test_an_upgrade_keeps_the_mode_of_the_file(tmp_path):
+    from sunglasses.firewall import write_starter_policy
+    sh = _home(tmp_path)
+    policy = _put(sh, _earlier(V065_HEAD))
+    os.chmod(policy, 0o640)
+    assert write_starter_policy(home=sh, enabled=True) == policy
+    assert (os.stat(policy).st_mode & 0o777) == 0o640
+
+
+def test_the_untouched_check_reads_bytes_and_accepts_only_the_texts_that_were_written():
+    from sunglasses.firewall import _is_our_untouched_disabled_starter as ours, starter_policy_text
+    current = starter_policy_text(enabled=False).encode("utf-8")
+    assert ours(current)                                          # control: today's own disabled starter
+    assert ours(_earlier(V065_HEAD)) and ours(_earlier(V066_HEAD))
+    assert not ours(starter_policy_text(enabled=True).encode("utf-8"))   # an enabled file is a policy
+    assert not ours(b"")
+    assert not ours(_earlier(V065_HEAD) + b"\n")
+    assert not ours(_crlf(current))
+
+
+def _init_policy(tmp_path, data):
+    home = tmp_path / "home"
+    sh = home / ".sunglasses"
+    sh.mkdir(parents=True)
+    (sh / "policy.yaml").write_bytes(data)
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(sh), PYTHONPATH=str(REPO))
+    out = subprocess.run([sys.executable, "-m", "sunglasses.cli", "init", "--policy"],
+                         capture_output=True, text=True, env=env, cwd=str(proj),
+                         stdin=subprocess.DEVNULL, timeout=180)
+    return sh, out
+
+
+def test_init_policy_enables_an_unchanged_older_starter_and_does_not_blame_the_user(tmp_path):
+    """The CLI message is what a person reads."""
+    sh, out = _init_policy(tmp_path, _earlier(V066_HEAD))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "ENABLED" in out.stdout, out.stdout
+    assert "your own edits" not in out.stdout, out.stdout
+    from sunglasses.firewall import starter_policy_text
+    assert (sh / "policy.yaml").read_bytes() == starter_policy_text(enabled=True).encode("utf-8")
+
+
+@pytest.mark.parametrize("which", ["current", "v0.6.5", "v0.6.6"])
+def test_init_policy_on_an_enabled_starter_says_it_is_already_enabled(tmp_path, which):
+    from sunglasses.firewall import starter_policy_text
+    data = (starter_policy_text(enabled=True).encode("utf-8") if which == "current"
+            else _earlier(EARLIER_ENABLED[which][0], True))
+    sh, out = _init_policy(tmp_path, data)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "already enabled" in out.stdout, out.stdout
+    assert "your own edits" not in out.stdout and "Uncomment" not in out.stdout, out.stdout
+    assert (sh / "policy.yaml").read_bytes() == data
+
+
+def test_init_policy_on_a_changed_file_says_it_was_left_untouched_without_claiming_who_changed_it(tmp_path):
+    sh, out = _init_policy(tmp_path, _crlf(_earlier(V065_HEAD)))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "left untouched" in out.stdout, out.stdout
+    assert "your own edits" not in out.stdout and "already enabled" not in out.stdout, out.stdout
+    assert (sh / "policy.yaml").read_bytes() == _crlf(_earlier(V065_HEAD))
+
+
+def test_the_policy_file_header_says_where_the_secret_check_applies_and_keeps_the_empty_file_warning():
+    from sunglasses.firewall import starter_policy_text
+    for enabled in (True, False):
+        flat = re.sub(r"\s*\n#\s*", " ", starter_policy_text(enabled=enabled))
+        assert "Detected secret material in outbound tool calls is denied even without this file." in flat
+        assert "This file adds your path and host rules." in flat
+        assert "Secret material in tool calls is denied" not in flat
+        assert "No file at all enforces nothing" not in flat
+        assert "a file with only comments enforces nothing" not in flat
+        assert "An empty file is treated as a broken policy, and a tool call that nothing else settles asks until the file is repaired" in flat

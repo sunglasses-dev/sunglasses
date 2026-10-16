@@ -60,6 +60,28 @@ LEET = {
     '7': 't', '@': 'a', '$': 's', '!': 'i',
 }
 
+# Control characters that are neither whitespace nor escape. A NUL between
+# letters (or after each ASCII letter of a UTF-16 file saved without a byte
+# order mark) split a phrase for every lane. Tab, newline, carriage return,
+# vertical tab, form feed, the four separators and next line stay because \s
+# reads them as spaces, and escape stays because a rule matches it raw.
+CONTROL_RANGES = '\x00-\x08\x0e-\x1a\x7f-\x84\x86-\x9f'
+CONTROL_CHARS = re.compile('[' + CONTROL_RANGES + ']')
+_CONTROL_RUN = re.compile('[' + CONTROL_RANGES + ']+')
+
+
+def controls_as_spaces(text: str) -> str:
+    """The text with each run of control characters read as one space, except where the run
+    already stands next to blank space or at an edge of the text: deleting it there leaves
+    the same words as reading it as a space, and the extra space would only double a blank
+    that the normalizer collapses again."""
+    def one(run):
+        a, b = run.start(), run.end()
+        if a == 0 or b == len(text) or text[a - 1].isspace() or text[b].isspace():
+            return ""
+        return " "
+    return _CONTROL_RUN.sub(one, text)
+
 # Zero-width and invisible Unicode characters
 INVISIBLE_CHARS = re.compile(
     '[\u200b\u200c\u200d\u200e\u200f'   # zero-width spaces/joiners
@@ -70,6 +92,7 @@ INVISIBLE_CHARS = re.compile(
     '\u061c'                              # Arabic letter mark
     '\u2028\u2029'                        # line/paragraph separators
     '\U000e0001-\U000e007f'              # Unicode tag characters
+    + CONTROL_RANGES +
     ']'
 )
 
@@ -94,15 +117,30 @@ def normalize(text: str) -> str:
     return normalize_with_length(text)[0]
 
 
-def normalize_with_length(text: str) -> tuple:
+def normalize_with_length(text: str, record=None) -> tuple:
     """normalize(), plus the length of the folded plain text that the
     enrichment gate measured. That length is taken after every fold and before
     any view is appended, so a caller gating on it agrees with this function
-    about what counts as a short input."""
+    about what counts as a short input.
+
+    record, when given, is a list: each base64 blob the pipeline replaced is
+    appended to it, in the plain view and in the shadow view's own pipeline, and
+    so is HTML_FALLBACK each time the entity step gave up on the whole input. It
+    changes nothing else; a caller that needs to know whether the pipeline
+    decoded anything asks the pipeline and does not run a second decoder."""
     text = text.replace(VIEW_SEP, " ")
     # Read before strip_invisible removes them, so the plain view still loses
     # them (a split phrase keeps matching) and the shadow view sees the text.
     shadow = decode_shadow_ascii(text)
+    # Control characters are deleted below so a phrase they split reads whole.
+    # Deleting one also joins what it separated, and a base64 run that followed
+    # a NUL then merges with the word before it and no longer decodes. So the
+    # same text with each control read as a space is kept as a view of its own,
+    # behind the separator, and decoded on its original boundaries.
+    spaced = controls_as_spaces(text) if CONTROL_CHARS.search(text) else None
+    if spaced is not None and spaced == CONTROL_CHARS.sub("", text):
+        # Every control stands next to blank space: the view would repeat the plain one.
+        spaced = None
     text = strip_invisible(text)
     text = normalize_unicode(text)
     text = replace_homoglyphs(text)
@@ -115,10 +153,10 @@ def normalize_with_length(text: str) -> tuple:
     DECODE_MAX_PASSES = 3
     for _ in range(DECODE_MAX_PASSES):
         before = text
-        text = decode_html_entities(text)     # HTML entities (&#73; etc) → chars
+        text = decode_html_entities(text, record)     # HTML entities (&#73; etc) → chars
         text = decode_url_encoding(text)      # URL encoding (%49 etc) → chars
         text = decode_hex_escapes(text)       # \x49 etc → chars
-        text = decode_base64_segments(text)   # base64 blobs → decoded text
+        text = decode_base64_segments(text, record)   # base64 blobs → decoded text
         if text == before:
             break
     text = decode_leetspeak(text)
@@ -163,10 +201,12 @@ def normalize_with_length(text: str) -> tuple:
         if rot != text:
             text = text + " " + VIEW_SEP + " " + rot
         text = text.lower()
+    if spaced is not None:
+        text = text + " " + VIEW_SEP + " " + normalize(spaced)
     if shadow is not None:
         # Its own views, behind the separator, so an excerpt never joins it
         # to the plain text.
-        text = text + " " + VIEW_SEP + " " + normalize(shadow)
+        text = text + " " + VIEW_SEP + " " + normalize_with_length(shadow, record)[0]
     return text, folded_length
 
 
@@ -211,13 +251,23 @@ def collapse_whitespace(text: str) -> str:
     return text.strip()
 
 
-def decode_html_entities(text: str) -> str:
-    """Decode HTML entities (&#73; &amp; &lt; etc) to raw characters."""
+# Put in a record by decode_html_entities when it gave up on the whole input. It is the one step of
+# the pipeline whose result for a stretch of text depends on the text around it.
+HTML_FALLBACK = "\x00html-whole-input-fallback"
+
+
+def decode_html_entities(text: str, record=None) -> str:
+    """Decode HTML entities (&#73; &amp; &lt; etc) to raw characters.
+
+    record, when given, is a list that HTML_FALLBACK is appended to when the whole input is left
+    unchanged because one reference in it could not be read."""
     if '&' not in text:
         return text
     try:
         return html.unescape(text)
     except Exception:
+        if record is not None:
+            record.append(HTML_FALLBACK)
         return text
 
 
@@ -254,13 +304,17 @@ def decode_rot13(text: str) -> str:
         return text
 
 
-def decode_base64_segments(text: str) -> str:
-    """Find and inline-decode Base64 segments, REPLACING the encoded text with decoded."""
+def decode_base64_segments(text: str, record=None) -> str:
+    """Find and inline-decode Base64 segments, REPLACING the encoded text with decoded.
+
+    record, when given, is a list that each replaced segment is appended to."""
     def _try_decode(match):
         segment = match.group(0)
         try:
             decoded = base64.b64decode(segment).decode('utf-8', errors='ignore')
             if decoded.isprintable() and len(decoded) > 4:
+                if record is not None:
+                    record.append(segment)
                 return decoded  # Replace encoded with decoded for pattern matching
         except Exception:
             pass

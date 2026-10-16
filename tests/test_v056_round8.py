@@ -119,13 +119,17 @@ def test_eager_frame_list_mutation_loses_the_finding():
     place, the cells above prove nothing.
     """
     from sunglasses.scanner import SunglassesScanner
-    real_iter = ImageSequence.Iterator
+    from sunglasses.extractors.image import ImageExtractor
+    # r3: the walk goes through `_reachable_frames`, which yields the same mutable
+    # image re-seeked, exactly as ImageSequence.Iterator did. Materialising it is
+    # the same defect, so the mutation is applied to the walker the code uses.
+    real_walk = ImageExtractor._reachable_frames
 
-    def eager(img):
-        return iter(list(real_iter(img)))
+    def eager(img, reader):
+        return iter(list(real_walk(img, reader)))
 
     lost = []
-    with patch.object(ImageSequence, "Iterator", side_effect=lambda im: eager(im)):
+    with patch.object(ImageExtractor, "_reachable_frames", staticmethod(eager)):
         for fixture, text_frame in OCR_FRAME_FIXTURES:
             if text_frame == 2:
                 continue  # the last frame is where an aliased walk lands anyway
@@ -163,10 +167,16 @@ def test_iterator_is_not_materialised_in_the_ocr_walk():
                 if isinstance(arg, ast.Call):
                     inner = arg.func
                     name = getattr(inner, "attr", getattr(inner, "id", ""))
-                    if name == "Iterator":
+                    if name in ("Iterator", "_reachable_frames"):
                         offenders.append(ast.dump(node)[:80])
     assert not offenders, (
         f"the frame sequence is materialised again in _ocr_frames_of: {offenders}")
+    # The walker itself has to stay a generator: a list-returning walker would be
+    # the same defect one level down.
+    walker = ast.parse(textwrap.dedent(inspect.getsource(
+        image_mod.ImageExtractor._reachable_frames)))
+    assert any(isinstance(n, ast.Yield) for n in ast.walk(walker)), (
+        "_reachable_frames is no longer a generator")
 
 
 # --------------------------------------------------------------------------

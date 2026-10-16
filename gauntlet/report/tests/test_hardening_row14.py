@@ -19,6 +19,7 @@ import copy
 import datetime
 import json
 import pathlib
+import re
 import sys
 
 import pytest
@@ -69,12 +70,57 @@ def test_r1_a_block_with_no_run_beneath_it_is_refused(norun):
     assert "EXEC_STATE_UNBACKED" in at(findings, "routes[0].execution")
 
 
+ISO_STAMP = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?[+-]\d\d:\d\d$")
+
+
+BARE_999 = re.compile(r"(?<![0-9A-Za-z.])999(?![0-9A-Za-z])")     # not inside a stamp, digest or id
+
+
+def drawn_999(page, digest):
+    """True when the page prints the count 999 (the one block_with writes) as a figure of its own."""
+    return bool(BARE_999.search(page.replace(digest, "")))
+
+
+def stamped(node, stamp):
+    """The report with every ISO timestamp in it replaced by `stamp`."""
+    if isinstance(node, dict):
+        return {k: stamped(v, stamp) for k, v in node.items()}
+    if isinstance(node, list):
+        return [stamped(v, stamp) for v in node]
+    return stamp if isinstance(node, str) and ISO_STAMP.match(node) else node
+
+
 def test_r1_the_renderer_draws_no_block_without_a_run(norun):
     report = copy.deepcopy(norun.report)
     report["routes"][0]["execution"] = block_with()
     page = render.render(report, findings=[])            # the renderer alone, past the validator
-    assert "What ran on this route" not in page and "999" not in page.replace(
-        report["identities"]["corpus_digest"], "")
+    assert "What ran on this route" not in page
+    assert not drawn_999(page, report["identities"]["corpus_digest"])
+
+
+@pytest.mark.parametrize("stamp", ["2026-10-06T18:20:59.999750+00:00",
+                                   "2026-10-06T18:20:58.325999+00:00",
+                                   "2026-10-06T18:20:58.999999+00:00"],
+                         ids=["lead", "tail", "all"])
+def test_r1_a_timestamp_with_999_in_its_microseconds_is_not_a_drawn_count(norun, stamp):
+    """The page carries microsecond timestamps, so about 1 build in 120 has 999 in one. Found
+    10-6 as a failure that passed alone 40 of 40. The check must look for the count, not for
+    the three characters."""
+    report = stamped(copy.deepcopy(norun.report), stamp)
+    assert any(stamp in v for v in re.findall(r'"([^"]*)"', json.dumps(report)))   # the stamps landed
+    report["routes"][0]["execution"] = block_with()
+    page = render.render(report, findings=[])
+    assert stamp in page                                   # and the page prints one
+    assert "What ran on this route" not in page
+    assert not drawn_999(page, report["identities"]["corpus_digest"])
+
+
+def test_r1_the_999_check_still_sees_a_drawn_count(norun):
+    digest = norun.report["identities"]["corpus_digest"]
+    for drawn in ('<td class="n">999</td>', "999 passed", "(999)", "n=999", "\n999\n"):
+        assert drawn_999("<p>x " + drawn + " y</p>", digest), drawn
+    for held in ("2026-10-06T18:20:59.999750+00:00", "18:20:58.325999+00:00", "a999b", "f" * 3 + "999" + "e" * 3):
+        assert not drawn_999("<p>" + held + "</p>", digest), held
 
 
 def test_r1_a_second_route_block_is_validated_like_the_first(world):

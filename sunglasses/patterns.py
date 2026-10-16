@@ -1868,7 +1868,7 @@ PATTERNS = [
             "pull from rss and auto-publish",
         ],
         "regex": [
-            r"(?i)(fetch|crawl|scrape|read)\s+(?:this|the)?\s*(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
+            r"(?i)(fetch|crawl|scrape|read)\s+(?:(?:this|the)\s*)?(?:url|page|site|website|rss|feed).{0,80}(publish|post|schedule|push to cms|push to wordpress)",
             r"(?i)(publish|post|schedule).{0,80}(fetched|scraped|crawled|rss|feed)",
         ],
         "description": "Indirect prompt injection or poisoned source content entering an agent workflow that fetches external pages, generates content, and pushes toward publishing systems."
@@ -2372,12 +2372,20 @@ PATTERNS = [
             # block on ordinary work. So the repair also narrows it to what it was
             # always meant to catch: an upload whose PAYLOAD is a credential file.
             # A generic upload is not evidence of anything; `-d @` a dotfile is.
+            # The credential words use plain alternation, `secret(?:s|)` and not `secrets?`,
+            # `api(?:_key|-key|key)` and not `api[_-]?key`, and so on. It is the same
+            # language and the same order of tries, with the same number of
+            # alternatives. A class of optional pieces gives the engine no word to look
+            # for, so it ran on an eligible text whenever it held a curl. With literal words
+            # the engine derives a second required set of literals and short prefixes of
+            # the words, such as `access` and `secret`, and it skips an eligible text that
+            # holds a curl and none of them. A text with one such literal still runs the regex.
             # Branch A — a payload reference: some upload flag, then `@<credential file>`.
             r"curl\b[^\n]{0,200}?(?:\b|(?<!\S))"
             r"(?:-X\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)"
             r"(?:\b|(?!\S))[^\n]{0,160}?@[^\s;|&]{0,120}?"
             r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
-            r"|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)"
+            r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
             r"(?:\b|(?!\S))"
             # Branch B — `-T` / `--upload-file` take a BARE path, no `@`. Kept separate
             # and anchored directly to the flag: allowing a bare path in branch A would
@@ -2385,7 +2393,7 @@ PATTERNS = [
             r"|curl\b[^\n]{0,200}?(?:\b|(?<!\S))(?:--upload-file|-T)(?:\b|(?!\S))\s+"
             r"[^\s;|&]{0,120}?"
             r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
-            r"|id_rsa|id_ed25519|credentials|secrets?|api[_-]?key|access[_-]?token)"
+            r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
             r"(?:\b|(?!\S))",
         ],
         "description": "Detects a curl command uploading a credential file (.env, .npmrc, SSH or AWS credentials, tokens) to a remote endpoint — the payload shape of agent-workflow exfiltration. A plain upload of ordinary data is not flagged."
@@ -3142,7 +3150,7 @@ PATTERNS = [
             "wallet",
         ],
         "regex": [
-            r"(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|POST|upload|C2|send)",
+            r"(?i)(?:Atomic Stealer|AMOS|keychain|cookies|Telegram sessions|SSH keys|wallet).{0,200}(?:zip|compress|\bPOST(?:s|ed)?\b|upload|C2|send)",
         ],
         "description": "Detects AMOS-style infostealer behavior: harvesting sensitive data then compressing and exfiltrating."
     },
@@ -3516,7 +3524,7 @@ PATTERNS = [
             "disabled tools",
         ],
         "regex": [
-            r"(?i)(?:--allowed-tools\s*[\"']?\s*[\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)",
+            r"(?i)(?:--allowed-tools\s*(?:[\"']\s*)?[\"']?).{0,120}(?:sandbox|restrict|disabled).{0,120}(?:run|execute|tool)",
         ],
         "description": "Detects mismatches where sandbox/restriction claims in config do not match actual tool execution."
     },
@@ -4931,9 +4939,9 @@ PATTERNS = [
         ],
         "regex": [
             r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}\b(?:in\s+your\s+(?:reply|response|output|answer))\b",
-            r"(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=|javascript:)",
+            r"""(?i)\b(?:render|embed|include|insert|output|display)\b.{0,80}(?:<\s*(?:iframe|script|form)\b|onclick\s*=|onerror\s*=|onload\s*=(?!\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?'))|javascript:)|(?:(?<![\s\S])|>|(?!<(?-i:[lL][iI][nN][kK])(?=[ \t\n\r\f])(?=(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>)(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]*/?>)(?=(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>)(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>)|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]*/?>))<)[^<>]*?\b(?:render|embed|include|insert|output|display)\b[^<>]{0,80}?(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')|\b(?:render|embed|include|insert|output|display)\b.{0,80}?(?!<(?-i:[lL][iI][nN][kK])(?=[ \t\n\r\f])(?=(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>)(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]*/?>)(?=(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>)(?:[ \t\n\r\f]+(?!on)(?!(?-i:[mM][eE][dD][iI][aA])(?=[ \t\n\r\f=>]))[^ \t\n\r\f/>=\"'<]+(?=[ \t\n\r\f=>])(?:[ \t\n\r\f]*=[ \t\n\r\f]*(?:\"[^\"<>]*\"|'[^'<>]*'))?|[ \t\n\r\f]+(?-i:[mM][eE][dD][iI][aA])[ \t\n\r\f]*=[ \t\n\r\f]*(?:(?-i:\"[pP][rR][iI][nN][tT]\"|'[pP][rR][iI][nN][tT]'))(?=[ \t\n\r\f]|/?>)|[ \t\n\r\f]+(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')(?=[ \t\n\r\f]|/?>))*[ \t\n\r\f]*/?>))<[^<>]{0,80}?(?-i:[oO][nN][lL][oO][aA][dD])\s*=\s*(?-i:\"this\.media\s*=\s*'all'\s*(?:;\s*)?\"|'this\.media\s*=\s*\"all\"\s*(?:;\s*)?')""",
         ],
-        "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel.",
+        "description": "Detects instructions telling the agent to render or embed live HTML/UI elements (button, iframe, script, onclick handler) inside its reply — used to plant exfiltration triggers or fake interactive elements via the assistant's own output channel. A deferred stylesheet loader is excused only in one narrow form: a link tag whose attributes are separated by whitespace, with quoted values, one media attribute set to print, the exact media switch load handler and no other event handler, and with a slash allowed only as the last character before the closing bracket. Any other shape of that tag, including a slash between attributes or an unquoted value, is read as before.",
     },
 
     # --- GLS-SEM-UI-220: Fake terminal / auth-success output forgery ---
@@ -11404,7 +11412,7 @@ PATTERNS = [
             "silent integrity loss bifurcation",
         ],
         "regex": [
-            r"""(?i)(?:(?:primary[- ]?key\s+starvation|alias\s+precedence\s+inversion|null[- ]?coalescing\s+laundering|row[- ]?field\s+polymorphism)|(?:omits?|drops?|nulls?)\s+(?:canonical|primary)\s+(?:keys?|fields?)\s+(?:to\s+)?(?:force|steer|coerce)\s+(?:parser\s+)?(?:fallback|alias)|(?:tool\s+(?:result|output))\s+(?:schema)?\s*(?:bifurcation|variants?|polymorphism)\s+(?:steers?|promotes?|elevates?)\s+(?:weaker|stale|attacker[- ]controlled))""",
+            r"""(?i)(?:(?:primary[- ]?key\s+starvation|alias\s+precedence\s+inversion|null[- ]?coalescing\s+laundering|row[- ]?field\s+polymorphism)|(?:omits?|drops?|nulls?)\s+(?:canonical|primary)\s+(?:keys?|fields?)\s+(?:to\s+)?(?:force|steer|coerce)\s+(?:parser\s+)?(?:fallback|alias)|(?:tool\s+(?:result|output))\s+(?:schema\s*)?(?:bifurcation|variants?|polymorphism)\s+(?:steers?|promotes?|elevates?)\s+(?:weaker|stale|attacker[- ]controlled))""",
         ],
         "description": "Attacker steers tool-result parsing toward weaker fallback schemas by omitting canonical keys or polymorphing row fields, promoting false READY verdicts or stale states while the payload remains superficially valid."
     },
@@ -16608,7 +16616,7 @@ PATTERNS = [
             "board-level decision spoof",
         ],
         "regex": [
-            r"""(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\s+(?:policy|governance|compliance|authority|board[- ]level)\s+(?:tag|preamble|directive|decision|override)|(?:compliance\s+update|policy\s+(?:update|supersede)|decision\s*:?\s*must[_ ]run)\s+.{0,80}?(?:supersede|override|outrank|inverts?)\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\s+(?:content|chunk|payload|context)\s+(?:outranks?|overrides?|beats?|exceeds?)\s+(?:canonical|board|system|mission)\s+(?:policy|priority|directive))""",
+            r"""(?i)(?:(?:shadow|forged|fake|spoofed|untrusted)\s+(?:policy|governance|compliance|authority|board[- ]level)\s+(?:tag|preamble|directive|decision|override)|(?:compliance\s+update|policy\s+(?:update|supersede)|decision\s*(?::\s*)?must[_ ]run)\s+.{0,80}?(?:supersede|override|outrank|inverts?)\s+(?:mission|canonical|prior|previous)|(?:untrusted|retrieval|tool)\s+(?:content|chunk|payload|context)\s+(?:outranks?|overrides?|beats?|exceeds?)\s+(?:canonical|board|system|mission)\s+(?:policy|priority|directive))""",
         ],
         "description": "Attacker floods the context window with high-priority-looking pseudo-policy text and forged governance tags, tricking the planner into treating untrusted content as board-level decisions and silently inverting mission priorities."
     },
@@ -17053,7 +17061,7 @@ PATTERNS = [
         "regex": [
             r"""(?i)(?:(?:patch[- ]note|hotfix|vnext|latest[- ]version|newer\s+prompt)\s+(?:authority|directive|update)\s+(?:flip|overrides?|deprecates?|replaces?)\s+(?:previous|canonical|true)\s+(?:constraints?|prompt|spec|contract))""",
             r"""(?i)(?:reply[- ]?template|cycle[- ]update|runbook)\s+(?:shadow|overwrite|graft)\s+(?:contains?|plants?|injects?)\s+(?:fake|mandatory|new)\s+(?:rules?|policy|directives?)""",
-            r"""(?i)(?:production\s+emergency|urgent\s+hotfix|critical\s+bypass)\s*[,:.]?\s+(?:bypass|skip|merge|override)\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\s+(?:rule|gate|constraint)""",
+            r"""(?i)(?:production\s+emergency|urgent\s+hotfix|critical\s+bypass)(?:\s*[,:.])?\s+(?:bypass|skip|merge|override)\s+(?:one[- ]task|single[- ]task|cycle|approval|policy)\s+(?:rule|gate|constraint)""",
         ],
         "description": "Attacker plants directives that masquerade as a newer prompt version, hotfix, or emergency override and pushes the agent to treat the inline text as stronger than canonical mission and policy artifacts. Urgency framing or fake patch-note language collapses precedence and silently rewrites the operating contract."
     },
@@ -25479,7 +25487,7 @@ PATTERNS = [
             "pg_read_file .env",
         ],
         "regex": [
-            r"""(?i)\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\s*(?:/\*.*?\*/)?\s*\(\s*(?:BULK\s+)?['\"]?[^'\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\.pem\b|\.env\b|private[_-]?key)""",
+            r"""(?i)\b(?:pg_read_file|pg_read_binary_file|pg_stat_file|LOAD_FILE|OPENROWSET|OPENDATASOURCE)\s*(?:/\*.*?\*/\s*)?\((?:\s*BULK(?=\s))?(?:\s*['\"])?[^'\")]*?(/etc/(?:shadow|passwd|sudoers)|/etc/(?:postgresql|mysql|nginx|ssh)/|pg_hba\.conf|/root/|/proc/self|\.ssh/|\.aws/credentials|\.kube/config|id_rsa|id_ed25519|/var/(?:lib|run)/secrets|\.pem\b|\.env\b|private[_-]?key)""",
             r"""(?i)\bATTACH\s+(?:DATABASE\s+)?['\"][^'\"]*(?:\.ssh/|id_rsa|\.pem|\.env|/etc/|credentials)""",
         ],
         "description": "A filesystem-read SQL primitive (Postgres pg_read_file/pg_read_binary_file/pg_stat_file, MSSQL OPENROWSET/OPENDATASOURCE, MySQL LOAD_FILE, SQLite ATTACH) targets a SENSITIVE path (/etc/{shadow,passwd}, DB config like pg_hba.conf, SSH keys, cloud credentials, .env files, secrets dirs, PEM keys) in agent-generated/untrusted query text. Detection requires the primitive AND a sensitive-path argument together, which separates an attack from benign admin SQL (GRANT/REVOKE/COMMENT/monitoring). Source: CVE-2026-50180 (Langroid SQLChatAgent)."
@@ -27755,8 +27763,11 @@ PATTERNS = [
     # removes files under ~/.sunglasses/proxy (approvals, captures, installs,
     # locks, receipts), runs `sunglasses proxy approve` or `sunglasses uninstall`
     # itself to spare the human the prompt, pipes an answer into approve, or starts
-    # the server outside the proxy. Every branch names our
-    # own state or command. A generic rm -rf is left to GLS-CI-001.
+    # the server outside the proxy. The later branches read the same intent in the
+    # client's config file: unwrapping our entry from .mcp.json, killing the
+    # running proxy, uninstalling it with a reason that hides it from the human, or
+    # a sed or jq line that rewrites the config around our wrapper. Every branch
+    # names our own state or command. A generic rm -rf is left to GLS-CI-001.
     {
         "id": "GLS-PE-111",
         "name": "Agent told to tamper with the proxy's own state",
@@ -27770,8 +27781,14 @@ PATTERNS = [
             r"""\b(?:skip|avoid|bypass|suppress)\s+(?:the\s+|a\s+|any\s+)?(?:approval|confirmation)\b[^\n]{0,160}?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
             r"""(?:\|\s*|\bscript\s+-q\S*\s+\S+\s+|\bexpect\b[^\n]{0,60}?)(?:python3?\s+-m\s+)?(?:\bsunglasses\s+proxy\s+approve|\bsunglasses\.proxy\s+approve|\bsunglasses\s+uninstall)\b""",
             r"""\b(?:runs?|running|launch(?:es)?|starts?|calls?|invoke|points?)\b[^\n]{0,80}?\bdirectly\b[^\n]{0,40}?\b(?:instead\s+of|rather\s+than|without)\b[^\n]{0,30}?\b(?:(?:going|passing|routing)\s+)?(?:through|via)\s+(?:the\s+)?sunglasses\b""",
+            r"""(?:^|[.!?]\s+|[:;][^\S\n]+)(?:(?:to|in\s+order\s+to|so\s+as\s+to)\s+[^\s,.!?;:\n][^,.!?;:\n]{0,60},\s+)?(?:(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)*(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:remove|delete|drop|strip|unwrap|take\s+out|get\s+rid\s+of|bypass|disable|turn\s+off|switch\s+off|replace)\b[^\n]{0,60}?\bsunglasses(?:\.proxy)?[\"'`]?\s+(?:proxy|wrapper|entry|command|launcher|shim|layer)\b[^\n]{0,120}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)""",
+            r"""(?:^|[.!?]\s+|[:;][^\S\n]+)(?:(?:to|in\s+order\s+to|so\s+as\s+to)\s+[^\s,.!?;:\n][^,.!?;:\n]{0,60},\s+)?(?:(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)*(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:edit|change|modify|rewrite|patch|update|open)\b[^\n]{0,100}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)[^\n]{0,140}?\b(?:remov(?:e|ing)|delet(?:e|ing)|dropp?(?:ing)?|strip(?:ping)?|unwrap(?:ping)?|taking\s+out|getting\s+rid\s+of|bypass(?:ing)?|disabl(?:e|ing)|turn(?:ing)?\s+off|switch(?:ing)?\s+off|replac(?:e|ing))\b[^\n]{0,60}?\bsunglasses(?:\.proxy)?[\"'`]?\s+(?:proxy|wrapper|entry|command|launcher|shim|layer)\b""",
+            r"""(?:^|[.!?]\s+|[:;][^\S\n]+)(?:(?:to|in\s+order\s+to|so\s+as\s+to)\s+[^\s,.!?;:\n][^,.!?;:\n]{0,60},\s+)?(?:(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)*(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:kill|pkill|killall)\b[^\n]{0,40}?\bsunglasses(?:\.proxy|\s+proxy)\b""",
+            r"""(?:^|[.!?]\s+|[:;][^\S\n]+)(?:(?:to|in\s+order\s+to|so\s+as\s+to)\s+[^\s,.!?;:\n][^,.!?;:\n]{0,60},\s+)?(?:(?:then|first|now|next|just|simply|please|also|temporarily|quickly)\s+)*(?:you\s+(?:should|must|need\s+to|have\s+to|can)\s+)?(?:run|execute|invoke|call)\b[^\n]{0,60}?(?:\bsunglasses|\bsunglasses\.proxy)\s+uninstall\b[^\n]{0,160}?\b(?:(?:the\s+)?(?:proxy|sunglasses)\s+(?:is\s+)?(?:blocks?|blocking|slowing|breaking|causing|in\s+the\s+way)|(?:user|human|they)\s+(?:will\s+not|won't|does\s+not|doesn't)\s+(?:mind|need|care)|to\s+(?:remove|disable|get\s+rid\s+of)\s+(?:the\s+)?proxy|so\s+(?:that\s+)?(?:the|this)\s+(?:tool|server|call|request)\s+)""",
+            r"""(?:^|[;&|][^\S\n]*|[.!?]\s+|:[^\S\n]+|\$[^\S\n]+)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)""",
+            r"""(?:^|[;&|][^\S\n]*|[.!?]\s+|:[^\S\n]+|\$[^\S\n]+)(?:sudo\s+)?(?:sed|jq|perl)\b[^\n]{0,160}?(?:\.mcp\.json|\.claude\.json|\bmcp\.json|claude_desktop_config(?:\.json)?|\bmcp\s+(?:client\s+)?(?:config(?:uration)?|settings)|\bclient\s+config(?:uration)?|\bmcpServers\b)[^\n]{0,160}?\bsunglasses(?:\.proxy|\s+proxy)\b""",
         ],
-        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, or to start the server outside the proxy. Each one removes the human check the proxy exists to keep."
+        "description": "An instruction to write or remove the proxy's approvals, captures, installs, locks or receipts, to run approve or uninstall on the human's behalf, to start the server outside the proxy, to take the proxy out of the client's config file, or to stop the running proxy. Each one removes the human check the proxy exists to keep. Quoted or fenced examples of these commands are also flagged."
     },
     {
         "id": "GLS-DKS-002",
@@ -28916,7 +28933,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:unit\s+test|security\s+(?:guide|training|documentation)|defensive|blocked\s+payload|negative\s+fixture|verified\s+edit|conflict[_ -]?check\s*["']?\s*[:=]\s*["']?passed)\b)(?=.*\bknowledge[_ -]?edit\b)(?=.*\bedit[_ -]?status\b.{0,80}\bapplied\b)(?=.*\bprovenance\b.{0,100}\b(?:missing|unverified|external)\b)(?=.*\b(?:downstream[_ -]?reasoning|reasoning)\b.{0,140}\b(?:conclusion|decision)\b.{0,100}\b(?:allow|approve|safe)\b)(?=.*\bconflict[_ -]?check\b.{0,60}\b(?:not\s+run|skipped|absent)\b).*$""",
+            r"""(?is)^(?!.*\b(?:unit\s+test|security\s+(?:guide|training|documentation)|defensive|blocked\s+payload|negative\s+fixture|verified\s+edit|conflict[_ -]?check\s*(?:["']\s*)?[:=]\s*["']?passed)\b)(?=.*\bknowledge[_ -]?edit\b)(?=.*\bedit[_ -]?status\b.{0,80}\bapplied\b)(?=.*\bprovenance\b.{0,100}\b(?:missing|unverified|external)\b)(?=.*\b(?:downstream[_ -]?reasoning|reasoning)\b.{0,140}\b(?:conclusion|decision)\b.{0,100}\b(?:allow|approve|safe)\b)(?=.*\bconflict[_ -]?check\b.{0,60}\b(?:not\s+run|skipped|absent)\b).*$""",
         ],
         "description": "A malicious knowledge edit silently replaces a factual premise, and downstream reasoning accepts it to produce an unsafe security conclusion without an instruction-shaped payload."
     },
@@ -29344,8 +29361,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["tool_output", "api_response", "web_content"],
         "regex": [
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:retrie?ve|get|fetch|list|download|find|access|search|check|collect|gather|pull|export|look\s+up|provide|obtain|extract|dump|copy)\b[^\n]{0,240}?\b(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:it|them|this|these|that|those|(?:the|a|an|all|this|these|those|my)\s+(?:[\w'-]+\s+){0,3}?(?:details|data|information|info|list|file|files|results?|records?|summary|copy|history|report|contents?|email|passwords?|credentials?))\b[^\n]{0,80}?\b(?:to|with|at)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:all\s+(?:of\s+)?)?my\s+(?:[\w'-]+\s+){0,4}?(?:details|data|information|info|records?|history|files?|passwords?|credentials?|addresses|accounts?|contacts?|messages|emails|documents?|photos?|location|keys?)\b[^\n]{0,80}?\b(?:to|with)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:retrie?ve|get|fetch|list|download|find|access|search|check|collect|gather|pull|export|look\s+up|provide|obtain|extract|dump|copy)\b[^\n]{0,240}?\b(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:it|them|this|these|that|those|(?:the|a|an|all|this|these|those|my)\s+(?:[\w'-]+\s+){0,3}?(?:details|data|information|info|list|file|files|results?|records?|summary|copy|history|report|contents?|email|passwords?|credentials?))\b[^\n]{0,80}?\b(?:to|with|at)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:send|e-?mail|forward|share|upload|post|transmit|text)\s+(?:all\s+(?:of\s+)?)?my\s+(?:[\w'-]+\s+){0,4}?(?:details|data|information|info|records?|history|files?|passwords?|credentials?|addresses|accounts?|contacts?|messages|emails|documents?|photos?|location|keys?)\b[^\n]{0,80}?\b(?:to|with)\b[^\n]{0,40}?(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://|\bwww\.|\+\d[\d\s().-]{7,}\d|\(\d{3}\)\s*\d{3}-\d{4}|\b\d{3}-\d{3}-\d{4}\b)""",
         ],
         "description": "Text inside a tool result or fetched page that tells the agent to retrieve the user's records, files or account details and then send them to a named email address, URL or phone number. A tool result reports data. It has no business asking the agent to move the user's data somewhere."
     },
@@ -29356,10 +29373,10 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["tool_output", "web_content", "file"],
         "regex": [
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:encode|encrypt|provide|write|express|render|give|put|reverse|format|convert|present|return|display|replace|translate|reply|respond|answer)\b[^\n.!?]{0,40}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b(?:[^\n.!?]|\.(?=\S)){0,60}?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:(?:use|apply|substitute|swap|replace|encrypt|encode)\b[^\n.!?]{0,60}?)?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b(?:[^\n.!?]|\.(?=\S)){0,60}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b""",
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:reply|respond|answer)\s+(?:only\s+)?(?:in|using|with)\s+(?:a\s+)?(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
-            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)\s*,?\s+|\btool\s+to\s+)(?:translate|render|provide|write|give|put)\s+your\s+(?:response|answer|reply|output|message)\s+(?:in|into|to)\s+(?:spanish|french|german|italian|portuguese|chinese|japanese|korean|russian|arabic|hindi|dutch|turkish|polish|swedish|greek|hebrew|vietnamese|indonesian|thai)\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:encode|encrypt|provide|write|express|render|give|put|reverse|format|convert|present|return|display|replace|translate|reply|respond|answer)\b[^\n.!?]{0,40}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b(?:[^\n.!?]|\.(?=\S)){0,60}?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:(?:use|apply|substitute|swap|replace|encrypt|encode)\b[^\n.!?]{0,60}?)?\b(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b(?:[^\n.!?]|\.(?=\S)){0,60}?\byour\s+(?:[\w-]+\s+){0,2}?(?:response|answer|reply|output|message)(?:'s)?\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:reply|respond|answer)\s+(?:only\s+)?(?:in|using|with)\s+(?:a\s+)?(?:caesar|substitution\s+cipher|monoalphabetic|cipher|base\s?(?:16|32|58|64|85)|rot-?13|morse\s+code|emojis?|reverse|backwards?|invert|character\s+order|shift\s+each\s+letter|order\s+of\s+(?:the\s+)?(?:letters|characters|words))\b""",
+            r"""(?i)(?:^|[\n.!?;:"'\[{(]\s*|\bplease\s+|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?|\b(?:first|then|also|now|and)(?:\s*,\s+|\s+)|\btool\s+to\s+)(?:translate|render|provide|write|give|put)\s+your\s+(?:response|answer|reply|output|message)\s+(?:in|into|to)\s+(?:spanish|french|german|italian|portuguese|chinese|japanese|korean|russian|arabic|hindi|dutch|turkish|polish|swedish|greek|hebrew|vietnamese|indonesian|thai)\b""",
             r"""(?i)\b(?:add|integrate|insert|include|incorporate|append|embed|put|write)\s+(?:a|an|the|this|that|one)\s+(?:[\w'-]+\s+){0,4}?(?:sentence|line|statement|fact|teaser|link|claim|statistic|note|paragraph|remark|reference|announcement|rumou?r|story|joke|promotion|slogan|phrase|quote|mention|disclaimer|signature|footer)\b(?:[^\n]){0,120}?\b(?:in|into|to|within)\s+your\s+(?:response|answer|reply|output|message)\b""",
             r"""(?i)\b(?:add|insert|include|append|put|write)\s+["\u201c'][^"\u201d\n]{3,200}["\u201d']\s+(?:to|in|into|at\s+the\s+end\s+of)\s+your\s+(?:response|answer|reply|output|message)\b""",
             r"""(?i)\b(?:add|include|insert|incorporate|integrate)\s+in(?:to)?\s+your\s+(?:response|answer|reply|output|message)\s+(?:a|an|the|that)\b""",
@@ -29400,5 +29417,30 @@ PATTERNS = [
             r"""(?i)<[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>[ \t\r\n]{0,3}(?:execute|run|ignore|override|disable|delete|send)\b[\w \t_-]{0,30}<[ \t]{0,2}/[ \t]{0,2}(?:critical|urgent|priority|admin|system)[ \t]{0,2}>""",
         ],
         "description": "A made up priority or authority tag, such as critical, urgent, priority, admin or system, followed by text that opens with an order word such as execute, run, ignore, override, disable, delete or send, as in execute immediately, and then closed by a closing tag from the same list. A tag like this imitates a priority marker.",
+    },
+    {
+        "id": "GLS-IP-007",
+        "name": 'AI Addressed Directive About The Answer',
+        "category": "indirect_prompt_injection",
+        "severity": "medium",
+        "channel": ["web_content", "file"],
+        "regex": [
+            r"""(?im)^[ \t]*(?:#{1,6}[ \t]*)?(?:(?:direct\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\s+(?:for|to)\s+(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^\n]{0,60}\n(?:(?:(?!\b(?:humans?|staff|editors?|employees|reviewers?|moderators?|operators?)\b)[\s\S]){0,400}?(?:[.!?]\s{1,20}|\n[ \t]*))?(?:[-*+][ \t]+)?(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)\s*:\s*)?(?:(?:(?:ai|a\.i\.)\s+)?(?:you|assistants?|models?|llms?|agents?)\s+(?:should|must|shall|are\s+to|need\s+to|have\s+to)\s+(?:always\s+|never\s+)?(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,100}?\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|(?:when|if)\s+(?:discussing|asked|users?|someone|a\s+user|answering|recommending|describing|summari[sz]ing|you)\b[^.\n]{0,100}[,:]\s*(?:you\s+)?(?:(?:should|must|please)\s+)?(?:offer|direct|send|refer|point|steer|invite|recommend|mention|add|emphasi[sz]e|tell|say|suggest|always|never)\b|(?:always|never)\s+(?:mention|recommend|say|add|use|include|suggest|answer|reply|respond|cite|link|refer)\b|(?:offer|direct|send|refer|steer)\s+(?:the\s+)?(?:users?|them)\b|(?:add|append|end|finish|close)\b[^.\n]{0,60}\b(?:to|at|with)\s+(?:the\s+)?(?:end|start)\s+of\s+(?:your|the)\s+(?:response|reply|answer)\b|(?:ignore|disregard)\s+(?:all\s+|any\s+)?(?:previous|prior|above)\b|please\s+(?:tell|inform|mention|recommend|say|add|answer|reply)\b)|(?:direct\s+)?(?:command|instructions?|directives?|notes?|messages?|attention)\s+(?:for|to)\s+(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^\n]{0,60}\n[\s\S]{0,400}?(?:[.!?]\s{1,20}|\n[ \t]*)(?:[-*+][ \t]+)?(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,100}?\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?)\s*:\s*(?:(?:(?:ai|a\.i\.)\s+)?(?:you|assistants?|models?|llms?|agents?)\s+(?:should|must|shall|are\s+to|need\s+to|have\s+to)\s+(?:always\s+|never\s+)?(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,100}?\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|state|tell|say|add|offer|direct|refer|include|answer|reply|respond|ignore|avoid|cite|link|point|steer)\b|(?:when|if)\s+(?:discussing|asked|users?|someone|a\s+user|answering|recommending|describing|summari[sz]ing|you)\b[^.\n]{0,100}[,:]\s*(?:you\s+)?(?:(?:should|must|please)\s+)?(?:offer|direct|send|refer|point|steer|invite|recommend|mention|add|emphasi[sz]e|tell|say|suggest|always|never)\b|(?:always|never)\s+(?:mention|recommend|say|add|use|include|suggest|answer|reply|respond|cite|link|refer)\b|(?:offer|direct|send|refer|steer)\s+(?:the\s+)?(?:users?|them)\b|(?:add|append|end|finish|close)\b[^.\n]{0,60}\b(?:to|at|with)\s+(?:the\s+)?(?:end|start)\s+of\s+(?:your|the)\s+(?:response|reply|answer)\b|(?:ignore|disregard)\s+(?:all\s+|any\s+)?(?:previous|prior|above)\b|please\s+(?:tell|inform|mention|recommend|say|add|answer|reply)\b))""",
+            r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llms?|chatgpt|claude|gemini|copilot|perplexity)\b[^.\n]{0,60}\b(?:answering|responding|discussing|asked|describing|recommending)\b[^.\n]{0,80}\b(?:should|must|shall|are\s+to|need\s+to|please)\s+(?:\w+\s+){0,2}(?:emphasi[sz]e|stress|encourage|advise|highlight|mention|recommend|suggest|promote|note|state|tell|say|add|offer|direct|refer)\b""",
+            r"""(?is)\b(?:(?:ai|a\.i\.)\s+(?:assistants?|models?|agents?|chatbots?)|(?:large\s+)?language\s+models?|llm\s+agents?|llms?)\b[^\n]{0,200}?\b(?:when|if)\s+(?:discussing|asked\s+about|users?\s+ask|answering|recommending)\b[^.\n]{0,100}[:,]\s*(?:offer|direct|send|refer|point|steer|invite|ask)\s+(?:the\s+)?(?:users?|them)\b[^.\n]{0,80}\b(?:to|visit|go\s+to|read|see|check)\b[^\n]{0,120}https?://""",
+        ],
+        "description": "Text on a page or in a file that is written to AI models and tells them how to answer. It is found when a heading or label names AI assistants or models and is followed by a sentence that orders or obliges the model, and a line in between that names a human recipient keeps its own scope over a body that does not name the model, so that a description of what some software does, or an instruction aimed at staff, is not held on the cases tested, while a sentence under the heading that itself names the model and orders it is read after such a line, and the recipient scope depends on the recipient words, so wording that avoids them is read like any other body, when AI assistants answering questions about a subject are told what they should emphasize or recommend, or when text that names AI assistants says that users who ask about a subject should be sent to a link. A page can be honest about this, and it is still an instruction aimed at the answer of an agent that read it. The rule reads web content and files only, because a system prompt is written to a model on purpose.",
+    },
+    {
+        "id": "GLS-IP-008",
+        "name": 'Order To Put A Marker In The Reply',
+        "category": "indirect_prompt_injection",
+        "severity": "low",
+        "channel": ["web_content", "file"],
+        "regex": [
+            r"""(?is)\bif\s+you\s+(?:see|read|find|are\s+reading|have\s+read)\s+this\b(?!\s+(?:error|notice|message|warning|page|email|form|screen|banner|dialog|prompt|alert|popup))[^.\n]{0,120}\b(?:add|append|include|insert|end|finish|close|prepend|put|write|say)\b[^.\n]{0,80}\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\b""",
+            r"""(?is)\b(?:add|append|insert|include|put)\b[^.\n]{0,40}\b(?:emoji|emoticon|token|phrase|word|symbol|marker|watermark|codeword|sentence|sign[- ]?off|hashtag)\b[^.\n]{0,40}\b(?:to|at)\s+the\s+(?:end|start|beginning)\s+of\s+(?:your|the)\s+(?:response|reply|answer|message|output)\b""",
+        ],
+        "description": "Text that tells a model that reads it to add a marker to its own reply, such as if you see this add an emoji, a word or a phrase to the end of your response. A marker like that may show that an agent read the text and followed it, which is the mechanism an injection needs. The rule is reported and not blocked, because the text is often benign marketing. It needs the marker to be a token, word, phrase, emoji or similar, so that an order to add a signature or a flag to a message is not found.",
     },
 ]

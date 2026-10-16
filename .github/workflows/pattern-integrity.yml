@@ -89,7 +89,7 @@ permissions: read-all
 
 jobs:
   classify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 10
@@ -150,12 +150,12 @@ jobs:
           echo "quick=$quick" >> "$GITHUB_OUTPUT"
 
   fast:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     # A hang must fail, not wait. Set from the first hosted measurement, not
     # from local arithmetic (ASTRA round 1); tighten once measured.
-    timeout-minutes: 60
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -319,7 +319,7 @@ jobs:
   integrity:
     needs: classify
     if: needs.classify.outputs.full == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     # 180, and the reason is that 120 was measured on a quiet runner.
@@ -338,7 +338,7 @@ jobs:
     # failure, not to turn a slow queue into one.
     #
     # Lower it when the regex prefilter work lands and the real numbers drop.
-    timeout-minutes: 180
+    timeout-minutes: 360
     # One version was tested while setup.py claimed five. A support claim backed by
     # no run is the same class of defect as a published number with no generator:
     # believable, unverified, and only discovered by the user it breaks.
@@ -351,6 +351,10 @@ jobs:
         # EXCLUDE the graded interpreter prove compatibility, not reproduction.
         # 3.14 is fully blocking here — never informational, never continue-on-error.
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        # Each interpreter runs the full suite as two jobs that together are
+        # exactly the suite (tests/ci_shard.py), because the slowest
+        # interpreter's single job outgrew GitHub's six-hour job limit.
+        shard: ["1", "2"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -504,6 +508,8 @@ jobs:
         # full-matrix run says exactly how many tests wait and which ones,
         # which is the difference between a suspicion and a fix. The cost is
         # log lines on a job that already runs for over two hours.
+        env:
+          CI_SHARD: ${{ matrix.shard }}/2
         run: pytest -q --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
 
   coverage:
@@ -511,7 +517,7 @@ jobs:
     # failed upstream job still produces a verdict here instead of silence.
     needs: [classify, fast, integrity]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # No per-job permissions here, deliberately. `coverage` is THE gate and
     # its key set is an ASTRA reviewed contract (tests/test_ci_gate.py,
     # COVERAGE_JOB_KEYS, round 3 R3-2) that exists so an unreviewed shape
@@ -553,7 +559,7 @@ jobs:
     # skipped, been cancelled, or never run. A missing leg is not a pass.
     needs: [classify, fast, integrity, coverage]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 5

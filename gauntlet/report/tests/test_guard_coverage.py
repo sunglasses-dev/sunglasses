@@ -162,10 +162,10 @@ def test_an_unknown_ceiling_state_is_rejected(honest):
         validate.validate_report(mutate(honest, "coverage.ceiling.state", "probably")))
 
 
-def test_a_refusal_must_name_how_many_things_it_could_not_classify(honest):
+def test_a_refusal_must_name_how_many_things_it_could_not_classify(refused_report):
     assert "REFUSAL_WITHOUT_CAUSE" in codes(
         validate.validate_report(
-            mutate(honest, "coverage.ceiling.unclassified_count", 0)))
+            mutate(refused_report, "coverage.ceiling.unclassified_count", 0)))
 
 
 def test_not_applicable_beside_blocked_variants_is_rejected(honest):

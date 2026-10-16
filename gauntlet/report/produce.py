@@ -91,13 +91,31 @@ def engine_head() -> str | None:
     return pinned if len(pinned) == 40 and all(c in "0123456789abcdef" for c in pinned) else None
 
 
+def _corpus_access(root: pathlib.Path) -> tuple[bool, str | None]:
+    """(listable, why_not). Absent is (False, None). Present but not listable is
+    (False, <the OS error class and text, no path>).
+
+    An unreadable review folder (a macOS privacy block, a mode 000 directory)
+    must end in the same refusal as an absent one, never in a traceback. The
+    reason is kept so the refusal can say which of the two it is, and the path is
+    left out because this text can reach a published artifact.
+    """
+    try:
+        if not root.is_dir():
+            return False, None
+        with os.scandir(root):
+            return True, None
+    except OSError as exc:
+        return False, f"{type(exc).__name__}, {exc.strerror or 'no OS text'}, errno {exc.errno}"
+
+
 def _digest_tree(root: pathlib.Path) -> str | None:
     """One digest over the corpus, so a changed variant changes the identity.
 
     Names as well as bytes: a renamed file is a different corpus, and hashing
     only contents would call the two the same.
     """
-    if not root.is_dir():
+    if not _corpus_access(root)[0]:
         return None
     h = hashlib.sha256()
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
@@ -144,7 +162,7 @@ def plan_corpus(materialised: pathlib.Path = MATERIALISED) -> dict:
     execution: a drivable variant that never ran is `not_run`, never `passed`.
     """
     result = {"drivable": [], "blocked": {}, "invalid": {}}
-    if not materialised.is_dir():
+    if not _corpus_access(materialised)[0]:
         return result
     for directory in sorted(p for p in materialised.iterdir() if p.is_dir()):
         variant_id = directory.name
@@ -386,6 +404,11 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
 
     planned = plan_corpus()
     corpus_digest = _digest_tree(MATERIALISED)
+    _, corpus_why_not = _corpus_access(MATERIALISED)
+    if corpus_why_not is not None:
+        # The panel carries a reason code and no sentence, so the why goes to the console, not the report.
+        print("gauntlet report: the pinned corpus is present but cannot be listed from this seat "
+              f"({corpus_why_not})", file=sys.stderr)
 
     # The driver's records, imported like the examiner's. A document that does not bind to
     # tonight's corpus, code and freshness window is set aside with its reason, never counted.
@@ -411,7 +434,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     if capmap is None:
         coverage = _unavailable("EVIDENCE_UNBOUND")          # the capability map is unusable
     elif corpus_digest is None:
-        coverage = _unavailable("EVIDENCE_UNBOUND")          # the pinned corpus is not on this host
+        coverage = _unavailable("EVIDENCE_UNBOUND")          # the pinned corpus is not on this host, or cannot be listed
     else:
         coverage = coverage_panel(planned, capmap, run_doc)
         if run_set_aside:

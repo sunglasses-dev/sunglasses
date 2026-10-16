@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,6 @@ from . import __version__
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .reporter import ProtectedEngine, generate_report
-from .mailer import set_email, get_email, send_report
 from .sarif import to_sarif
 
 
@@ -1798,21 +1798,25 @@ def _offer_starter_policy(args):
     a `| sh` install) writes the same rules COMMENTED OUT — discoverable,
     enforcing nothing. Silence is never read as consent.
     """
-    from .firewall import STARTER_POLICY_PATHS, sunglasses_home, write_starter_policy
+    from .firewall import (STARTER_POLICY_PATHS, existing_policy_kind, sunglasses_home,
+                           write_starter_policy)
 
     existing = sunglasses_home() / "policy.yaml"
-    if existing.exists():
+    if existing.exists() or existing.is_symlink():
         if args.policy:
             # The advertised "re-run with --policy" path. write_starter_policy
-            # upgrades ONLY our own untouched commented-out starter file.
+            # enables only a disabled starter this project wrote, and does not say
+            # who changed a file it leaves alone.
             upgraded = write_starter_policy(enabled=True)
             if upgraded:
                 print(f"\n  {GREEN}Starter policy ENABLED{RESET} "
                       f"{DIM}-> {upgraded} (was commented out){RESET}")
+            elif existing_policy_kind() == "enabled_starter":
+                print(f"\n  {DIM}Your {existing} is already enabled. Left untouched.{RESET}")
             else:
-                print(f"\n  {DIM}Your {existing} has your own edits — left "
-                      f"untouched. Uncomment the blocked_paths lines to "
-                      f"enable the starter blocks.{RESET}")
+                print(f"\n  {DIM}Your {existing} is not an unchanged disabled starter, "
+                      f"so it was left untouched. Add or uncomment the blocked_paths "
+                      f"lines yourself to enable those blocks.{RESET}")
         else:
             print(f"\n  {DIM}Your {existing} is untouched.{RESET}")
         return
@@ -1856,7 +1860,7 @@ def _offer_starter_policy(args):
 
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
-    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+    from .firewall import (_HOOK_TIMEOUT, build_hook_entry, install_hook, self_test_hook,
                            settings_path_for, uninstall_hook)
 
     path = settings_path_for(args.scope_global)
@@ -1868,13 +1872,21 @@ def cmd_init(args):
               f"sits next to the file.{RESET}\n")
         return 0
 
-    entry = build_hook_entry()
+    fail_open = bool(getattr(args, "fail_open", False))
+    # The commands printed below must act on the file just written: a global install
+    # needs --global, a project install needs the directory it was run in.
+    scope = " --global" if args.scope_global else ""
+    where = "" if args.scope_global else f"cd {shlex.quote(str(path.parent.parent))} && "
+    entry = build_hook_entry(fail_open=fail_open)
     command = entry["hooks"][0]["command"]
 
     # Self-test BEFORE writing. A hook that fails, fails open — so a broken
     # wire would leave the firewall silently off. Better to refuse to install.
     print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
-    ok, detail = self_test_hook(command)
+    # A blocking hook turns "cannot answer" into "every tool call refused", so it
+    # is judged by the time limit the host will apply. The fail-open entry keeps
+    # the longer one.
+    ok, detail = self_test_hook(command) if fail_open else self_test_hook(command, timeout=_HOOK_TIMEOUT)
     if not ok:
         print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
         print(f"  {DIM}Command tried: {command}{RESET}")
@@ -1886,13 +1898,23 @@ def cmd_init(args):
     print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
 
     try:
-        install_hook(path)
+        install_hook(path, fail_open=fail_open)
     except Exception as exc:
         print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
         return 1
 
     print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
     print(f"  {DIM}{command}{RESET}")
+    if fail_open:
+        print(f"  {DIM}Failure policy: Claude Code's default. A hook that fails opens "
+              f"(the tool call goes ahead).{RESET}")
+    else:
+        print(f"  {DIM}Failure policy: \"onFailure\": \"block\". A hook that times out or cannot "
+              f"start refuses the tool call. Claude Code reads this key from v2.1.295; "
+              f"`{where}sunglasses init{scope} --fail-open` leaves it out.{RESET}")
+        print(f"  {DIM}If the hook ever cannot start, every tool call is refused until you remove "
+              f"its entry from {path} or run `{where}sunglasses init{scope} --uninstall` "
+              f"in a terminal.{RESET}")
 
     _offer_starter_policy(args)
     print(f"\n  {DIM}{_policy_state_line()}{RESET}")
@@ -2453,6 +2475,16 @@ class _MachineAwareParser(argparse.ArgumentParser):
 
 
 def main():
+    # `sunglasses mcp …` hands everything after the word to the MCP server's own
+    # main(), whole, for the same reason as `proxy`: the server answers --help and
+    # --version itself and must see argv exactly as `python -m sunglasses.mcp` does.
+    # It runs first, before the colour policy and the parsers, and this module no
+    # longer imports the mailer (and its optional `resend` import) at load time.
+    # Imports the server shares with the CLI, such as the scanner engine's, still
+    # run before this point. Its exit status is the server's own.
+    if len(sys.argv) > 1 and sys.argv[1] == "mcp":
+        from .mcp import main as mcp_main
+        sys.exit(mcp_main(sys.argv[2:]))
     _apply_color_policy()
     parser = _MachineAwareParser(
         prog="sunglasses",
@@ -2480,7 +2512,7 @@ def main():
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
-                             choices=["message", "file", "api_response", "web_content", "log_memory"],
+                             choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
                              help="Where the content came from, not what the attack is. "
                                   "Patterns are scoped by channel, so this changes which "
                                   "rules apply (default: message)")
@@ -2548,6 +2580,9 @@ def main():
     init_parser.add_argument(
         "--no-policy", action="store_true",
         help="Do not write ~/.sunglasses/policy.yaml at all")
+    init_parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Leave onFailure out of the hook entry, so a hook that fails lets the tool call go ahead")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts
@@ -2653,6 +2688,13 @@ def main():
              "snapshot (sunglasses proxy approve <server_id> --snapshot <sha>)",
         add_help=False)
 
+    # Listed so `sunglasses --help` shows it. Like `proxy`, the word never
+    # reaches this parser; see the interception at the top of main().
+    subparsers.add_parser(
+        "mcp",
+        help="Run the SUNGLASSES MCP server on stdio (same as python -m sunglasses.mcp)",
+        add_help=False)
+
     # `sunglasses proxy …` is an ALIAS, handled before argparse sees it.
     # 0.6.0 beta's product surface is this command, and everything it does
     # lives in sunglasses.proxy.commands. It is intercepted rather than made a
@@ -2681,6 +2723,7 @@ def main():
 
 def cmd_report(args):
     """Generate daily protection report."""
+    from .mailer import get_email, send_report
     if args.send:
         html = generate_report(date=args.date, as_html=True)
         email = get_email()
@@ -2974,6 +3017,7 @@ def cmd_doctor(args, _run=None):
 
 def cmd_config(args):
     """Configure SUNGLASSES."""
+    from .mailer import get_email, set_email
     if args.email:
         set_email(args.email)
         print(f"\n  {GREEN}Email saved:{RESET} {args.email}")

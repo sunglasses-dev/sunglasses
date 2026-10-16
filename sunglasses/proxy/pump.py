@@ -345,10 +345,13 @@ class _Replaced:
     is settled and NOTHING crosses.
     """
 
-    __slots__ = ("frame",)
+    __slots__ = ("frame", "cause")
 
-    def __init__(self, frame):
+    def __init__(self, frame, cause=None):
         self.frame = frame
+        # The Cause the item settled with, for a caller that ends the session
+        # on a replacement and has to name the same reason the receipt does.
+        self.cause = cause
 
 
 class Session:
@@ -1264,7 +1267,7 @@ class Session:
         if not self._settle_outside_lock(identity):
             return None
         if verdict is not None:
-            return _Replaced(replacement)
+            return _Replaced(replacement, cause)
 
         # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
@@ -1891,9 +1894,15 @@ class Session:
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
                     # T2.R12. Dropped with a receipt and never a response,
-                    # because a notification has no id to answer in.
+                    # because a notification has no id to answer in. The
+                    # verdict is (replacement, reason, rule) and the reason is
+                    # the part that says WHY: dropped without it, the row on
+                    # disk could not tell a flagged notification from a lost
+                    # one.
+                    why = verdict[1] if len(verdict) > 1 else None
+                    fields = {"reason_code": why} if isinstance(why, str) else {}
                     self._core._emit("NOTIFICATION_DROPPED", None,
-                                     supported=True)
+                                     supported=True, **fields)
                     continue
                 # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
@@ -1963,7 +1972,7 @@ class Session:
                     "initialize" and "result" in message:
                 init_identity = key(ORIGIN_CLIENT, message["id"])
                 init_key = self._core_key(init_identity)
-                forwarded = self._initialize_result(message, raw)
+                forwarded = self._initialize_result(message, raw, inspect=inspect)
                 if forwarded is None:
                     yield from self._drain_refusals()
                     return
@@ -2067,7 +2076,7 @@ class Session:
         # recorded while this reader was blocked on the pipe.
         yield from self._drain_refusals()
 
-    def _initialize_result(self, message, raw):
+    def _initialize_result(self, message, raw, inspect=None):
         """T1.R2 and T1.R3, on the one frame where they apply.
 
         Negotiation and the capability intersection are not advisory helpers a
@@ -2114,10 +2123,31 @@ class Session:
         # performs the handoff. It was using the direct-caller retirement, so
         # the obligation ended one step too early and a close landing in that
         # step paid nothing: one frame for two known requests.
-        self.deliver_response(origin=ORIGIN_UPSTREAM,
-                              request_id=message["id"], frame=rebuilt,
-                              defer_retire=True)
+        #
+        # R5-1. THE RESULT IS INSPECTED LIKE EVERY OTHER ONE. This call was the
+        # only delivery without `inspect=`, so `instructions` (free text that
+        # clients place in the model's system prompt) and `serverInfo` reached
+        # the client unread while the receipts said SETTLED CLEAN. The seam is
+        # handed the frame as REBUILT, after negotiation and the capability
+        # filter, so what is scanned is what would have crossed; `raw` stays
+        # the bytes the server sent, which is what the receipt digest binds.
+        answer = self.deliver_response(origin=ORIGIN_UPSTREAM,
+                                       request_id=message["id"], frame=rebuilt,
+                                       defer_retire=True, inspect=inspect,
+                                       raw=raw)
         if self._closed:
+            return None
+        if isinstance(answer, _Replaced):
+            # A withheld initialize result ends the session. The handshake is
+            # the one frame the whole session rests on, so there is nothing to
+            # carry on with and no reason to keep a server that put text like
+            # this in it running. The close pays the client's one answer from
+            # the cause the inspection already settled this item with; the raw
+            # frame is never handed over.
+            cause = answer.cause
+            self._close(cause.reason, "the initialize result was withheld by "
+                        "inspection", rule=cause.rule,
+                        kind="INITIALIZE_RESULT_WITHHELD")
             return None
         return (_json.dumps(rebuilt, separators=(",", ":")) + "\n").encode()
 

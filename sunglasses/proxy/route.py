@@ -28,8 +28,8 @@ import json
 import pathlib
 import uuid
 
-from . import (activation, bounds, envelope, framing, inspection, policy, pump,
-               receipts, selector, snapshot, worker)
+from . import (activation, bounds, envelope, framing, handshake, inspection,
+               policy, pump, receipts, selector, snapshot, worker)
 
 # ONE DEFINITION, ALIASED RATHER THAN RE-SPELLED. These were two more copies
 # of a vocabulary `pump` already owns: `ORIGIN_CLIENT`, `ORIGIN_UPSTREAM`,
@@ -78,6 +78,10 @@ REASON_APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 REASON_SCAN_EXCEPTION = "SCAN_EXCEPTION"
 REASON_UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
 REASON_UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
+
+# `_surface` answer for a member that is present and is not an object or list.
+# Distinct from None, which means "the frame carries no such member".
+_UNREADABLE = object()
 REASON_REQUEST_CANCELLED = "REQUEST_CANCELLED"
 REASON_DESCRIPTOR_CHANGED = "DESCRIPTOR_CHANGED"
 REASON_RECEIPT_IO_ERROR = "RECEIPT_IO_ERROR"
@@ -497,15 +501,33 @@ class Route:
         if retired is not None and is_response:
             return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
+        # A CLEAN VERDICT COVERS WHAT WAS READ. The scan reads one member of the
+        # frame and a clean verdict forwards the original bytes, so a second
+        # member crossed to the client without a rule seeing it. Withheld whole,
+        # the way binary content is: reporting the read part clean describes a
+        # frame that was not read.
+        if self._unread_members(message, is_response):
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE, record=False)
+
         surface, channel = self._surface(message, method)
+        if surface is _UNREADABLE:
+            # A result, error or params that is a string, number or boolean is
+            # not an object a scan reads, and "nothing to inspect" forwarded it.
+            return self._withhold_result(request_id,
+                                         REASON_UNSUPPORTED_CONTENT,
+                                         RULE_RESOURCE, record=False)
         if surface is None:
             return None
 
         # T2.R14 BEFORE everything else, exactly as in the client direction.
-        # A ping result has zero inspectable leaves and no channel of its own,
-        # so scanning it means handing a worker nothing to read on a channel
-        # that does not exist, and every rule is scoped to a channel.
-        if selector.zero_leaves_is_complete(method, surface):
+        # A ping result with nothing in it has zero inspectable leaves and no
+        # channel of its own, so scanning it means handing a worker nothing to
+        # read on a channel that does not exist, and every rule is scoped to a
+        # channel. One that carries content is not that shape and falls to the
+        # channel test below.
+        if selector.zero_leaves_is_complete(method, surface, surface_only=True):
             return None
 
         if channel is None:
@@ -581,14 +603,39 @@ class Route:
                                      settlement.rule, settlement=settlement,
                                      result=result, record=False)
 
+    @staticmethod
+    def _unread_members(message, is_response):
+        """The top-level members of this frame that no scan will read.
+
+        `_surface` reads the first of `result`, `error` and `params`. The frame
+        envelope (`jsonrpc`, `id`) is correlated by the session, and `method`
+        is read by the selector on a notification and is not a member of a
+        response at all. Anything else in the frame is not read.
+        """
+        read = {"jsonrpc", "id"}
+        if not is_response:
+            read.add("method")
+        for member in ("result", "error", "params"):
+            if member in message:
+                read.add(member)
+                break
+        return sorted(set(message) - read)
+
     def _surface(self, message, method):
         """The inspected surface and its channel, per T2's result rows."""
         for member in ("result", "error", "params"):
             if member in message:
                 surface = message[member]
-                if not isinstance(surface, (dict, list)):
+                if surface is None:
                     return None, None
-                return surface, selector.channel_for(method, RESULT)
+                if not isinstance(surface, (dict, list)):
+                    return _UNREADABLE, None
+                # An ERROR is a reply whatever it answers, and the selector
+                # names its channel under `error`, not under the method. Asked
+                # by method, a ping error found no channel at all and was
+                # refused unread, where main forwarded it.
+                return surface, selector.channel_for(
+                    "error" if member == "error" else method, RESULT)
         return None, None
 
     def _withhold_result(self, request_id, reason, rule, *, settlement=None,
@@ -602,7 +649,11 @@ class Route:
         SETTLED row per build is a second terminal for an item that settles
         once. The caller records separately, after the decision is final.
         """
-        if record:
+        # A notification is built once and has no later decision to wait for,
+        # so `record=False` does not apply to it: the pump's own drop event is
+        # in memory only, and without this row nothing durable says why the
+        # frame never reached the client.
+        if record or request_id is NO_ID:
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
         if request_id is NO_ID:
@@ -674,6 +725,21 @@ class Route:
             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
             catalog=self.catalog))
 
+    def _decline_probe(self, request_id):
+        """The `server/discover` probe, answered the way an older peer answers.
+
+        Not a refusal. The pump already reserved and settled this attempt when
+        it reported the admission refusal, so there is nothing to settle here
+        either (the `_withhold_refusal` argument). The client gets plain
+        JSON-RPC "Method not found", its own id in its own type, and upstream
+        sees nothing.
+        """
+        # No `method` field: the receipt log only takes methods the selector
+        # knows, and this one is by definition not among them. The event name
+        # says which probe it was.
+        self._record("PROBE_DECLINED", id_type=type(request_id).__name__)
+        self._to_client(envelope.method_not_found(request_id))  # to-client-exempt: a declined probe was refused AT ADMISSION and the pump already settled it under its own token, so no obligation is owed here
+
     # ── requests ───────────────────────────────────────────────────────────
 
     def _client_request(self, raw, message, method):
@@ -692,6 +758,10 @@ class Route:
             closed = self.session.closed_with()
             if closed:
                 self._answer_close(closed, request_id)
+            elif (method == handshake.DISCOVER_PROBE_METHOD
+                  and (not refusal or refusal[0].cause is None
+                       or refusal[0].cause.reason == REASON_UNINSPECTED_METHOD)):
+                self._decline_probe(request_id)
             else:
                 self._withhold_refusal(request_id, refusal[0] if refusal
                                        else None)
@@ -766,7 +836,7 @@ class Route:
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         over = bounds.check_content(
-            selector.content_bytes(message.get("params") or {}))
+            selector.content_bytes(selector.client_surface(method, message)))
         if over:
             # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
             # existed, so it was the one `_withhold` in this method that did not
@@ -1027,8 +1097,7 @@ class Route:
     def _inspect(self, raw, message, method, *, request_id, attempt=None,
                  approved_under=None):
         channel = selector.channel_for(method, REQUEST)
-        params = message.get("params")
-        params = params if isinstance(params, (dict, list)) else {}
+        params = selector.client_surface(method, message)
         held_bytes = selector.content_bytes(params)
 
         binding = {

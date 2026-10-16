@@ -48,6 +48,10 @@ EVENTS = frozenset({
     # revoke path. A new KIND and no new field (T9 ruling 120): a 0.6.0 verifier
     # reads it as UNKNOWN_EVENT under lifecycle, never an integrity failure.
     "APPROVAL_INVALIDATED",
+    # 0.6.9. The `server/discover` probe is declined with Method not found and
+    # is not a refusal: nothing was withheld, because nothing was asked for.
+    # A new KIND and no new field (T9 ruling 120).
+    "PROBE_DECLINED",
 })
 
 # T9.R5. The events that END a session. A log that stops without one of these
