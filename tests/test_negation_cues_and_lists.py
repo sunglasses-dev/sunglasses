@@ -736,7 +736,15 @@ def test_a_separator_after_the_end_of_the_sentence_does_not_matter(engine, cue):
 
 
 BEFORE_PREFIXES = ["ordinary, ", "a; ", "a: ", "a / ", "a & ", "a and ", "a or ", "a nor ",
-                   "ordinary\uff0c ", "ordinary\u2e41 ", "x\n", "x\r", "a, b, ", "a, b. c, "]
+                   "ordinary\uff0c ", "ordinary\u2e41 ", "x\n", "x\r", "a, b, ", "a, b. c, ",
+                   "ordinary\u201a ", "a AND ", "a OR ", "a NOR ", "a And "]
+
+
+@pytest.mark.parametrize("prefix", ["brand ", "oracle ", "Andes ", "nord ", "\u00e9and ", "and\u00e9 ", "\u0436or ",
+                                    "or\u4e2d ", "and_ ", "or7 ", "7and ", "nor\u0436 "])
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_word_that_only_contains_a_joining_word_in_front_of_the_cue_joins_nothing(engine, cue, prefix):
+    assert _decision(engine, f"{prefix}{cue} {PAYLOAD}.") == "allow_redacted", prefix
 
 
 def _sev(engine, text, channel="file"):
@@ -810,19 +818,110 @@ def test_a_sentence_end_may_be_followed_by_a_closing_quote_or_bracket(engine, cu
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
-def test_the_200_character_bound_is_exact_from_the_start_of_the_cue(engine, cue):
-    """The sentence end at index 200 from the cue still governs, at 201 it does not."""
+def test_the_200_character_bound_is_exact_from_the_end_of_the_payload(engine, cue):
+    """The sentence end 200 characters after the payload still governs, 201 does not; so does
+    the end of the text. Only the distance after the payload counts."""
     head = f"{cue} {LIST_FIRST} "
-    for total, expect_governed in ((201, True), (202, False)):
-        text = head + "x" * (total - len(head) - 1) + "."
+    for after, expect_governed in ((199, True), (200, True), (201, False)):
+        text = head + "x" * (after - 1) + "."
         plain = "xx" + text[len(cue):]
         governed, as_main = _governed(engine, text, plain)
-        assert governed is expect_governed and as_main is (not expect_governed), total
-    # Without a sentence end, a text that ends at the bound is read; one char more is not.
-    for total, expect_governed in ((200, True), (201, False)):
-        text = head + "x" * (total - len(head))
+        assert governed is expect_governed and as_main is (not expect_governed), after
+    # Without a sentence end, a text that ends within the bound is read; one char more is not.
+    for after, expect_governed in ((199, True), (200, True), (201, False)):
+        text = head + "x" * (after - 1)
         plain = "xx" + text[len(cue):]
-        assert _governed(engine, text, plain)[0] is expect_governed, total
+        assert _governed(engine, text, plain)[0] is expect_governed, after
+
+
+@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("length", [199, 200, 201, 1000])
+def test_the_length_of_the_payload_is_never_counted(engine, cue, length):
+    """The two bounds are separate: a payload of any length with a short gap and a short tail."""
+    text = f"{cue} " + "p" * length + "."
+    assert not engine._sentence_is_a_list(text, 0, " ", len(text) - 1)
+    text = f"{cue} " + "p" * length
+    assert not engine._sentence_is_a_list(text, 0, " ", len(text))
+
+
+@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("distance", [0, 150, 199, 200, 201, 1000, 5000])
+@pytest.mark.parametrize("mark", [",", ";", " and ", "\n"])
+def test_a_separator_any_distance_before_the_cue_since_the_last_sentence_end_means_main(
+        engine, cue, distance, mark):
+    """The look-back is not limited to 200 characters: it runs to the previous sentence end."""
+    filler = " ".join(["word"] * (distance // 5 + 1))[:distance]
+    front = f"a{mark}b {filler} " if mark != "\n" else f"a\nb {filler} "
+    text = f"{front}{cue} {LIST_FIRST}."
+    got = _sev(engine, text)
+    assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}."), distance
+
+
+@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("distance", [199, 200, 201, 1000])
+def test_a_sentence_end_ends_the_look_back_at_any_distance(engine, cue, distance):
+    filler = "w" * distance
+    text = f"a, b. {filler}. {cue} {LIST_FIRST}."
+    governed, _ = _governed(engine, text, f"a, b. {filler}. xx {LIST_FIRST}.")
+    assert governed, distance
+
+
+BREAKS = ["\n", "\r", "\r\n", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"]
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_line_break_in_front_of_the_cue_counts_with_text_before_or_after_it(engine, cue, br, channel):
+    for front in (f"{br}foo ", f"foo{br}", f"foo{br}bar "):
+        got = _sev(engine, f"{front}{cue} {LIST_FIRST}.", channel)
+        assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}.", channel), repr(front)
+
+
+@pytest.mark.parametrize("br", BREAKS)
+@pytest.mark.parametrize("cue", NEW_CUES)
+def test_a_break_with_nothing_else_in_front_of_the_cue_is_a_paragraph_start(engine, cue, br):
+    for front in (br, f" {br}", f"Done.{br}", f"Done. {br}"):
+        governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
+        assert governed, repr(front)
+
+
+def _comma_named_characters():
+    import sys
+    import unicodedata
+    return [chr(c) for c in range(sys.maxunicode + 1) if "COMMA" in unicodedata.name(chr(c), "")]
+
+
+def test_every_character_named_comma_is_a_list_mark(engine):
+    """Read from the Unicode data of the running interpreter, no category excluded."""
+    missing = [f"U+{ord(c):04X}" for c in _comma_named_characters() if c not in engine._LIST_MARKS]
+    assert not missing, missing
+
+
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
+@pytest.mark.parametrize("cue", NEW_CUES[:3])
+def test_each_comma_named_character_is_a_separator_in_front_of_the_cue_and_after_it(engine, cue, channel):
+    for c in _comma_named_characters():
+        before = _sev(engine, f"a{c} b {cue} {LIST_FIRST}.", channel)
+        assert before and before == _sev(engine, f"a{c} b xx {LIST_FIRST}.", channel), hex(ord(c))
+        after = _sev(engine, f"{cue} {LIST_FIRST} a{c} b.", channel)
+        assert after and after == _sev(engine, f"xx {LIST_FIRST} a{c} b.", channel), hex(ord(c))
+
+
+@pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
+@pytest.mark.parametrize("edge", ["\u00e9", "\u0436", "\u4e2d", "_", "7"])
+@pytest.mark.parametrize("cue", NEW_CUES[:3])
+def test_a_joining_word_glued_to_a_letter_or_digit_is_not_a_joining_word(engine, cue, word, edge):
+    for tail in (f" {edge}{word} more.", f" {word}{edge} more."):
+        governed, _ = _governed(engine, f"{cue} {LIST_FIRST}{tail}", f"xx {LIST_FIRST}{tail}")
+        assert governed, tail
+
+
+@pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
+@pytest.mark.parametrize("cue", NEW_CUES[:3])
+def test_a_whole_joining_word_after_the_payload_means_main(engine, cue, word):
+    got = _sev(engine, f"{cue} {LIST_FIRST} {word} more.")
+    assert got and got == _sev(engine, f"xx {LIST_FIRST} {word} more.")
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
@@ -841,7 +940,7 @@ def test_an_existing_cue_reads_the_first_item_as_it_does_on_main(engine, cue, ch
 # 7b. Inside the string of a refusal line, a new cue never lowers a finding: an injection
 #     phrase there is a block (the refusal reading is for the one rule, nothing else).
 
-@pytest.mark.parametrize("channel", ["file", "code"])
+@pytest.mark.parametrize("channel", LIST_CHANNELS)
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_new_cue_inside_a_refusal_string_does_not_lower_an_injection_phrase(
         engine, cue, channel):

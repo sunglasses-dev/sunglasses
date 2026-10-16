@@ -798,6 +798,14 @@ class _ViewEnds:
     def __init__(self):
         self._seps = {}
         self._closes = {}
+        self._sentences = {}
+
+    def sentence_index(self, text: str, build):
+        """`build(text)`, made once for a text and kept while the same object is asked about."""
+        kept = self._sentences.get(id(text))
+        if kept is None or kept[0] is not text:
+            kept = self._sentences[id(text)] = (text, build(text))
+        return kept[1]
 
     def first_close(self, text: str, close: str, start: int, stop: int, find) -> int:
         """`find(text, close, start, stop)` for the walk of one text, which asks for
@@ -2224,7 +2232,10 @@ class SunglassesEngine:
                         text, window_start + m.start(), gap,
                         match_end if match_end is not None else match_start):
                     continue
-                if self._refusal_string(text, match_start, match_end, align):
+                if align is not None and self._raw_sentence_is_a_list(
+                        text, window_start + m.start(), m.end() - m.start(), match_start, match_end, align):
+                    continue
+                if self._refusal_literal(text, match_start, match_end, align):
                     continue
             if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
                     or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
@@ -2265,53 +2276,100 @@ class SunglassesEngine:
         "\U0001145a\U00012471\U00012472\U00012473\U00012474\U00016e97"
         "\U0001da87\U0001da89\U0001da8a\U0001f674\U0001f675\U0001f676"
         "\U0001f677\U0001f678\U0001f67c"
+        # the characters whose name holds COMMA that are not punctuation: letters with a comma,
+        # combining commas, a comma in a digit, the tag comma
+        "\u0218\u0219\u021a\u021b\u02bb\u02bd\u0312\u0313\u0314\u0315\u0326\ua72e"
+        "\ua72f\U0001f101\U0001f102\U0001f103\U0001f104\U0001f105\U0001f106\U0001f107"
+        "\U0001f108\U0001f109\U0001f10a\U000e002c"
     )
-    _LIST_WORD_RX = re.compile(r"(?<![a-z0-9_])(?:and|or|nor)(?![a-z0-9_])", re.I)
-    _LINE_BREAK_RX = re.compile(r"[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]")
-    # A full stop, "!" or "?" that closes the sentence: followed by white space, a quote, a
-    # bracket, or the end of the text.
+    _JOINING_WORD_RX = re.compile(r"(?<!\w)(?:and|or|nor)(?!\w)", re.I)
+    _LINE_BREAK_CHARS = "\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+    # A full stop, "!" or "?" followed by white space, a quote, a bracket, or the end of the text
+    # closes a sentence.
     _SENTENCE_END_RX = re.compile(r"[.!?](?=[\s\"'\u2018\u2019\u201c\u201d)\]}]|\Z)")
+    # What a sentence is scanned for, once per text: the list marks, the joining words, the line
+    # breaks.
+    _JOIN_RX = re.compile(
+        "[" + re.escape("".join(sorted(_LIST_MARKS))) + "]|(?<!\\w)(?:and|or|nor)(?!\\w)", re.I)
+    _BREAK_RX = re.compile("[" + re.escape(_LINE_BREAK_CHARS) + "]")
     NEGATION_SENTENCE_SCAN = 200
 
     @classmethod
-    def _joins_items(cls, run: str, before: bool = False) -> bool:
+    def _joins_items(cls, run: str) -> bool:
         """Whether ``run`` (text inside one sentence) holds a list mark, a joining word, or a
-        line break with text on both sides of it (after it for a run that follows the cue, before
-        it for a run that stands in front of the cue)."""
+        line break with text after it (a break that only trails the run is a paragraph end)."""
         if any(c in cls._LIST_MARKS for c in run):
             return True
-        if cls._LIST_WORD_RX.search(run):
+        if cls._JOINING_WORD_RX.search(run):
             return True
-        body = run.lstrip() if before else run.rstrip()
-        return cls._LINE_BREAK_RX.search(body) is not None
+        return cls._BREAK_RX.search(run.rstrip()) is not None
+
+    @classmethod
+    def _index_sentences(cls, text: str):
+        """Where the sentences of ``text`` end, and where a list mark or joining word, and a line
+        break, stand: three sorted lists of offsets."""
+        return (
+            [m.start() for m in cls._SENTENCE_END_RX.finditer(text)],
+            [m.start() for m in cls._JOIN_RX.finditer(text)],
+            [m.start() for m in cls._BREAK_RX.finditer(text)],
+        )
+
+    @classmethod
+    def _joins_in_front(cls, text: str, cue_start: int) -> bool:
+        """Whether a list mark, a joining word, or a line break (with text in the stretch)
+        stands between the end of the previous sentence and the cue: back to that end, however
+        far."""
+        ends = getattr(_SCAN_LOCAL, "ends", None)
+        ends_at, joins_at, breaks_at = (
+            cls._index_sentences(text) if ends is None else ends.sentence_index(text, cls._index_sentences))
+        k = bisect.bisect_left(ends_at, cue_start)
+        start = ends_at[k - 1] + 1 if k else 0
+        j = bisect.bisect_left(joins_at, start)
+        if j < len(joins_at) and joins_at[j] < cue_start:
+            return True
+        b = bisect.bisect_left(breaks_at, start)
+        # A break counts when there is text in the stretch at all, before it or after it; the
+        # break that only follows a sentence end, with nothing else in front of the cue, does not.
+        return b < len(breaks_at) and breaks_at[b] < cue_start and text[start:cue_start].strip() != ""
+
+    @classmethod
+    def _raw_sentence_is_a_list(cls, view: str, cue_start: int, cue_len: int, match_start: int,
+                                match_end: Optional[int], align) -> bool:
+        """_sentence_is_a_list asked of the raw input, for a cue of a view. The view can have
+        lost what makes a sentence a list (a leading line break, a line separator read as a
+        space); the raw text has it. Asked only when the cue and the start of the match are
+        placed in the raw input; otherwise the view is all there is, and this is False."""
+        raw = align.raw
+        cue = align.origin(view, cue_start)
+        start = align.origin(view, match_start)
+        if cue is None or start is None or start < cue + cue_len:
+            return False
+        end = start + 1
+        if match_end is not None and match_end - 1 > match_start:
+            last = align.origin(view, match_end - 1)
+            end = last + 1 if last is not None and last - start == match_end - 1 - match_start else start + 1
+        return cls._sentence_is_a_list(raw, cue, raw[cue + cue_len:start].lower(), end)
 
     @classmethod
     def _sentence_is_a_list(cls, text: str, cue_start: int, gap: str, match_end: int) -> bool:
         """Whether a new cue does NOT govern, because its sentence is anything but a plain run.
-        The cue governs only when, within NEGATION_SENTENCE_SCAN characters of it, its sentence
-        reaches a sentence end (see _SENTENCE_END_RX) or the end of the text; there is no list
-        mark, joining word or line break between the cue and that end; and none stands in front
-        of the cue since the previous sentence end. The payload itself is left out (a URL has a
-        colon and solidi). Anything else is read as on main."""
+        The cue governs only when no list mark, joining word or line break with text after it
+        stands between the previous sentence end (see _SENTENCE_END_RX; the start of the text is
+        one) and the cue, however far back; none stands between the cue and the payload (the gap,
+        which the cue window keeps short); and the sentence reaches a sentence end, or the end of
+        the text, within NEGATION_SENTENCE_SCAN characters of the payload's end with none of them
+        in between. The payload itself is neither scanned nor counted (a URL has a colon and
+        solidi). Anything else is read as on main."""
         reach = cls.NEGATION_SENTENCE_SCAN
-        # In front of the cue, back to the previous sentence end.
-        front = text[max(0, cue_start - reach):cue_start]
-        ends = list(cls._SENTENCE_END_RX.finditer(front))
-        if ends:
-            front = front[ends[-1].end():]
-        if cls._joins_items(front, before=True):
+        if cls._joins_in_front(text, cue_start):
             return True
-        # From the cue to the end of its sentence, the payload excluded.
         if cls._joins_items(gap):
             return True
-        limit = cue_start + reach
-        if match_end > limit:
-            return True
-        tail = text[match_end:limit + 2]
+        tail = text[match_end:match_end + reach + 2]
         end = cls._SENTENCE_END_RX.search(tail)
-        if end is not None and match_end + end.start() <= limit:
+        if end is not None and end.start() <= reach:
             tail = tail[:end.start()]
-        elif end is None and len(text) <= limit:
+        elif len(text) - match_end <= reach:
             tail = text[match_end:]
         else:
             return True
@@ -2824,9 +2882,14 @@ class SunglassesEngine:
         be the same characters at the same place in the raw input (a view that holds a copy of
         it, written backwards or in ROT13, is never vouched for). The line is the raw text
         between two line breaks, REFUSAL_LINE_SPAN characters or fewer either side of the hit."""
-        if match_end is None or match_end <= match_start:
-            return False
         if getattr(_SCAN_LOCAL, "channel", None) not in self._SOURCE_CHANNELS:
+            return False
+        return self._refusal_literal(text, match_start, match_end, align)
+
+    def _refusal_literal(self, text: str, match_start: int, match_end: Optional[int], align=None) -> bool:
+        """_refusal_string on any channel: whether the hit sits wholly inside such a string. A new
+        cue never lowers a hit there, on any channel; only the rule exception reads the channel."""
+        if match_end is None or match_end <= match_start:
             return False
         if match_end > self._view_end(text, match_start, align):
             return False
