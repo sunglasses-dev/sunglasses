@@ -21,9 +21,11 @@ document missing either family is skipped.
 Every derivation rule errs toward extracting LESS. An empty requirement means
 "no prefilter, evaluate as before", which is always correct.
 """
+import ast
 import functools
 import hashlib
 import json
+import os
 import re
 
 try:
@@ -438,13 +440,17 @@ def requirement(pattern_source: str):
 # `requirement()` when it is not (a custom rule, a rule newer than the table), so anything
 # the table does not know behaves exactly as before. The key is a digest of the FULL source
 # text, never of a rule id or an object, so a custom rule reaches a shipped entry only if
-# its source is character for character the shipped one. A table in an unknown format, with
-# the wrong number of entries, or one that cannot be read at all is not used.
+# its source is character for character the shipped one. The data file is read as literals
+# (`ast`), never imported, so nothing in it is executed; a file that holds anything but its
+# three literals, a table in an unknown format, with the wrong number of entries, or one that
+# cannot be read at all is not used.
 TABLE_FORMAT = 1
 
 
 def _digest(source: str) -> str:
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:32]
+    # "surrogatepass": `re` accepts a source holding a lone surrogate, strict UTF-8 does not.
+    # For every source that encodes strictly the bytes (and the digest) are the same.
+    return hashlib.sha256(source.encode("utf-8", "surrogatepass")).hexdigest()[:32]
 
 
 def encode_requirement(req) -> list:
@@ -483,21 +489,59 @@ def build_table(sources) -> dict:
 
 
 _TABLE = None
+_DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_requirements_data.py")
+_DATA_NAMES = ("FORMAT", "COUNT", "LINES")
+
+
+def _read_data_literals(path) -> dict:
+    """FORMAT, COUNT and LINES of the data file, read as literals; the file is never imported.
+
+    The file must be, statement for statement: an optional docstring, then one assignment each
+    of FORMAT, COUNT and LINES to a literal. Anything else (another statement, a call, a name)
+    raises, and the caller uses no table. Nothing in the file is executed.
+    """
+    with open(path, "rb") as handle:
+        tree = ast.parse(handle.read())
+    body = list(tree.body)
+    if (body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)):
+        body = body[1:]
+    values = {}
+    for node in body:
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)):
+            raise ValueError("not a plain assignment")
+        name = node.targets[0].id
+        if name not in _DATA_NAMES or name in values:
+            raise ValueError("unexpected or repeated name")
+        values[name] = ast.literal_eval(node.value)
+    if sorted(values) != sorted(_DATA_NAMES):
+        raise ValueError("missing name")
+    if not (isinstance(values["FORMAT"], int) and isinstance(values["COUNT"], int)
+            and isinstance(values["LINES"], tuple)
+            and all(isinstance(line, str) for line in values["LINES"])):
+        raise ValueError("wrong literal types")
+    return values
+
+
+def _load_table(path) -> dict:
+    """The requirement table in the data file at `path`, or {} when it cannot be trusted."""
+    try:
+        data = _read_data_literals(path)
+        if data["FORMAT"] != TABLE_FORMAT:
+            return {}
+        loaded = json.loads("{" + ",".join(data["LINES"]) + "}")
+        if isinstance(loaded, dict) and len(loaded) == data["COUNT"]:
+            return loaded
+    except Exception:
+        pass
+    return {}
 
 
 def _shipped_table() -> dict:
     global _TABLE
     if _TABLE is None:
-        table = {}
-        try:
-            from . import _requirements_data as data
-            if data.FORMAT == TABLE_FORMAT:
-                loaded = json.loads("{" + ",".join(data.LINES) + "}")
-                if len(loaded) == data.COUNT:
-                    table = loaded
-        except Exception:
-            table = {}
-        _TABLE = table
+        _TABLE = _load_table(_DATA_PATH)
     return _TABLE
 
 

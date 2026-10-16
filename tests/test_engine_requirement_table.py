@@ -11,7 +11,8 @@ What these tests pin:
    (the table is generated once; the derivation is what a different Python could change).
 2. Every source the engine loads is in the table, and the data file is what the generator writes.
 3. Anything the table does not hold (a custom rule, a table in another format or of the wrong
-   size, a damaged entry) is derived live, as before. A custom rule reaches a shipped entry only
+   size, a damaged entry, a data file that holds more than its three literals) is derived live,
+   as before; the data file is read as literals and never imported. A custom rule reaches a shipped entry only
    through the full source text.
 4. Starting the engine derives nothing live for a shipped source, and the engine ends up with
    the same rules, modes and requirements as without the table.
@@ -20,13 +21,13 @@ What these tests pin:
 
 import pathlib
 import re
+import subprocess
 import sys
 
 import pytest
 
 import sunglasses._prefilter as prefilter
 import sunglasses.engine as engine_module
-from sunglasses import _requirements_data
 from sunglasses.engine import MECHANISM_PATTERNS, PATTERNS, SunglassesEngine
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -65,7 +66,7 @@ def fresh_table(monkeypatch):
 
 def test_every_table_entry_equals_the_live_derivation(fresh_table):
     table = prefilter._shipped_table()
-    assert len(table) == _requirements_data.COUNT > 1500
+    assert len(table) == prefilter._read_data_literals(prefilter._DATA_PATH)["COUNT"] > 1500
     engine = SunglassesEngine()
     sources = {rx.pattern for _p, rxs in engine._regex_patterns for _m, rx, _e in rxs}
     wrong = []
@@ -143,21 +144,95 @@ def test_a_source_that_differs_by_one_character_is_not_a_table_hit(fresh_table):
     assert prefilter._digest(source.replace("(?i)", "(?s)", 1) + "x") not in prefilter._shipped_table()
 
 
-@pytest.mark.parametrize("damage", ["format", "count", "not_json", "bad_entry", "no_module"])
-def test_a_table_that_cannot_be_trusted_is_not_used(fresh_table, monkeypatch, damage):
+def _data_text():
+    return pathlib.Path(prefilter._DATA_PATH).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("damage", ["format", "count", "not_json", "no_file",
+                                    "extra_statement", "call_in_literal", "repeated_name"])
+def test_a_table_that_cannot_be_trusted_is_not_used(fresh_table, monkeypatch, tmp_path, damage):
     source = next(s for s in _shipped_sources() if prefilter.requirement(s))
-    data = _requirements_data
+    text = _data_text()
+    path = tmp_path / "_requirements_data.py"
     if damage == "format":
-        monkeypatch.setattr(data, "FORMAT", data.FORMAT + 1)
+        text = text.replace("FORMAT = 1\n", "FORMAT = 2\n", 1)
     elif damage == "count":
-        monkeypatch.setattr(data, "COUNT", data.COUNT + 1)
+        text = re.sub(r"COUNT = \d+", "COUNT = 1", text, count=1)
     elif damage == "not_json":
-        monkeypatch.setattr(data, "LINES", data.LINES[:-1] + ('"x":[',))
-    elif damage == "bad_entry":
-        monkeypatch.setattr(prefilter, "decode_requirement", lambda entry: 1 / 0)
-    else:
-        monkeypatch.setitem(sys.modules, "sunglasses._requirements_data", None)
+        text = text.replace("LINES = (\n", "LINES = (\n    '\"x\":[',\n", 1)
+    elif damage == "extra_statement":
+        text += "\nVALUE = 1\n"
+    elif damage == "call_in_literal":
+        text = text.replace("FORMAT = 1\n", "FORMAT = int('1')\n", 1)
+    elif damage == "repeated_name":
+        text += "\nFORMAT = 1\n"
+    if damage != "no_file":
+        path.write_text(text, encoding="utf-8")
+    assert prefilter._load_table(str(path)) == {}
+    monkeypatch.setattr(prefilter, "_DATA_PATH", str(path))
+    assert prefilter._shipped_table() == {}
     assert _shape(prefilter.shipped_requirement(source)) == _shape(prefilter.requirement(source))
+
+
+def test_an_entry_that_cannot_be_decoded_is_derived_live(fresh_table, monkeypatch):
+    source = next(s for s in _shipped_sources() if prefilter.requirement(s))
+    assert prefilter._digest(source) in prefilter._shipped_table()
+    monkeypatch.setattr(prefilter, "decode_requirement", lambda entry: 1 / 0)
+    assert _shape(prefilter.shipped_requirement(source)) == _shape(prefilter.requirement(source))
+
+
+def test_the_data_file_is_never_executed_or_imported(fresh_table, monkeypatch, tmp_path):
+    marker = tmp_path / "executed"
+    path = tmp_path / "_requirements_data.py"
+    path.write_text(_data_text() + f"\nopen({str(marker)!r}, 'w').close()\n", encoding="utf-8")
+    assert prefilter._load_table(str(path)) == {}
+    assert not marker.exists()
+    # the table that ships loads, and loading it does not import the data module
+    probe = ("import sys; import sunglasses._prefilter as p; "
+             "from sunglasses.engine import SunglassesEngine; SunglassesEngine(); "
+             "print(len(p._shipped_table()), 'sunglasses._requirements_data' in sys.modules)")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True,
+                         cwd=str(ROOT), check=True).stdout.split()
+    assert int(out[0]) > 1000 and out[1] == "False"
+
+
+def test_a_data_file_is_rejected_when_a_value_is_not_a_literal(fresh_table, tmp_path):
+    marker = tmp_path / "executed"
+    path = tmp_path / "_requirements_data.py"
+    path.write_text(_data_text().replace(
+        "COUNT = ", f"COUNT = len(open({str(marker)!r}, 'w').name) * 0 + ", 1), encoding="utf-8")
+    assert prefilter._load_table(str(path)) == {}
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("where", ["regex", "extra_patterns"])
+def test_a_custom_source_with_a_lone_surrogate_still_builds_and_scans(fresh_table, where):
+    source = "(?i)surrogate\\s+marker\ud800tail"
+    assert prefilter.shipped_requirement(source) == prefilter.requirement(source)
+    assert len(prefilter._digest(source)) == 32
+    rule = _rule("GLS-TEST-030", source)
+    if where == "regex":
+        engine = SunglassesEngine(patterns=[rule], mechanisms=False)
+    else:
+        engine = SunglassesEngine(patterns=[_rule("GLS-TEST-031", r"(?i)\bother\s+marker\b")],
+                                  extra_patterns=[rule], mechanisms=False)
+    assert engine.scan("a surrogate  marker\ud800tail here").threat_found
+
+
+def test_the_digest_of_a_source_that_encodes_strictly_is_unchanged():
+    import hashlib
+    source = "(?i)caf\u00e9\\s+ignore"
+    assert prefilter._digest(source) == hashlib.sha256(source.encode("utf-8")).hexdigest()[:32]
+
+
+def test_the_generator_check_exits_1_on_a_stale_file_and_0_on_a_current_one(monkeypatch, tmp_path, capsys):
+    stale = tmp_path / "_requirements_data.py"
+    stale.write_text(gen_requirements.render().replace("COUNT = ", "COUNT = 0 + ", 1), encoding="utf-8")
+    monkeypatch.setattr(gen_requirements, "TARGET", stale)
+    monkeypatch.setattr(gen_requirements, "ROOT", tmp_path)
+    assert gen_requirements.main([]) == 1
+    stale.write_text(gen_requirements.render(), encoding="utf-8")
+    assert gen_requirements.main([]) == 0
 
 
 def test_the_engine_with_an_unusable_table_equals_the_engine_with_the_table(fresh_table, monkeypatch):
