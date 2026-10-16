@@ -1456,8 +1456,10 @@ class SunglassesEngine:
         "however", "yet", "still", "rather", "you", "your", "yours", "yourself", "we", "i",
         "just", "simply", "please", "also", "go", "ahead", "feel", "free", "can", "could",
         "should", "would", "will", "may", "might", "must", "shall", "let", "to")) | _NEGATION_FLIP_WORDS
-    # A trailing phrase may say "to anyone" or "your key"; it may not open another clause.
-    _LIST_TRAIL_STOPS = _NEGATION_LIST_STOPS - frozenset(("to", "your", "yours", "yourself"))
+    # The last item (the rule's own phrase, "transmit your API key") and a trailing phrase ("to
+    # anyone", "your key") may say "to" or "your", and no other word of the stop list; they may
+    # not open another clause.
+    _LIST_TRAIL_STOPS = _NEGATION_LIST_STOPS - frozenset(("to", "your"))
     NEGATION_LIST_COMMAS = 3
     NEGATION_LIST_WORDS = 8  # the whole list: items, the conjunction, the last item
     NEGATION_LIST_ITEM_WORDS = 3
@@ -1473,7 +1475,10 @@ class SunglassesEngine:
         "except", "other", "for", "from", "with", "in", "on", "at", "by", "into", "about",
         "before", "after", "during", "while"))
     _LIST_TRAIL_RX = re.compile(r"((?: [a-z0-9]+(?:-[a-z0-9]+)*)*)")
-    _LIST_END_RX = re.compile(r"[ \t]*(?:\Z|[.!?;)\]]|\n|\x1e)")
+    # A real end: the end of the text, a line end, or a mark that a sentence end is made of
+    # (_SENTENCE_END_RX: followed by a blank, a quote, a closing bracket or the end). A mark with
+    # a letter or digit attached ("a.b", "x;y") is not an end.
+    _LIST_END_RX = re.compile("[ \\t]*(?:\\Z|[.!?;)\\]](?=[\\s\"'\u2018\u2019\u201c\u201d)\\]}]|\\Z)|\\n|\\x1e)")
     _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
     _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
     _LIST_WORD_RX = re.compile(_LIST_WORD)
@@ -2270,22 +2275,9 @@ class SunglassesEngine:
             # blocks.
             shape = "plain"
             if plain:
-                view = None
-                if not raw_frame:
-                    # A normalized text holds several views joined by " VIEW_SEP " (a planted
-                    # separator is stripped from the input first), and a sentence stays
-                    # inside its view. The raw input has no such frame.
-                    lo = text.rfind(" " + VIEW_SEP + " ", 0, match_start)
-                    hi = text.find(" " + VIEW_SEP + " ", match_start)
-                    view = (0 if lo == -1 else lo + 3, len(text) if hi == -1 else hi)
-                shape = self._sentence_shape(
-                    text, window_start + m.start(), gap,
-                    match_end if match_end is not None else match_start, view)
-                if shape != "other" and align is not None:
-                    raw_shape = self._raw_sentence_shape(
-                        text, window_start + m.start(), m.end() - m.start(), match_start, match_end, align)
-                    if raw_shape == "other" or shape == "plain":
-                        shape = raw_shape
+                shape = self._list_shape(
+                    text, window_start + m.start(), m.end() - m.start(), gap, match_start, match_end,
+                    align, raw_frame)
                 if shape == "other":
                     continue
                 if self._refusal_literal(text, match_start, match_end, align):
@@ -2296,7 +2288,13 @@ class SunglassesEngine:
                 if tail is None:
                     tail = _ascii_lower(text[match_start:match_start + self.NEGATION_LIST_TAIL])
                 hit = None if match_end is None else text[match_start:match_end]
-                reach = self._negation_reach(gap + leadin, tail, hit)
+                # A list is read for an existing cue only in a sentence of the shape a new cue
+                # needs: nothing in front of the cue, and the raw input says the same.
+                reach = None
+                if plain or self._list_shape(
+                        text, window_start + m.start(), m.end() - m.start(), gap, match_start,
+                        match_end, align, raw_frame) != "other":
+                    reach = self._negation_reach(gap + leadin, tail, hit)
                 if reach is not None:
                     # A list read through the words after the match start: the raw input
                     # must say the same there too.
@@ -2400,21 +2398,22 @@ class SunglassesEngine:
     def _joins_in_front(cls, text: str, cue_start: int, lo: int = 0) -> bool:
         """Whether a list mark, a joining word, or a line break (with text in the stretch)
         stands between the end of the previous sentence and the cue: back to that end, however
-        far, and no further back than ``lo``, the start of the view that holds the cue."""
+        far. ``lo`` (0 unless a list is being read in a later view of a multi-view text, see
+        _check_negation) is the earliest place looked at; at 0 this is the reading main has."""
         ends = getattr(_SCAN_LOCAL, "ends", None)
         ends_at, joins_at, breaks_at = (
             cls._index_sentences(text) if ends is None else ends.sentence_index(text, cls._index_sentences))
         k = bisect.bisect_left(ends_at, cue_start)
-        prev = ends_at[k - 1] + 1 if k else 0
-        start = max(prev, lo)
+        start = ends_at[k - 1] + 1 if k else 0
+        start = max(start, lo)
         j = bisect.bisect_left(joins_at, start)
         if j < len(joins_at) and joins_at[j] < cue_start:
             return True
-        # A line break right after a sentence end opens a new paragraph: the sentence of the cue
-        # starts after that break (and after any closing quote or bracket before it), and the
-        # words between there and the cue are ordinary words, never separators. At the start of
-        # the text (or of a view) there is no sentence end to follow: a break there counts.
-        if prev > lo:
+        if k and start > lo:
+            # A line break right after a sentence end opens a new paragraph: the sentence of the
+            # cue starts after that break (and after any closing quote or bracket before it), and
+            # the words between there and the cue are ordinary words, never separators. At the
+            # start of the text there is no sentence end to follow: a break there counts.
             start = cls._PARAGRAPH_LEAD_RX.match(text, start, cue_start).end()
         b = bisect.bisect_left(breaks_at, start)
         return b < len(breaks_at) and breaks_at[b] < cue_start
@@ -2440,18 +2439,20 @@ class SunglassesEngine:
     @classmethod
     def _sentence_shape(cls, text: str, cue_start: int, gap: str, match_end: int,
                         view: Optional[tuple] = None) -> str:
-        """The shape of the sentence a new cue stands in. "plain": no list mark, joining word or
-        line break with text after it stands between the previous sentence end (see
-        _SENTENCE_END_RX; the start of the text is one) and the payload's sentence end, so the
-        cue governs as any cue does. "list": the front is clean, but the gap or the rest of the
-        sentence holds one; the cue governs only if the bounded list reading of _negation_reach
-        accepts it. "other": a mark, word or break stands in front of the cue, however far
-        back, or the sentence reaches no sentence end, or the end of the text, within
-        NEGATION_SENTENCE_SCAN characters of the payload's end; the cue governs nothing and the
-        finding is read as on main. The payload itself is neither scanned nor counted (a URL has
-        a colon and solidi). ``view`` is the (start, end) of the view of a multi-view text that
-        holds the cue: the sentence stays inside it, and the end of a view that is not the last
-        is not the end of a sentence."""
+        """The shape of the sentence a new cue stands in, read exactly as main reads whether a
+        cue is in a list (this is its three-way form: "other" and "list" together are main's
+        True). "plain": no list mark, joining word or line break with text after it stands
+        between the previous sentence end (see _SENTENCE_END_RX; the start of the text is one)
+        and the payload's sentence end, so the cue governs as any cue does. "list": the front is
+        clean, but the gap or the rest of the sentence holds one; the cue governs only if the
+        bounded list reading of _negation_reach accepts it. "other": a mark, word or break stands
+        in front of the cue, however far back, or the sentence reaches no sentence end, or the end
+        of the text, within NEGATION_SENTENCE_SCAN characters of the payload's end; the cue
+        governs nothing and the finding is read as on main. The payload itself is neither scanned
+        nor counted (a URL has a colon and solidi). ``view`` (None: main's reading) is the
+        (start, end) of the view of a multi-view text that holds the cue: the sentence then stays
+        inside it, and the end of the view is the end of its sentence (every view is the whole input,
+        read another way, and the raw input is asked the same by _raw_sentence_shape)."""
         reach = cls.NEGATION_SENTENCE_SCAN
         lo, hi = view if view is not None else (0, len(text))
         if cls._joins_in_front(text, cue_start, lo):
@@ -2462,11 +2463,42 @@ class SunglassesEngine:
         end = cls._SENTENCE_END_RX.search(tail)
         if end is not None and end.start() <= reach:
             tail = tail[:end.start()]
-        elif hi - match_end <= reach and hi == len(text):
+        elif hi - match_end <= reach:
             tail = text[match_end:hi]
         else:
             return "other"
         return "list" if cls._joins_items(gap, True) or cls._joins_items(tail) else "plain"
+
+    def _list_shape(self, text: str, cue_start: int, cue_len: int, gap: str, match_start: int,
+                    match_end: Optional[int], align, raw_frame: bool) -> str:
+        """_cue_shape as main reads a sentence, and, when that says "other", once more inside the
+        view of a multi-view text that holds the cue. Main reads a sentence in a later view from
+        the end of the text before it, so a list mark in an earlier view keeps the cue from
+        governing; that stays so for every plain sentence. Only a sentence that reads as a LIST
+        inside its view is let through (the caller then needs _negation_reach to accept it), so a
+        sentence without a list is read exactly as on main. The raw input has no views."""
+        shape = self._cue_shape(text, cue_start, cue_len, gap, match_start, match_end, align)
+        if shape != "other" or raw_frame:
+            return shape
+        sep = " " + VIEW_SEP + " "
+        lo = text.rfind(sep, 0, match_start)
+        hi = text.find(sep, match_start)
+        in_view = self._cue_shape(text, cue_start, cue_len, gap, match_start, match_end, align,
+                                  (0 if lo == -1 else lo + 3, len(text) if hi == -1 else hi))
+        return "list" if in_view == "list" else "other"
+
+    def _cue_shape(self, text: str, cue_start: int, cue_len: int, gap: str, match_start: int,
+                   match_end: Optional[int], align, view: Optional[tuple] = None) -> str:
+        """_sentence_shape of a cue, and of the raw input when the cue is placed in it: the raw
+        input can hold a list mark or a line break the view lost, and it can say the sentence is
+        not clean where the view says it is."""
+        shape = self._sentence_shape(
+            text, cue_start, gap, match_end if match_end is not None else match_start, view)
+        if shape != "other" and align is not None:
+            raw_shape = self._raw_sentence_shape(text, cue_start, cue_len, match_start, match_end, align)
+            if raw_shape == "other" or shape == "plain":
+                shape = raw_shape
+        return shape
 
     @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
@@ -3043,6 +3075,13 @@ class SunglassesEngine:
             m = self._LIST_OPEN_TAIL_RX.match(tail)
             if m is None:
                 return None
+            # The match starts at the item the list goes on from and takes all of it (not a part
+            # of it); what it takes beyond the item is checked below to lie inside the list.
+            lowered = None if hit is None else _ascii_lower(hit)
+            item = m.group(1)
+            if (not lowered or not lowered.startswith(item)
+                    or (len(lowered) > len(item) and lowered[len(item)] not in ", ")):
+                return None
             commas += m.group(0).count(",")
             # The item after the conjunction is one to NEGATION_LIST_ITEM_WORDS plain words;
             # the shortest one that ends the list (or leads into its trailing phrase) is read.
@@ -3065,6 +3104,13 @@ class SunglassesEngine:
             if last is None:
                 return None
             reach = last[1]  # through the trailing phrase and the mark that ends the list
+            # The match lies inside what was read as the list: it is the words of the list from
+            # the item on, and ends on a word boundary, before the mark that ends the list. A
+            # match that carries a mark, or runs on past the list, is not read.
+            list_text_end = at + len(self._LIST_TRAIL_RX.match(tail, at).group(0))
+            if (len(lowered) > list_text_end or tail[:len(lowered)] != lowered
+                    or (len(lowered) < len(tail) and tail[len(lowered)] not in ", \n.!?;)]\t\x1e")):
+                return None
             words = m.group(1).split(" ")
             # the item after the conjunction is held to the stop list like any other item
             if any(w in self._NEGATION_LIST_STOPS or w in self._NEGATION_CLAUSE_WORDS for w in final_item):
@@ -3073,11 +3119,9 @@ class SunglassesEngine:
             body = gap[1:-2]
         else:
             body = None
-            for conj in (", and ", ", or ", " and ", " or "):
+            for conj in (", and ", ", or "):
                 if gap.endswith(conj):
                     body = gap[1:-len(conj)]
-                    if not (conj.startswith(",") or "," in body):
-                        return None
                     break
             if body is None:
                 return None
@@ -3136,7 +3180,14 @@ class SunglassesEngine:
         if not after:
             return at + trail.end() if len(tail) < self.NEGATION_LIST_TAIL else None
         mark = self._LIST_END_RX.match(after)
-        return None if mark is None else at + trail.end() + mark.end()
+        if mark is None:
+            return None
+        end = at + trail.end() + mark.end()
+        # A full window ends where it ends, not where the text does: blanks, or a mark, at the very
+        # edge of it do not show what follows. Only a line end is an end whatever follows.
+        if end >= len(tail) >= self.NEGATION_LIST_TAIL and mark.group(0).strip(" \t") not in ("\n", "\x1e"):
+            return None
+        return end
 
     @property
     def pattern_count(self) -> int:
