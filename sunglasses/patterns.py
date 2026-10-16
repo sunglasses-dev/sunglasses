@@ -792,7 +792,6 @@ PATTERNS = [
         "category": "hidden_instruction",
         "severity": "high",
         "channel": ["web_content", "file"],
-        "match_on": "normalized",
         "keywords": [
             "font-size:0",
             "font-size: 0",
@@ -806,9 +805,9 @@ PATTERNS = [
             "opacity: 0",
         ],
         "regex": [
-            r"""(?i)(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\#fff;background:\#fff)(?![^\W_])|(?<![\w-])font-size\s*:\s*0(?:\.0+)?(?:px|pt|em|rem|%|ex|ch|vw|vh)?(?![\w.%])|(?<![\w-])opacity\s*:\s*0(?:\.0+)?(?![\w.%])""",
+            r"""(?i)(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\#fff;background:\#fff)(?![^\W_]|[!$@])|(?<![\w-])font-size\s*:\s*0(?:\.0+)?(?:px|pt|em|rem|%|ex|ch|vw|vh)?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}!"'<>]|\Z))|(?<![\w-])opacity\s*:\s*0(?:\.0+)?%?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}!"'<>]|\Z))""",
         ],
-        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. The two listed words font-size:0 and opacity:0 could never be found in the folded text, which turns every 0 into an o, so the regex reads those two as an exact zero value with a boundary on the raw text as well, and every other hiding style is read exactly as before."
+        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. The two listed words font-size:0 and opacity:0 could never be found in the folded text, which turns every 0 into an o, so the regex reads those two as a complete zero value: the number, an optional unit, then the end of the declaration. Every other hiding style is read exactly as before."
     },
 
     # =========================================================================
