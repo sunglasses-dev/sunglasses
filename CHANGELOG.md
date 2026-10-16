@@ -2844,6 +2844,13 @@ The `discovery_file_poisoning` category ships in two waves: GLS-DFP-001..025 (v0
 - **12 new patterns, all in `cross_agent_injection`** (one-category-per-day rule). Auto-shipped via daily-push runner.
 
 
+## [0.2.29] — 2026-05-02
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`272e9237`). Shipped to PyPI and tagged `v0.2.29`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 481 patterns, 2296 keywords, 54 categories.
+
 ## [0.2.28] — 2026-05-01
 
 ### Added
@@ -2885,6 +2892,27 @@ The `discovery_file_poisoning` category ships in two waves: GLS-DFP-001..025 (v0
 ### Context
 - One-category-per-day shipping rule locked in — every v0.2.X push from now on focuses one attack class so the day's release + blog tell one story. v0.2.26 = `cross_agent_injection`. Companion blog: `/blog/a2a-trusted-handoff-override` (Jack byline, original Cycle 181 evidence).
 - Source pool: `~/jack-harvest/ready/v0.2.26_ready.json`. 19 staged → 3 dropped (empty regex) → 16 shipped.
+
+## [0.2.25] — 2026-04-28
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`14baf576`). Shipped to PyPI and tagged `v0.2.25`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 413 patterns, 2296 keywords, 54 categories.
+
+## [0.2.24] — 2026-04-27
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`dd786796`). Shipped to PyPI and tagged `v0.2.24`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 393 patterns, 2296 keywords, 54 categories.
+
+## [0.2.23] — 2026-04-26
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`46e8ebd8`). Shipped to PyPI and tagged `v0.2.23`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 378 patterns, 2296 keywords, 52 categories.
 
 ## [0.2.22] — 2026-04-25
 
@@ -3067,6 +3095,13 @@ Patterns derived from Jack's autonomous pattern-extraction cycles CYCLE287–CYC
 ### Research source
 Patterns derived from Jack's autonomous pattern-extraction work (CYCLE181 + CYCLE184), validated CLEAN (FP=0, FN=0) on reference corpus of 12 and 16 cases respectively. Both cover attack surfaces explicitly flagged as uncovered in the internal pattern database reference.
 
+## [0.2.14] — 2026-04-16
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`afa9202c`). Shipped to PyPI and tagged `v0.2.14`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 253 patterns, 1475 keywords, 40 categories.
+
 ## [0.2.13] — 2026-04-15
 
 ### Added
@@ -3075,6 +3110,27 @@ Patterns derived from Jack's autonomous pattern-extraction work (CYCLE181 + CYCL
 - Per-finding `security-severity` scores (0.0–10.0) for GitHub Advanced Security severity triage.
 - Rule deduplication: identical rules across multiple scan results appear only once in `tool.driver.rules`.
 - `columnKind: utf16CodeUnits` for correct GitHub GHAS column rendering.
+
+## [0.2.12] — 2026-04-13
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`c40a57e4`). Shipped to PyPI and tagged `v0.2.12`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 245 patterns, 1417 keywords, 35 categories.
+
+## [0.2.11] — 2026-04-12
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`1faa9a8b`). Shipped to PyPI and tagged `v0.2.11`; no CHANGELOG entry was written at the time.
+
+### Added
+- 15 new patterns. Totals: 227 patterns, 1,273 keywords, 33 categories.
+
+## [0.2.10] — 2026-04-11
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`290ad17b`). Shipped to PyPI and tagged `v0.2.10`; no CHANGELOG entry was written at the time.
+
+### Added
+- 11 new pattern packs and a preprocessor expansion.
 
 ## [0.2.3] — 2026-04-04
 

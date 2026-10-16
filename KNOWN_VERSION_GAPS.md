@@ -73,6 +73,9 @@ PyPI versions accepted as not-published:
 - pypi-gap: 0.2.9
 - pypi-gap: 0.2.27
 - pypi-gap: 0.2.30
+- pypi-gap: 0.6.1
+
+2026-10-15 — 0.6.1 was planned then skipped on Sep-27 (0.6.2 shipped on its base); no renumbering.
 
 Pre-launch tags accepted as not-recovered:
 - tag-gap: 0.1.0
