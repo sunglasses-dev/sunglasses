@@ -436,8 +436,8 @@ leave stdout as one document.
 Files the scan does not read are listed in `skipped` with the reason, and the scan is then
 incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
 exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
-cannot be listed, anything the scan finds changed (a folder or file swapped for another one or
-for a link before the scan opened or listed it; see below for what a later change does), and every
+cannot be listed, a folder found swapped for another folder or a link found where a file or folder
+was before the scan opened or listed it (see below for what a change after that does), and every
 file past `--max-files N`.
 `--skip-lockfiles` adds `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
 `Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
@@ -452,12 +452,14 @@ opened relative to the step before, refusing a link at every step, and the scan 
 folder's identity (device and inode) when it opens it and when it lists it, so a folder that was
 swapped for another one, or for a link, before one of those steps is named as changed and not
 read. A folder replaced after the scan has already opened it is still the one the scan holds, and
-the scan judges what it read from that handle; it does not report the later change. Each file (at
+the scan judges what it read from that handle; it does not report the later change. A regular file
+replaced by another regular file is not a detected change either: the scan judges the bytes it
+actually opened. Each file (at
 most 1 MB) is read once through those handles, and the scan judges exactly those bytes: they are
 held in memory and go straight to content routing and extraction, so the scan writes no copy of
-any file, anywhere (no temporary file or folder, nothing inside the scanned folder; Python's
-bytecode-cache writing is switched off for the length of the scan, so loading an extractor in
-the middle of a scan leaves nothing next to its source either), and no file's content is opened
+any file, anywhere (no temporary file or folder, nothing inside the scanned folder; the PDF,
+image and QR extractors are imported before the folder is opened, so none is first loaded in the
+middle of the walk), and no file's content is opened
 a second time by routing or extraction (the folders on the way down are opened again to list
 them and to read the next file). The findings carry the file's path in the tree. A file that
 changes after it was read is judged as it was when it was read. The previous file's bytes are
@@ -465,10 +467,13 @@ let go before the next file is read, and the 1 MB cap bounds each read; it is no
 process's total memory. One caveat outside the scan itself: reading text out of an image with
 the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
 your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside
-a folder you scan.
-A second limit of the same kind: if the folder you scan holds sunglasses' own source and you start
-the scan with `python -m sunglasses`, Python can cache sunglasses' own modules there at start-up,
-before any scanning code runs; set `PYTHONDONTWRITEBYTECODE=1` for that case.
+a folder you scan. Two limits of the same kind: if the folder you scan holds sunglasses' own source
+and you start the scan with `python -m sunglasses`, Python can cache sunglasses' own modules there
+at start-up, before any scanning code runs; and an image or PDF library that is first loaded
+during the scan and lives inside the folder you scan can be cached there by Python. Set
+`PYTHONDONTWRITEBYTECODE=1` for either case. If the scan is interrupted (Ctrl-C) the process
+exits and the operating system closes its folder handle; a program that calls the scan as a
+library and swallows that interrupt keeps the handle open until it exits.
 
 Where the platform has no such handles (Windows) the scan checks for a link and for a path that
 leaves the tree before it reads and again against the file it opened. That is a weaker guarantee

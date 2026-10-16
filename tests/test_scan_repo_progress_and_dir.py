@@ -28,6 +28,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -382,9 +383,10 @@ def test_the_readme_says_what_a_directory_scan_claims():
     # opened twice, and the bytecode cache is not written into the scanned folder.
     assert "writes no copy of any file" in readme
     assert "no file's content is opened a second time" in readme
-    assert "bytecode-cache writing is switched off" in readme
+    assert "imported before the folder is opened" in readme
     assert "does not report the later change" in readme
     assert "PYTHONDONTWRITEBYTECODE=1" in readme
+    assert "replaced by another regular file is not a detected change" in readme
 
 
 # ── 5. review round 1: the edges of a local tree, stderr, names, links ─────
@@ -932,39 +934,97 @@ def test_the_scan_makes_no_write_of_any_kind(work, monkeypatch, capsys):
     assert code == EXIT_THREAT and doc["files_scanned"] == 3
 
 
-def _tree_listing(top):
-    return sorted((str(p.relative_to(top)), p.stat().st_mtime_ns) for p in top.rglob("*"))
+_WATCH_CHILD = """
+import json, os, sys
+from sunglasses import cli
+target, mode = os.path.realpath(sys.argv[1]), sys.argv[2]
+state = {"open": False, "writes": [], "before": None}
+WRITE = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+
+
+def hook(event, args):
+    if not state["open"]:
+        return
+    if event == "open" and isinstance(args[0], (str, bytes)) and isinstance(args[2], int) and args[2] & WRITE:
+        state["writes"].append(os.fsdecode(args[0]))
+    elif event in ("os.rename", "os.mkdir", "os.remove"):
+        state["writes"].append(event + " " + " ".join(os.fsdecode(a) for a in args[:2] if isinstance(a, (str, bytes))))
+
+
+real_open_root = cli._open_root
+loaded = lambda: {m for m in sys.modules if m.startswith("sunglasses")}
+
+
+def open_root(path):
+    state["before"] = loaded()
+    fd = real_open_root(path)
+    state["open"] = True
+    return fd
+
+
+cli._open_root = open_root
+sys.addaudithook(hook)
+args = cli.argparse.Namespace(json=(mode == "json"), output=mode, verbose=False, max_files=None,
+                              directory=sys.argv[1], skip_lockfiles=False, channel="file")
+try:
+    cli._scan_tree(args, cli.SunglassesEngine(), sys.argv[1], source=sys.argv[1], kind="directory")
+except SystemExit:
+    pass
+state["open"] = False
+sys.stderr.write("RESULT " + json.dumps({"writes": state["writes"], "late": sorted(loaded() - state["before"])}) + "\\n")
+"""
+
+
+def _watch_scan(work, name, root, mode, pythonpath, warm=True):
+    """Scan `root` in a fresh interpreter with the default bytecode settings, reporting every
+    write made inside it after the scan opened it, and every sunglasses module imported then."""
+    child = work / f"{name}_child.py"
+    child.write_text(_WATCH_CHILD)
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    env.update(PYTHONPATH=str(pythonpath), NO_COLOR="1")
+    if warm:
+        # Let the start-up imports write their caches first, so a write seen afterwards was
+        # made by something the scan loaded.
+        done = subprocess.run([sys.executable, "-c", "import sunglasses.cli"], cwd=work, env=env,
+                              capture_output=True, text=True, timeout=300)
+        assert done.returncode == 0, done.stderr
+    proc = subprocess.run([sys.executable, str(child), str(root), mode], cwd=work, env=env,
+                          capture_output=True, text=True, timeout=300)
+    line = [ln for ln in proc.stderr.splitlines() if ln.startswith("RESULT ")]
+    assert line, proc.stderr
+    return json.loads(line[-1][len("RESULT "):])
 
 
 @pytest.mark.parametrize("output", ["json", "sarif"])
-def test_scanning_the_packages_own_folder_writes_no_bytecode_cache_into_it(work, output):
+def test_scanning_the_packages_own_folder_writes_nothing_into_it_once_it_is_open(work, output):
     """The default Python settings, not the test-friendly ones.
 
-    An extractor is imported the first time a file needs one, in the middle of the walk.
-    Python then writes a cache file next to the module, which is a write inside the folder
-    being scanned when that folder is the package itself. A PDF in the folder is what makes
-    the scan reach for the PDF extractor, so the scan is the first thing to import it.
+    Scanning the package's own folder, with a PDF, an image and a ZIP in it so that every
+    extractor is reached: after the scan has opened the folder, nothing is written inside it
+    and no sunglasses module is first imported (Python would write its bytecode cache next
+    to it). The extractors are imported before the folder is opened.
     """
     pkg = work / f"selfscan_{output}"
     shutil.copytree(REPO / "sunglasses", pkg / "sunglasses",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     target = pkg / "sunglasses" / "extractors"
     (target / "report.txt").write_bytes(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")
-    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
-    env.update(PYTHONPATH=str(pkg), NO_COLOR="1")
-    cwd = work / "cwd"
-    cwd.mkdir(exist_ok=True)
-    # Let the ordinary start-up imports write their caches first, so that anything new in
-    # the folder afterwards was written by the scan itself.
-    warm = subprocess.run([sys.executable, "-c", "import sunglasses.cli"], cwd=cwd, env=env,
-                          capture_output=True, text=True, timeout=300)
-    assert warm.returncode == 0, warm.stderr
-    before = _tree_listing(target)
-    proc = subprocess.run([sys.executable, "-m", "sunglasses", "scan", "--dir", str(target), "-o", output],
-                          cwd=cwd, env=env, capture_output=True, text=True, timeout=300)
-    assert proc.returncode in (EXIT_CLEAN, EXIT_THREAT, EXIT_INCOMPLETE), proc.stderr
-    assert json.loads(proc.stdout)
-    assert _tree_listing(target) == before
+    (target / "shot.dat").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64)
+    with zipfile.ZipFile(target / "bundle.dat", "w") as z:
+        z.writestr("inner.txt", CLEAN)
+    seen = _watch_scan(work, f"selfscan_{output}", target, output, pkg)
+    assert seen["writes"] == [], seen
+    assert seen["late"] == [], seen
+
+
+@pytest.mark.parametrize("output", ["json", "sarif"])
+def test_the_extractors_are_loaded_before_the_root_is_opened(work, output):
+    """Nothing the scan reaches is imported after the root folder is open; a fresh
+    interpreter, so none of it is loaded beforehand."""
+    root = _local(work, f"preload_{output}", {"ok.md": CLEAN, "a.pdf": b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n",
+                                              "p.png": b"\x89PNG\r\n\x1a\n" + b"\x00" * 64})
+    seen = _watch_scan(work, f"preload_{output}", root, output, REPO, warm=False)
+    assert seen["late"] == [], seen
 
 
 def test_the_previous_files_bytes_are_let_go_before_the_next_file_is_read(work, monkeypatch, capsys):
@@ -993,68 +1053,6 @@ def test_the_previous_files_bytes_are_let_go_before_the_next_file_is_read(work, 
     code, doc = _scan_tree_out(root, "json", capsys)
     assert doc["files_scanned"] == 4 and len(alive_at_read) == 4
     assert alive_at_read == [0, 0, 0, 0], alive_at_read
-
-
-@pytest.mark.parametrize("start", [False, True])
-def test_an_interrupt_right_after_the_bytecode_switch_still_restores_it_and_leaks_no_handle(work, monkeypatch, start):
-    """The switch is set inside the protected block, so no gap lets an interrupt skip the restore."""
-    from sunglasses import cli
-    root = _local(work, f"bytecode_interrupt_{start}", {"ok.md": CLEAN})
-    real_sys = sys
-
-    class InterruptAfterSwitch:
-        def __getattr__(self, name):
-            return getattr(real_sys, name)
-
-        def __setattr__(self, name, value):
-            setattr(real_sys, name, value)
-            if name == "dont_write_bytecode" and value is True:
-                raise KeyboardInterrupt
-
-    def open_fds():
-        return len(os.listdir("/dev/fd")) if os.path.isdir("/dev/fd") else None
-
-    monkeypatch.setattr(real_sys, "dont_write_bytecode", start)
-    monkeypatch.setattr(cli, "sys", InterruptAfterSwitch())
-    before = open_fds()
-    with pytest.raises(KeyboardInterrupt):
-        cli._scan_tree(_args_for(root, "json"), cli.SunglassesEngine(), str(root),
-                       source=str(root), kind="directory")
-    assert real_sys.dont_write_bytecode is start
-    assert open_fds() == before
-
-
-@pytest.mark.parametrize("start", [False, True])
-def test_an_interrupt_after_the_root_is_open_restores_the_switch_and_closes_the_handle(work, monkeypatch, start):
-    from sunglasses import cli
-    root = _local(work, f"bytecode_interrupt_open_{start}", {"ok.md": CLEAN})
-    closed = []
-    real_close = os.close
-
-    def interrupt(*a, **kw):
-        raise KeyboardInterrupt
-
-    def watch_close(fd):
-        closed.append(fd)
-        real_close(fd)
-
-    monkeypatch.setattr(sys, "dont_write_bytecode", start)
-    monkeypatch.setattr(cli, "_scan_tree_inner", interrupt)
-    monkeypatch.setattr(cli.os, "close", watch_close)
-    with pytest.raises(KeyboardInterrupt):
-        cli._scan_tree(_args_for(root, "json"), cli.SunglassesEngine(), str(root),
-                       source=str(root), kind="directory")
-    assert sys.dont_write_bytecode is start
-    assert len(closed) == 1
-
-
-def test_the_bytecode_setting_is_put_back_after_the_scan(work, monkeypatch, capsys):
-    from sunglasses import cli
-    root = _local(work, "bytecode_restore", {"ok.md": CLEAN})
-    for start in (False, True):
-        monkeypatch.setattr(sys, "dont_write_bytecode", start)
-        _scan_tree_out(root, "json", capsys)
-        assert sys.dont_write_bytecode is start
 
 
 @pytest.mark.parametrize("name,before,after,threats", [

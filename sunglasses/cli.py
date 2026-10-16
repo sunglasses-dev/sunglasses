@@ -611,17 +611,17 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     length and releases it on every way out. A root that cannot be opened that way is a
     refusal (exit 2, one document), never a half scan.
     """
-    # Extractors are imported the first time a file needs one, which happens in the middle
-    # of the walk. Python writes a bytecode cache next to the module it imports, and when
-    # the folder being scanned holds that module (scanning the package's own source, or a
-    # site-packages folder) that cache would be a write inside the scanned tree. Switch the
-    # cache writing off for the length of the scan, then put the setting back. The switch
-    # is the first thing inside the protected block, so an interrupt at any point after it
-    # still reaches the `finally` and restores it.
-    keep_bytecode_setting = sys.dont_write_bytecode
+    # The PDF, image and QR extractors (and the result writers) are imported the first time
+    # they are needed, which would be in the middle of the walk. Python writes a bytecode
+    # cache next to the module it imports, and when the folder being scanned holds that
+    # module (scanning the package's own source) that would be a write inside the tree while
+    # it is being read. Import them now, before the root is opened, so nothing is imported
+    # once the scan has started reading. (A
+    # third-party library loaded later, such as an image or PDF reader living inside the
+    # scanned folder, is outside what the scan controls; see the README.)
+    _load_extractors()
     root_fd = None
     try:
-        sys.dont_write_bytecode = True
         try:
             root_fd = _open_root(tmp_dir)
         except OSError as exc:
@@ -629,9 +629,15 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
                          "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
         return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
     finally:
-        sys.dont_write_bytecode = keep_bytecode_setting
         if root_fd is not None:
             os.close(root_fd)
+
+
+def _load_extractors():
+    """Import the modules a scan reaches late (extractors, result and SARIF writers), so
+    none is first imported after the root folder is open."""
+    from . import result, sarif  # noqa: F401
+    from .extractors import dispatch, image, pdf, qr  # noqa: F401
 
 
 def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
