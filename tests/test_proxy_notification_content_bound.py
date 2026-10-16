@@ -204,7 +204,7 @@ def test_the_envelope_is_not_counted_on_the_notification_path(tmp_path, method):
 # order params/extra/split x under/at/over. F = forwarded after one scan, N = not
 # forwarded and not scanned (an existing admission or special path, or the
 # content bound). On main the oversized top-level extra (slots 5 and 8) was
-# forwarded on twelve shapes; the request guard now counts it, so those cells are
+# forwarded on eight shapes; the request guard now counts it, so those cells are
 # N. Nothing else moved: params over the cap was already N, every at-or-under
 # cell is as it was, and the shapes that never reach the guard are N throughout.
 REQUEST_NOW = {
@@ -263,3 +263,36 @@ def test_an_oversized_extra_on_a_request_is_answered_over_budget(
     assert answers[0]["id"] == 7
     assert answers[0]["error"]["data"]["reason_code"] == "OVER_BUDGET"
     assert answers[0]["error"]["data"].get("budget") == "content"
+
+
+@pytest.mark.parametrize("edge", ["under", "at", "over"])
+@pytest.mark.parametrize("with_params", [False, True])
+@pytest.mark.parametrize("method", sorted(REQUEST_MOVED))
+def test_several_extras_on_a_request_share_one_content_bound(
+        tmp_path, method, with_params, edge):
+    """Two extras that are each far under the cap but together over it are
+    refused; the same two at or under the cap are forwarded after one scan. A
+    guard that counted only the first extra would forward the over case."""
+    total = EDGES[edge]
+    message = {"id": 7, "method": method,
+               "extra": "a" * (CAP // 2), "second": "b" * (total - CAP // 2)}
+    if with_params:
+        message["params"] = {"data": "c"}
+        message["second"] = message["second"][:-1]
+    assert (len(message["extra"]) + len(message["second"])
+            + len(message.get("params", {}).get("data", ""))) == total
+    engine, upstream, client, scans = make_route(tmp_path)
+    raw = frame(**message)
+    engine.client_frame(raw)
+    if total <= CAP:
+        assert upstream.bytes == raw and len(scans) == 1 and client.bytes == b""
+    else:
+        assert upstream.bytes == b"" and scans == []
+        answers = client.messages()
+        assert len(answers) == 1 and answers[0]["id"] == 7
+        data = answers[0]["error"]["data"]
+        assert (data["reason_code"], data["rule"], data["budget"]) == \
+            ("OVER_BUDGET", "S3", "content")
+        settled = _settled(tmp_path)
+        assert len(settled) == 1 and settled[0]["reason_code"] == "OVER_BUDGET"
+    engine.log.close()
