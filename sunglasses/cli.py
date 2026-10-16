@@ -611,19 +611,22 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     length and releases it on every way out. A root that cannot be opened that way is a
     refusal (exit 2, one document), never a half scan.
     """
-    try:
-        root_fd = _open_root(tmp_dir)
-    except OSError as exc:
-        _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
-                     "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
     # Extractors are imported the first time a file needs one, which happens in the middle
     # of the walk. Python writes a bytecode cache next to the module it imports, and when
     # the folder being scanned holds that module (scanning the package's own source, or a
     # site-packages folder) that cache would be a write inside the scanned tree. Switch the
-    # cache writing off for the length of the scan, then put the setting back.
+    # cache writing off for the length of the scan, then put the setting back. The switch
+    # is the first thing inside the protected block, so an interrupt at any point after it
+    # still reaches the `finally` and restores it.
     keep_bytecode_setting = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
+    root_fd = None
     try:
+        sys.dont_write_bytecode = True
+        try:
+            root_fd = _open_root(tmp_dir)
+        except OSError as exc:
+            _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
+                         "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
         return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
     finally:
         sys.dont_write_bytecode = keep_bytecode_setting
@@ -677,8 +680,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
         # The tree can change between the walk and the read. Read the file once, through
         # the directory descriptors (no link at any step), and judge those bytes: they go
         # to routing and extraction as they are, in memory. Nothing is written anywhere and
-        # no path is opened a second time, so the bytes we judged are the bytes we read,
-        # whatever the tree does next.
+        # the file's content is not opened a second time (the folders on the way down are
+        # opened again to list them and to read the next file), so the bytes we judged are
+        # the bytes we read, whatever the tree does next.
         data = snapshot = None   # let go of the previous file's bytes before reading the next
         try:
             data = _read_member(tmp_dir, rel_path, root_fd, idents)

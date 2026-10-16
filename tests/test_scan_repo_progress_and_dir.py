@@ -384,6 +384,7 @@ def test_the_readme_says_what_a_directory_scan_claims():
     assert "no file's content is opened a second time" in readme
     assert "bytecode-cache writing is switched off" in readme
     assert "does not report the later change" in readme
+    assert "PYTHONDONTWRITEBYTECODE=1" in readme
 
 
 # ── 5. review round 1: the edges of a local tree, stderr, names, links ─────
@@ -992,6 +993,59 @@ def test_the_previous_files_bytes_are_let_go_before_the_next_file_is_read(work, 
     code, doc = _scan_tree_out(root, "json", capsys)
     assert doc["files_scanned"] == 4 and len(alive_at_read) == 4
     assert alive_at_read == [0, 0, 0, 0], alive_at_read
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_an_interrupt_right_after_the_bytecode_switch_still_restores_it_and_leaks_no_handle(work, monkeypatch, start):
+    """The switch is set inside the protected block, so no gap lets an interrupt skip the restore."""
+    from sunglasses import cli
+    root = _local(work, f"bytecode_interrupt_{start}", {"ok.md": CLEAN})
+    real_sys = sys
+
+    class InterruptAfterSwitch:
+        def __getattr__(self, name):
+            return getattr(real_sys, name)
+
+        def __setattr__(self, name, value):
+            setattr(real_sys, name, value)
+            if name == "dont_write_bytecode" and value is True:
+                raise KeyboardInterrupt
+
+    def open_fds():
+        return len(os.listdir("/dev/fd")) if os.path.isdir("/dev/fd") else None
+
+    monkeypatch.setattr(real_sys, "dont_write_bytecode", start)
+    monkeypatch.setattr(cli, "sys", InterruptAfterSwitch())
+    before = open_fds()
+    with pytest.raises(KeyboardInterrupt):
+        cli._scan_tree(_args_for(root, "json"), cli.SunglassesEngine(), str(root),
+                       source=str(root), kind="directory")
+    assert real_sys.dont_write_bytecode is start
+    assert open_fds() == before
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_an_interrupt_after_the_root_is_open_restores_the_switch_and_closes_the_handle(work, monkeypatch, start):
+    from sunglasses import cli
+    root = _local(work, f"bytecode_interrupt_open_{start}", {"ok.md": CLEAN})
+    closed = []
+    real_close = os.close
+
+    def interrupt(*a, **kw):
+        raise KeyboardInterrupt
+
+    def watch_close(fd):
+        closed.append(fd)
+        real_close(fd)
+
+    monkeypatch.setattr(sys, "dont_write_bytecode", start)
+    monkeypatch.setattr(cli, "_scan_tree_inner", interrupt)
+    monkeypatch.setattr(cli.os, "close", watch_close)
+    with pytest.raises(KeyboardInterrupt):
+        cli._scan_tree(_args_for(root, "json"), cli.SunglassesEngine(), str(root),
+                       source=str(root), kind="directory")
+    assert sys.dont_write_bytecode is start
+    assert len(closed) == 1
 
 
 def test_the_bytecode_setting_is_put_back_after_the_scan(work, monkeypatch, capsys):

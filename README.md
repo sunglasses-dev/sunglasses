@@ -436,7 +436,9 @@ leave stdout as one document.
 Files the scan does not read are listed in `skipped` with the reason, and the scan is then
 incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
 exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
-cannot be listed, anything that changed while the scan ran, and every file past `--max-files N`.
+cannot be listed, anything the scan finds changed (a folder or file swapped for another one or
+for a link before the scan opened or listed it; see below for what a later change does), and every
+file past `--max-files N`.
 `--skip-lockfiles` adds `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
 `Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
 scanned.
@@ -464,6 +466,9 @@ process's total memory. One caveat outside the scan itself: reading text out of 
 the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
 your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside
 a folder you scan.
+A second limit of the same kind: if the folder you scan holds sunglasses' own source and you start
+the scan with `python -m sunglasses`, Python can cache sunglasses' own modules there at start-up,
+before any scanning code runs; set `PYTHONDONTWRITEBYTECODE=1` for that case.
 
 Where the platform has no such handles (Windows) the scan checks for a link and for a path that
 leaves the tree before it reads and again against the file it opened. That is a weaker guarantee
