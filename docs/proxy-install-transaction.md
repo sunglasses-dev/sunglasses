@@ -172,7 +172,7 @@ a review found the absence of them:
   under different `HOME` values lock different files and do not serialise
   against each other.
 - Locking reads `flock` where it exists and `None` where it does not, because
-  `fcntl` is POSIX-only while the README promises Windows.
+  `fcntl` is POSIX-only, and the README states POSIX only, Windows unsupported.
 - Inode reuse is neither proven nor handled.
 - A config that is a symbolic link is refused when the command starts. That is
   a check made once, at entry, and it is not protection against a local process
