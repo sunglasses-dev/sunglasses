@@ -52,6 +52,22 @@ ZERO_SIZE_OR_OPACITY = [
     '<span style="font-size:0 /* x */ !important">%s</span>' % TEXT,
     '<span style="opacity:0%%">%s</span>' % TEXT,
     '<span style="opacity:0.00">%s</span>' % TEXT,
+    # every unit the rule reads, on its own
+    '<span style="font-size:0pt">%s</span>' % TEXT,
+    '<span style="font-size:0ex">%s</span>' % TEXT,
+    '<span style="font-size:0ch">%s</span>' % TEXT,
+    '<span style="font-size:0vw">%s</span>' % TEXT,
+    '<span style="font-size:0vh">%s</span>' % TEXT,
+    # a tag bracket ends the declaration too
+    "<p style=font-size:0>%s</p>" % TEXT,
+    "a{opacity:0<b>%s</b>" % TEXT,
+    # a full priority annotation ends it, with the blanks and comments CSS allows inside it
+    '<span style="font-size:0 ! important">%s</span>' % TEXT,
+    '<span style="font-size:0!/**/IMPORTANT;">%s</span>' % TEXT,
+    '<span style="opacity:0!important;color:red">%s</span>' % TEXT,
+    # the longest stretch of blanks and of comment the rule reads (see the bound test below)
+    '<span style="font-size:0%s;">%s</span>' % (" " * 12, TEXT),
+    '<span style="opacity:0/*%s*/;">%s</span>' % ("x" * 60, TEXT),
     # the declaration is the last thing in the text, so the end of the text completes it
     "the hidden part is font-size:0",
     "the hidden part is opacity: 0",
@@ -85,7 +101,10 @@ NOT_A_COMPLETE_ZERO = [
     '<p style="%s:%s">%s</p>' % (prop, value, TEXT)
     for prop in ("font-size", "opacity")
     for value in ("0 px", "0 em", "0-invalid", "0/2", "0@x", "0/**/px", "0.0.1", "0e0", "0e5", "0.", "00", "-0", "+0",
-                  "0 0", "0,5", "0:1", "0_x", "0px2", "0.5", "0.05", "05")
+                  "0 0", "0,5", "0:1", "0_x", "0px2", "0.5", "0.05", "05",
+                  # no number at all, a letter or a percent after the unit, and priority tails that are not a priority
+                  "", "px", "%", "0a", "0z", "0pxa", "0px%", "0%%", "0%a", "0!", "0!wrong", "0 !wrong", "0 !important more",
+                  "0 !importantx", "0!important!", "0 !", "0 ! more")
 ]
 # Every hiding style the rule had before this change must keep firing, which proves the reader still works.
 EXISTING_HIDING = [
@@ -139,6 +158,47 @@ OLD_WORD_BEFORE_A_FOLDED_SYMBOL = [
 @pytest.mark.parametrize("snippet", OLD_WORD_BEFORE_A_FOLDED_SYMBOL)
 def test_an_old_word_keeps_the_boundary_the_folded_text_gave_it(engine, snippet, channel):
     assert not flagged(engine, snippet, channel)
+
+
+# Blanks and comments between the zero and the end of the declaration are read up to a bound, so the cost stays linear: twelve
+# blanks or comments, and a comment body of sixty characters. A longer stretch is a valid zero that this rule does not read.
+BEYOND_THE_BOUND = [
+    '<span style="font-size:0%s;">%s</span>' % (" " * 13, TEXT),
+    '<span style="opacity:0%s;">%s</span>' % (" " * 13, TEXT),
+    '<span style="font-size:0/*%s*/;">%s</span>' % ("x" * 61, TEXT),
+    '<span style="opacity:0%s;">%s</span>' % ("/**/" * 13, TEXT),
+]
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("snippet", BEYOND_THE_BOUND)
+def test_a_stretch_longer_than_the_bound_is_not_read(engine, snippet, channel):
+    assert not flagged(engine, snippet, channel)
+
+
+# The old words used to be looked up in the normalized text, where a zero-width character is deleted and an entity or a
+# percent escape is decoded. A word followed by a letter, a digit or ! $ @ spelled that way was never a hit. The regex reads
+# the raw text, so it has to look past those spellings itself. Encoded characters that are not word characters (a space, a
+# zero-width space written as an entity) leave the word complete, as they did before.
+OLD_STYLES = ["display:none", "display: none", "visibility:hidden", "visibility: hidden",
+              "color:white;background:white", "color:#fff;background:#fff"]
+HIDDEN_TAILS = ["\u200b9", "\u200bx", "\u200b!", "\u200b$", "\u200b@", "\u200b\u200d1", "\ufeffa", "\u00ad7",
+                "&#97;", "&#x61;", "&#48;", "&#33;", "&#36;", "&#64;", "%61", "%30", "%21", "%24", "%40", "&#0097;"]
+COMPLETE_TAILS = ["&#8203;0", "&#x200b;1", "%E2%80%8B2", "&#32;", "&#x20;", "%20", "&#1000;", "&#9;", "\u200b", "\u200b "]
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("tail", HIDDEN_TAILS)
+@pytest.mark.parametrize("style", OLD_STYLES)
+def test_an_old_word_followed_by_a_hidden_word_character_is_not_flagged(engine, style, tail, channel):
+    assert not flagged(engine, '<div style="%s%s">%s</div>' % (style, tail, TEXT), channel)
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("tail", COMPLETE_TAILS)
+@pytest.mark.parametrize("style", OLD_STYLES)
+def test_an_old_word_followed_by_a_hidden_non_word_character_is_still_flagged(engine, style, tail, channel):
+    assert flagged(engine, '<div style="%s%s">%s</div>' % (style, tail, TEXT), channel)
 
 
 # The old words are also found when they are spelled in a way only the folded text can read. The regex must not lose those.
