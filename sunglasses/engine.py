@@ -15,6 +15,7 @@ import collections
 import functools
 import html
 import keyword
+import itertools
 import re
 import threading
 import unicodedata
@@ -1161,6 +1162,8 @@ def _shipped_regex_sources():
     return frozenset(src for rule in (*PATTERNS, *MECHANISM_PATTERNS)
                      for src in rule.get("regex", ()))
 
+_BACKTICK_RUN_RX = re.compile("`+")
+
 
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
@@ -2218,7 +2221,7 @@ class SunglassesEngine:
         return at if at in self._LEADIN_BREAKS else ""
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
-                        refusal_ok: bool = False) -> bool:
+                        refusal_ok: bool = False, trace: Optional[list] = None) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -2235,6 +2238,12 @@ class SunglassesEngine:
         then be the same characters in the raw input, at the place the view got
         them from, so a negation built by decoding, erasing or folding characters
         never downgrades. The text is lowercased for ASCII letters only.
+
+        ``trace`` is a list the caller may pass to learn which quotes the cues used: each
+        quote that held, and each that closed INSIDE the hit (see _quoted_gap_holds and
+        _resolve_cover, which looks for a shorter hit that ends there), and, when the hit
+        is covered, the quote that covered it ("cover": where its opening mark is and where
+        it closes). Nothing in the answer depends on it.
         """
         if refusal_ok and self._refusal_string(text, match_start, match_end, align):
             return True
@@ -2268,21 +2277,26 @@ class SunglassesEngine:
                     continue
                 if self._refusal_literal(text, match_start, match_end, align):
                     continue
+            first_entry = len(trace) if trace is not None else 0
             if not (self._negation_governs(gap + self._leadin_break(text, match_start), gap_words)
-                    or self._quoted_gap_holds(gap, text, match_start, match_end, align)):
+                    or self._quoted_gap_holds(gap, text, match_start, match_end, align,
+                                              trace=trace)):
                 continue
             if align is None or align.holds(
                     text, max(0, window_start + m.start() - 1), hit_end,
                     self._spaced_inside(text, window_start + m.end(), match_start)):
+                self._note_cover(trace, first_entry)
                 return True
         for phrase in self.FRAMING_LABELS:
             pos = before_text.rfind(phrase)
             if pos == -1:
                 continue
+            first_entry = len(trace) if trace is not None else 0
             if not self._quoted_gap_holds(before_text[pos + len(phrase):], text, match_start,
-                                          match_end, align, label=True):
+                                          match_end, align, label=True, trace=trace):
                 continue
             if align is None or align.holds(text, window_start + pos, hit_end):
+                self._note_cover(trace, first_entry)
                 return True
         return False
 
@@ -2429,6 +2443,18 @@ class SunglassesEngine:
         return cls._joins_items(tail)
 
     @staticmethod
+    def _note_cover(trace: Optional[list], first_entry: int) -> None:
+        """Record in `trace` which quote covered the hit: ("cover", text, where its opening
+        mark is, the mark, where it closes). Only the quote of the cue that covered the hit
+        is recorded, so the caller knows the stretch of text the covering quote holds."""
+        if trace is None:
+            return
+        for kind, t, opener_at, opener, at in reversed(trace[first_entry:]):
+            if kind == "held":
+                trace.append(("cover", t, opener_at, opener, at))
+                return
+
+    @staticmethod
     def _spaced_inside(text: str, cue_end: int, match_start: int):
         """For the raw-input check of a negation: the function that says whether a space the
         view kept, where a run of plain spaces collapsed to it, may be read as one space. It
@@ -2502,9 +2528,11 @@ class SunglassesEngine:
         from. The end of the match is handed on, so a quote that is to cover the
         whole match is checked against it; in the raw frame the end is known only
         when the last character of the match is also placed in the raw text."""
-        def negated_at(match):
+        marks = {}
+
+        def negated_at(match, trace=None):
             position = match.start()
-            if self._negated_here(text, position, align, match.end()):
+            if self._negated_here(text, position, align, match.end(), trace=trace):
                 return True
             if source is not None:
                 raw, origin, copied = source
@@ -2514,24 +2542,80 @@ class SunglassesEngine:
                     stop = None
                     if last is not None and last - at == match.end() - 1 - position:
                         stop = last + 1
-                    return self._check_negation(raw, at, None, stop)
+                    return self._check_negation(raw, at, None, stop, trace=trace)
                 return copied(position, match.end())
             return False
 
-        def covered_at(match):
-            if negation and negated_at(match):
+        def covered_at(match, trace=None):
+            if negation and negated_at(match, trace):
                 return "negation"
             if framed and self._framed_here(text, match.start(), align, match.end()):
                 return "framing"
             return None
 
-        how = covered_at(first)
+        cut = []     # each hit cut short at a closing mark: (where it starts, where the short hit ends, where the wide hit ends, the wide hit)
+        spans = []   # what each covered hit rests on: (from its quote's opening mark, to the end of that quote, where the hit ends)
+
+        def owned_cover(match):
+            """How `match` is covered, counting only the quotes that begin a quotation, and
+            what it rests on. A cue whose quote mark closes the quotation before it opens
+            nothing: the text after it is not an example, so a cover that rests on it is no
+            cover. `(how, span)`; `how` is None when nothing covers it."""
+            trace = []
+            how = covered_at(match, trace)
+            if how is None:
+                return None, None
+            lo, hi = match.start(), match.end()
+            for kind, t, opener_at, opener, at in trace:
+                if kind == "held" and not self._opens_a_quote(t, opener_at, opener, marks):
+                    return None, None
+                if kind == "cover" and t is text:
+                    lo = min(lo, opener_at)
+                    hi = max(hi, at + len(self._QUOTE_CLOSERS[opener]))
+            return how, (lo, hi, match.end())
+
+        def covered_or_narrowed(match):
+            """(how, match). A plain-mode match can run on past the quote its cue opened:
+            a wide gap reaches from one quoted copy of the words to the next, so the quote
+            closes inside the hit and the hit is not covered. The same rule is then matched
+            again from the same start, bounded at that closing mark, so the shorter hit is
+            judged on what the quote holds. It must start where the first one did; when
+            the rule needs text past the mark there is no shorter hit and the occurrence
+            stays live. What follows the mark is judged by the walk, as its own match.
+
+            Once a hit has been cut short, the quotes that cover later hits are counted
+            (owned_cover), and at the end of the walk what the cut-short hit reached must
+            be accounted for: see _remainder_is_accounted."""
+            if not cut:
+                how = covered_at(match)
+                span = None
+            else:
+                how, span = owned_cover(match)
+            if how is not None or mode != "plain" or not negation:
+                if how is not None:
+                    spans.append(span or (match.start(), match.end(), match.end()))
+                return how, match
+            trace = []
+            self._negated_here(text, match.start(), align, match.end(), trace=trace)
+            closes = sorted({at for kind, t, opener_at, opener, at in trace
+                             if kind == "early" and t is text})
+            for at in closes:
+                short = rx.match(text, match.start(), at)
+                if short is None or not short.end() > short.start():
+                    continue
+                how, span = owned_cover(short)
+                if how is not None:
+                    cut.append((match.start(), short.end(), match.end(), match))
+                    spans.append(span)
+                    return how, short
+            return None, match
+
+        how, match = covered_or_narrowed(first)
         if how is None:
             return first, None
         # The walk asks for each next occurrence of ONE regex in ONE text, so
         # what the anchored mode derives from the text is kept across the steps.
         memo = {}
-        match = first
         plan = None
         if mode == "anchored":
             anchors, window = self._anchor_spec[guards]
@@ -2555,6 +2639,15 @@ class SunglassesEngine:
             found = self._eval_regex(mode, rx, guards, text, resume, memo)
             budget.charge(resume, None if found is None else found.start())
             if found is None:
+                spans.sort()
+                starts = [lo for lo, _, _ in spans]
+                reach = list(itertools.accumulate((hi for _, hi, _ in spans), max))
+                for wide_start, short_end, wide_end, wide in cut:
+                    if not self._remainder_is_accounted(rx, text, wide_start, short_end, wide_end,
+                                                        spans, starts, reach):
+                        # The hit that was cut short reached over words that no quote
+                        # holds: it stays live, as it is on main.
+                        return wide, None
                 return first, how
             # A regex with a variable lead-in reaches the same words from several
             # starts in a row (the blanks and boundary marks in front of them). A
@@ -2565,7 +2658,8 @@ class SunglassesEngine:
             match = found
             if same:
                 continue
-            if covered_at(match) is None:
+            covered, match = covered_or_narrowed(match)
+            if covered is None:
                 return match, None
 
     @staticmethod
@@ -2672,14 +2766,15 @@ class SunglassesEngine:
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False) -> bool:
+    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False,
+                      trace: Optional[list] = None) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
         one that does not keep the offsets never is."""
         if align is not None and align.moved(view, pos):
             return False
         if refusal_ok and self._refusal_in_shape_copy(view, pos, end, align):
             return True
-        return self._check_negation(view, pos, self._align_at(view, pos, align), end, refusal_ok)
+        return self._check_negation(view, pos, self._align_at(view, pos, align), end, refusal_ok, trace=trace)
 
     def _framed_here(self, view: str, pos: int, align, end: int) -> bool:
         """Whether the hit at view[pos:end] sits in a clause that describes the attack.
@@ -2816,15 +2911,20 @@ class SunglassesEngine:
         return _RawAlign.view_end(text, pos) if ends is None else ends.end_of_view(text, pos)
 
     def _quoted_gap_holds(self, gap: str, text: str, match_start: int, match_end: Optional[int],
-                          align=None, label: bool = False) -> bool:
+                          align=None, label: bool = False, trace: Optional[list] = None) -> bool:
         """A cue followed by plain words, an optional colon and ONE opening quote
         or fence governs a hit inside that quote, only while the quote closes after
         the whole hit, in the view the hit is in, and the closing mark is the
         character the raw input holds there. A framing label also takes the opening
         mark alone, with blanks around it. A later hit outside the closing quote is
-        judged on its own."""
+        judged on its own.
+
+        ``trace`` collects ("held" or "early", text, where the opening mark is, the mark,
+        where the quote closes) for the quotes this call found, so that the caller can
+        ask whether the opening mark begins a quotation (see _opens_a_quote)."""
         if match_end is None:
             return False
+        gap_start = match_start - len(gap)
         m = self._QUOTED_GAP_RX.fullmatch(gap)
         if m is not None:
             words = (m.group("words") or "").split()
@@ -2835,8 +2935,10 @@ class SunglassesEngine:
             if any(w in self._NEGATION_CLAUSE_WORDS for w in words):
                 return False
             opener = m.group("open")
+            opener_at = gap_start + m.start("open")
         elif label and self._LABEL_OPENER_RX.match(gap):
             opener = gap.strip()
+            opener_at = gap_start + len(gap) - len(gap.lstrip())
         else:
             return False
         close = self._QUOTE_CLOSERS[opener]
@@ -2848,8 +2950,257 @@ class SunglassesEngine:
         stop = self._view_end(text, match_start, align)
         at = self._find_close(text, close, match_start, stop, True)
         if at == -1 or at < match_end:
+            if trace is not None and at != -1 and (
+                    align is None or align.holds(text, at, at + len(close))):
+                trace.append(("early", text, opener_at, opener, at))
             return False
-        return align is None or align.holds(text, at, at + len(close))
+        held = align is None or align.holds(text, at, at + len(close))
+        if held and trace is not None:
+            trace.append(("held", text, opener_at, opener, at))
+        return held
+
+    # The most places in a hit's remainder that `_remainder_is_accounted` will ask about (a
+    # stretch no quote holds, a covered quote, a place where a covered hit ends), and the most
+    # match attempts it will make in all; a remainder with more of either stays live. An end
+    # found in a place costs three attempts (find it, ask the blanked text, search either side).
+    REMAINDER_ENDS_CAP = 48
+    REMAINDER_ATTEMPTS_CAP = 3 * REMAINDER_ENDS_CAP
+
+    _ENDING_WITHIN: dict = {}
+    _ENDS_CAN_BE_ASKED: dict = {}
+
+    @staticmethod
+    def _ending_within(rx, slack: int, tail: int = 0):
+        """`rx` with the match required to end within `slack` characters of where the text
+        ends, leaving `tail` characters after it (the end the caller gives as `endpos`):
+        `match(text, start, end)` says whether some match from `start` ends in
+        (end - slack - tail - 1, end - tail]. With `slack` 0 the match must end exactly
+        `tail` characters before `end`. Kept per compiled pattern, slack and tail."""
+        cache = SunglassesEngine._ENDING_WITHIN
+        found = cache.get((rx, slack, tail))
+        if found is None:
+            if len(cache) >= 4096:
+                cache.clear()
+            pattern = rx.pattern
+            head = re.match(r"(?:\(\?[aiLmsux]+\))*", pattern).group(0)
+            # a verbose pattern may end in a comment, which would swallow the closing bracket
+            end = "\n" if rx.flags & re.VERBOSE else ""
+            found = cache[(rx, slack, tail)] = re.compile(
+                head + "(?:" + pattern[len(head):] + end + r")(?=[\s\S]{%d,%d}\Z)" % (tail, tail + slack),
+                rx.flags)
+        return found
+
+    @staticmethod
+    def _match_ending_in(rx, text: str, start: int, lo: int, hi: int):
+        """The match of `rx` from `start` that ends in (lo, hi], or None. The character
+        after `hi` is kept, because a word boundary at the end of a match reads it: cut at
+        `hi` itself, a boundary before a word character would not be there."""
+        stop = min(len(text), hi + 1)
+        return SunglassesEngine._ending_within(rx, hi - lo - 1, stop - hi).match(text, start, stop)
+
+    @staticmethod
+    def _ends_can_be_asked(rx) -> bool:
+        """Whether `rx` is a rule `_ending_within` can be trusted on. The text is cut one
+        character after where the match is asked to end, so a rule is accepted only when it is
+        made of constructs that read nothing but the matched text and the one character after
+        it: literals and sets, repeats, groups, alternations, `^`, `$`, `\\A`, `\\Z` and `\\b`.
+        Anything else is declined: an assertion of any kind (look-ahead or look-behind, either
+        polarity), a back-reference, a scoped flag group, a non-boundary, a conditional, an
+        atomic group or possessive repeat. So is a rule that does not parse here or whose
+        rewrite does not compile."""
+        cache = SunglassesEngine._ENDS_CAN_BE_ASKED
+        found = cache.get(rx)
+        if found is None:
+            try:
+                try:
+                    from re import _constants as const, _parser as parser
+                except ImportError:  # Python before 3.11
+                    import sre_constants as const
+                    import sre_parse as parser
+                plain = (const.LITERAL, const.NOT_LITERAL, const.ANY, const.IN)
+                non_boundary = {const.AT_NON_BOUNDARY, const.AT_LOC_NON_BOUNDARY,
+                                const.AT_UNI_NON_BOUNDARY}
+
+                def accepted(nodes):
+                    for op, arg in nodes:
+                        if op in plain:
+                            continue
+                        if op is const.AT:
+                            if arg in non_boundary:
+                                return False
+                        elif op is const.SUBPATTERN:
+                            if arg[1] or arg[2] or not accepted(arg[-1]):  # a scoped flag group
+                                return False
+                        elif op is const.BRANCH:
+                            if not all(accepted(part) for part in arg[1]):
+                                return False
+                        elif op in (const.MAX_REPEAT, const.MIN_REPEAT):
+                            if not accepted(arg[2]):
+                                return False
+                        else:
+                            return False
+                    return True
+
+                found = accepted(parser.parse(rx.pattern, rx.flags))
+                if found:
+                    for tail in (0, 1):
+                        SunglassesEngine._ending_within(rx, 0, tail)
+                        SunglassesEngine._ending_within(rx, 1, tail)
+            except Exception:
+                found = False
+            cache[rx] = found
+        return found
+
+    def _remainder_is_accounted(self, rx, text: str, start: int, short_end: int, stop: int,
+                                spans: list, starts: list, reach: list) -> bool:
+        """Whether the part of a wide hit that lies past the quote that cut it short is
+        accounted for. The wide hit is text[start:stop]; the shorter hit that was judged
+        ends at `short_end`. `spans` (sorted by where they begin, with `starts` and the
+        running maximum of their ends `reach`) are what the covered hits rest on: from the
+        opening mark of the quote that held a hit to the end of that quote, and where the
+        hit ends.
+
+        The wide hit is dropped for the shorter one, so a match from `start` that the
+        shorter one does not make must not have been the live order. Every question is "does
+        some match from `start` end in this stretch", asked of the rule itself with the
+        match required to end there (see _ending_within):
+          * in a stretch outside every covered quote (the words between two quotations, the
+            cue and the marks), no match may end anywhere;
+          * in a covered quote, and at each place a covered hit ends, every end a match has
+            in the text must be an end a match has in the text with everything outside the
+            covered quotes blanked out. The ends are taken one at a time (each end found is
+            asked of the blanked text on its own, then the stretch on either side of it is
+            searched again), so one end cannot stand in for another. The end of the wide hit
+            lies in one of these stretches, so it is asked with them.
+        A rule that `_ends_can_be_asked` declines, a remainder with more places than
+        REMAINDER_ENDS_CAP, and one that needs more than REMAINDER_ATTEMPTS_CAP match attempts,
+        stay live."""
+        if not self._ends_can_be_asked(rx):
+            return False
+        window = spans[bisect.bisect_right(reach, short_end):bisect.bisect_left(starts, stop)]
+        gaps = []
+        at = short_end
+        for lo, hi, _ in window:
+            if hi <= at:
+                continue
+            if lo > at:
+                gaps.append((at, min(lo, stop)))
+            at = max(at, hi)
+            if at >= stop:
+                break
+        if at < stop:
+            gaps.append((at, stop))
+        quotes = [(max(lo, short_end), min(hi, stop)) for lo, hi, _ in window]
+        quotes = [(a, b) for a, b in quotes if b > a]
+        covered = sorted({end for _, _, end in window if short_end < end <= stop})
+        places = quotes + [(end - 1, end) for end in covered]
+        if len(gaps) + len(places) > self.REMAINDER_ENDS_CAP:
+            return False
+        attempts = self.REMAINDER_ATTEMPTS_CAP
+        for a, b in gaps:
+            attempts -= 1
+            if attempts < 0 or self._match_ending_in(rx, text, start, a, b):
+                return False
+        masked = None
+        offset = 0
+        for place in places:
+            todo = [place]
+            while todo:
+                lo, hi = todo.pop()
+                if hi <= lo:
+                    continue
+                attempts -= 1
+                if attempts < 0:
+                    return False
+                found = self._match_ending_in(rx, text, start, lo, hi)
+                if not found:
+                    continue
+                if masked is None:
+                    offset = max(0, start - 64)
+                    body = [" "] * (stop + 1 - start)
+                    for qlo, qhi, _ in spans[bisect.bisect_right(reach, start):
+                                             bisect.bisect_left(starts, stop)]:
+                        for i in range(max(qlo, start), min(qhi, stop + 1)):
+                            body[i - start] = text[i]
+                    masked = text[offset:start] + "".join(body)
+                end = found.end()
+                attempts -= 1
+                if attempts < 0 or not self._match_ending_in(
+                        rx, masked, start - offset, end - offset - 1, end - offset):
+                    return False
+                todo.append((lo, end - 1))
+                todo.append((end, hi))
+        return True
+
+    # The marks that can open, close or hold a quotation, grouped by the kind of quotation.
+    _QUOTE_KINDS = (("```",), ('"',), ("\u201c", "\u201d"), ("\u00ab", "\u00bb"),
+                    ("\u2018", "\u2019"), ("'",), ("`",), ("\u300c", "\u300d"),
+                    ("\u300e", "\u300f"))
+
+    def _opens_a_quote(self, text: str, pos: int, opener: str, marks: dict) -> bool:
+        """Whether the mark `opener` at text[pos] can be told to begin a quotation. The marks
+        before it in its view are counted: a mark that has an odd number of its own kind
+        before it closes a quotation, and a mark that closes one is not the opening of
+        another. A cue that stands between a quotation's marks is quoted text, not an
+        instruction to read what follows as an example.
+
+        The count is trusted only while the marks before `opener` are all of its own kind.
+        A mark of another kind in front of it (a code span, a quotation of another kind, an
+        apostrophe that does not sit between two letters) can hold a mark of this kind
+        literally, so the parity says nothing: the answer is then False, and the caller
+        leaves the hit live. `marks` keeps the positions found, per text and kind."""
+        seps = marks.get((id(text), None))
+        if seps is None:
+            seps = marks[(id(text), None)] = []
+            at = text.find(VIEW_SEP)
+            while at != -1:
+                seps.append(at + len(VIEW_SEP))
+                at = text.find(VIEW_SEP, at + len(VIEW_SEP))
+        found_view = bisect.bisect_right(seps, pos)
+        start = seps[found_view - 1] if found_view else 0
+
+        def backtick_runs():
+            """Where the runs of backticks begin, by length: one backtick is a mark, three are
+            a fence, and a run of any other length (two, four, five...) is neither."""
+            key = (id(text), start, "runs")
+            found = marks.get(key)
+            if found is None:
+                found = marks[key] = {1: [], 3: [], 0: []}
+                for run in _BACKTICK_RUN_RX.finditer(text, start):
+                    found[len(run.group()) if len(run.group()) in (1, 3) else 0].append(run.start())
+            return found
+
+        def positions(mark):
+            if mark == "`":
+                return backtick_runs()[1]
+            if mark == "```":
+                return backtick_runs()[3]
+            key = (id(text), start, mark)
+            found = marks.get(key)
+            if found is None:
+                found = marks[key] = []
+                at = text.find(mark, start)
+                while at != -1:
+                    if mark in ("'", "\u2019") and 0 < at < len(text) - 1 \
+                            and text[at - 1].isalnum() and text[at + 1].isalnum():
+                        pass
+                    else:
+                        found.append(at)
+                    at = text.find(mark, at + len(mark))
+            return found
+
+        close = self._QUOTE_CLOSERS[opener]
+        kind = next(group for group in self._QUOTE_KINDS if opener in group)
+        if backtick_runs()[0] and backtick_runs()[0][0] < pos:
+            return False
+        for group in self._QUOTE_KINDS:
+            if group is not kind and any((found := positions(mark)) and found[0] < pos
+                                         for mark in group):
+                return False
+        before = bisect.bisect_left(positions(opener), pos)
+        if close == opener:
+            return before % 2 == 0
+        return before == bisect.bisect_left(positions(close), pos)
 
     @staticmethod
     def _find_close(text: str, close: str, start: int, stop: int, forward: bool = False) -> int:
