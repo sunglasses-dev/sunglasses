@@ -15,11 +15,20 @@ less even, it never makes the split wrong.
 One file is the exception. tests/test_negation_cues_and_lists.py holds about
 two fifths of all collected tests, and its measured seconds swing between runs
 by a factor of four (1372 s to 6009 s on the same interpreter), so no file-sized
-slot can be balanced against it. It is split by test instead: its k-th
-collected test (counting from 0) goes to part k % n + 1. Both parts then carry
-an equal share of it whatever it costs, and its cost drops out of the balance.
+slot can be balanced against it. It is split by test instead: a test goes to
+part crc32(node id) % n + 1. Both parts then carry about an equal share of it
+whatever it costs, and its cost drops out of the balance.
+
+The deal is made on the node id and not on the test's position in the
+collection, on purpose. The two parts are collected in two separate jobs, and
+the order tests are collected in is not the same in both (parametrize lists
+built from a directory listing come back in a different order on each runner).
+A position-based deal then gives two jobs two different answers and some tests
+run in neither part; a deal on the id gives one answer however the list is
+ordered.
 """
 import os
+import zlib
 
 DEFAULT_COST = 6
 
@@ -90,14 +99,11 @@ def select(items, spec):
     """(kept, dropped) for part spec over a list of collected items."""
     i, n = parse(spec)
     part = assign([path_of(it.nodeid) for it in items], n)
-    dealt = {}
     kept, dropped = [], []
     for it in items:
         p = path_of(it.nodeid)
         if p in SPLIT_BY_TEST:
-            k = dealt.get(p, 0)
-            dealt[p] = k + 1
-            mine = k % n + 1 == i
+            mine = zlib.crc32(it.nodeid.encode()) % n + 1 == i
         else:
             mine = part[p] == i
         (kept if mine else dropped).append(it)

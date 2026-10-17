@@ -7,6 +7,7 @@ a malformed setting fails loudly, and the cost table names real files.
 """
 import os
 import pathlib
+import random
 import subprocess
 import sys
 import types
@@ -55,8 +56,8 @@ def test_a_file_is_never_split_across_parts_except_the_one_dealt_by_test():
 def test_a_file_dealt_by_test_is_collected_exactly_once_across_the_parts(n):
     f = "tests/test_negation_cues_and_lists.py"
     assert f in ci_shard.SPLIT_BY_TEST
-    # ids with brackets and repeats, in a mixed order, as parametrize makes them
-    items = [types.SimpleNamespace(nodeid=f"{f}::t[{k % 7}-{k}]") for k in range(101)]
+    # ids with brackets and repeats, as parametrize makes them
+    items = [types.SimpleNamespace(nodeid=f"{f}::t[{k % 7}-{k}]") for k in range(1001)]
     items += _items(["tests/test_other.py"])
     full = [it.nodeid for it in items if ci_shard.path_of(it.nodeid) == f]
     halves = [[it.nodeid for it in ci_shard.select(items, f"{i}/{n}")[0]
@@ -64,9 +65,25 @@ def test_a_file_dealt_by_test_is_collected_exactly_once_across_the_parts(n):
     assert sum(len(h) for h in halves) == len(full)
     assert set().union(*map(set, halves)) == set(full)
     assert sorted(x for h in halves for x in h) == sorted(full)
-    assert max(map(len, halves)) - min(map(len, halves)) <= 1
-    # part i holds the tests whose collected index k has k % n == i - 1
-    assert halves[0] == full[0::n]
+    # an even-ish deal, not everything in one part
+    assert min(map(len, halves)) > 0.8 * len(full) / n
+
+
+@pytest.mark.parametrize("n", [2, 3])
+def test_the_parts_agree_when_each_job_collects_in_a_different_order(n):
+    # Each CI part is its own job. If the file's tests come back in another
+    # order in one job (a parametrize list built from a directory listing), the
+    # parts must still be exactly the file: nothing in neither, nothing in both.
+    f = "tests/test_negation_cues_and_lists.py"
+    base = [types.SimpleNamespace(nodeid=f"{f}::t[{k}]") for k in range(500)]
+    base += _items(["tests/test_other.py", "tests/test_more.py"])
+    rng = random.Random(7)
+    seen = []
+    for i in range(1, n + 1):
+        order = base[:]
+        rng.shuffle(order)
+        seen.extend(it.nodeid for it in ci_shard.select(order, f"{i}/{n}")[0])
+    assert sorted(seen) == sorted(it.nodeid for it in base)
 
 
 def test_the_dealt_file_does_not_move_the_other_files():
