@@ -142,14 +142,56 @@ if os.environ.get("SUNGLASSES_COMPILE_TIMER"):  # pragma: no cover - CI only
 
     re.compile = _timed_compile
 
-    @atexit.register
-    def _dump_compile_times():  # pragma: no cover - CI only
-        with open(_TIMER_PATH, "w") as handle:
+    # WHY THE TABLE IS WRITTEN MORE THAN ONCE.
+    #
+    # Run 38661188195 (Oct 14): the 3.12 leg ran to the 300-minute job cap and
+    # was killed. The table was only written at interpreter exit, so the
+    # artifact was the 13 collection-time compiles and the question the run
+    # existed to answer got no number. So the same report is now also written
+    # every SUNGLASSES_COMPILE_TIMER_FLUSH_S seconds (default 1800) from a
+    # daemon thread, and on SIGTERM. Each write goes to a temporary file and is
+    # renamed over the report, so a kill in the middle of a write leaves the
+    # previous complete table, never a half-written one. The `report` line says
+    # whether the table is `final` (the process ended) or `partial` (it did
+    # not, and how far in it was).
+    #
+    # SIGKILL cannot be caught, and a runner that cancels a job may go straight
+    # to it; the interval write is what covers that case, at the cost of
+    # losing at most one interval.
+    _STARTED = time.perf_counter()
+    _REPORT_LOCK = threading.Lock()
+
+    def _write_compile_report(kind):  # pragma: no cover - CI only
+        # One writer at a time (the interval thread, the SIGTERM handler and
+        # the exit hook share one temporary file). A writer that cannot get the
+        # lock in 20 s gives up rather than hang the process it is reporting on.
+        if not _REPORT_LOCK.acquire(timeout=20):
+            return
+        try:
+            _write_compile_report_locked(kind)
+        finally:
+            _REPORT_LOCK.release()
+
+    def _write_compile_report_locked(kind):  # pragma: no cover - CI only
+        for _attempt in range(5):
+            try:
+                totals = list(_TOTALS.items())
+                counts = dict(_COUNTS)
+                break
+            except RuntimeError:  # the suite added a source mid-copy; try again
+                continue
+        else:
+            return
+        calls, spent_total = _WALL["calls"], _WALL["in_compile"]
+        totals.sort(key=lambda item: item[1], reverse=True)
+        tmp_path = _TIMER_PATH + ".tmp"
+        with open(tmp_path, "w") as handle:
             handle.write(f"python {os.sys.version.split()[0]}\n")
             handle.write(f"re._MAXCACHE {getattr(re, '_MAXCACHE', '?')}\n")
-            handle.write(f"total re.compile calls {_WALL['calls']}\n")
-            handle.write(f"distinct sources {len(_TOTALS)}\n")
-            handle.write(f"seconds inside re.compile {_WALL['in_compile']:.3f}\n")
+            handle.write(f"total re.compile calls {calls}\n")
+            handle.write(f"distinct sources {len(totals)}\n")
+            handle.write(f"seconds inside re.compile {spent_total:.3f}\n")
+            handle.write(f"report {kind} after {time.perf_counter() - _STARTED:.0f} s\n")
             # HOW MANY SOURCES THE TABLE CARRIES, and why it is settable.
             # The first run answered "is 3.12 slower to compile" with a top-50
             # table: 4.52x overall, every shared source at least 3x. It could
@@ -162,14 +204,37 @@ if os.environ.get("SUNGLASSES_COMPILE_TIMER"):  # pragma: no cover - CI only
             # `all` writes every source -- about 3,400 rows, a few hundred KB.
             want = os.environ.get("SUNGLASSES_COMPILE_TIMER_TOP", "50").strip().lower()
             limit = None if want in ("0", "all") else int(want)
-            shown = _TOTALS.most_common() if limit is None else _TOTALS.most_common(limit)
+            shown = totals if limit is None else totals[:limit]
             handle.write(f"\n-- {'ALL' if limit is None else 'top ' + str(limit)} "
                          f"sources by TOTAL seconds ({len(shown)} rows) --\n")
             handle.write(f"{'total_s':>9} {'calls':>7} {'per_call_ms':>12}  source\n")
             for source, total in shown:
-                n = _COUNTS[source]
+                n = counts[source]
                 handle.write(f"{total:9.3f} {n:7d} {1000 * total / n:12.4f}  "
                              f"{source[:110]!r}\n")
+        os.replace(tmp_path, _TIMER_PATH)
+
+    def _flush_forever():  # pragma: no cover - CI only
+        every = float(os.environ.get("SUNGLASSES_COMPILE_TIMER_FLUSH_S", "1800"))
+        stop = threading.Event()
+        while not stop.wait(every):
+            try:
+                _write_compile_report("partial")
+            except Exception:  # noqa: BLE001 — a failed flush must not stop the suite
+                pass
+
+    def _flush_on_sigterm(signum, _frame):  # pragma: no cover - CI only
+        try:
+            _write_compile_report("partial")
+        finally:
+            signal.signal(signum, signal.SIG_DFL)
+            os.kill(os.getpid(), signum)
+
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _flush_on_sigterm)
+    threading.Thread(target=_flush_forever, name="compile-timer-flush",
+                     daemon=True).start()
+    atexit.register(_write_compile_report, "final")
 
 
 # ── THE REGEX CACHE THE ENGINE ASSUMES AND DOES NOT GET ────────────────────
