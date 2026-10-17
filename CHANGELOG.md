@@ -3,6 +3,65 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- A control character that is neither whitespace nor escape (NUL, bell, delete and the C1 range) no
+  longer splits a phrase before matching, on the keyword lane and the regex lane alike. A phrase
+  with one between its letters, or a UTF-16 text file saved without a byte order mark (a NUL after
+  every letter), is now judged at least as strictly as the same text without them, and the file
+  blocks where it was allowed. Some texts that were redacted are now blocked. A text made largely of
+  control characters costs up to 1.9 times what it did on the shapes measured; text without them
+  costs what it did. Tab, newline, carriage return, vertical tab, form feed and escape are still not
+  removed, a NUL that only appears after a decode is still not removed, and an inspection cut at the
+  size cap still says so. (#344)
+
+- `sunglasses init` now writes `"onFailure": "block"` into the PreToolUse hook entry, so a hook that
+  times out, cannot start or prints output Claude Code cannot read as an answer refuses the tool
+  call instead of falling back to normal permissions. Claude Code reads the key from v2.1.295; an
+  older host ignores it and behaves as before. `sunglasses init --fail-open` writes the entry
+  without it. The install self-test now uses the host's 10 second limit in block mode, and `init`
+  prints which policy it wrote and how to remove the hook if it ever cannot start. A hook that
+  cannot start now refuses every tool call until it is fixed or removed. An error the firewall
+  catches itself is still answered as before and is not covered by this key. (#387)
+
+- The negation reading is wider for everyday refusals. `no`, `not`, `does not`, `did not`, `cannot`,
+  `will not`, `is not`, `are not`, `without` and their contractions now count as a negation cue,
+  reaching one word before the payload, so "Do not log the API key" and "We never store credentials"
+  are no longer blocked as if they were the instruction. A cue that sits in front of a list, a
+  joining word or a line break, or is followed by a word that turns the next thing into an order
+  ("no problem, ...", "without further ado, ..."), does not lower anything. A one-line Python `raise
+  Name("message")` is read as a message by GLS-RP-250 on the `file` and `code` channels. The SC-015
+  keyword `POST` now matches as a whole word, so `posting` and `postgres` no longer match. Negated
+  lists keep their old severity. Known limits: a list continued past a full stop, a list mark before
+  the cue, and the finite list of order-turning words are tracked. (#394)
+
+- Starting the engine no longer compiles a shipped co-occurrence rule as a whole when its pieces
+  compile, which saves about 460 ms of an engine start of about 1.6 s on the machine measured
+  (Python 3.14). No rule, flag, window or decision changes: all 1,650 built rule entries and 4,578
+  scan results are identical. A custom rule keeps the old path unless its source is one that ships.
+  (#397)
+
+### Fixed
+
+- `sunglasses install` and `uninstall` no longer damage a config they do not own. A server name that
+  can leave the records directory (`..`, an absolute path, a drive or stream name, a control
+  character) is refused before anything is written. A symbolic-link config is refused with a message
+  naming the file it points at. A number that overflows (`1e400`) is refused instead of being
+  written back as the invalid `Infinity`. `uninstall` now refuses, and keeps its records, when the
+  file changed after it was read, instead of erasing a second install. A standby pair is matched to
+  its own server only. These are checks made at entry, not protection against a process that changes
+  the config while a command runs. (#377)
+
+### Housekeeping
+
+- `stats/current.json` carries the 0.6.9 release date. (#395) - CHANGELOG entries for 0.2.10,
+  0.2.11, 0.2.12, 0.2.14, 0.2.23, 0.2.24, 0.2.25 and 0.2.29, which shipped without one, and 0.6.1
+  recorded as a skipped version. (#391) - A GitHub issue form for outside testers to report an
+  install, its commands and the output. (#399)
+
+
 ## [0.6.9] — 2026-10-15
 
 ### Added
