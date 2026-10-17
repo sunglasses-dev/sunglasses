@@ -420,6 +420,79 @@ sunglasses scan ./typo.txt; echo $?            # 2 — no such file; nothing was
 A path-shaped argument that does not exist is a usage error, not text. Pass
 `--text` if you really do mean to scan the string `./typo.txt` itself.
 
+### Scanning a whole directory or repository
+
+```bash
+sunglasses scan --dir ./my-project                       # a local tree, no clone
+sunglasses scan --repo https://github.com/org/repo       # clone, then the same scan
+sunglasses scan --dir ./my-project --max-files 500       # read at most 500 files
+```
+
+`scan --dir` reads a local directory the way `--repo` reads a clone: the same walker, the
+same skips, the same exit codes (a local tree can hold files a clone does not, such as
+untracked ones). It does not change anything in the tree. One progress line per file
+(`[3/120]`, the time spent, the file) goes to stderr, so `-o json` and `-o sarif` still
+leave stdout as one document.
+
+Files the scan does not read are listed in `skipped` with the reason, and the scan is then
+incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
+exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
+cannot be listed, a folder found swapped for another folder or a link found where a file or folder
+was before the scan opened or listed it (see below for what a change after that does), and every
+file past `--max-files N`.
+`--skip-lockfiles` adds `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+`Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
+scanned.
+
+A link is never followed, because it can point outside the tree: a link is named as skipped
+whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
+itself a link, naming the real directory to use instead (the parent folders of the path as you
+typed it are resolved by the operating system as usual). The scan opens the root folder once,
+refusing a link, and keeps that one handle for the whole run; every folder and file below it is
+opened relative to the step before, refusing a link at every step, and the scan checks each
+folder's identity (device and inode) when it opens it and when it lists it, so a folder that was
+swapped for another one, or for a link, before one of those steps is named as changed and not
+read. A folder replaced after the scan has already opened it is still the one the scan holds, and
+the scan judges what it read from that handle; it does not report the later change. A regular file
+replaced by another regular file is not a detected change either: the scan judges the bytes it
+actually opened. Each file (at
+most 1 MB) is read once through those handles, and the scan judges exactly those bytes: they are
+held in memory and go straight to content routing and extraction, so the scan writes no copy of
+any file, anywhere (no temporary file or folder, nothing inside the scanned folder; the PDF,
+image and QR extractors are imported before the folder is opened, so none is first loaded in the
+middle of the walk), and no file's content is opened
+a second time by routing or extraction (the folders on the way down are opened again to list
+them and to read the next file). The findings carry the file's path in the tree. A file that
+changes after it was read is judged as it was when it was read. The previous file's bytes are
+let go before the next file is read, and the 1 MB cap bounds each read; it is not a limit on the
+process's total memory. One caveat outside the scan itself: reading text out of an image with
+the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
+your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside
+a folder you scan. Two limits of the same kind: if the folder you scan holds sunglasses' own source
+and you start the scan with `python -m sunglasses`, Python can cache sunglasses' own modules there
+at start-up, before any scanning code runs; and an image or PDF library that is first loaded
+during the scan and lives inside the folder you scan can be cached there by Python. Set
+`PYTHONDONTWRITEBYTECODE=1` for either case. If the scan is interrupted (Ctrl-C) the process
+exits and the operating system closes its folder handle; a program that calls the scan as a
+library and swallows that interrupt keeps the handle open until it exits.
+
+Where the platform has no such handles (Windows) the scan checks for a link and for a path that
+leaves the tree before it reads and again against the file it opened. That is a weaker guarantee
+against a tree that changes while the scan runs, and it has not been exercised on Windows.
+In a `--repo` scan a link inside the clone is a named skip, so a repository that holds one and
+used to come back clean (exit `0`) now exits `3`.
+
+Dependency and build folders (`node_modules`, `venv`, `dist`, `build` and the like) are not
+entered. Their files are neither scanned nor listed one by one; the folders are named in
+`excluded_folders` (and under `excludedFolders` in SARIF; the human report shows the first ten)
+and are not counted as skipped files. SARIF `notInspected` lists every file in `skipped`.
+The files that were read, the results and the skipped list are sorted by path (the order the
+folders are visited in is not part of that promise). File names shown to a person (progress lines, results, the banner)
+have control characters escaped. A path that is not a directory is refused with exit `2`, and so
+is `--dir` together with `--file` (even an empty value), `--text`, `--stdin` or text to scan.
+`--file` still refuses a directory: scanning a tree is a different claim from scanning one file,
+and `--dir` is where it is made.
+
 ### Deep Scan Setup (Audio & Video)
 
 Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:

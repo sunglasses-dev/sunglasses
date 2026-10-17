@@ -25,6 +25,8 @@ carried in the return value rather than swallowed.
 import os
 import stat
 
+from .member import Member, display_name
+
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif", ".webp",
 }
@@ -187,17 +189,20 @@ def read_text_source(path: str):
     here. We still scan what decodes (dropping the file entirely would lose real
     coverage), but the answer is INCOMPLETE and says how many bytes went unread.
     """
-    try:
-        with open(path, "rb") as fh:
-            raw = fh.read()
-    except OSError as exc:
-        raise UnreadableFile(path, exc) from exc
+    if isinstance(path, Member):
+        raw = bytes(path)
+    else:
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+        except OSError as exc:
+            raise UnreadableFile(path, exc) from exc
 
     text, undecodable, first_bad = decode_lossy(raw)
     if not undecodable:
         return text, []
     return text, [
-        f"{os.path.basename(path)} is not valid UTF-8 — {undecodable} byte(s) could "
+        f"{display_name(path)} is not valid UTF-8 — {undecodable} byte(s) could "
         f"not be decoded and were NOT inspected (first at offset {first_bad}). "
         f"Only the text that decoded was scanned."
     ]
@@ -216,7 +221,7 @@ def _extract_image(path: str):
             # incomplete: an image whose text was never read is not a clean image.
             complete = False
             warnings.append(
-                f"{os.path.basename(path)} not fully read — {failure}."
+                f"{display_name(path)} not fully read — {failure}."
             )
     except ImportError:
         complete = False
@@ -239,7 +244,7 @@ def _extract_image(path: str):
             # it had not looked at.
             complete = False
             warnings.append(
-                f"{os.path.basename(path)} not fully read — {failure}."
+                f"{display_name(path)} not fully read — {failure}."
             )
     except ImportError:
         # QR is a narrower claim than OCR; say so separately rather than lumping them.
@@ -354,6 +359,8 @@ _SNIFF_BYTES = 512
 
 
 def _sniff(path: str) -> bytes:
+    if isinstance(path, Member):
+        return bytes(path[:_SNIFF_BYTES])
     try:
         with open(path, "rb") as fh:
             return fh.read(_SNIFF_BYTES)
@@ -375,6 +382,8 @@ def _probe_readable(path: str) -> None:
     first, because the readability check opens the path and opening a FIFO with no
     writer blocks forever. A probe that hangs is not a probe.
     """
+    if isinstance(path, Member):
+        return          # already read: there is no file left to probe
     try:
         st = os.stat(path)
     except OSError as exc:
@@ -432,7 +441,7 @@ def identify(path: str):
 
     # No signature. Fall back to the suffix so an extension-named PDF/image with an
     # unusual header still reaches its extractor, exactly as before this change.
-    ext = os.path.splitext(path)[1].lower()
+    ext = os.path.splitext(display_name(path))[1].lower()
     if ext in PDF_EXTENSIONS:
         return "pdf", "PDF document"
     if ext in IMAGE_EXTENSIONS:
@@ -445,7 +454,7 @@ def _opaque_result(path: str, label: str) -> ExtractionResult:
     return ExtractionResult(
         [],
         [f"{label} not inspected — SUNGLASSES does not extract this format, so no "
-         f"content from {os.path.basename(path)} was scanned. This is not a clean result."],
+         f"content from {display_name(path)} was scanned. This is not a clean result."],
         complete=False,
     )
 
@@ -494,7 +503,7 @@ def _extract_file_sources(path: str) -> ExtractionResult:
         return ExtractionResult(
             [],
             [f"{label} not transcribed — deep scan not requested. Nothing in "
-             f"{os.path.basename(path)} was inspected. Re-run with --deep."],
+             f"{display_name(path)} was inspected. Re-run with --deep."],
             complete=False,
         )
 
