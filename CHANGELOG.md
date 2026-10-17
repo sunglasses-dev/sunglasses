@@ -43,6 +43,34 @@ All notable changes to Sunglasses are documented here.
   scan results are identical. A custom rule keeps the old path unless its source is one that ships.
   (#397)
 
+- `sunglasses scan` starts faster. The engine no longer re-reads every shipped rule's regex at
+  start to work out which literals the rule cannot match without; the answers ship as
+  `sunglasses/_prefilter_table.py`, written by `scripts/gen_prefilter_table.py`, and a source the
+  table does not hold (a custom rule, `extra_patterns`) is worked out live as before. The engine
+  ignores the whole table when `_prefilter.py` is not the file it was made from. On the machine
+  measured (Python 3.14.7), `sunglasses scan --text hello` took 1.63 to 1.66 s before and 1.21 to
+  1.23 s after. Most of the remaining 1.1 s is regex compilation. (#405)
+
+- Fourteen rules about tool descriptions, tool metadata and tool results now also read the
+  `api_response` channel, which is where a `tools/list` result arrives. Before, a poisoned tool
+  listing matched none of them. Each rule has a new `-API` sibling that is a copy of its parent with
+  only the channel, `id` and `name` changed, and the pattern count goes from 1,569 to 1,583. A tool
+  description written as security-training prose (it explains why a description claiming trusted
+  status must never bypass approval) is blocked on `api_response` by two of the siblings, as the
+  same text is already blocked on `file` by their two parents. (#407)
+
+- A negation now covers a short list of plain words. In "The plugin does not log, store, or
+  transmit your API key anywhere other than the API itself", the payload that is an item of the
+  list is judged under the negation, so a README that states what it refuses to do is a review
+  where it was a block. A list is read only when its end is shown by the raw input itself (the text
+  end, blanks, a line end, or a sentence mark), at most 3 commas and 8 words, with no clause word,
+  order word or word of omission in it. A payload with a pipe, a URL or a shell word is still a
+  block. A payload of up to five plain words that is the last item of a short negated list is now
+  a review, and so is a middle item of an open list; the first item of a list is unchanged.
+  ROT13 and reversed copies get no list reading. Known limits: a list with no comma before its
+  conjunction ("never log, store or transmit X") is not read as a list, and the stop-word lists are
+  finite. This supersedes the earlier line saying negated lists keep their old severity. (#409)
+
 ### Fixed
 
 - `sunglasses install` and `uninstall` no longer damage a config they do not own. A server name that
@@ -61,6 +89,28 @@ All notable changes to Sunglasses are documented here.
   recorded as a skipped version. (#391) - A GitHub issue form for outside testers to report an
   install, its commands and the output. (#399)
 
+- The README Platforms row now says macOS and Linux are supported and Windows is not yet: signed
+  receipts need `fcntl` and the proxy supervisor needs process groups, and neither exists on
+  Windows. Comment and doc text only, no code path changes. (#308)
+
+- The README carries the mcpservers.org listing badge. (#366)
+
+- Tests only: the `gen2` refusal case no longer depends on where `TMPDIR` points (#311), and
+  a clean verdict is pinned to forward only what the scan read (#384).
+
+- The README benchmark table header says `Metric (v0.6.9)` instead of `v0.6.5`. The values in the
+  table already matched the measured 0.6.9 run, so no figure changes. (#410)
+
+- `scripts/sync-stats.py` rewrites a site page count only when it equals the previous total (an
+  explicit previous value, else the landing repo's own `stats/current.json`). Before, run by hand
+  with no previous value, it rewrote 13 per-chapter labels to the new total and dropped the comma
+  from an unchanged "6,675 keywords". Other counts it looked at are left alone and listed in its
+  output. (#411)
+
+- CI: the table of measured seconds per test file that splits each interpreter's run into two parts
+  (`tests/ci_shard.py`) is re-measured from a green main run, and `tools/ci_durations.py <run-id>`
+  reads one finished run and prints the job wall clocks, the 20 slowest tests and a COST block to
+  paste into that table. Tests and tooling only. (#413)
 
 ## [0.6.9] — 2026-10-15
 
