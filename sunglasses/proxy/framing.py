@@ -21,6 +21,7 @@ from __future__ import annotations
 import time
 
 import json
+import math
 
 # T8.R1, T1.R2. Frozen for 0.6.0.
 MAX_FRAME_BYTES = 4_194_304
@@ -66,6 +67,20 @@ class DuplicateKey(ValueError):
 
 def _reject_constant(literal):
     raise NotJsonNumber(f"{literal} is not a JSON number")
+
+
+def _finite_float(literal):
+    """A number written with a fraction or an exponent must stay a number.
+
+    `1e400` is valid JSON text, and `json.loads` turns it into `inf`, which is
+    the same poison as the literal `Infinity`: it compares false both ways, and
+    written back out it is the token `Infinity`, which is not JSON. A peer is
+    held to the same rule for both spellings.
+    """
+    value = float(literal)
+    if not math.isfinite(value):
+        raise NotJsonNumber(f"{literal} is not a finite JSON number")
+    return value
 
 
 def _no_duplicate_keys(pairs):
@@ -348,7 +363,8 @@ def parse_frame(raw, *, origin="upstream"):
 
     try:
         message = json.loads(text, object_pairs_hook=_no_duplicate_keys,
-                             parse_constant=_reject_constant)
+                             parse_constant=_reject_constant,
+                             parse_float=_finite_float)
     except NotJsonNumber as constant:
         return Frame(ok=False, rule=S5, reason=malformed,
                      detail=str(constant), size=size, kind='FRAME_JSON_CONSTANT')
