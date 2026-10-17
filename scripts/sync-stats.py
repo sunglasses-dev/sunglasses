@@ -152,6 +152,25 @@ def sync_website_index(stats):
     return update_file(index, replacements, "website/index.html")
 
 
+def _previous_totals(stats):
+    """The totals the site pages carry right now: explicit `_prev_*` values first, else the
+    landing repo's stats/current.json. A key with no usable number stays None."""
+    import json
+    recorded = {}
+    try:
+        recorded = json.loads((WEBSITE_ROOT / "stats" / "current.json").read_text())
+    except (OSError, ValueError):
+        pass
+    out = {}
+    for key in ("patterns", "keywords", "categories"):
+        raw = stats.get(f"_prev_{key}", recorded.get(key))
+        try:
+            out[key] = int(str(raw).replace(",", ""))
+        except (TypeError, ValueError):
+            out[key] = None
+    return out
+
+
 def sync_website_pages(stats):
     """Update all other website pages with stale pattern/keyword/category counts."""
     if not WEBSITE_ROOT.exists():
@@ -167,17 +186,56 @@ def sync_website_pages(stats):
     # numeric window (incl comma) covers 100..999,999; still avoids "3 patterns
     # per category". A specific previous value (set by the ship pipeline) is
     # preferred when available so only the real old count is rewritten.
-    old_pat = stats.get("_prev_patterns", r"[\d,]{3,6}")
-    old_kw = stats.get("_prev_keywords", r"[\d,]{3,6}")
-    old_cat = stats.get("_prev_categories", r"\d{2,3}")
-    generic_replacements = [
-        # "1046 patterns" / "1,046 detection patterns" — 3-6 char counts (incl comma)
-        (rf'\b{old_pat} (detection )?patterns\b', lambda m: f'{stats["patterns"]} {m.group(1) or ""}patterns'),
-        # "7653 keywords" / "7,653 keywords"
-        (rf'\b{old_kw} keywords\b', lambda m: f'{stats["keywords"]} keywords'),
-        # "65 categories" / "65 threat categories"
-        (rf'\b{old_cat} (threat |attack )?categories\b', lambda m: f'{stats["categories"]} {m.group(1) or ""}categories'),
-    ]
+    # THE PREVIOUS TOTAL IS THE ONLY NUMBER THIS RULE MAY REWRITE.
+    # The old rule matched ANY 3-6 character number in front of "patterns", "keywords" or
+    # "categories" whenever no previous value was passed in, and nothing ever passed one in.
+    # Run by hand (Oct 16 2026, 18:12) it rewrote 13 per-chapter labels ("Chapter 01 · 156
+    # patterns" -> "1569 patterns") and dropped the comma from "6,675 keywords". A chapter
+    # count, a per-family count and a total are all "N patterns"; only the total is stale
+    # when the catalog grows, and the total is known: it is what the site currently shows.
+    # So the rule now rewrites a number only when it equals the previous total (an explicit
+    # `_prev_*` value, else the landing repo's own stats/current.json, the file the release stamp
+    # keeps), keeps the comma style of the text it replaces, and lists every other count it
+    # looked at and left alone, so a skipped stale total is visible in the receipt, not silent.
+    prev = _previous_totals(stats)
+    shape = {
+        "patterns": r"({n}|{nc}) ((?:detection )?patterns)\b",
+        "keywords": r"({n}|{nc}) (keywords)\b",
+        "categories": r"({n}|{nc}) ((?:threat |attack )?categories)\b",
+    }
+    generic_any = {
+        "patterns": r"([\d,]{3,6}) ((?:detection )?patterns)\b",
+        "keywords": r"([\d,]{3,6}) (keywords)\b",
+        "categories": r"(\d{2,3}) ((?:threat |attack )?categories)\b",
+    }
+
+    def _style(old_text, value):
+        return f"{value:,}" if "," in old_text else str(value)
+
+    def _rewrite_for(key):
+        def repl(m):
+            return f"{_style(m.group(1), stats[key])} {m.group(2)}"
+        return repl
+
+    generic_replacements = []
+    for key in ("patterns", "keywords", "categories"):
+        n = prev.get(key)
+        if n is None:
+            print(f"  NOTE no previous {key} total known (no _prev_{key}, no stats/current.json): "
+                  f"{key} counts on the site pages are left alone")
+            continue
+        rx = r"(?<![\d,.])" + shape[key].format(n=n, nc=f"{n:,}")
+        generic_replacements.append((rx, _rewrite_for(key)))
+
+    skipped = []
+
+    def _note_skipped(rel, content):
+        for key, rx in generic_any.items():
+            for m in re.finditer(r"(?<![\d,.])" + rx, content):
+                n = int(m.group(1).replace(",", ""))
+                if n in (prev.get(key), stats[key]):
+                    continue
+                skipped.append((str(rel), m.group(0)))
 
     # A count is HISTORICAL (must NOT be rewritten) when its preceding text pins
     # it to a past release or frames it as a one-time delta — e.g. "v0.2.21
@@ -237,12 +295,21 @@ def sync_website_pages(stats):
 
         for pattern, replacement in generic_replacements:
             content = _apply(content, pattern, replacement)
+        _note_skipped(page.relative_to(WEBSITE_ROOT), content)
 
         if content != original:
             page.write_text(content)
             rel = page.relative_to(WEBSITE_ROOT)
             print(f"  UPDATED website/{rel}")
             changed = True
+
+    if skipped:
+        print(f"  SKIPPED {len(skipped)} count(s) that are not the previous total (per-chapter and "
+              f"per-family counts are meant to differ; a stale TOTAL would show up here):")
+        for rel, text in skipped[:40]:
+            print(f"    {rel}: {text}")
+        if len(skipped) > 40:
+            print(f"    ... and {len(skipped) - 40} more")
 
     return changed
 
