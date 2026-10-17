@@ -946,7 +946,9 @@ def hook(event, args):
     if not state["open"]:
         return
     if event == "open" and isinstance(args[0], (str, bytes)) and isinstance(args[2], int) and args[2] & WRITE:
-        state["writes"].append(os.fsdecode(args[0]))
+        # /dev/null is opened for writing by the interpreter on Linux (a stream redirect); it holds no file.
+        if os.fsdecode(args[0]) != os.devnull:
+            state["writes"].append(os.fsdecode(args[0]))
     elif event in ("os.rename", "os.mkdir", "os.remove"):
         state["writes"].append(event + " " + " ".join(os.fsdecode(a) for a in args[:2] if isinstance(a, (str, bytes))))
 
