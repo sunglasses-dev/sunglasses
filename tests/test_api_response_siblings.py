@@ -39,16 +39,20 @@ from p1b_api_space import cases as _api_space   # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
-def _is_prose_sibling(pattern):
-    """This file is about the PROSE-injection siblings, which carry a regex.
+# The family is named, not inferred. `-API` alone is the naming convention every
+# sibling family uses: the GLS-SD secret siblings adopted it and took the pinned
+# total from 12 to 25, and the tool-metadata siblings carry it too. An exclusion
+# list for the families to keep out goes stale each time a family adopts the
+# suffix and fails by sweeping something in, so the six are named instead.
+PROSE_SIBLINGS = frozenset({
+    "GLS-PI-013-API", "GLS-PI-016-API", "GLS-PI-017-API",
+    "GLS-PI-021-API", "GLS-PI-INFO-API", "GLS-PIEMN-001-API",
+})
 
-    `-API` alone is not the family. It is the naming convention every sibling
-    family uses, and the GLS-SD secret siblings adopted it: they match a literal
-    token shape, so counting their regex entries here took the pinned total from
-    12 to 25 and said nothing true about either family. An id suffix is not
-    family membership.
-    """
-    return pattern["id"].endswith("-API") and not pattern["id"].startswith("GLS-SD-")
+
+def _is_prose_sibling(pattern):
+    """Membership is the named set, not a guess about the id."""
+    return pattern["id"] in PROSE_SIBLINGS
 
 
 API_IDS = {p["id"] for p in PATTERNS if _is_prose_sibling(p)}
@@ -68,6 +72,10 @@ def _api(engine, text, channel="api_response"):
 
 
 def test_there_are_exactly_six_siblings_and_they_are_scoped_to_the_new_channels():
+    # Both directions: a named set would otherwise keep grading five after a rule was deleted.
+    missing = sorted(PROSE_SIBLINGS - {p["id"] for p in PATTERNS})
+    assert missing == [], f"{missing} are named as prose siblings but are not in the rule DB"
+    assert API_IDS == set(PROSE_SIBLINGS), sorted(API_IDS ^ set(PROSE_SIBLINGS))
     assert len(API_IDS) == 6, sorted(API_IDS)
     for p in PATTERNS:
         if p["id"] in API_IDS:
