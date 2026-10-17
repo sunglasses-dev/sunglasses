@@ -172,5 +172,18 @@ a review found the absence of them:
   under different `HOME` values lock different files and do not serialise
   against each other.
 - Locking reads `flock` where it exists and `None` where it does not, because
-  `fcntl` is POSIX-only while the README promises Windows.
+  `fcntl` is POSIX-only, and the README states POSIX only, Windows unsupported.
 - Inode reuse is neither proven nor handled.
+- A config that is a symbolic link is refused when the command starts. That is
+  a check made once, at entry, and it is not protection against a local process
+  that can write to the config directory while a command runs. Such a process
+  can put a symbolic link in place of the final component after the check, and
+  then install, both uninstall write branches (the byte-exact restore and the
+  entry-only rewrite) and journal recovery can each replace that link by
+  rename. It can also retarget a parent directory after the check, which
+  redirects where install publishes while the record keeps the path as it was
+  checked. Retargeting an ancestor needs control of that parent directory
+  entry; being able to write the config file alone is not the same capability.
+  A final component that is already a link when the command starts is refused.
+  Closing the rest needs publication bound to a held directory descriptor,
+  which is a separate change.

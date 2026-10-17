@@ -248,13 +248,15 @@ PRODUCER_STEPS = {
     "decode_url_encoding", "decode_hex_escapes", "decode_shadow_ascii", "decode_base64_segments",
 }
 AFTER_THE_PASSES = {"decode_leetspeak", "strip_delimiter_padding", "collapse_whitespace"}
-VIEWS_BEHIND_THE_SEPARATOR = {"decode_rot13"}
+VIEWS_BEHIND_THE_SEPARATOR = {"decode_rot13", "controls_as_spaces"}
 RECURSION = {"normalize", "normalize_with_length"}
 BUILTINS = {"len", "range"}
 METHODS_ON_THE_TEXT = {
     "text.replace": "the separator character is read as a blank (recorded as a blank change)",
     "text.lower": "lower-casing after the passes",
     "re.sub": "the l-for-I view, behind the separator",
+    "CONTROL_CHARS.search": "whether a control character is present; no control, no extra view",
+    "CONTROL_CHARS.sub": "the plain view's deletion of the controls, compared with the control view to see whether it would only repeat it",
 }
 SLICES = {"text[::-1]": "the reversed view, behind the separator"}
 
@@ -263,6 +265,12 @@ STATEMENTS = {
     # normalize_with_length, in order
     "normalize_with_length: text = text.replace(VIEW_SEP, ' ')": "separator read as a blank",
     "normalize_with_length: shadow = decode_shadow_ascii(text)": "producer: shadow view",
+    "normalize_with_length: spaced = controls_as_spaces(text) if CONTROL_CHARS.search(text) else None":
+        "control view: a copy of the input with each run of controls read as one blank, taken before the plain "
+        "view deletes them; the plain view and the raw offsets are not touched",
+    "normalize_with_length: spaced = None":
+        "the control view is dropped when it equals the plain text with the controls deleted, so it adds no hit "
+        "the plain view does not already have",
     "normalize_with_length: text = strip_invisible(text)": "producer",
     "normalize_with_length: text = normalize_unicode(text)": "producer",
     "normalize_with_length: text = replace_homoglyphs(text)": "producer",
@@ -283,10 +291,17 @@ STATEMENTS = {
     "normalize_with_length: text = text.lower()": "lower-casing after the passes",
     "normalize_with_length: shape_variant = re.sub('\\\\bl(?=[a-z])', 'i', text)": "l-for-I view",
     "normalize_with_length: text = text + " + _SEP + " + shape_variant": "l-for-I view, behind the separator",
+    "normalize_with_length: text = text + " + _SEP + " + normalize(spaced)":
+        "control view's own pipeline, behind the separator, so no phrase is read across it",
     "normalize_with_length: text = text + " + _SEP + " + normalize_with_length(shadow, record)[0]":
         "shadow view's own pipeline, behind the separator",
     "normalize_with_length: return (text, folded_length)": "the result",
     # the functions it reaches
+    "controls_as_spaces: a, b = (run.start(), run.end())": "control view: where the run stands",
+    "controls_as_spaces: return ''":
+        "control view: a run beside blank space or at an edge is deleted, as the plain view deletes it",
+    "controls_as_spaces: return ' '": "control view: any other run is one blank",
+    "controls_as_spaces: return _CONTROL_RUN.sub(one, text)": "control view: the text with each run replaced",
     "strip_invisible: return INVISIBLE_CHARS.sub('', text)": "producer",
     "normalize_unicode: return unicodedata.normalize('NFKC', text)": "producer",
     "replace_homoglyphs: return ''.join((HOMOGLYPHS.get(c, c) for c in text))": "producer",
@@ -323,6 +338,7 @@ STATEMENTS = {
     "collapse_whitespace: return text.strip()": "after the passes",
     "decode_rot13: return codecs.decode(text, 'rot_13')": "rot13 view",
     "decode_rot13: return text": "rot13 view",
+    "normalize: return normalize_with_length(text)[0]": "the control view's own pipeline returns the text only",
 }
 
 # The producer rows are exercised by the table in test_negation_later_hits_round18.py.
@@ -352,12 +368,25 @@ def _functions_reached(overrides=None):
     return seen
 
 
+def _unparse(node):
+    """ast.unparse, with a tuple assignment target written without brackets.
+
+    Python 3.9 writes `(a, b) = x` where 3.11 and later write `a, b = x`; a ledger key
+    has to read the same on every interpreter the suite runs on.
+    """
+    if isinstance(node, ast.Assign) and any(isinstance(t, ast.Tuple) for t in node.targets):
+        targets = [", ".join(ast.unparse(e) for e in t.elts) if isinstance(t, ast.Tuple) else ast.unparse(t)
+                   for t in node.targets]
+        return " = ".join(targets + [ast.unparse(node.value)])
+    return ast.unparse(node)
+
+
 def _statements(name, source):
     """Every statement in the function that binds a name or returns a value, as 'function: source'."""
     keys = []
     for node in ast.walk(ast.parse(textwrap.dedent(source))):
         if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign, ast.NamedExpr, ast.Return)):
-            keys.append("%s: %s" % (name, ast.unparse(node)))
+            keys.append("%s: %s" % (name, _unparse(node)))
         elif isinstance(node, (ast.For, ast.AsyncFor)):
             keys.append("%s: for %s in %s" % (name, ast.unparse(node.target), ast.unparse(node.iter)))
         elif isinstance(node, ast.comprehension):

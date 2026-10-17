@@ -3,6 +3,141 @@
 All notable changes to Sunglasses are documented here.
 
 
+## [Unreleased]
+
+### Changed
+
+- A control character that is neither whitespace nor escape (NUL, bell, delete and the C1 range) no
+  longer splits a phrase before matching, on the keyword lane and the regex lane alike. A phrase
+  with one between its letters, or a UTF-16 text file saved without a byte order mark (a NUL after
+  every letter), is now judged at least as strictly as the same text without them, and the file
+  blocks where it was allowed. Some texts that were redacted are now blocked. A text made largely of
+  control characters costs up to 1.9 times what it did on the shapes measured; text without them
+  costs what it did. Tab, newline, carriage return, vertical tab, form feed and escape are still not
+  removed, a NUL that only appears after a decode is still not removed, and an inspection cut at the
+  size cap still says so. (#344)
+
+- `sunglasses init` now writes `"onFailure": "block"` into the PreToolUse hook entry, so a hook that
+  times out, cannot start or prints output Claude Code cannot read as an answer refuses the tool
+  call instead of falling back to normal permissions. Claude Code reads the key from v2.1.295; an
+  older host ignores it and behaves as before. `sunglasses init --fail-open` writes the entry
+  without it. The install self-test now uses the host's 10 second limit in block mode, and `init`
+  prints which policy it wrote and how to remove the hook if it ever cannot start. A hook that
+  cannot start now refuses every tool call until it is fixed or removed. An error the firewall
+  catches itself is still answered as before and is not covered by this key. (#387)
+
+- The negation reading is wider for everyday refusals. `no`, `not`, `does not`, `did not`, `cannot`,
+  `will not`, `is not`, `are not`, `without` and their contractions now count as a negation cue,
+  reaching one word before the payload, so "Do not log the API key" and "We never store credentials"
+  are no longer blocked as if they were the instruction. A cue that sits in front of a list, a
+  joining word or a line break, or is followed by a word that turns the next thing into an order
+  ("no problem, ...", "without further ado, ..."), does not lower anything. A one-line Python `raise
+  Name("message")` is read as a message by GLS-RP-250 on the `file` and `code` channels. The SC-015
+  keyword `POST` now matches as a whole word, so `posting` and `postgres` no longer match. Negated
+  lists keep their old severity. Known limits: a list continued past a full stop, a list mark before
+  the cue, and the finite list of order-turning words are tracked. (#394)
+
+- Starting the engine no longer compiles a shipped co-occurrence rule as a whole when its pieces
+  compile, which saves about 460 ms of an engine start of about 1.6 s on the machine measured
+  (Python 3.14). No rule, flag, window or decision changes: all 1,650 built rule entries and 4,578
+  scan results are identical. A custom rule keeps the old path unless its source is one that ships.
+  (#397)
+
+### Fixed
+
+- `sunglasses install` and `uninstall` no longer damage a config they do not own. A server name that
+  can leave the records directory (`..`, an absolute path, a drive or stream name, a control
+  character) is refused before anything is written. A symbolic-link config is refused with a message
+  naming the file it points at. A number that overflows (`1e400`) is refused instead of being
+  written back as the invalid `Infinity`. `uninstall` now refuses, and keeps its records, when the
+  file changed after it was read, instead of erasing a second install. A standby pair is matched to
+  its own server only. These are checks made at entry, not protection against a process that changes
+  the config while a command runs. (#377)
+
+### Housekeeping
+
+- `stats/current.json` carries the 0.6.9 release date. (#395) - CHANGELOG entries for 0.2.10,
+  0.2.11, 0.2.12, 0.2.14, 0.2.23, 0.2.24, 0.2.25 and 0.2.29, which shipped without one, and 0.6.1
+  recorded as a skipped version. (#391) - A GitHub issue form for outside testers to report an
+  install, its commands and the output. (#399)
+
+
+## [0.6.9] — 2026-10-15
+
+### Added
+
+- The command line now has a `sunglasses mcp` command and a `sunglasses-mcp` console script that
+  start the MCP server, so a client that needs a console command to launch a listed Python package
+  can start it. Both routes run the same server as `python -m sunglasses.mcp`, whose entry is
+  unchanged, and both answer help and version without starting anything. No scanner code changes.
+  (#365)
+
+### Changed
+
+- GLS-PE-111 now covers more wordings of an instruction to take the proxy out of the client config.
+  This is a bounded expansion of the existing rule, so the rule count does not move. Some quoted or
+  fenced examples can be flagged too, and some wordings are still not covered and are tracked as
+  known limits. (#369)
+
+- A negation or a defensive framing clause now lowers a rule only when it covers every occurrence of
+  that rule in the views that are read. A negated or framed hit is held back until every view has
+  been read, and the old limit on how many later occurrences were walked is replaced by a reading
+  budget that is reserved before each search. A search that does not fit the budget is judged live,
+  which is the stricter direction. Some texts that were redacted are now blocked. The budget bounds
+  reads and not time, a few steps are not charged and the limits are tracked. (#372)
+
+- A sentence break after a negation now ends the negation's reach for the rules whose match opens on
+  that break. Six regexes of two rules began on the break, so the negation was taken to cover a
+  clause it never reached, and a live instruction after a negated sentence was lowered to review.
+  Those rules, and any other rule whose match opens on a break, now decide such text as they decide
+  the same words without the negation, so some texts that were redacted are now blocked. Negation
+  coverage inside one clause is unchanged and further limits are tracked. (#375)
+
+### Fixed
+
+- The proxy no longer refuses every server that negotiates protocol version 2025-11-25, which is a
+  version current clients offer, so a wrapped server connects again. The discover probe that newer
+  clients send first is now declined with Method not found and not forwarded, so the client falls
+  back to a normal initialize. Every other unknown method is still refused and the version check
+  stays exact. The decline is recorded in the receipts as a new event kind, and a verifier that
+  predates it reads that row as an unknown event. (#385)
+
+- The initialize result previously bypassed inspection. It now passes through the scan after the
+  existing negotiation and filtering, and a clean result continues as before. A result the scan
+  withholds ends the session, because the handshake is what the rest of the session rests on, and
+  the refusal carries the scan's own reason. A frame with any member beside the envelope and the
+  result is withheld whole. (#376)
+
+- The proxy no longer forwards a ping or an initialized message unread on the strength of the method
+  name alone. On a client ping or initialized message the params and any extra top level member are
+  now scanned, and a clean message is forwarded unchanged. A ping error is scanned as a reply. A
+  ping result that holds anything is withheld, which includes a result whose only member is the
+  metadata field, so a server that answers a ping that way now has that answer withheld. A scalar
+  ping result is withheld too, and an initialized message whose params are a list is withheld while
+  the session continues. A notification the proxy withholds now leaves a receipt row with its
+  reason. (#386)
+
+- `sunglasses scan --channel` now offers every channel the engine documents. It kept a list of five,
+  so a tool result, an agent input, code or a prompt could not be scanned from the shell although
+  the library and the MCP server accepted them. The command line now reads the engine's own list, so
+  the two cannot drift apart. What each channel scans is unchanged. (#374)
+
+- Five rules no longer take time that grows with the square of a long run of blank space around an
+  optional token. The blanks now belong to one quantifier, in GLS-SC-018, GLS-CF-251, GLS-TMS-243,
+  GLS-PI-025 and GLS-AW-713. The new regexes were compared with the old ones on hand written cases
+  and on seeded random text and matched the same text. No id, count or channel changes. (#378)
+
+### Continuous integration
+
+- The cost table that splits each long integrity leg into two parts is rebalanced from measured run
+  times, which are estimates and not a promise about any one run. The split logic and the gates
+  are unchanged. (#371)
+
+### Documentation
+
+- The stats file now carries the day 0.6.8 was published. The counts, the code, the rules and the
+  tests do not change. (#373)
+
 ## [0.6.8] — 2026-10-12
 
 ### Added
@@ -2768,6 +2903,13 @@ The `discovery_file_poisoning` category ships in two waves: GLS-DFP-001..025 (v0
 - **12 new patterns, all in `cross_agent_injection`** (one-category-per-day rule). Auto-shipped via daily-push runner.
 
 
+## [0.2.29] — 2026-05-02
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`272e9237`). Shipped to PyPI and tagged `v0.2.29`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 481 patterns, 2296 keywords, 54 categories.
+
 ## [0.2.28] — 2026-05-01
 
 ### Added
@@ -2809,6 +2951,27 @@ The `discovery_file_poisoning` category ships in two waves: GLS-DFP-001..025 (v0
 ### Context
 - One-category-per-day shipping rule locked in — every v0.2.X push from now on focuses one attack class so the day's release + blog tell one story. v0.2.26 = `cross_agent_injection`. Companion blog: `/blog/a2a-trusted-handoff-override` (Jack byline, original Cycle 181 evidence).
 - Source pool: `~/jack-harvest/ready/v0.2.26_ready.json`. 19 staged → 3 dropped (empty regex) → 16 shipped.
+
+## [0.2.25] — 2026-04-28
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`14baf576`). Shipped to PyPI and tagged `v0.2.25`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 413 patterns, 2296 keywords, 54 categories.
+
+## [0.2.24] — 2026-04-27
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`dd786796`). Shipped to PyPI and tagged `v0.2.24`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 393 patterns, 2296 keywords, 54 categories.
+
+## [0.2.23] — 2026-04-26
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`46e8ebd8`). Shipped to PyPI and tagged `v0.2.23`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 378 patterns, 2296 keywords, 52 categories.
 
 ## [0.2.22] — 2026-04-25
 
@@ -2991,6 +3154,13 @@ Patterns derived from Jack's autonomous pattern-extraction cycles CYCLE287–CYC
 ### Research source
 Patterns derived from Jack's autonomous pattern-extraction work (CYCLE181 + CYCLE184), validated CLEAN (FP=0, FN=0) on reference corpus of 12 and 16 cases respectively. Both cover attack surfaces explicitly flagged as uncovered in the internal pattern database reference.
 
+## [0.2.14] — 2026-04-16
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`afa9202c`). Shipped to PyPI and tagged `v0.2.14`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 253 patterns, 1475 keywords, 40 categories.
+
 ## [0.2.13] — 2026-04-15
 
 ### Added
@@ -2999,6 +3169,27 @@ Patterns derived from Jack's autonomous pattern-extraction work (CYCLE181 + CYCL
 - Per-finding `security-severity` scores (0.0–10.0) for GitHub Advanced Security severity triage.
 - Rule deduplication: identical rules across multiple scan results appear only once in `tool.driver.rules`.
 - `columnKind: utf16CodeUnits` for correct GitHub GHAS column rendering.
+
+## [0.2.12] — 2026-04-13
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`c40a57e4`). Shipped to PyPI and tagged `v0.2.12`; no CHANGELOG entry was written at the time.
+
+### Changed
+- 245 patterns, 1417 keywords, 35 categories.
+
+## [0.2.11] — 2026-04-12
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`1faa9a8b`). Shipped to PyPI and tagged `v0.2.11`; no CHANGELOG entry was written at the time.
+
+### Added
+- 15 new patterns. Totals: 227 patterns, 1,273 keywords, 33 categories.
+
+## [0.2.10] — 2026-04-11
+
+Backfilled 2026-10-15 by the daily integrity audit from the release commit (`290ad17b`). Shipped to PyPI and tagged `v0.2.10`; no CHANGELOG entry was written at the time.
+
+### Added
+- 11 new pattern packs and a preprocessor expansion.
 
 ## [0.2.3] — 2026-04-04
 
