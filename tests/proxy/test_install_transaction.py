@@ -16,6 +16,7 @@ import json
 import os
 import pathlib
 import signal
+import stat
 import subprocess
 import sys
 
@@ -1811,19 +1812,20 @@ def test_a_new_owners_note_survives_an_older_cleanups_forget(
     new_note = json.dumps(
         {"canonical": retained.name, "held": newly_held.name,
          "owner": "999-new", "sha256": inst._digest_file(newly_held)})
-    real_read_text = pathlib.Path.read_text
+    real_read_text = inst._read_regular_bytes
     replaced = []
 
-    def replace_after_reading(self, *a, **kw):
+    def replace_after_reading(path, *a, **kw):
+        self = pathlib.Path(path)
         out = real_read_text(self, *a, **kw)
         if self.name.startswith("github.taking") and not replaced:
             replaced.append(True)
             note.write_text(new_note, encoding="utf-8")
         return out
 
-    monkeypatch.setattr(pathlib.Path, "read_text", replace_after_reading)
+    monkeypatch.setattr(inst, "_read_regular_bytes", replace_after_reading)
     inst._forget_take(note, mine)
-    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+    monkeypatch.setattr(inst, "_read_regular_bytes", real_read_text)
 
     assert replaced, "the note was never read, so the window was not reached"
 
@@ -1966,10 +1968,11 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
          "owner": "a-take-that-is-not-ours", "sha256": "0" * 64}),
         encoding="utf-8")
 
-    real_read_text = pathlib.Path.read_text
+    real_read_text = inst._read_regular_bytes
     published = []
 
-    def a_new_owner_claims_the_name(self, *a, **kw):
+    def a_new_owner_claims_the_name(path, *a, **kw):
+        self = pathlib.Path(path)
         out = real_read_text(self, *a, **kw)
         if ".forgetting-" in self.name and not published:
             published.append(True)
@@ -1980,9 +1983,9 @@ def test_a_put_back_loses_to_a_new_owner_of_the_name(
                  "owner": "the-new-owner", "sha256": "1" * 64}), encoding="utf-8")
         return out
 
-    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    monkeypatch.setattr(inst, "_read_regular_bytes", a_new_owner_claims_the_name)
     inst._forget_take(note, "an-older-take")
-    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+    monkeypatch.setattr(inst, "_read_regular_bytes", real_read_text)
 
     assert published, "the put-back window was never reached"
     assert json.loads(read(note))["held"] == "the-new-owners", (
@@ -2015,10 +2018,11 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
         {"canonical": retained.name, "held": held.name,
          "owner": "1-a", "sha256": inst._digest_file(held)}), encoding="utf-8")
 
-    real_read_text = pathlib.Path.read_text
+    real_read_text = inst._read_regular_bytes
     published = []
 
-    def a_new_owner_claims_the_name(self, *a, **kw):
+    def a_new_owner_claims_the_name(path, *a, **kw):
+        self = pathlib.Path(path)
         out = real_read_text(self, *a, **kw)
         if ".forgetting-" in self.name and not published:
             published.append(True)
@@ -2027,9 +2031,9 @@ def test_a_private_note_is_dropped_once_its_bytes_are_answered_for(
                  "owner": "the-new-owner", "sha256": "1" * 64}), encoding="utf-8")
         return out
 
-    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    monkeypatch.setattr(inst, "_read_regular_bytes", a_new_owner_claims_the_name)
     inst._forget_take(note, "an-older-take")
-    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+    monkeypatch.setattr(inst, "_read_regular_bytes", real_read_text)
 
     assert published
     # ROUND 13 CORRECTS THIS ROW AGAIN, and the reason is the reviewer's
@@ -2072,10 +2076,11 @@ def test_contested_forgets_keep_every_held_file_named(
     note = records / "github.taking"
     rounds = 24
 
-    real_read_text = pathlib.Path.read_text
+    real_read_text = inst._read_regular_bytes
     contests = []
 
-    def a_new_owner_claims_the_name(self, *a, **kw):
+    def a_new_owner_claims_the_name(path, *a, **kw):
+        self = pathlib.Path(path)
         # The put-back reads the note it holds privately; a new owner claims
         # the canonical name in that window, so the `os.link` back genuinely
         # fails with EEXIST. Nothing is faked -- the name really is taken by
@@ -2089,7 +2094,7 @@ def test_contested_forgets_keep_every_held_file_named(
                  "sha256": "1" * 64}), encoding="utf-8")
         return out
 
-    monkeypatch.setattr(pathlib.Path, "read_text", a_new_owner_claims_the_name)
+    monkeypatch.setattr(inst, "_read_regular_bytes", a_new_owner_claims_the_name)
     counts = []
     for n in range(rounds):
         held = records / ("github.original.discarding-%d-a" % n)
@@ -2100,7 +2105,7 @@ def test_contested_forgets_keep_every_held_file_named(
              "sha256": inst._digest_file(held)}), encoding="utf-8")
         inst._forget_take(note, "an-older-take")
         counts.append(len(list(records.glob("github.taking*.forgetting-*"))))
-    monkeypatch.setattr(pathlib.Path, "read_text", real_read_text)
+    monkeypatch.setattr(inst, "_read_regular_bytes", real_read_text)
 
     assert len(contests) >= rounds, (
         "SETUP: the contested branch was not reached %d times, only %d"
@@ -2931,7 +2936,19 @@ def test_a_standby_claim_with_a_non_finite_number_moves_nothing(
 
 
 def _snapshot(records):
-    return sorted((p.name, read(p)) for p in records.iterdir() if p.is_file())
+    """Every entry in the records directory with what it IS: its kind, its bytes
+    when it is a regular file, and where it points when it is a link. A FIFO or
+    a link is recorded without being read."""
+    out = []
+    for p in sorted(records.iterdir()):
+        mode = os.lstat(p).st_mode
+        if stat.S_ISLNK(mode):
+            out.append((p.name, "link", os.readlink(p)))
+        elif stat.S_ISREG(mode):
+            out.append((p.name, "file", read(p)))
+        else:
+            out.append((p.name, "other", stat.S_IFMT(mode)))
+    return out
 
 
 def _half_promoted(cfg, home, artifact, monkeypatch, name="github"):
@@ -3163,12 +3180,16 @@ def test_a_fifo_where_a_claim_or_record_should_be_is_refused_without_blocking(
     target = claim if which == "sibling_claim" else inst._record_paths(home, "github")[1]
     target.unlink()
     os.mkfifo(target)
+    published = read(cfg)
+    before = _snapshot(records)
     previous = _bounded()
     try:
         assert inst._adopt_standby(home, "github", cfg) is False
     finally:
         _unbound(previous)
-    assert standby.exists() and not bytes_path.exists()
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+    assert read(cfg) == published
 
 
 @pytest.mark.parametrize("field,value", [
@@ -3209,7 +3230,114 @@ def test_a_linked_orphan_is_not_moved(cfg, home, artifact, monkeypatch):
     copy.write_bytes(read(standby))
     standby.unlink()
     standby.symlink_to(copy)
+    published = read(cfg)
+    before = _snapshot(records)
 
     assert inst._adopt_standby(home, "github", cfg) is False
 
-    assert standby.is_symlink() and not bytes_path.exists()
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_a_linked_paired_standby_copy_is_not_moved(
+        cfg, home, artifact, monkeypatch):
+    """The ordinary paired route, where the claim and the copy are both still
+    standby names: a copy that is a link is not digested or promoted, and the
+    claim beside it is not renamed into the canonical pair."""
+    _leave_a_standby(cfg, home, artifact, monkeypatch, "github")
+    records = home / "proxy" / "installs"
+    (standby,) = records.glob("*.standby")
+    copy = records / "outside-copy"
+    copy.write_bytes(read(standby))
+    standby.unlink()
+    standby.symlink_to(copy)
+    published = read(cfg)
+    before = _snapshot(records)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+    assert _snapshot(records) == before
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+@pytest.mark.parametrize("flag", ["O_NOFOLLOW", "O_NONBLOCK"])
+@pytest.mark.parametrize("which", ["sibling_claim", "canonical_record"])
+def test_a_static_link_is_still_refused_when_the_platform_lacks_an_open_flag(
+        cfg, home, artifact, monkeypatch, which, flag):
+    """The refusal of a link that is already in place must not depend on the
+    open flags: a platform without the no-follow flag used to read a record
+    link as the file behind it, and the public uninstall went on to finish."""
+    records, standby, claim, bytes_path = _half_promoted(
+        cfg, home, artifact, monkeypatch)
+    target = claim if which == "sibling_claim" else inst._record_paths(home, "github")[1]
+    behind = records / "outside-copy"
+    behind.write_bytes(read(target))
+    target.unlink()
+    target.symlink_to(behind)
+    published = read(cfg)
+    before = _snapshot(records)
+    monkeypatch.delattr(os, flag, raising=False)
+
+    assert inst._adopt_standby(home, "github", cfg) is False
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+
+    with pytest.raises((inst.ConfigConflict, inst.ConfigIOError)):
+        inst.uninstall(cfg, "github", home=home)
+    assert not bytes_path.exists()
+    assert _snapshot(records) == before
+    assert read(cfg) == published
+
+
+def test_a_link_swapped_in_after_the_look_is_refused_without_the_no_follow_flag(
+        tmp_path, monkeypatch):
+    """Without the flag the open follows a link that arrives between the look
+    and the open, so the descriptor has to be the file the look saw."""
+    target = tmp_path / "claim.json"
+    behind = tmp_path / "behind.json"
+    target.write_bytes(b'{"a": 1}')
+    behind.write_bytes(b'{"a": 2}')
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    real_open = os.open
+
+    def swap_then_open(path, *a, **kw):
+        if pathlib.Path(path) == target:
+            target.unlink()
+            target.symlink_to(behind)
+        return real_open(path, *a, **kw)
+
+    monkeypatch.setattr(inst.os, "open", swap_then_open)
+    with pytest.raises(ValueError):
+        inst._read_regular_bytes(target)
+
+
+def test_an_ordinary_file_is_read_whichever_open_flags_the_platform_has(
+        tmp_path, monkeypatch):
+    target = tmp_path / "claim.json"
+    target.write_bytes(b'{"a": 1}')
+    assert inst._read_regular_bytes(target) == b'{"a": 1}'
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    monkeypatch.delattr(os, "O_NONBLOCK", raising=False)
+    assert inst._read_regular_bytes(target) == b'{"a": 1}'
+    with pytest.raises(FileNotFoundError):
+        inst._read_regular_bytes(tmp_path / "absent.json")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="needs POSIX FIFOs")
+def test_a_fifo_is_refused_without_blocking_when_the_platform_lacks_nonblock(
+        tmp_path, monkeypatch):
+    """The look at the name is what keeps a FIFO from being opened at all when
+    the open itself cannot ask not to block."""
+    fifo = tmp_path / "claim.json"
+    os.mkfifo(fifo)
+    monkeypatch.delattr(os, "O_NONBLOCK", raising=False)
+    previous = _bounded()
+    try:
+        with pytest.raises(ValueError):
+            inst._read_regular_bytes(fifo)
+    finally:
+        _unbound(previous)
