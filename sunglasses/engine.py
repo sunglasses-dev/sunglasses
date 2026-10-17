@@ -1479,6 +1479,8 @@ class SunglassesEngine:
     # (_SENTENCE_END_RX: followed by a blank, a quote, a closing bracket or the end). A mark with
     # a letter or digit attached ("a.b", "x;y") is not an end.
     _LIST_END_RX = re.compile("[ \\t]*(?:\\Z|[.!?;)\\]](?=[\\s\"'\u2018\u2019\u201c\u201d)\\]}]|\\Z)|\\n|\\x1e)")
+    # What may follow a sentence-ending mark for it to end a list, as _LIST_END_RX asks of the view.
+    _LIST_FOLLOWER_RX = re.compile("[\\s\"'\u2018\u2019\u201c\u201d)\\]}]")
     _LIST_GAP_CHARS_RX = re.compile(r" [a-z0-9][a-z0-9, -]*")
     _LIST_WORD = r"[a-z0-9]+(?:-[a-z0-9]+)*"
     _LIST_WORD_RX = re.compile(_LIST_WORD)
@@ -2283,6 +2285,7 @@ class SunglassesEngine:
                 if self._refusal_literal(text, match_start, match_end, align):
                     continue
             gap_end = hit_end
+            mark_end = None
             leadin = self._leadin_break(text, match_start)
             if shape == "list" or not self._negation_governs(gap + leadin, gap_words):
                 if tail is None:
@@ -2299,13 +2302,16 @@ class SunglassesEngine:
                     # A list read through the words after the match start: the raw input
                     # must say the same there too.
                     gap_end = max(hit_end, match_start + reach)
+                    if self._ends_in_sentence_mark(tail, reach):
+                        mark_end = match_start + reach
                     if view_end is not None:
                         gap_end = min(gap_end, view_end)
                 elif shape == "list" or not self._quoted_gap_holds(gap, text, match_start, match_end, align):
                     continue
-            if align is None or align.holds(
+            if align is None or (align.holds(
                     text, max(0, window_start + m.start() - 1), gap_end,
-                    self._spaced_inside(text, window_start + m.end(), match_start)):
+                    self._spaced_inside(text, window_start + m.end(), match_start))
+                    and (mark_end is None or self._raw_follower_holds(align, text, mark_end))):
                 return True
         for phrase in self.FRAMING_LABELS:
             pos = before_text.rfind(phrase)
@@ -3160,6 +3166,26 @@ class SunglassesEngine:
     def _list_ends(self, tail: str, at: int) -> bool:
         return self._list_end(tail, at) is not None
 
+    def _raw_follower_holds(self, align, text: str, mark_end: int) -> bool:
+        """True if the raw input ends the sentence where the view does. A sentence-ending mark is
+        an end only because of what follows it (a blank, a quote, a bracket, the end of the text),
+        and the view may have lost that: a character it dropped, or one it decoded, stands
+        between the mark and what the view shows after it, and the end of the view is not the end
+        of the raw input. So the character that follows the mark in the RAW input is asked for
+        itself: the raw text ends there, or it is a character the end rule accepts. The
+        walk can say where the mark stands in the raw input only for a mark it matched
+        character for character."""
+        k = align.origin(text, mark_end - 1)
+        if k is None:
+            return False
+        raw = align.raw
+        return k + 1 >= len(raw) or self._LIST_FOLLOWER_RX.match(raw, k + 1) is not None
+
+    @staticmethod
+    def _ends_in_sentence_mark(tail: str, reach: int) -> bool:
+        """True if the list read up to tail[:reach] ended at a mark that needs a follower."""
+        return 0 < reach <= len(tail) and tail[reach - 1] in ".!?;)]"
+
     def _list_end(self, tail: str, at: int) -> Optional[int]:
         """Where the list that was read up to tail[at] ends, or None when it does not end
         within NEGATION_LIST_TRAIL_WORDS plain words after it: the text itself ends, or a
@@ -3187,11 +3213,6 @@ class SunglassesEngine:
         # edge of it do not show what follows. Only a line end is an end whatever follows.
         if end >= len(tail) >= self.NEGATION_LIST_TAIL and mark.group(0).strip(" \t") not in ("\n", "\x1e"):
             return None
-        if end < len(tail) and mark.group(0).strip(" \t") not in ("", "\n", "\x1e"):
-            # A sentence-ending mark is an end only because of the character after it (a blank,
-            # a quote, a bracket), so that character is relied on too: the raw input must show
-            # it, or a character the view dropped could make an end that is not one.
-            end += 1
         return end
 
     @property
