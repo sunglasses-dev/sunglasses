@@ -3187,6 +3187,11 @@ class SunglassesEngine:
         # edge of it do not show what follows. Only a line end is an end whatever follows.
         if end >= len(tail) >= self.NEGATION_LIST_TAIL and mark.group(0).strip(" \t") not in ("\n", "\x1e"):
             return None
+        if end < len(tail) and mark.group(0).strip(" \t") not in ("", "\n", "\x1e"):
+            # A sentence-ending mark is an end only because of the character after it (a blank,
+            # a quote, a bracket), so that character is relied on too: the raw input must show
+            # it, or a character the view dropped could make an end that is not one.
+            end += 1
         return end
 
     @property
