@@ -16,6 +16,7 @@ import json
 import pathlib
 import shutil
 import sys
+import tempfile
 
 import pytest
 
@@ -160,11 +161,34 @@ def test_materialising_writes_the_files_the_variant_names(private_root):
     assert built.payload, "the resolved payload bytes did not come back"
 
 
-def test_materialising_refuses_a_root_outside_the_private_tmp_tree(tmp_path):
+@pytest.fixture
+def outside_root(tmp_path):
+    """A run root that is NOT under /private/tmp, whatever TMPDIR says.
+
+    pytest's tmp_path follows TMPDIR. With the macOS login default it lands
+    under /private/var, outside the allowed tree. With TMPDIR pointed into
+    /private/tmp, or unset so Python falls back to /tmp, it lands INSIDE, the
+    refusal never happens and the test failed for a reason that is not the code.
+    So use tmp_path when it is outside, and otherwise make a directory under
+    the home folder. If even that is inside, there is no honest outside to test.
+    """
+    if not tmp_path.resolve().is_relative_to(materialize.PRIVATE_TMP):
+        yield tmp_path
+        return
+    home = pathlib.Path.home()
+    if home.resolve().is_relative_to(materialize.PRIVATE_TMP):
+        pytest.skip("neither tmp_path nor the home folder is outside "
+                    f"{materialize.PRIVATE_TMP}, so there is no root to refuse")
+    root = pathlib.Path(tempfile.mkdtemp(prefix="gen2-outside-", dir=home))
+    yield root
+    shutil.rmtree(root, ignore_errors=True)
+
+
+def test_materialising_refuses_a_root_outside_the_private_tmp_tree(outside_root):
     entry, scenario = _g2_13()
 
     with pytest.raises(materialize.UnsafeRunRoot):
-        materialize.materialize(entry, scenario["variants"][0], run_root=tmp_path)
+        materialize.materialize(entry, scenario["variants"][0], run_root=outside_root)
 
 
 def test_materialising_checks_the_two_copies_first(private_root, monkeypatch):
