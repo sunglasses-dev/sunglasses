@@ -742,6 +742,16 @@ class Route:
 
     # ── requests ───────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _offer_is_text(message):
+        """True when `params.protocolVersion` is a string. An absent `params`
+        or `protocolVersion` is not decided here: this row is about a present
+        offer of the wrong type."""
+        params = message.get("params")
+        if not isinstance(params, dict) or "protocolVersion" not in params:
+            return True
+        return isinstance(params["protocolVersion"], str)
+
     def _client_request(self, raw, message, method):
         request_id = message["id"]
 
@@ -807,6 +817,21 @@ class Route:
         if selector.refusal(method, REQUEST, origin=CLIENT) is not None:
             self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION,
                            attempt=attempt)
+            return
+
+        # T1.R2, the CLIENT side. `handshake.negotiate` judges the version the
+        # server answers with; the version the client OFFERS was never read, so
+        # a `protocolVersion` of 7, null or a list went upstream and the
+        # handshake began from a frame nobody had looked at. Only the TYPE is
+        # refused: a string the supported set does not name still goes upstream,
+        # because the server answers with a version it does support and the
+        # client decides whether to go on. Withhold the request, answer it
+        # once, then end the session the way an unsupported answer does.
+        if method == "initialize" and not self._offer_is_text(message):
+            self._withhold(request_id, handshake.UNSUPPORTED_PROTOCOL,
+                           RULE_PROTOCOL, attempt=attempt)
+            self._close(handshake.UNSUPPORTED_PROTOCOL, RULE_PROTOCOL, None,
+                        kind="PROTOCOL_VERSION_UNSUPPORTED")
             return
 
         approved_under = None

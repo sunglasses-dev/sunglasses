@@ -14,48 +14,36 @@ less even, it never makes the split wrong.
 """
 import os
 
-DEFAULT_COST = 9
+DEFAULT_COST = 6
 
 # Seconds on the slowest interpreter in the matrix (3.12), from a green full
-# run's per-test durations: run 38357184575, both 3.12 parts, setup + call +
-# teardown summed per file. Every file measured at 60 s or more is listed;
-# DEFAULT_COST is the mean of the rest. Keys are collected paths, as pytest
-# prints them.
+# run's per-test durations: run 39015698884 (main after the prefilter-table
+# change), both 3.12 parts, setup + call + teardown summed per file. Every file
+# measured at 60 s or more is listed; DEFAULT_COST is the mean of the rest.
+# Keys are collected paths, as pytest prints them.
 COST = {
-    "tests/test_defensive_framing_later_hits.py": 3602,
-    "tests/test_v056_matrix.py": 2076,
-    "tests/test_regex_prefilter.py": 1590,
-    "tests/test_api_response_siblings.py": 1343,
-    "tests/test_negation_blank_run_in_match.py": 1291,
-    "tests/test_directive_and_hidden_text_case_matrix.py": 707,
-    "tests/test_enc_alt_210_run_boundary.py": 435,
-    "tests/test_ai_addressed_directive_rules.py": 384,
-    "tests/test_repair_v056.py": 335,
-    "tests/test_lab_a1_folded_regex_lane.py": 297,
-    "tests/test_hidden_text_rule_on_every_start_tag.py": 277,
-    "tests/test_leading_whitespace_run_cost.py": 252,
-    "tests/test_sd_api_siblings.py": 240,
-    "tests/test_benchmark_installed.py": 232,
-    "tests/test_benchmark_negatives_truth.py": 220,
-    "tests/test_lab_b1_quadratic_whitespace_gate.py": 172,
-    "tests/test_firewall_fuzzy.py": 143,
-    "tests/test_anchored_window_matching.py": 136,
-    "tests/test_mcp_manifest_poisoning.py": 129,
-    "tests/proxy/test_artifact_review.py": 128,
-    "tests/test_input_cap.py": 124,
-    "tests/test_proxy_state_dir_obstruction.py": 116,
-    "tests/test_mcp_engine_lifetime.py": 109,
-    "tests/test_sync_stats_languages.py": 107,
+    "tests/test_negation_cues_and_lists.py": 6009,
+    "tests/test_v056_matrix.py": 1198,
+    "tests/test_api_response_siblings.py": 512,
+    "tests/test_repair_v056.py": 238,
+    "tests/test_benchmark_installed.py": 228,
+    "tests/test_defensive_framing_later_hits.py": 210,
+    "tests/test_lab_b1_quadratic_whitespace_gate.py": 205,
+    "tests/test_directive_and_hidden_text_case_matrix.py": 202,
+    "tests/test_benchmark_negatives_truth.py": 200,
+    "tests/test_prefilter_table.py": 164,
+    "tests/test_a_control_character_beside_a_negated_quote_changes_nothing.py": 148,
+    "tests/test_regex_prefilter.py": 146,
+    "tests/test_anchored_window_matching.py": 119,
+    "tests/test_hidden_text_rule_on_every_start_tag.py": 109,
+    "tests/test_ai_addressed_directive_rules.py": 109,
+    "tests/proxy/test_artifact_review.py": 108,
     "tests/test_gauntlet.py": 101,
-    "tests/test_real_corpus_fp.py": 78,
-    "tests/test_cli_file_routing.py": 74,
-    "tests/test_negation_later_hits_round11.py": 67,
-    "tests/test_negation_later_hits_round8.py": 66,
-    "tests/test_dogfood_bugs.py": 62,
-    "tests/test_stacked_lookaheads.py": 61,
-    "tests/test_receipts_log_missing_and_run_jsonl.py": 61,
+    "tests/test_enc_alt_210_run_boundary.py": 92,
+    "tests/test_proxy_state_dir_obstruction.py": 89,
+    "tests/test_real_corpus_fp.py": 82,
+    "tests/test_repo_ladder_corpus.py": 61,
     "tests/test_prefilter_branch_coverage.py": 61,
-    "tests/test_defensive_framing_window_edge.py": 60,
 }
 
 
