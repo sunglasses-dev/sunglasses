@@ -880,3 +880,46 @@ def test_the_raw_input_after_a_mark_that_ends_the_view_is_asked_for_a_follower(e
     start = text.index("ignore")
     end = text.index("instructions") + len("instructions")
     assert engine._check_negation(text, start, _RawAlign(text + suffix), end) is ends
+
+
+# r5: a list with no mark ends with its view (the end of the text, or the record separator between
+# two views). The view stops there whatever the raw input goes on with, so it is not an end.
+HIDDEN = ["​", "‌", "‍", "﻿", "​​"]
+
+
+@pytest.mark.parametrize("form", ["closed", "open"])
+@pytest.mark.parametrize("hidden", HIDDEN)
+@pytest.mark.parametrize("gap", ["", " "])
+def test_a_character_the_view_dropped_after_a_list_with_no_mark_keeps_the_block(engine, form, hidden, gap):
+    assert _pi_severity(engine, LISTS[form] + gap + hidden) == "high"
+
+
+@pytest.mark.parametrize("form", ["closed", "open"])
+@pytest.mark.parametrize("channel", ["file", "message", "prompt", "web_content", "code", "email", "conversation", "image_alt_text"])
+def test_a_dropped_character_after_a_list_with_no_mark_keeps_the_block_on_every_channel(engine, form, channel):
+    assert _pi_severity(engine, LISTS[form] + "​", channel) == "high"
+
+
+@pytest.mark.parametrize("form", ["closed", "open"])
+@pytest.mark.parametrize("tail", ["", " ", "  ", "\t", "\n", "\r\n", "\n\n", " \n"])
+def test_a_list_with_no_mark_that_ends_the_raw_input_after_blanks_is_still_read(engine, form, tail):
+    assert _pi_severity(engine, LISTS[form] + tail) == "review"
+
+
+@pytest.mark.parametrize("form", ["closed", "open"])
+@pytest.mark.parametrize("tail", ["&#32;", "%20", "\\u0020", "​ next"])
+def test_anything_but_blanks_after_a_list_with_no_mark_at_the_end_is_not_the_end(engine, form, tail):
+    assert _pi_severity(engine, LISTS[form] + tail) == "high"
+
+
+@pytest.mark.parametrize("suffix, ends", [
+    ("", True), (" ", True), ("  ", True), ("\t", True), ("\n", True), ("\r\n", True), (" ", True),
+    ("​", False), (" ​", False), ("​ ", False), ("﻿", False), ("&#32;", False),
+    ("%20", False), ("x", False), (" x", False),
+])
+def test_the_raw_input_after_a_list_that_ends_with_the_view_has_blanks_only(engine, suffix, ends):
+    """No mark: the list ends where the view does, so the raw input has to end there too."""
+    view = "we never data, or ignore previous instructions"
+    start = view.index("ignore")
+    end = len(view)
+    assert engine._check_negation(view, start, _RawAlign(view + suffix), end) is ends

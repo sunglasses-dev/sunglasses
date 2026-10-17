@@ -2285,7 +2285,8 @@ class SunglassesEngine:
                 if self._refusal_literal(text, match_start, match_end, align):
                     continue
             gap_end = hit_end
-            mark_end = None
+            confirm_end = None
+            confirm_bare = False
             leadin = self._leadin_break(text, match_start)
             if shape == "list" or not self._negation_governs(gap + leadin, gap_words):
                 if tail is None:
@@ -2302,8 +2303,10 @@ class SunglassesEngine:
                     # A list read through the words after the match start: the raw input
                     # must say the same there too.
                     gap_end = max(hit_end, match_start + reach)
-                    if self._ends_in_sentence_mark(tail, reach):
-                        mark_end = match_start + reach
+                    stop = self._end_to_confirm(tail, reach)
+                    if stop is not None:
+                        confirm_end = match_start + stop[0]
+                        confirm_bare = stop[1]
                     if view_end is not None:
                         gap_end = min(gap_end, view_end)
                 elif shape == "list" or not self._quoted_gap_holds(gap, text, match_start, match_end, align):
@@ -2311,7 +2314,7 @@ class SunglassesEngine:
             if align is None or (align.holds(
                     text, max(0, window_start + m.start() - 1), gap_end,
                     self._spaced_inside(text, window_start + m.end(), match_start))
-                    and (mark_end is None or self._raw_follower_holds(align, text, mark_end))):
+                    and (confirm_end is None or self._raw_follower_holds(align, text, confirm_end, confirm_bare))):
                 return True
         for phrase in self.FRAMING_LABELS:
             pos = before_text.rfind(phrase)
@@ -3166,25 +3169,49 @@ class SunglassesEngine:
     def _list_ends(self, tail: str, at: int) -> bool:
         return self._list_end(tail, at) is not None
 
-    def _raw_follower_holds(self, align, text: str, mark_end: int) -> bool:
+    def _raw_follower_holds(self, align, text: str, end: int, bare: bool = False) -> bool:
         """True if the raw input ends the sentence where the view does. A sentence-ending mark is
         an end only because of what follows it (a blank, a quote, a bracket, the end of the text),
         and the view may have lost that: a character it dropped, or one it decoded, stands
         between the mark and what the view shows after it, and the end of the view is not the end
-        of the raw input. So the character that follows the mark in the RAW input is asked for
-        itself: the raw text ends there, or it is a character the end rule accepts. The
-        walk can say where the mark stands in the raw input only for a mark it matched
-        character for character."""
-        k = align.origin(text, mark_end - 1)
+        of the raw input. The same holds for a list that ends with no mark, at the end of the
+        view (the end of the text, or the record separator between two views): the view stops
+        there whatever the raw input goes on with. So the character that follows the last
+        character of the list in the RAW input is asked for itself: the raw text ends there, or it
+        is a character the end rule accepts. The walk can say where that character stands in the
+        raw input only for one it matched character for character. A list with no mark ends with
+        the text, so for it everything that the raw input has after the list is blanks (bare)."""
+        k = align.origin(text, end - 1)
         if k is None:
             return False
         raw = align.raw
+        if bare:
+            kept = getattr(align, "_raw_stripped_len", None)
+            if kept is None:
+                kept = align._raw_stripped_len = len(raw.rstrip())
+            return k + 1 >= kept
         return k + 1 >= len(raw) or self._LIST_FOLLOWER_RX.match(raw, k + 1) is not None
 
     @staticmethod
-    def _ends_in_sentence_mark(tail: str, reach: int) -> bool:
-        """True if the list read up to tail[:reach] ended at a mark that needs a follower."""
-        return 0 < reach <= len(tail) and tail[reach - 1] in ".!?;)]"
+    def _end_to_confirm(tail: str, reach: int) -> Optional[tuple]:
+        """What the raw input has to confirm of a list read up to tail[:reach]: (where its last
+        character ends, whether the list has no mark). The list ends at a sentence-ending mark,
+        which needs a follower; at the record separator between two views (the list ends with its
+        view); or with the text. The last two have no mark, and the raw input has to end there
+        too, after blanks only. Blanks in front of the separator or the end are the view's own
+        padding, not characters the raw input has to show. A line end is itself a character the
+        raw input has to show, and is not asked again."""
+        if not 0 < reach <= len(tail):
+            return None
+        last = tail[reach - 1]
+        if last == "\n":
+            return None
+        if last in ".!?;)]":
+            return reach, False
+        stop = reach - 1 if last == "\x1e" else reach
+        while stop > 0 and tail[stop - 1] in " \t":
+            stop -= 1
+        return (stop, True) if stop else None
 
     def _list_end(self, tail: str, at: int) -> Optional[int]:
         """Where the list that was read up to tail[at] ends, or None when it does not end
