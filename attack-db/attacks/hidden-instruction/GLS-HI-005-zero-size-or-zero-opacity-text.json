@@ -1,0 +1,24 @@
+{
+  "id": "GLS-HI-005",
+  "name": "Zero-size or zero-opacity text",
+  "version": "1.0",
+  "category": "hidden_instruction",
+  "severity": "high",
+  "channels": [
+    "web_content",
+    "file"
+  ],
+  "description": "Instructions hidden with a zero font size or a zero opacity, which makes text invisible to humans but readable by agents. GLS-HI-002 lists font-size:0 and opacity:0 as words, but the text is folded before words are looked up and the fold turns every 0 into an o, so those two words could never be found there. This rule reads them as a complete zero value instead: the number, an optional unit, optional spaces and comments, then the end of the declaration.",
+  "keywords": [],
+  "regex": [
+    "(?i)(?<![\\w-])font-size\\s*:\\s*0(?:\\.0+)?(?:px|pt|em|rem|%|ex|ch|vw|vh)?(?=(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}(?:[;}\"'<>]|\\Z|!(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}important(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}(?:[;}\"'<>]|\\Z)))|(?<![\\w-])opacity\\s*:\\s*0(?:\\.0+)?%?(?=(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}(?:[;}\"'<>]|\\Z|!(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}important(?:\\s|/\\*(?:[^*]|\\*(?!/)){0,60}\\*/){0,12}(?:[;}\"'<>]|\\Z)))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-17",
+  "source": "patterns.py:GLS-HI-005"
+}

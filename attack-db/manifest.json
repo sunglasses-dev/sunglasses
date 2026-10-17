@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-10-07T14:12:06.719835Z",
+  "generated_at": "2026-10-17T02:19:30.968587Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1569,
+  "total_patterns": 1570,
   "categories": {
     "prompt-injection": 51,
     "data-exfiltration": 43,
-    "hidden-instruction": 4,
+    "hidden-instruction": 5,
     "command-injection": 18,
     "secret-detection": 18,
     "memory-poisoning": 11,

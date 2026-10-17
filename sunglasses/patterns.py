@@ -804,10 +804,7 @@ PATTERNS = [
             "opacity:0",
             "opacity: 0",
         ],
-        "regex": [
-            r"""(?i)(?:display: ?none|visibility: ?hidden|color:white;background:white|color:\#fff;background:\#fff)(?!(?:[\u200b-\u200f\u2060-\u2064\ufeff\u00ad\u034f\u061c\u2028\u2029\U000e0001-\U000e007f\x00-\x08\x0e-\x1a\x7f-\x84\x86-\x9f]+)?(?:[^\W_]|[!$@]|&\#(?:0*(?:3[36]|64|4[89]|5[0-7]|6[5-9]|[78]\d|90|9[7-9]|1[01]\d|12[0-2])(?:;|(?!\d))|x0*(?:2[14]|40|3\d|4[1-9a-f]|5[0-9a]|6[1-9a-f]|7[0-9a])(?:;|(?![0-9a-f])))|%(?:2[14]|40|3\d|4[1-9a-f]|5[0-9a]|6[1-9a-f]|7[0-9a])))|(?<![\w-])font-size\s*:\s*0(?:\.0+)?(?:px|pt|em|rem|%|ex|ch|vw|vh)?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z|!(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}important(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z)))|(?<![\w-])opacity\s*:\s*0(?:\.0+)?%?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z|!(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}important(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z)))""",
-        ],
-        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents. The two listed words font-size:0 and opacity:0 could never be found in the folded text, which turns every 0 into an o, so the regex reads those two as a complete zero value: the number, an optional unit, then the end of the declaration. Every other hiding style is read exactly as before."
+        "description": "Instructions hidden using CSS to make text invisible to humans but readable by agents."
     },
 
     # =========================================================================
@@ -3248,6 +3245,19 @@ PATTERNS = [
             r"(?i)<!--.{0,160}(include|add|mention|recommend|redirect|promote).{0,160}(link|url|product|vendor|affiliate|coupon).{0,160}-->",
         ],
         "description": "Behavior-shaping instructions hidden in comments, markup, or low-visibility text that do not use classic prompt-injection phrases but still redirect an agent's output, links, recommendations, or priorities toward attacker-favored affiliate, sponsor, or promotional content."
+    },
+
+    # --- GLS-HI-005: zero font size or zero opacity ---
+    {
+        "id": "GLS-HI-005",
+        "name": "Zero-size or zero-opacity text",
+        "category": "hidden_instruction",
+        "severity": "high",
+        "channel": ["web_content", "file"],
+        "regex": [
+            r"""(?i)(?<![\w-])font-size\s*:\s*0(?:\.0+)?(?:px|pt|em|rem|%|ex|ch|vw|vh)?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z|!(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}important(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z)))|(?<![\w-])opacity\s*:\s*0(?:\.0+)?%?(?=(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z|!(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}important(?:\s|/\*(?:[^*]|\*(?!/)){0,60}\*/){0,12}(?:[;}"'<>]|\Z)))""",
+        ],
+        "description": "Instructions hidden with a zero font size or a zero opacity, which makes text invisible to humans but readable by agents. GLS-HI-002 lists font-size:0 and opacity:0 as words, but the text is folded before words are looked up and the fold turns every 0 into an o, so those two words could never be found there. This rule reads them as a complete zero value instead: the number, an optional unit, optional spaces and comments, then the end of the declaration."
     },
 
     # --- GLS-MCP-005: MCP definition threat indicator ---
