@@ -54,15 +54,6 @@ README_LINES = {
         "Does not access any platform account, no login, no session cookies, no posting.",
 }
 
-# Sentences that need a negated LIST to be read (a follow-up change): they keep the severity
-# they have on main, and the whole README that holds them still blocks.
-LIST_README_LINES = {
-    "ghsa_pi_202_log_store_transmit":
-        "The plugin does not log, store, or transmit your API key anywhere other than the API itself.",
-    "mech_002_change_provider_model":
-        "Do not change provider, model, or render path without telling the user first.",
-}
-
 README = "# Plugin\n\n" + "\n\n".join(README_LINES.values()) + "\n"
 
 GATE_PY = (
@@ -85,34 +76,9 @@ def test_the_readme_lines_this_change_reads_never_block_as_a_file(engine):
     assert _decision(engine, README) != "block"
 
 
-@pytest.mark.parametrize("name", sorted(LIST_README_LINES))
-def test_a_sentence_that_needs_a_negated_list_keeps_main_severity_in_this_change(engine, name):
-    assert _decision(engine, LIST_README_LINES[name]) == "block"
-
-
-# The feedback README as a file (readme1.md of the corpus), heading first, one blank line between
-# its paragraphs. Each paragraph after the first comes right after a sentence end: a paragraph
-# start is a boundary, so "The plugin" in front of a cue does not stop it.
-README1 = (
-    "# Plugin\n\n" + README_LINES["sc015_no_session_cookies"] + "\n\n"
-    + LIST_README_LINES["ghsa_pi_202_log_store_transmit"] + "\n\n"
-    + LIST_README_LINES["mech_002_change_provider_model"] + "\n"
-)
-
 
 def _blocking(engine, text):
     return {f["id"] for f in engine.scan(text, channel="file").findings if f["severity"] in ("high", "critical")}
-
-
-def test_the_feedback_readme_as_a_file_blocks_only_through_its_two_list_sentences(engine):
-    """Without the list reading (a follow-up change) the two list sentences keep main's severity;
-    nothing else of the file is a block: not its heading, not its first paragraph, and not the
-    paragraph start in front of the cue of the second paragraph."""
-    from_lists = set()
-    for line in LIST_README_LINES.values():
-        from_lists |= _blocking(engine, line)
-    assert from_lists
-    assert _blocking(engine, README1) == from_lists
 
 
 def test_the_feedback_readme_with_plain_payloads_in_place_of_its_list_sentences_never_blocks(engine):
@@ -913,9 +879,9 @@ def test_the_200_character_bound_is_exact_from_the_end_of_the_payload(engine, cu
 def test_the_length_of_the_payload_is_never_counted(engine, cue, length):
     """The two bounds are separate: a payload of any length with a short gap and a short tail."""
     text = f"{cue} " + "p" * length + "."
-    assert not engine._sentence_is_a_list(text, 0, " ", len(text) - 1)
+    assert engine._sentence_shape(text, 0, " ", len(text) - 1) == "plain"
     text = f"{cue} " + "p" * length
-    assert not engine._sentence_is_a_list(text, 0, " ", len(text))
+    assert engine._sentence_shape(text, 0, " ", len(text)) == "plain"
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
@@ -1036,12 +1002,12 @@ def test_the_sentence_check_reads_a_break_at_the_end_of_the_gap_but_not_at_the_e
     """Asked directly (the scan can hide it): a break that ends the gap separates the cue from
     the payload, so the sentence is not a plain run; a break that ends the tail is a paragraph end."""
     text = f"no{br}payload"
-    assert engine._sentence_is_a_list(text, 0, br, len(text)) is True
-    assert engine._sentence_is_a_list(text, 0, f" {br}", len(text)) is True
-    assert engine._sentence_is_a_list("no payload", 0, " ", len("no payload")) is False
+    assert engine._sentence_shape(text, 0, br, len(text)) == "list"
+    assert engine._sentence_shape(text, 0, f" {br}", len(text)) == "list"
+    assert engine._sentence_shape("no payload", 0, " ", len("no payload")) == "plain"
     tail_text = f"no payload{br}"
-    assert engine._sentence_is_a_list(tail_text, 0, " ", len("no payload")) is False
-    assert engine._sentence_is_a_list(f"no payload{br}x", 0, " ", len("no payload")) is True
+    assert engine._sentence_shape(tail_text, 0, " ", len("no payload")) == "plain"
+    assert engine._sentence_shape(f"no payload{br}x", 0, " ", len("no payload")) == "list"
 
 
 @pytest.mark.parametrize("br", BREAKS)
@@ -1116,10 +1082,10 @@ def test_a_whole_joining_word_after_the_payload_means_main(engine, cue, word):
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_gap_longer_than_200_characters_between_the_cue_and_the_payload_is_read_as_on_main(engine, cue):
     """Not reachable through a scan (the cue window keeps the gap short); asked of the helper."""
-    for n, expected in ((200, False), (201, True), (1000, True)):
+    for n, expected in ((200, "plain"), (201, "other"), (1000, "other")):
         gap = " " + "a" * (n - 1)
         text = f"{cue}{gap}{LIST_FIRST}."
-        assert engine._sentence_is_a_list(text, 0, gap, len(text) - 1) is expected, n
+        assert engine._sentence_shape(text, 0, gap, len(text) - 1) == expected, n
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
