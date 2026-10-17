@@ -40,13 +40,39 @@ def test_parts_are_a_partition_of_the_collected_items(n):
     assert len(seen) == len(set(seen))
 
 
-def test_a_file_is_never_split_across_parts():
+def test_a_file_is_never_split_across_parts_except_the_one_dealt_by_test():
     items = _items(_real_paths(), per=5)
     where = {}
     for i in (1, 2):
         for it in ci_shard.select(items, f"{i}/2")[0]:
             where.setdefault(ci_shard.path_of(it.nodeid), set()).add(i)
-    assert all(len(v) == 1 for v in where.values())
+    whole = {p for p, v in where.items() if len(v) == 1}
+    assert set(where) - whole == set(ci_shard.SPLIT_BY_TEST)
+    assert all(len(where[p]) == 2 for p in ci_shard.SPLIT_BY_TEST)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_a_file_dealt_by_test_is_collected_exactly_once_across_the_parts(n):
+    f = "tests/test_negation_cues_and_lists.py"
+    assert f in ci_shard.SPLIT_BY_TEST
+    # ids with brackets and repeats, in a mixed order, as parametrize makes them
+    items = [types.SimpleNamespace(nodeid=f"{f}::t[{k % 7}-{k}]") for k in range(101)]
+    items += _items(["tests/test_other.py"])
+    full = [it.nodeid for it in items if ci_shard.path_of(it.nodeid) == f]
+    halves = [[it.nodeid for it in ci_shard.select(items, f"{i}/{n}")[0]
+               if ci_shard.path_of(it.nodeid) == f] for i in range(1, n + 1)]
+    assert sum(len(h) for h in halves) == len(full)
+    assert set().union(*map(set, halves)) == set(full)
+    assert sorted(x for h in halves for x in h) == sorted(full)
+    assert max(map(len, halves)) - min(map(len, halves)) <= 1
+    # part i holds the tests whose collected index k has k % n == i - 1
+    assert halves[0] == full[0::n]
+
+
+def test_the_dealt_file_does_not_move_the_other_files():
+    paths = _real_paths()
+    rest = [p for p in paths if p not in ci_shard.SPLIT_BY_TEST]
+    assert ci_shard.assign(paths, 2) == ci_shard.assign(rest, 2)
 
 
 def test_assignment_depends_only_on_the_set_of_files():
@@ -62,6 +88,7 @@ def test_every_costed_file_exists():
 
 def test_the_two_parts_are_within_ten_percent_by_cost():
     parts = ci_shard.assign(_real_paths(), 2)
+    # a dealt file adds the same share to every part, so it is left out of the sum
     load = {1: 0, 2: 0}
     for p, k in parts.items():
         load[k] += ci_shard.COST.get(p, ci_shard.DEFAULT_COST)
