@@ -164,6 +164,34 @@ def test_methods_take_the_keyword_arguments_re_takes():
     assert lazy.split(string=text, maxsplit=1) == real.split(string=text, maxsplit=1)
 
 
+def test_the_end_position_is_forwarded_where_leaving_it_out_changes_the_answer():
+    """`endpos` cuts the text short, so a call that drops it gives a different result. `b+c` in
+    "abbbc BBC": the whole text holds a match at 6..9, the text cut at 8 ("abbbc BB") does not; and
+    `abbbc` is a full match only when the text is cut at 5."""
+    text = "abbbc BBC"
+    cut_source, full_source = r"b+c", r"abbbc"
+    lazy, real = _LazyRegex(cut_source, re.IGNORECASE), re.compile(cut_source, re.IGNORECASE)
+    spans = lambda m: m and m.span()                     # noqa: E731
+    assert real.search(text, 6, 8) is None and real.search(text, 6) is not None   # the premise
+    assert spans(lazy.search(text, 6, 8)) == spans(real.search(text, 6, 8)) is None
+    assert spans(lazy.search(string=text, pos=6, endpos=8)) is None
+    assert spans(lazy.match(string=text, pos=6, endpos=8)) is None
+    assert lazy.findall(text, 6, 8) == real.findall(text, 6, 8) == []
+    assert lazy.findall(string=text, pos=6, endpos=8) == []
+    assert list(lazy.finditer(string=text, pos=6, endpos=8)) == []
+    assert lazy.scanner(string=text, pos=6, endpos=8).search() is None
+    lazy_full, real_full = _LazyRegex(full_source, re.IGNORECASE), re.compile(full_source, re.IGNORECASE)
+    assert real_full.fullmatch(text, 0, 5) is not None and real_full.fullmatch(text) is None
+    assert spans(lazy_full.fullmatch(string=text, pos=0, endpos=5)) == (0, 5)
+    assert lazy_full.fullmatch(text, 0, 5) is not None
+    # the same cut, positionally and by keyword, agrees with `re` on a spread of boundaries
+    for pos in range(0, len(text) + 1):
+        for endpos in range(pos, len(text) + 1):
+            assert spans(lazy.search(string=text, pos=pos, endpos=endpos)) == spans(real.search(text, pos, endpos))
+            assert spans(lazy.match(string=text, pos=pos, endpos=endpos)) == spans(real.match(text, pos, endpos))
+            assert lazy.findall(string=text, pos=pos, endpos=endpos) == real.findall(text, pos, endpos)
+
+
 def test_search_and_match_agree_with_re_including_position_arguments():
     source = r"b+c"
     lazy, real = _LazyRegex(source, re.IGNORECASE), re.compile(source, re.IGNORECASE)
