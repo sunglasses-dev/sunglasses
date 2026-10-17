@@ -83,9 +83,8 @@ def _every_compiled_source():
 
 # --- the shipped database ---------------------------------------------------------------
 
-def test_every_shipped_regex_guard_core_and_twin_compiles():
-    sources = _every_compiled_source()
-    assert len(sources) > 3000, "the shipped database held no regexes; this would pass on nothing"
+def _sources_that_do_not_compile(sources):
+    """(rule, error, source) for each source `re.compile` rejects, a warning counted as a rejection."""
     bad = []
     for rule, source in sources:
         try:
@@ -94,7 +93,13 @@ def test_every_shipped_regex_guard_core_and_twin_compiles():
                 re.compile(source, re.IGNORECASE)
         except Exception as error:                       # noqa: BLE001 - the point is to list them
             bad.append((rule, type(error).__name__, source[:60]))
-    assert bad == []
+    return bad
+
+
+def test_every_shipped_regex_guard_core_and_twin_compiles():
+    sources = _every_compiled_source()
+    assert len(sources) > 3000, "the shipped database held no regexes; this would pass on nothing"
+    assert _sources_that_do_not_compile(sources) == []
 
 
 def test_every_shipped_regex_entry_is_loaded(lazy_engine):
@@ -103,9 +108,12 @@ def test_every_shipped_regex_entry_is_loaded(lazy_engine):
 
 
 def test_the_guard_checks_the_checker_a_bad_source_is_reported():
-    """Mutant: the compile check above must be able to fail."""
-    with pytest.raises(re.error):
-        re.compile("(unclosed", re.IGNORECASE)
+    """Mutant: the check above must be able to fail. A bad source added to what the
+    constructor compiles is reported by the same function, by rule, and a warning counts."""
+    sources = _every_compiled_source() + [("RULE-BAD", "(unclosed"), ("RULE-WARN", "[[x]")]
+    bad = _sources_that_do_not_compile(sources)
+    assert [rule for rule, _, _ in bad] == ["RULE-BAD", "RULE-WARN"]         # the class name of re.error varies by version
+    assert bad[1][1] == "FutureWarning"
 
 
 # --- _LazyRegex itself ------------------------------------------------------------------
@@ -116,13 +124,44 @@ def test_the_pattern_is_readable_without_compiling():
     assert rx._compiled is None
 
 
-def test_the_first_search_compiles_and_the_second_reuses_it():
-    rx = _LazyRegex(r"ab+c", re.IGNORECASE)
-    assert rx.search("xx ABBC") is not None
-    first = rx._compiled
-    assert first is not None
-    assert rx.search("ABC") is not None
-    assert rx._compiled is first
+def test_the_first_search_compiles_and_the_second_reuses_it(monkeypatch):
+    """One compile, counted at the compiler. The native `re` cache would hand back the same
+    object on a second `re.compile` and hide a wrapper that compiles on every call."""
+    source = r"ab+c_compile_count_probe"
+    calls = []
+    real_compile = re.compile
+
+    def spy(pattern, flags=0):
+        if pattern == source:
+            calls.append(flags)
+        return real_compile(pattern, flags)
+
+    monkeypatch.setattr(re, "compile", spy)
+    rx = _LazyRegex(source, re.IGNORECASE)
+    assert calls == []                                   # construction compiles nothing
+    assert rx.search("xx ABBC_COMPILE_COUNT_PROBE") is not None
+    assert calls == [re.IGNORECASE]
+    for method in (rx.search, rx.match, rx.fullmatch, rx.findall):
+        method("ABC_COMPILE_COUNT_PROBE")
+    assert rx.flags == real_compile(source, re.IGNORECASE).flags and rx.groups == 0
+    assert calls == [re.IGNORECASE], "the pattern was compiled again after the first use"
+
+
+def test_methods_take_the_keyword_arguments_re_takes():
+    source, text = r"b+c", "abbbc BBC"
+    lazy, real = _LazyRegex(source, re.IGNORECASE), re.compile(source, re.IGNORECASE)
+    spans = lambda m: m and m.span()                     # noqa: E731
+    assert spans(lazy.search(string=text, pos=2)) == spans(real.search(string=text, pos=2))
+    assert spans(lazy.search(text, pos=6, endpos=9)) == spans(real.search(text, pos=6, endpos=9))
+    assert spans(lazy.match(string=text, pos=1, endpos=5)) == spans(real.match(string=text, pos=1, endpos=5))
+    assert spans(lazy.fullmatch(string="BBC")) == spans(real.fullmatch(string="BBC"))
+    assert lazy.findall(string=text, pos=2) == real.findall(string=text, pos=2)
+    assert [m.span() for m in lazy.finditer(string=text, pos=2, endpos=9)] == \
+        [m.span() for m in real.finditer(string=text, pos=2, endpos=9)]
+    assert lazy.scanner(string=text, pos=2).search().span() == real.scanner(string=text, pos=2).search().span()
+    assert lazy.sub(repl="-", string=text) == real.sub(repl="-", string=text)
+    assert lazy.subn(repl="-", string=text, count=1) == real.subn(repl="-", string=text, count=1)
+    assert lazy.split(string=text, maxsplit=1) == real.split(string=text, maxsplit=1)
 
 
 def test_search_and_match_agree_with_re_including_position_arguments():

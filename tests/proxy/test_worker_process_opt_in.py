@@ -154,24 +154,36 @@ def test_process_mode_hands_route_a_ProcessScan_and_close_kills_the_spare(tmp_pa
 
 # ── startup is never charged to the deadline (MEASURED) ──────────────────
 
+# The real worker, started after a fixed delay. The delay stands in for a slow start (a cold
+# interpreter, a loaded runner, an engine build that costs more than it does today), so the
+# row does not depend on how fast this machine builds the engine: the cold path loses by the
+# delay, the warm one does not pay it.
+_START_DELAY_S = 2.5
+SLOW_START = _script(
+    f"import runpy,time;time.sleep({_START_DELAY_S});"
+    "runpy.run_module('sunglasses._proxy_worker', run_name='__main__', alter_sys=True)")
+SCAN_BUDGET_MS = 1000  # well under the delay, far over a scan (tens of ms, hundreds on a slow runner)
+
+
 def test_a_budget_that_kills_the_cold_path_is_met_by_the_warm_one():
-    """50 ms: the cold spawn-per-scan pays interpreter start and the engine
-    build (about 100 ms measured) inside it and dies; the warm spare built the
-    engine before the clock started and scans in a few ms."""
-    cold = worker_process.run(PAYLOAD, binding=BINDING, argv=REAL, timeout_ms=50)
+    """The worker starts after a fixed delay longer than the scan budget. The cold
+    spawn-per-scan pays the delay inside the budget and dies; the warm spare is
+    ready before the clock starts and scans well inside it."""
+    assert _START_DELAY_S * 1000 > SCAN_BUDGET_MS
+    cold = worker_process.run(PAYLOAD, binding=BINDING, argv=SLOW_START, timeout_ms=SCAN_BUDGET_MS)
     assert cold["status"] == "deadline", cold
 
-    scan = worker_process.ProcessScan(argv=REAL, timeout_ms=50)
+    scan = worker_process.ProcessScan(argv=SLOW_START, timeout_ms=SCAN_BUDGET_MS)
     try:
         started = time.monotonic()
         warm = scan(PAYLOAD["params"], channel="tool_output", binding=BINDING,
                     content_bytes=5)
         total = time.monotonic() - started
         assert warm["status"] == "complete" and warm["accepted"] is True, warm
-        # The first call waited for readiness (startup budget), then scanned
-        # inside 50 ms. The whole call is allowed to exceed 50 ms; the scan
-        # was not.
-        assert total < worker_process.STARTUP_MS / 1000.0
+        # The first call waited for readiness (the startup budget, which holds the delay), then
+        # scanned inside the scan budget. The whole call is allowed to exceed the budget; the
+        # scan was not.
+        assert _START_DELAY_S <= total < worker_process.STARTUP_MS / 1000.0
     finally:
         scan.close()
 

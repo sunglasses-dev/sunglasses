@@ -305,12 +305,13 @@ def _requirement_for(source):
 class _LazyRegex:
     """A rule regex that is compiled on first use instead of at engine start.
 
-    Compiling the ~3,000 regexes a `SunglassesEngine()` holds is nearly all of what building it
-    costs (0.70 s, of which 0.63 s was compiling), and a scan of ordinary text reads 1-4% of them.
+    Compiling the 2,342 rule regexes a `SunglassesEngine()` holds is nearly all of what building it
+    costs (0.70 s, of which 0.63 s was compiling), and a scan of ordinary text reaches few of them
+    (17 for a one-line file).
     `pattern` is the source, readable without compiling (the prefilter and the table key
-    read it). Every other method and attribute of `re.Pattern` is delegated to the pattern,
-    compiled once, the first time one is asked for. Two threads that ask at once both compile and keep the same
-    result, so no lock is needed.
+    read it). Every other method and attribute of `re.Pattern` is delegated, with its keyword
+    arguments, to the pattern compiled once the first time one is asked for. Two threads that ask
+    at once both compile and keep an equal result, so no lock is needed.
 
     Only the shipped rule database is held this way. A regex that does not compile is then
     an error at the first scan that reaches it rather than a rule dropped at start, which
@@ -329,22 +330,22 @@ class _LazyRegex:
             rx = self._compiled = re.compile(self.pattern, self._flags)
         return rx
 
-    def search(self, *args):
-        return self._rx().search(*args)
+    def search(self, *args, **kwargs):
+        return self._rx().search(*args, **kwargs)
 
-    def match(self, *args):
-        return self._rx().match(*args)
+    def match(self, *args, **kwargs):
+        return self._rx().match(*args, **kwargs)
 
     # The rest of the `re.Pattern` API, written out: a name that is not listed is an
     # AttributeError, and nothing here reads an attribute by a computed name.
-    def fullmatch(self, *args):
-        return self._rx().fullmatch(*args)
+    def fullmatch(self, *args, **kwargs):
+        return self._rx().fullmatch(*args, **kwargs)
 
-    def findall(self, *args):
-        return self._rx().findall(*args)
+    def findall(self, *args, **kwargs):
+        return self._rx().findall(*args, **kwargs)
 
-    def finditer(self, *args):
-        return self._rx().finditer(*args)
+    def finditer(self, *args, **kwargs):
+        return self._rx().finditer(*args, **kwargs)
 
     def split(self, *args, **kwargs):
         return self._rx().split(*args, **kwargs)
@@ -355,8 +356,8 @@ class _LazyRegex:
     def subn(self, *args, **kwargs):
         return self._rx().subn(*args, **kwargs)
 
-    def scanner(self, *args):
-        return self._rx().scanner(*args)
+    def scanner(self, *args, **kwargs):
+        return self._rx().scanner(*args, **kwargs)
 
     @property
     def flags(self):
