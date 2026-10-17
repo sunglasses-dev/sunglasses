@@ -43,6 +43,14 @@ All notable changes to Sunglasses are documented here.
   scan results are identical. A custom rule keeps the old path unless its source is one that ships.
   (#397)
 
+- `sunglasses scan` starts faster. The engine no longer re-reads every shipped rule's regex at
+  start to work out which literals the rule cannot match without; the answers ship as
+  `sunglasses/_prefilter_table.py`, written by `scripts/gen_prefilter_table.py`, and a source the
+  table does not hold (a custom rule, `extra_patterns`) is worked out live as before. The engine
+  ignores the whole table when `_prefilter.py` is not the file it was made from. On the machine
+  measured (Python 3.14.7), `sunglasses scan --text hello` took 1.63 to 1.66 s before and 1.21 to
+  1.23 s after. Most of the remaining 1.1 s is regex compilation. (#405)
+
 ### Fixed
 
 - `sunglasses install` and `uninstall` no longer damage a config they do not own. A server name that
@@ -60,6 +68,15 @@ All notable changes to Sunglasses are documented here.
   0.2.11, 0.2.12, 0.2.14, 0.2.23, 0.2.24, 0.2.25 and 0.2.29, which shipped without one, and 0.6.1
   recorded as a skipped version. (#391) - A GitHub issue form for outside testers to report an
   install, its commands and the output. (#399)
+
+- The README Platforms row now says macOS and Linux are supported and Windows is not yet: signed
+  receipts need `fcntl` and the proxy supervisor needs process groups, and neither exists on
+  Windows. Comment and doc text only, no code path changes. (#308)
+
+- The README carries the mcpservers.org listing badge. (#366)
+
+- Tests only: the `gen2` refusal case no longer depends on where `TMPDIR` points (#311), and
+  a clean verdict is pinned to forward only what the scan read (#384).
 
 
 ## [0.6.9] — 2026-10-15
