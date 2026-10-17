@@ -7,6 +7,7 @@ a malformed setting fails loudly, and the cost table names real files.
 """
 import os
 import pathlib
+import random
 import subprocess
 import sys
 import types
@@ -40,13 +41,55 @@ def test_parts_are_a_partition_of_the_collected_items(n):
     assert len(seen) == len(set(seen))
 
 
-def test_a_file_is_never_split_across_parts():
+def test_a_file_is_never_split_across_parts_except_the_one_dealt_by_test():
     items = _items(_real_paths(), per=5)
     where = {}
     for i in (1, 2):
         for it in ci_shard.select(items, f"{i}/2")[0]:
             where.setdefault(ci_shard.path_of(it.nodeid), set()).add(i)
-    assert all(len(v) == 1 for v in where.values())
+    whole = {p for p, v in where.items() if len(v) == 1}
+    assert set(where) - whole == set(ci_shard.SPLIT_BY_TEST)
+    assert all(len(where[p]) == 2 for p in ci_shard.SPLIT_BY_TEST)
+
+
+@pytest.mark.parametrize("n", [1, 2, 3])
+def test_a_file_dealt_by_test_is_collected_exactly_once_across_the_parts(n):
+    f = "tests/test_negation_cues_and_lists.py"
+    assert f in ci_shard.SPLIT_BY_TEST
+    # ids with brackets and repeats, as parametrize makes them
+    items = [types.SimpleNamespace(nodeid=f"{f}::t[{k % 7}-{k}]") for k in range(1001)]
+    items += _items(["tests/test_other.py"])
+    full = [it.nodeid for it in items if ci_shard.path_of(it.nodeid) == f]
+    halves = [[it.nodeid for it in ci_shard.select(items, f"{i}/{n}")[0]
+               if ci_shard.path_of(it.nodeid) == f] for i in range(1, n + 1)]
+    assert sum(len(h) for h in halves) == len(full)
+    assert set().union(*map(set, halves)) == set(full)
+    assert sorted(x for h in halves for x in h) == sorted(full)
+    # an even-ish deal, not everything in one part
+    assert min(map(len, halves)) > 0.8 * len(full) / n
+
+
+@pytest.mark.parametrize("n", [2, 3])
+def test_the_parts_agree_when_each_job_collects_in_a_different_order(n):
+    # Each CI part is its own job. If the file's tests come back in another
+    # order in one job (a parametrize list built from a directory listing), the
+    # parts must still be exactly the file: nothing in neither, nothing in both.
+    f = "tests/test_negation_cues_and_lists.py"
+    base = [types.SimpleNamespace(nodeid=f"{f}::t[{k}]") for k in range(500)]
+    base += _items(["tests/test_other.py", "tests/test_more.py"])
+    rng = random.Random(7)
+    seen = []
+    for i in range(1, n + 1):
+        order = base[:]
+        rng.shuffle(order)
+        seen.extend(it.nodeid for it in ci_shard.select(order, f"{i}/{n}")[0])
+    assert sorted(seen) == sorted(it.nodeid for it in base)
+
+
+def test_the_dealt_file_does_not_move_the_other_files():
+    paths = _real_paths()
+    rest = [p for p in paths if p not in ci_shard.SPLIT_BY_TEST]
+    assert ci_shard.assign(paths, 2) == ci_shard.assign(rest, 2)
 
 
 def test_assignment_depends_only_on_the_set_of_files():
@@ -62,6 +105,7 @@ def test_every_costed_file_exists():
 
 def test_the_two_parts_are_within_ten_percent_by_cost():
     parts = ci_shard.assign(_real_paths(), 2)
+    # a dealt file adds the same share to every part, so it is left out of the sum
     load = {1: 0, 2: 0}
     for p, k in parts.items():
         load[k] += ci_shard.COST.get(p, ci_shard.DEFAULT_COST)
