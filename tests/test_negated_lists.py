@@ -1056,28 +1056,83 @@ def test_the_pattern_has_one_alternative_per_kind_of_end():
     assert sorted(parts) == sorted(["\\Z", mark, "\\n"])
 
 
-def test_a_cue_lowers_a_hit_at_one_place_and_a_list_gets_there_only_through_the_raw_input():
-    """Structure: in the loop over the cues of _check_negation, exactly one `return True`, and the
-    condition in front of it names _list_confirmed. A second way out would be a path that skips it."""
+def _method_ast(name):
     import ast
     import inspect
     import textwrap
-    src = textwrap.dedent(inspect.getsource(SunglassesEngine._check_negation))
-    fn = ast.parse(src).body[0]
-    loops = [n for n in ast.walk(fn) if isinstance(n, ast.For) and "_NEGATION_RX" in ast.get_source_segment(src, n.iter)]
-    assert len(loops) == 1
-    returns = [n for n in ast.walk(loops[0]) if isinstance(n, ast.Return)]
-    assert len(returns) == 1 and isinstance(returns[0].value, ast.Constant) and returns[0].value.value is True
-    parents = {}
-    for node in ast.walk(loops[0]):
-        for child in ast.iter_child_nodes(node):
-            parents[child] = node
-    node, guards = returns[0], []
-    while node is not loops[0]:
-        node = parents[node]
-        if isinstance(node, ast.If):
-            guards.append(ast.get_source_segment(src, node.test))
-    assert any("_list_confirmed" in g for g in guards), guards
+    return ast.parse(textwrap.dedent(inspect.getsource(getattr(SunglassesEngine, name)))).body[0]
+
+
+def _return_sites(fn):
+    """Every `return` of a function: its value and the conditions and loops it sits under, outermost first."""
+    import ast
+    parents = {child: node for node in ast.walk(fn) for child in ast.iter_child_nodes(node)}
+    sites = []
+    for ret in (n for n in ast.walk(fn) if isinstance(n, ast.Return)):
+        chain, node = [], ret
+        while node is not fn:
+            parent = parents[node]
+            if isinstance(parent, ast.If):
+                chain.append(("if " if node in parent.body else "else of ") + ast.unparse(parent.test))
+            elif isinstance(parent, ast.For):
+                chain.append("for " + ast.unparse(parent.target) + " in " + ast.unparse(parent.iter))
+            node = parent
+        sites.append((ast.unparse(ret), tuple(reversed(chain))))
+    return sorted(sites)
+
+
+# Every way _check_negation can return, in the whole function. Only the last one reads a list, and it does so
+# through nothing but the raw owner's answer. A new `return True` anywhere (before the loop, in another branch), or
+# a condition that no longer asks the owner (short-circuited, `or True`, a second operand), changes this list.
+CHECK_NEGATION_RETURNS = sorted([
+    ("return False", ()),
+    ("return True", ("if refusal_ok and self._refusal_string(text, match_start, match_end, align)",)),
+    ("return True", ("for phrase in () if only_list else self.FRAMING_LABELS",
+                     "if align is None or align.holds(text, window_start + pos, hit_end)")),
+    ("return True", ("for m in self._NEGATION_RX.finditer(before_text)",
+                     "if align is None or align.holds(text, max(0, window_start + m.start() - 1), gap_end, "
+                     "self._spaced_inside(text, window_start + m.end(), match_start))",
+                     "if not only_list if list_end is None else self._list_confirmed(align, text, list_end)")),
+])
+
+
+def test_a_cue_lowers_a_hit_at_one_place_and_a_list_gets_there_only_through_the_raw_input():
+    """Structure, over the whole of _check_negation: these are all its returns, and the one a list can reach
+    is guarded by exactly the owner's answer (a short-circuited call that keeps the name is a different condition)."""
+    assert _return_sites(_method_ast("_check_negation")) == CHECK_NEGATION_RETURNS
+
+
+def test_the_raw_owner_is_asked_in_one_place():
+    import ast
+    import inspect
+    import sunglasses.engine as module
+    calls = [n for n in ast.walk(ast.parse(inspect.getsource(module)))
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "_list_confirmed"]
+    assert len(calls) == 1
+
+
+# The raw owner, written out. It is the only code that accepts the end of a list, and what it accepts is
+# the end pattern matched at the raw character after the last word (the table above lists what that is).
+# An added accepting branch, an `or` in the answer, or a changed way of finding the character is a change of
+# this body: it must be made here and in the table together.
+RAW_OWNER_BODY = """
+if align is None:
+    raw, k = (text, end - 1)
+else:
+    raw, k = (align.raw, align.origin(text, end - 1))
+    if k is None:
+        return False
+return k >= 0 and self._RAW_LIST_END_RX.match(raw, k + 1) is not None
+"""
+
+
+def test_every_way_the_raw_owner_accepts_is_the_end_pattern_matched_after_the_last_word():
+    import ast
+    fn = _method_ast("_list_confirmed")
+    body = fn.body[1:] if isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant) else fn.body
+    assert ast.dump(ast.Module(body=body, type_ignores=[])) == ast.dump(ast.parse(RAW_OWNER_BODY))
+    accepting = [v for v, _ in _return_sites(fn) if v != "return False"]
+    assert accepting == ["return k >= 0 and self._RAW_LIST_END_RX.match(raw, k + 1) is not None"]
 
 
 def _spy(engine, monkeypatch):
