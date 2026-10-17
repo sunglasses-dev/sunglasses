@@ -302,6 +302,79 @@ def _requirement_for(source):
     return _thaw_requirement(hit) if hit is not None else _prefilter.requirement(source)
 
 
+class _LazyRegex:
+    """A rule regex that is compiled on first use instead of at engine start.
+
+    Compiling the 2,342 rule regexes a `SunglassesEngine()` holds is nearly all of what building it
+    costs (0.70 s, of which 0.63 s was compiling), and a scan of ordinary text reaches few of them
+    (17 for a one-line file).
+    `pattern` is the source, readable without compiling (the prefilter and the table key
+    read it). Every other method and attribute of `re.Pattern` is delegated, with its keyword
+    arguments, to the pattern compiled once the first time one is asked for. Two threads that ask
+    at once both compile and keep an equal result, so no lock is needed.
+
+    Only the shipped rule database is held this way. A regex that does not compile is then
+    an error at the first scan that reaches it rather than a rule dropped at start, which
+    is why tests/test_lazy_regex.py compiles every shipped regex, guard, core and twin.
+    """
+    __slots__ = ("pattern", "_flags", "_compiled")
+
+    def __init__(self, pattern, flags=0):
+        self.pattern = pattern
+        self._flags = flags
+        self._compiled = None
+
+    def _rx(self):
+        rx = self._compiled
+        if rx is None:
+            rx = self._compiled = re.compile(self.pattern, self._flags)
+        return rx
+
+    def search(self, *args, **kwargs):
+        return self._rx().search(*args, **kwargs)
+
+    def match(self, *args, **kwargs):
+        return self._rx().match(*args, **kwargs)
+
+    # The rest of the `re.Pattern` API, written out: a name that is not listed is an
+    # AttributeError, and nothing here reads an attribute by a computed name.
+    def fullmatch(self, *args, **kwargs):
+        return self._rx().fullmatch(*args, **kwargs)
+
+    def findall(self, *args, **kwargs):
+        return self._rx().findall(*args, **kwargs)
+
+    def finditer(self, *args, **kwargs):
+        return self._rx().finditer(*args, **kwargs)
+
+    def split(self, *args, **kwargs):
+        return self._rx().split(*args, **kwargs)
+
+    def sub(self, *args, **kwargs):
+        return self._rx().sub(*args, **kwargs)
+
+    def subn(self, *args, **kwargs):
+        return self._rx().subn(*args, **kwargs)
+
+    def scanner(self, *args, **kwargs):
+        return self._rx().scanner(*args, **kwargs)
+
+    @property
+    def flags(self):
+        return self._rx().flags
+
+    @property
+    def groups(self):
+        return self._rx().groups
+
+    @property
+    def groupindex(self):
+        return self._rx().groupindex
+
+    def __repr__(self):
+        return "_LazyRegex(%r, %r)" % (self.pattern, self._flags)
+
+
 _ENTITY_RX = re.compile(r"&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]*);?")
 _PERCENT_RX = re.compile(r"(?:%[0-9A-Fa-f]{2})+")
 _PERCENT_ONE_RX = re.compile(r"%[0-9A-Fa-f]{2}")
@@ -1726,7 +1799,12 @@ class SunglassesEngine:
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
 
+        # The shipped rule database compiles on first use (_LazyRegex); a rule the
+        # caller supplied compiles now, so a bad one is dropped here as it always was.
+        shipped = {id(p) for p in PATTERNS}.union(id(p) for p in MECHANISM_PATTERNS)
+
         for pattern in self._patterns:
+            compile_rx = _LazyRegex if id(pattern) in shipped else re.compile
             for kw in pattern.get("keywords", []):
                 kw_lower = kw.lower()
                 if kw_lower in self.KEYWORD_DENYLIST:
@@ -1751,15 +1829,15 @@ class SunglassesEngine:
                     split = self._split_caret_predicate(r)
                     if split is not None and r in _shipped_regex_sources():
                         try:
-                            guard_rx = [re.compile(g, re.IGNORECASE) for g in split[0]]
-                            core_rx = re.compile(split[1], re.IGNORECASE)
+                            guard_rx = [compile_rx(g, re.IGNORECASE) for g in split[0]]
+                            core_rx = compile_rx(split[1], re.IGNORECASE)
                         except re.error:
                             pass
                         else:
                             compiled.append(("guarded", core_rx, guard_rx))
                             continue
                     try:
-                        rx = re.compile(r, re.IGNORECASE)
+                        rx = compile_rx(r, re.IGNORECASE)
                     except re.error:
                         continue
                     # Whole-document classifier regexes begin with a lookahead
@@ -1829,7 +1907,7 @@ class SunglassesEngine:
                         # key and every match start are the ones the rule has
                         # always had; the twin only finds where to start it.
                         try:
-                            twin = re.compile(
+                            twin = compile_rx(
                                 r.replace(_LEADIN_OLD, _LEADIN_FAST),
                                 re.IGNORECASE)
                         except re.error:
