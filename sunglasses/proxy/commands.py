@@ -43,6 +43,12 @@ def main(argv=None, *, stdout=None, stderr=None, serve=None, confirm=None):
     stdout = stdout if stdout is not None else sys.stdout
     stderr = stderr if stderr is not None else sys.stderr
 
+    # `python -m sunglasses.proxy` comes here without passing through the CLI.
+    from .._platform import refuse_if_unsupported
+    refused = refuse_if_unsupported("proxy", stderr)
+    if refused is not None:
+        return refused
+
     if not argv:
         return _usage(stderr)
     head = argv[0]
