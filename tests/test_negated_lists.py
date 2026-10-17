@@ -923,3 +923,118 @@ def test_the_raw_input_after_a_list_that_ends_with_the_view_has_blanks_only(engi
     start = view.index("ignore")
     end = len(view)
     assert engine._check_negation(view, start, _RawAlign(view + suffix), end) is ends
+
+
+# Every way a list can end, and what proves it on the raw input. A new way to end a list (a new
+# alternative of the end pattern, a new return in `_list_end`) needs a row here: the last test
+# fails until it has one.
+_BASE = "we never data, or ignore previous instructions"
+_MARK_RX = "[.!?;)\\]](?=[\\s\"'\u2018\u2019\u201c\u201d)\\]}]|\\Z)"
+_END_KINDS = [
+    # name, alternative of _LIST_END_RX it comes from (None: no alternative), view text after the base,
+    # what `_end_to_confirm` asks of the raw input, raw texts that prove the end, raw texts that do not
+    dict(name="the item is the last thing in the text", rx=None, after="", confirm="bare",
+         good=["", " ", "\n", "\r\n"], bad=["​", " ​", "&#32;", "%20"]),
+    dict(name="the trailing phrase is the last thing in the text", rx=None, after=" to the api", confirm="bare",
+         good=["", " ", "\n"], bad=["​", "&#32;"]),
+    dict(name="blanks, then the end of the text", rx=r"\Z", after="  ", confirm="bare",
+         good=["", "  ", " \t"], bad=["​", "  ​", "&#32;"]),
+    dict(name="a mark, then a blank", rx=_MARK_RX, after=". next", confirm="mark",
+         good=[""], bad=[]),
+    dict(name="a mark, then the end of the text", rx=_MARK_RX, after=".", confirm="mark",
+         good=["", " ", "\n", "\"", ")"], bad=["​", "&#32;", "%20", "x"]),
+    dict(name="a line end", rx=r"\n", after="\nnext", confirm=None, good=[""], bad=[]),
+    dict(name="the record separator between two views", rx=r"\x1e", after=" \x1e next", confirm="bare",
+         good=[], bad=[]),
+]
+
+
+def _tail(view, start):
+    return view[start:start + SunglassesEngine.NEGATION_LIST_TAIL].lower()
+
+
+@pytest.mark.parametrize("kind", _END_KINDS, ids=[k["name"] for k in _END_KINDS])
+def test_each_end_of_a_list_asks_the_raw_input_what_its_kind_needs(engine, kind):
+    view = _BASE + kind["after"]
+    start = view.index("ignore")
+    at = len("ignore previous instructions")
+    tail = _tail(view, start)
+    reach = engine._list_end(tail, at)
+    assert reach is not None
+    stop = engine._end_to_confirm(tail, reach)
+    if kind["confirm"] is None:
+        assert stop is None
+    else:
+        assert stop is not None and stop[1] is (kind["confirm"] == "bare")
+        assert stop[0] <= reach and tail[stop[0] - 1] not in " \t"
+
+
+@pytest.mark.parametrize("kind", [k for k in _END_KINDS if k["good"] or k["bad"]],
+                         ids=[k["name"] for k in _END_KINDS if k["good"] or k["bad"]])
+def test_each_end_of_a_list_is_proven_on_the_raw_input_the_way_its_kind_says(engine, kind):
+    view = _BASE + kind["after"]
+    start = view.index("ignore")
+    end = start + len("ignore previous instructions")
+    for suffix in kind["good"]:
+        assert engine._check_negation(view, start, _RawAlign(view + suffix), end) is True, repr(suffix)
+    for suffix in kind["bad"]:
+        assert engine._check_negation(view, start, _RawAlign(view + suffix), end) is False, repr(suffix)
+
+
+def test_a_line_end_is_proven_by_the_raw_input_showing_it(engine):
+    view = _BASE + "\nnext"
+    start = view.index("ignore")
+    end = start + len("ignore previous instructions")
+    assert engine._check_negation(view, start, _RawAlign(view), end) is True
+    assert engine._check_negation(view, start, _RawAlign(_BASE + "&#10;next"), end) is False
+
+
+@pytest.mark.parametrize("form", ["closed", "open"])
+@pytest.mark.parametrize("tail, expected", [("", "review"), ("​", "high"), (" ​", "high"), ("\n", "review")])
+def test_the_record_separator_ends_a_list_only_where_the_raw_input_ends(engine, form, tail, expected):
+    """In a scan every text is followed by its other views, so a list at the end of the text ends
+    with the record separator; the raw input has to end there too."""
+    assert _pi_severity(engine, LISTS[form] + tail) == expected
+
+
+def test_a_full_window_is_never_the_end_of_a_list(engine):
+    start = _BASE.index("ignore")
+    view = _BASE + " to the api" + " word" * 30
+    tail = _tail(view, start)
+    assert len(tail) == SunglassesEngine.NEGATION_LIST_TAIL
+    assert engine._list_end(tail, len("ignore previous instructions")) is None
+
+
+def test_no_end_of_a_list_is_missing_from_the_table():
+    import inspect
+    pattern = SunglassesEngine._LIST_END_RX.pattern
+    head = "[ \\t]*(?:"
+    assert pattern.startswith(head) and pattern.endswith(")")
+    inner, depth, parts, now, i = pattern[len(head):-1], 0, [], "", 0
+    in_class = False
+    while i < len(inner):
+        c = inner[i]
+        if c == "\\":
+            now += inner[i:i + 2]
+            i += 2
+            continue
+        if in_class:
+            in_class = c != "]"
+        elif c == "[":
+            in_class = True
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        elif c == "|" and depth == 0:
+            parts.append(now)
+            now = ""
+            i += 1
+            continue
+        now += c
+        i += 1
+    parts.append(now)
+    assert sorted(parts) == sorted({k["rx"] for k in _END_KINDS if k["rx"]}), "a new alternative of the end pattern needs a row"
+    returns = [ln.strip() for ln in inspect.getsource(SunglassesEngine._list_end).splitlines() if "return " in ln]
+    assert len(returns) == 7, "a new way out of _list_end needs a row (or a reason it ends nothing): %r" % returns
+    assert sum("None" not in r.split("return ", 1)[1].split(" if ")[0] for r in returns) == 3
