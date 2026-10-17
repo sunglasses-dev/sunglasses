@@ -26,6 +26,11 @@ preprocessor's fold covers:
 
 This is a preprocessor table problem, not a regex-lane problem, so the fix is
 one table serving both lanes. Nothing in this file is covered by the A1 patch.
+
+Since then the regex lane's fold deletes every character that renders as
+nothing (format characters, variation selectors, Hangul fillers); the seven
+mutations of that class are caught on every payload and lost their mark (see
+_CAUGHT_MUTATIONS). The keyword lane's view does not delete them yet.
 """
 import re
 
@@ -91,11 +96,21 @@ _XFAIL_REASON = (
 # so it carries no xfail mark and must keep passing.
 _CAUGHT = {("leet_digits", "canary_direct_injection")}
 
+# Caught for every payload once the regex lane's fold deletes every character
+# that renders as nothing (preprocessor.IGNORABLE_RANGES: format characters,
+# variation selectors, Hangul fillers). The ratchet: these marks came off.
+_CAUGHT_MUTATIONS = {
+    "variation_selector_16_U+FE0F", "bidi_isolate_U+2066", "bidi_embedding_U+202A",
+    "bidi_pop_U+202C", "mongolian_vowel_separator_U+180E", "hangul_filler_U+3164",
+    "interlinear_annotation_U+FFF9",
+}
+
 
 def _cases():
     for mutation in MUTATIONS:
         for name, payload, channel in PAYLOADS:
-            marks = () if (mutation, name) in _CAUGHT else (
+            caught = (mutation, name) in _CAUGHT or mutation in _CAUGHT_MUTATIONS
+            marks = () if caught else (
                 pytest.mark.xfail(strict=True, reason=_XFAIL_REASON),)
             yield pytest.param(name, payload, channel, mutation,
                                id=f"{mutation}-{name}", marks=marks)
