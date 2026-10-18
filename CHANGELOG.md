@@ -43,6 +43,63 @@ All notable changes to Sunglasses are documented here.
   scan results are identical. A custom rule keeps the old path unless its source is one that ships.
   (#397)
 
+- `sunglasses scan` starts faster. The engine no longer re-reads every shipped rule's regex at
+  start to work out which literals the rule cannot match without; the answers ship as
+  `sunglasses/_prefilter_table.py`, written by `scripts/gen_prefilter_table.py`, and a source the
+  table does not hold (a custom rule, `extra_patterns`) is worked out live as before. The engine
+  ignores the whole table when `_prefilter.py` is not the file it was made from. On the machine
+  measured (Python 3.14.7), `sunglasses scan --text hello` took 1.63 to 1.66 s before and 1.21 to
+  1.23 s after. Most of the remaining 1.1 s is regex compilation. (#405)
+
+- Fourteen rules about tool descriptions, tool metadata and tool results now also read the
+  `api_response` channel, which is where a `tools/list` result arrives. Before, a poisoned tool
+  listing matched none of them. Each rule has a new `-API` sibling that is a copy of its parent with
+  only the channel, `id` and `name` changed, and the pattern count goes from 1,569 to 1,583. A tool
+  description written as security-training prose (it explains why a description claiming trusted
+  status must never bypass approval) is blocked on `api_response` by two of the siblings, as the
+  same text is already blocked on `file` by their two parents. (#407)
+
+- A negation now covers a short list of plain words. In "The plugin does not log, store, or
+  transmit your API key anywhere other than the API itself", the payload that is an item of the
+  list is judged under the negation, so a README that states what it refuses to do is a review
+  where it was a block. A list is read only when its end is shown by the raw input itself (the text
+  end, blanks, a line end, or a sentence mark), at most 3 commas and 8 words, with no clause word,
+  order word or word of omission in it. A payload with a pipe, a URL or a shell word is still a
+  block. A payload of up to five plain words that is the last item of a short negated list is now
+  a review, and so is a middle item of an open list; the first item of a list is unchanged.
+  ROT13 and reversed copies get no list reading. Known limits: a list with no comma before its
+  conjunction ("never log, store or transmit X") is not read as a list, and the stop-word lists are
+  finite. This supersedes the earlier line saying negated lists keep their old severity. (#409)
+
+- Scan startup is about 6x faster (engine build 699 ms to 65 ms). The shipped rules' regular
+  expressions are no longer compiled when the engine starts; each compiles the first time a scan
+  reaches it. On one Mac (Python 3.14.7) `sunglasses scan --text hello` took 0.78 s before and 0.13
+  s after, and `sunglasses scan` of a one-line file took 1,430 ms before and 171 ms after; nothing
+  in CI measures startup. The benchmark's metrics, misses and false positives are identical. A
+  shipped regex that does not compile would now raise at the first scan that reaches it instead of
+  being dropped at start, so a test compiles every shipped regex. A custom rule still compiles at
+  load. (#412)
+
+
+- `sunglasses scan --repo` shows one progress line per file on stderr (stdout is unchanged, so `-o
+  json` and `-o sarif` still print one document), and gains `--max-files N` and the opt-in
+  `--skip-lockfiles`. A new `sunglasses scan --dir PATH` scans a local directory the way `--repo`
+  scans a clone. Files past a cap, lockfiles skipped by the flag, symbolic links (never followed,
+  also in `--repo`) and folders that cannot be listed are named under `skipped` and make the scan
+  incomplete (exit 3); a threat found anywhere still exits 1. Dependency and build folders are still
+  not entered and are named under `excluded_folders`. `--d` and `--s` keep their meaning. See the
+  README. (#396)
+
+
+- On a Python with no `fcntl` or no process groups (Windows is the case this is for), `sunglasses
+  proxy`, `doctor`, `receipts`, `install`, `uninstall` and `init` print one line saying so and exit
+  2, where they died with a traceback, some after they had started writing. `sunglasses scan` and
+  the other subcommands are unchanged. This was checked on a macOS interpreter modeled as Windows
+  (no `fcntl`, the POSIX names removed), not on Windows, and the refusal checks no more than that
+  the interpreter reports Windows or `fcntl` cannot be imported. The bundled test server `python -m
+  sunglasses.proxy.echo_server --proc FILE` now refuses before it opens FILE when `os.getpgid` is
+  missing. (#416)
+
 ### Fixed
 
 - `sunglasses install` and `uninstall` no longer damage a config they do not own. A server name that
@@ -54,6 +111,44 @@ All notable changes to Sunglasses are documented here.
   its own server only. These are checks made at entry, not protection against a process that changes
   the config while a command runs. (#377)
 
+- A client `initialize` whose `protocolVersion` is not a string (a number, null, a list, an object,
+  a boolean) was forwarded to the server. The proxy now withholds it, answers once with
+  `UNSUPPORTED_PROTOCOL` and closes the session. A string offer, whatever its value, still goes
+  upstream, and an absent `params` or `protocolVersion` is unchanged. (#401)
+
+
+- A client message with no id that was larger than the 262,144-byte content bound was scanned and
+  forwarded, where the same message with an id was refused. It is now refused before any scan with
+  one `OVER_BUDGET` receipt, nothing goes upstream, and the bound counts every top-level member
+  beside `jsonrpc`, `id` and `method`, not only `params`. An oversized `notifications/initialized`
+  is withheld like any other frame over the bound, so a server waiting for it does not see it until
+  a later one arrives; no real server was exercised. (#400)
+
+
+- A client request that carried its oversized content in a top-level member other than `params` was
+  forwarded after one scan, past the same content bound. Requests now count every top-level member
+  beside the envelope, as notifications do: such a request gets one `OVER_BUDGET` answer and nothing
+  is scanned or sent. A request whose only member beside the envelope is `params` counts what it
+  counted. What a scan reads is not changed; the extra members are counted, not scanned. (#404)
+
+
+- A `server/discover` probe is answered method-not-found and receipted as a probe decline only when
+  the proxy refused it as an unknown method. A probe that reused an id the client had already
+  cancelled used to be answered that way too, which said something about the peer that was not true
+  of the request; it now gets the ordinary withheld answer with the reason the refusal carries. An
+  ordinary probe is unchanged. (#388)
+
+
+- Three proxy fixes where a peer could make the proxy write a value that is not JSON, raise out of
+  the client reader, or have it keep per-id state it never reads. A number that overflows (`1e400`)
+  is refused like `NaN` and `Infinity` instead of being written back as the bare token `Infinity`. A
+  cancel whose target is a list or an object is ignored, and a `tools/call` whose name is missing,
+  null, empty or not a string is refused as `APPROVAL_REQUIRED` before any listing request is
+  written to the server; a list or object there used to close the session as an instrument fault.
+  Two per-id tables that nothing read are removed, an admission time is dropped when its request
+  leaves pending, and a cancel for an id no request ever used is ignored. Memory still grows with
+  the number of distinct requests a client sends; no per-request size is claimed. (#379)
+
 ### Housekeeping
 
 - `stats/current.json` carries the 0.6.9 release date. (#395) - CHANGELOG entries for 0.2.10,
@@ -61,6 +156,28 @@ All notable changes to Sunglasses are documented here.
   recorded as a skipped version. (#391) - A GitHub issue form for outside testers to report an
   install, its commands and the output. (#399)
 
+- The README Platforms row now says macOS and Linux are supported and Windows is not yet: signed
+  receipts need `fcntl` and the proxy supervisor needs process groups, and neither exists on
+  Windows. Comment and doc text only, no code path changes. (#308)
+
+- The README carries the mcpservers.org listing badge. (#366)
+
+- Tests only: the `gen2` refusal case no longer depends on where `TMPDIR` points (#311), and
+  a clean verdict is pinned to forward only what the scan read (#384).
+
+- The README benchmark table header says `Metric (v0.6.9)` instead of `v0.6.5`. The values in the
+  table already matched the measured 0.6.9 run, so no figure changes. (#410)
+
+- `scripts/sync-stats.py` rewrites a site page count only when it equals the previous total (an
+  explicit previous value, else the landing repo's own `stats/current.json`). Before, run by hand
+  with no previous value, it rewrote 13 per-chapter labels to the new total and dropped the comma
+  from an unchanged "6,675 keywords". Other counts it looked at are left alone and listed in its
+  output. (#411)
+
+- CI: the table of measured seconds per test file that splits each interpreter's run into two parts
+  (`tests/ci_shard.py`) is re-measured from a green main run, and `tools/ci_durations.py <run-id>`
+  reads one finished run and prints the job wall clocks, the 20 slowest tests and a COST block to
+  paste into that table. Tests and tooling only. (#413)
 
 ## [0.6.9] — 2026-10-15
 
