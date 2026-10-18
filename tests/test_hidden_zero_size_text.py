@@ -1400,3 +1400,139 @@ def test_an_unquoted_value_reads_a_brace_or_a_bracket_block_like_the_quoted_form
     for form in ("double", "unquoted"):
         assert flagged(engine, _in_value(form, "a:u" + _blk(kind, "x") + ";" + prop + ":0"), channel), form
         assert not flagged(engine, _in_value(form, "--x:" + _blk(kind, "a;" + prop + ":0")), channel), form
+
+
+# The prefix window (200 characters of earlier declarations) and the suffix window (200 characters after the zero) are one
+# copy of the regex per property; this pins each copy, for every form of the value, counting the characters that are not blanks.
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("form", ["double", "single", "unquoted"])
+@pytest.mark.parametrize("prop", ["font-size", "opacity"])
+@pytest.mark.parametrize("lead", ["", ";", ";;"])
+def test_the_two_hundred_character_windows_are_read_for_each_property_and_form(engine, form, prop, lead, channel):
+    before = lambda n: lead + "c:" + "x" * (n - 3 - len(lead)) + ";"
+    after = lambda n: ";c:" + "x" * (n - 3)
+    zero = prop + ":0"
+    assert flagged(engine, _in_value(form, before(201) + zero), channel)
+    assert not flagged(engine, _in_value(form, before(202) + zero), channel)
+    assert flagged(engine, _in_value(form, zero + after(200)), channel)
+    assert not flagged(engine, _in_value(form, zero + after(201)), channel)
+    # blanks are free: the same declarations spaced out are read as far as the unspaced ones
+    if form != "unquoted":
+        spaced = "c : " + "x " * 98 + ";"
+        assert flagged(engine, _in_value(form, spaced + zero), channel)
+
+
+# Comments in every gap of the zero declaration and of a later declaration of the same property. A comment is read up to 60
+# characters of body and 12 in a row; a read comment keeps the declaration whole, one past the limit breaks it. In the zero
+# declaration a broken gap means there is no declaration (no hit); in a later one it means the override is not recognized, so
+# the zero is read (hit). Expected values come from that reading, not from the regex.
+_GAP_READ = [(1, 0), (1, 60), (12, 1)]
+_GAP_PAST = [(1, 61), (13, 1)]
+_GAP_ZERO = {"font-size": "0", "opacity": "0"}
+_GAP_OVER = {"font-size": "12px", "opacity": "1"}
+
+
+def _gap_run(spec):
+    count, length = spec
+    return ("/*" + "x" * length + "*/") * count
+
+
+def _gap_value(prop, important, slot, spec):
+    c = dict.fromkeys(("z1", "z2", "z3", "z4", "z5", "z6", "l1", "l2", "l3", "l4", "l5", "l6"), "")
+    c[slot] = _gap_run(spec)
+    zero = prop + c["z1"] + ":" + c["z2"] + _GAP_ZERO[prop]
+    zero += (c["z4"] + "!" + c["z5"] + "important" + c["z6"]) if important else c["z3"]
+    later = c["l1"] + prop + c["l2"] + ":" + c["l3"] + _GAP_OVER[prop]
+    later += (c["l4"] + "!" + c["l5"] + "important" + c["l6"]) if important else c["l4"]
+    return zero + ";" + (later + ";" if slot.startswith("l") else "")
+
+
+def _gap_cases():
+    out = []
+    for prop in ("font-size", "opacity"):
+        for important in (False, True):
+            zero_slots = ["z1", "z2", "z4", "z5", "z6"] if important else ["z1", "z2", "z3"]
+            later_slots = ["l1", "l2", "l3", "l4", "l5", "l6"] if important else ["l1", "l2", "l3", "l4"]
+            for slot in zero_slots + later_slots:
+                for read, specs in ((True, _GAP_READ), (False, _GAP_PAST)):
+                    for spec in specs:
+                        hit = read if slot.startswith("z") else not read
+                        out.append(("%s %s %s %d*%d" % (prop, "important" if important else "plain", slot, spec[0], spec[1]),
+                                    _gap_value(prop, important, slot, spec), hit))
+    return out
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("form", ["double", "single", "unquoted"])
+@pytest.mark.parametrize("name,value,hit", _gap_cases())
+def test_a_comment_in_each_gap_of_the_zero_and_of_a_later_declaration_is_read_to_its_limit(engine, form, name, value, hit, channel):
+    assert flagged(engine, _in_value(form, value), channel) is hit, name
+
+
+# A plain zero followed by a later declaration marked important: that one wins, and the gaps of its mark are read.
+def _gap_plain_zero_important_later(prop, slot, spec):
+    c = dict.fromkeys(("l1", "l2", "l3", "l4", "l5", "l6"), "")
+    c[slot] = _gap_run(spec)
+    return (prop + ":0;" + c["l1"] + prop + c["l2"] + ":" + c["l3"] + _GAP_OVER[prop] + c["l4"] + "!" + c["l5"]
+            + "important" + c["l6"] + ";")
+
+
+_GAP_IMPORTANT_LATER = [
+    ("%s %s %d*%d" % (prop, slot, spec[0], spec[1]), _gap_plain_zero_important_later(prop, slot, spec), not read)
+    for prop in ("font-size", "opacity") for slot in ("l1", "l2", "l3", "l4", "l5", "l6")
+    for read, specs in ((True, _GAP_READ), (False, _GAP_PAST)) for spec in specs
+]
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("form", ["double", "single", "unquoted"])
+@pytest.mark.parametrize("name,value,hit", _GAP_IMPORTANT_LATER)
+def test_a_later_declaration_marked_important_replaces_a_plain_zero_and_its_gaps_are_read(engine, form, name, value, hit, channel):
+    assert flagged(engine, _in_value(form, value), channel) is hit, name
+
+
+# A later declaration whose value is a function: its block is read up to 100 items, 50 nested, a string of 100. Read = the
+# override applies (no hit); past the limit it cannot be read, so the zero stays live. A string needs a quote that the value
+# does not use, and an unquoted value holds no string and no nested block.
+def _gap_function_cases(form):
+    q = "'" if form == "double" else '"'
+    bodies = [("items", lambda n: "x" * n, 100, 101), ("empty", lambda n: "", 0, None)]
+    if form != "unquoted":
+        bodies += [("nested", lambda n: "(" + "x" * n + ")", 50, 51), ("string", lambda n: q + "x" * n + q, 100, 101),
+                   ("empty nested", lambda n: "()", 0, None), ("empty string", lambda n: q + q, 0, None)]
+    out = []
+    for prop in ("font-size", "opacity"):
+        for mark in ("", "!important"):
+            for name, body, at, past in bodies:
+                out.append(("%s%s %s at" % (prop, mark, name), prop + ":0" + mark + ";" + prop + ":calc(" + body(at) + ")" + mark, False))
+                if past is not None:
+                    out.append(("%s%s %s past" % (prop, mark, name), prop + ":0" + mark + ";" + prop + ":calc(" + body(past) + ")" + mark, True))
+    return out
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("form", ["double", "single", "unquoted"])
+def test_a_later_function_value_is_read_to_its_block_limits(engine, form, channel):
+    for name, value, hit in _gap_function_cases(form):
+        assert flagged(engine, _in_value(form, value), channel) is hit, (form, name)
+
+
+# The override that follows the zero directly, or after one other declaration, with nothing in the way.
+_GAP_IMMEDIATE = [
+    ("%s %s" % (prop, name), build(prop))
+    for prop in ("font-size", "opacity")
+    for name, build in (
+        ("plain zero, plain override", lambda p: p + ":" + _GAP_ZERO[p] + ";" + p + ":" + _GAP_OVER[p]),
+        ("important zero, important override", lambda p: p + ":" + _GAP_ZERO[p] + "!important;" + p + ":" + _GAP_OVER[p] + "!important"),
+        ("plain zero, important override", lambda p: p + ":" + _GAP_ZERO[p] + ";" + p + ":" + _GAP_OVER[p] + "!important"),
+        ("one declaration between", lambda p: p + ":" + _GAP_ZERO[p] + ";a:b;" + p + ":" + _GAP_OVER[p]),
+        ("one declaration between, important", lambda p: p + ":" + _GAP_ZERO[p] + "!important;a:b;" + p + ":" + _GAP_OVER[p] + "!important"),
+    )
+]
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("form", ["double", "single", "unquoted"])
+@pytest.mark.parametrize("name,value", _GAP_IMMEDIATE)
+def test_an_override_with_nothing_in_the_way_is_recognized(engine, form, name, value, channel):
+    assert not flagged(engine, _in_value(form, value), channel), name
