@@ -333,15 +333,19 @@ def test_cli_emits_valid_json_and_exit_zero(home):
     assert json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_cli_exit_code_is_zero_even_on_garbage(home):
+def test_cli_ends_as_a_hook_failure_on_garbage(home):
+    """Garbage is not a tool call, so it is a hook failure (exit 1, no stdout)
+    and the install's `onFailure` decides. Never exit 2, which refuses even
+    for an install that chose to continue."""
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses.firewall"],
         input="}{garbage", capture_output=True, text=True,
         env={"PATH": "/usr/bin:/bin", "SUNGLASSES_HOME": str(home),
              "PYTHONPATH": str(__import__("pathlib").Path(__file__).parent.parent)},
     )
-    assert proc.returncode == 0
-    assert json.loads(proc.stdout) == {}
+    assert proc.returncode == 1
+    assert proc.stdout == ""
+    assert "NOT_JSON" in proc.stderr
 
 
 def test_cli_clean_call_is_an_empty_object_on_the_wire(home):
