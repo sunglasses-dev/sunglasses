@@ -189,6 +189,89 @@ def test_the_decline_does_not_close_the_session(tmp_path):
     assert session.closed_with() is None
 
 
+def _refused_normally(tmp_path, client, request_id, reason):
+    """The probe was refused like any other request and not declined as a
+    probe: exactly one -32070 answer in the probe's own id carrying `reason`,
+    exactly one SETTLED receipt with that reason, no PROBE_DECLINED row and no
+    -32601. Asserting only that the decline is absent passes when the refusal
+    path says nothing at all."""
+    answers = client.messages()
+    assert len(answers) == 1, answers
+    assert answers[0]["id"] == request_id
+    assert answers[0]["error"]["code"] == -32070, answers
+    assert answers[0]["error"]["data"]["reason_code"] == reason
+    rows = _rows(tmp_path)
+    assert [r["kind"] for r in rows].count("PROBE_DECLINED") == 0, rows
+    settled = [r for r in rows if r["kind"] == "SETTLED"]
+    assert [r.get("reason_code") for r in settled] == [reason], settled
+
+
+def test_a_probe_on_a_cancelled_id_is_not_declined_as_a_probe(tmp_path):
+    """A cancelled id is refused for the rest of the session, with no reason
+    attached to the refusal. The decline was reached on "no reason", so a probe
+    reusing a cancelled id was answered "method not found" and receipted as a
+    probe decline. It is a refused request, not an old peer asking."""
+    engine, upstream, client, session = _engine(tmp_path)
+    assert session.admit_request(5, method="tools/call", origin=pump.ORIGIN_CLIENT)
+    session.cancel(5, origin=pump.ORIGIN_CLIENT)
+    engine.client_frame(
+        b'{"jsonrpc":"2.0","id":5,"method":"server/discover"}\n')
+    _refused_normally(tmp_path, client, 5, "UNINSPECTED_METHOD")
+    assert upstream.bytes == b""
+
+
+def test_a_probe_whose_admission_fails_without_a_reason_is_not_declined(
+        tmp_path, monkeypatch):
+    """Defensive fault injection, not a reproduced path: the pump's silent
+    `return False` after the unknown-method refusal cannot be reached by a
+    natural probe. The route must still not read silence as the unknown-method
+    refusal."""
+    engine, upstream, client, session = _engine(tmp_path)
+    monkeypatch.setattr(session, "admit_request",
+                        lambda *args, **kwargs: False)
+    engine.client_frame(PROBE)
+    _refused_normally(tmp_path, client, "server-discover-probe-1",
+                      "UNINSPECTED_METHOD")
+    assert upstream.bytes == b""
+
+
+def test_a_probe_refused_with_an_attempt_that_has_no_cause_is_not_declined(
+        tmp_path, monkeypatch):
+    """The refusal callback fires, but the attempt carries no cause. That is
+    the arm the gate used to accept. Fault injection again; the real source of
+    a causeless refusal is the cancelled id above."""
+    engine, upstream, client, session = _engine(tmp_path)
+
+    def refuse_without_cause(request_id, *, method, origin, on_refusal=None,
+                             on_attempt=None):
+        on_refusal(pump.Attempt(pump.key(origin, request_id), 1))
+        return False
+
+    monkeypatch.setattr(session, "admit_request", refuse_without_cause)
+    engine.client_frame(PROBE)
+    _refused_normally(tmp_path, client, "server-discover-probe-1",
+                      "UNINSPECTED_METHOD")
+    assert upstream.bytes == b""
+
+
+def test_a_probe_refused_for_another_reason_is_not_declined(
+        tmp_path, monkeypatch):
+    """Only the unknown-method refusal is declined. A probe refused for any
+    other stated reason keeps that reason."""
+    engine, upstream, client, session = _engine(tmp_path)
+
+    def refuse_overloaded(request_id, *, method, origin, on_refusal=None,
+                          on_attempt=None):
+        on_refusal(pump.Attempt(pump.key(origin, request_id), 1,
+                                pump.Cause("OVERLOADED", "S3")))
+        return False
+
+    monkeypatch.setattr(session, "admit_request", refuse_overloaded)
+    engine.client_frame(PROBE)
+    _refused_normally(tmp_path, client, "server-discover-probe-1", "OVERLOADED")
+    assert upstream.bytes == b""
+
+
 @pytest.mark.parametrize("method", [
     "x/experimental", "server/discover/extra", "Server/Discover", "discover",
     "sampling/createMessage", "completion/complete",
@@ -278,5 +361,6 @@ def test_a_run_that_declined_a_probe_still_verifies(tmp_path):
     signer = keys.load(home)
     public = keys.public_path(home, signer.fingerprint).read_bytes()
     results = verify.verify_log(log.path, public).results
+    assert results["chain_integrity"] == "CHAIN_OK", results
     assert results["lifecycle"] == "PAIRING_UNKEYED", results
     assert all(not str(v).startswith("MALFORMED") for v in results.values()), results
