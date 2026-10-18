@@ -168,27 +168,79 @@ def _strict_loads(raw, what):
         raise ConfigIOError(f"{what} is not usable JSON: {e}") from e
 
 
-def _require_regular(path):
-    """Look at an entry before reading it, and say what it is.
+def _optional_open_flags():
+    """The two open flags a platform may lack, read when called (the tests take
+    either away) and as plain attribute reads: the environment audit in
+    test_repair_v056 refuses a computed `getattr(os, name, 0)`."""
+    try:
+        no_follow = os.O_NOFOLLOW
+    except AttributeError:
+        no_follow = 0
+    try:
+        non_block = os.O_NONBLOCK
+    except AttributeError:
+        non_block = 0
+    return no_follow, non_block
+
+
+def _read_regular_bytes(path):
+    """The bytes of a regular file, read through ONE descriptor whose type was
+    checked on the descriptor itself.
 
     A symbolic link (dangling or not), a FIFO or a device is PRESENT and
-    unusable, which is not the same as absent, and reading one can block or
-    follow a link to somewhere else. A missing entry is the one case that raises
-    FileNotFoundError, so a caller can tell the two apart; anything else
-    unusable is ValueError. This is a check made at entry, not protection
-    against a process that swaps the entry afterwards."""
-    if not stat.S_ISREG(os.lstat(path).st_mode):
+    unusable, which is not the same as absent: a missing entry is the one case
+    that raises FileNotFoundError, so a caller can tell the two apart; anything
+    else unusable is ValueError.
+
+    The name is looked at first and refused unless it is a regular file, which
+    holds on every platform. The open then asks not to follow a link and not to
+    block (every POSIX platform has both flags), and the type is checked again
+    on the descriptor, so an entry swapped between the look and the open can
+    neither block the read nor be read through a link. Where the platform has
+    no no-follow flag the open cannot refuse a link by itself, so the
+    descriptor must be the very file the look saw (same device and inode) or
+    the read is refused; an entry that cannot be told apart that way is
+    refused rather than read. A platform without the nonblocking flag has no
+    FIFO to open, and the look above is all there is. This does not make a
+    later use of the same NAME safe: see the recovery concurrency contract in
+    docs/proxy-install-transaction.md."""
+    path = pathlib.Path(path)
+    seen = os.lstat(path)                       # FileNotFoundError = absent
+    if not stat.S_ISREG(seen.st_mode):
         raise ValueError(f"{path} is not a regular file")
+    no_follow, non_block = _optional_open_flags()
+    fd = os.open(path, os.O_RDONLY | no_follow | non_block)
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ValueError(f"{path} is not a regular file")
+        if not no_follow and not os.path.samestat(seen, opened):
+            raise ValueError(f"{path} changed while it was being opened")
+        with os.fdopen(fd, "rb") as fh:
+            fd = None
+            return fh.read()
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _is_plain_file(path):
+    """A regular file that is not itself a link. Used to decide whether a
+    recovery copy may be digested and moved at all."""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
 
 
 def _read_json_file(path):
     """A small JSON file read with the same grammar as a config or a record
     (no NaN or Infinity, no overflowing number, no duplicate key). Refusals are
     ValueError, which is what every caller of a note or a claim already treats as
-    unreadable. Only a regular file is read (see `_require_regular`)."""
-    _require_regular(path)
+    unreadable. Only a regular file is read (see `_read_regular_bytes`)."""
+    raw = _read_regular_bytes(path)
     try:
-        return _strict_loads(pathlib.Path(path).read_text(encoding="utf-8"), str(path))
+        return _strict_loads(raw, str(path))
     except ConfigIOError as e:
         raise ValueError(str(e)) from None
 
@@ -1879,7 +1931,7 @@ def _standby_pairs(home, name):
     out = []
     for record in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standbyrecord")):
         bytes_path = record.with_suffix(".standby")
-        if bytes_path.is_file():
+        if _is_plain_file(bytes_path):
             out.append((record, bytes_path))
     return out
 
@@ -1936,7 +1988,7 @@ def _adopt_standby(home, name, target):
         if _is_digest(before):
             for orphan in sorted(d.glob(f"{glob.escape(name)}.inflight-*.standby")):
                 try:
-                    if orphan.is_symlink() or not orphan.is_file():
+                    if not _is_plain_file(orphan):
                         continue
                     if _digest_file(orphan) != before:
                         continue
@@ -2259,8 +2311,7 @@ def _read_record(path, name, *, expect_state):
     rather than an exception from three frames deeper.
     """
     try:
-        _require_regular(path)
-        raw = pathlib.Path(path).read_bytes()
+        raw = _read_regular_bytes(path)
     except (OSError, ValueError) as e:
         raise ConfigConflict(f"the record for {name!r} could not be read: {e}") from e
     try:

@@ -174,6 +174,26 @@ a review found the absence of them:
 - Locking reads `flock` where it exists and `None` where it does not, because
   `fcntl` is POSIX-only, and the README states POSIX only, Windows unsupported.
 - Inode reuse is neither proven nor handled.
+- Recovery files are moved on the word of checks made at entry, under the
+  writer lock that install and uninstall both take for a config. Those checks
+  hold against every file the transactions themselves write. They do not hold
+  against a local process that can write to the records directory and does not
+  take the lock. Such a process can make a sibling claim appear after it was
+  seen to be absent, replace a recovery copy between the digest that vouched
+  for it and the rename that moves it, or put a FIFO in place of a claim after
+  its type was looked at. A claim, record or note is first looked at by name
+  and refused unless it is a regular file (a link, dangling or not, a FIFO or a
+  device is present and unusable), on every platform. It is then read through
+  one descriptor opened without following links and without blocking, with the
+  type checked on that descriptor, so a swap between the look and the read
+  cannot make the read block or follow a link. On a platform without the
+  no-follow flag the open cannot refuse a link itself, so the descriptor must
+  be the same file the look saw (same device and inode) or the read is
+  refused. A platform without the nonblocking flag has no FIFO to open, and
+  the look by name is the only check there. The name is not re-checked between
+  that read and a later rename, so a substituted recovery copy is not detected.
+  Binding the move to the validated entry needs directory-descriptor relative
+  operations, which is the same separate change as the one below.
 - A config that is a symbolic link is refused when the command starts. That is
   a check made once, at entry, and it is not protection against a local process
   that can write to the config directory while a command runs. Such a process
