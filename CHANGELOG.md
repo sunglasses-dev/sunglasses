@@ -20,7 +20,10 @@ All notable changes to Sunglasses are documented here.
   Other known misses: an unquoted style value that holds an equals sign, a quote or a backtick, an
   unquoted attribute value that holds a less-than sign, a tag inside a comment, script or textarea,
   and text beyond the stated bounds (20 attributes on each side of the style, 300 characters of
-  attribute value, 300 characters of element text, 200 characters either side of the zero). (#414)
+  attribute value, 300 characters of element text, 200 characters either side of the zero). One
+  bound makes a false hit: a CSS comment of more than 60 characters, or more than 12 comments in a
+  row, inside a later declaration that would replace the zero hides that declaration, so the zero
+  is read as live; it needs a hidden zero and an agent-addressed cue in the same element. (#414)
 
 ### Changed
 
