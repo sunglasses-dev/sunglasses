@@ -10,8 +10,8 @@ that records the open, list, create, remove, rename, link and stat-style calls i
 under the sandbox HOME, XDG_CONFIG_HOME and TMPDIR (both operands of a rename, the lexical
 name of a symlink as well as its target, descriptor-relative calls, listings of a descriptor).
 That is what "before it opens, lists, creates, removes or renames anything" means here: calls
-the hook can see, each one proved visible by a positive control below (descriptor-relative
-calls: open, remove, mkdir, rmdir, rename, link, symlink and chmod, and listing a descriptor). It is not a record of
+the hook can see, each one proved visible by a positive control below, except descriptor-relative
+mkdir, rmdir and rename, which are listened for without one. It is not a record of
 every read (imports read code; a metadata call that bypasses `os.stat` is not seen) and not a
 filesystem security boundary.
 """
