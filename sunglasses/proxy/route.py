@@ -854,8 +854,13 @@ class Route:
         #
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
+        #
+        # Counted over `bound_surface`, as the notification side is: a top-level
+        # member beside the envelope is not scanned for most methods, and counting
+        # only what is scanned let an oversized one cross past the bound that
+        # exists to stop it. Counted, not scanned: what a scan reads is unchanged.
         over = bounds.check_content(
-            selector.content_bytes(selector.client_surface(method, message)))
+            selector.content_bytes(selector.bound_surface(method, message)))
         if over:
             # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
             # existed, so it was the one `_withhold` in this method that did not
