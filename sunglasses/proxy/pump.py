@@ -1907,9 +1907,15 @@ class Session:
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
                     # T2.R12. Dropped with a receipt and never a response,
-                    # because a notification has no id to answer in.
+                    # because a notification has no id to answer in. The
+                    # verdict is (replacement, reason, rule) and the reason is
+                    # the part that says WHY: dropped without it, the row on
+                    # disk could not tell a flagged notification from a lost
+                    # one.
+                    why = verdict[1] if len(verdict) > 1 else None
+                    fields = {"reason_code": why} if isinstance(why, str) else {}
                     self._core._emit("NOTIFICATION_DROPPED", None,
-                                     supported=True)
+                                     supported=True, **fields)
                     continue
                 # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the

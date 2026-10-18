@@ -73,6 +73,9 @@ PyPI versions accepted as not-published:
 - pypi-gap: 0.2.9
 - pypi-gap: 0.2.27
 - pypi-gap: 0.2.30
+- pypi-gap: 0.6.1
+
+2026-10-15 — 0.6.1 was planned then skipped on Sep-27 (0.6.2 shipped on its base); no renumbering.
 
 Pre-launch tags accepted as not-recovered:
 - tag-gap: 0.1.0
@@ -432,15 +435,17 @@ This is the same family as the long-token entry above and carries the same
 consequence: the firewall hook has a fixed timeout, and a timed-out hook does not
 block the call. We have not published timings, for the same reason as before.
 
-`GLS-AW-001` is the first of the five to have a repair, and that repair is in
-review; this entry is updated when it ships. The other four are open. The input
-cap bounds the length of a scan, not its cost, and it is not a fix for any of
-them. The timed check is the gate that finds the rest of this family, and each
+Status after 0.6.8: four of the five are repaired. `GLS-AW-001` was repaired in
+0.6.8. `GLS-SC-018`, `GLS-CF-251` and `GLS-AW-713` are repaired in the release
+after 0.6.8: each now gives a run of whitespace around its optional token to one
+quantifier, so its cost grows in step with the input. `GLS-CICD-004` is still
+open. The input cap bounds the length of a scan, not its cost, and it is not a fix
+for it. The timed check is the gate that finds the rest of this family, and each
 open entry is listed in it as an expected failure, so repairing one without
 removing it from the list fails the suite.
 
-`tests/test_known_gaps_are_listed.py` asserts that these rows stay in this file
-until the entries are repaired.
+`tests/test_known_gaps_are_listed.py` asserts that the open entry stays in this
+file until it is repaired.
 
 ## Open limit as of 0.6.7 (2026-10-08) — look-alike letters outside the fold table still pass as ordinary letters
 

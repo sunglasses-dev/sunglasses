@@ -1,0 +1,84 @@
+name: Tester report
+description: You tried Sunglasses for ten minutes. Tell us what happened, good or bad.
+title: "[tester] "
+labels: ["tester-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing. Every field except the first three is optional. Paste real output, not a summary; raw text helps more than a description.
+
+        **This issue is public.** Paste only text you can share: no credentials, private mail or customer data. For anything security-sensitive use the [private advisory form](https://github.com/sunglasses-dev/sunglasses/security/advisories/new) instead.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows
+        - Windows + WSL
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Did the install work
+      options:
+        - Yes, first try
+        - Yes, after fixing something (say what below)
+        - No (paste the error below)
+        - Did not install, used sunglasses.dev/scan only
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where did you find this
+      options:
+        - Reddit r/ClaudeAI
+        - Reddit r/ClaudeCode
+        - GitHub
+        - Hacker News
+        - A friend or coworker
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Version and environment
+      description: "Output of `sunglasses --version` and `sunglasses check`, plus `python3 --version`. Skip if you only used the website."
+      render: text
+  - type: textarea
+    id: ran
+    attributes:
+      label: What you ran
+      description: The commands, in order. One per line.
+      render: shell
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: Paste the output. If it hung, say for how long. If a result looked wrong (something flagged that should not be, or something missed), paste the input too, or a safe stand-in for it.
+      render: text
+  - type: textarea
+    id: time
+    attributes:
+      label: How long did it take
+      description: "Rough is fine: install, first command, a scan of one file."
+  - type: textarea
+    id: verdict
+    attributes:
+      label: One line, honestly
+      description: Would you keep it installed? Why or why not?
+    validations:
+      required: true
+  - type: checkboxes
+    id: credit
+    attributes:
+      label: Credit
+      options:
+        - label: You may list my GitHub handle in the release notes as a tester.

@@ -66,6 +66,9 @@ BASELINE_PAIRS = frozenset({
     ("GLS-PE-004", 0),
     ("GLS-SC-014", 0),
     ("GLS-TP-002", 0),
+    # GLS-TP-002-API is a channel sibling: its regex entry 0 is byte-identical to ("GLS-TP-002", 0) above, so the
+    # cost is the parent's. What is new is the reach: the same unskippable regex now also runs on api_response.
+    ("GLS-TP-002-API", 0),
 })
 BASELINE = len(BASELINE_PAIRS)          # printed, never asserted against alone
 

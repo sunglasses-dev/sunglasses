@@ -21,6 +21,8 @@ Install: pip install sunglasses[qr]  (requires pyzbar + Pillow)
 import os
 from typing import List, Tuple
 
+from .member import Member, display_name
+
 
 def _check_deps():
     """Check that QR scanning dependencies are installed."""
@@ -221,7 +223,7 @@ class QRExtractor:
         """
         from .image import ImageExtractor, ImageRefused
 
-        if not os.path.exists(image_path):
+        if not isinstance(image_path, Member) and not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
         # v0.5.6 round 7 (ASTRA I5b): reset per EXTRACTION, not per instance. The
@@ -235,7 +237,7 @@ class QRExtractor:
         except ImageRefused as exc:
             self.failures.append(str(exc))
             return []
-        return self._decode_frames(img, source=os.path.basename(image_path))
+        return self._decode_frames(img, source=display_name(image_path))
 
     def extract_from_bytes(self, image_bytes: bytes) -> List[Tuple[str, str]]:
         """Extract QR/barcode text from image bytes, across ALL frames.

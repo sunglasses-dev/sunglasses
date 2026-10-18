@@ -149,12 +149,12 @@ def test_a_covered_p3p_keyword_gives_allow_with_no_finding_as_on_main(text):
 
 
 # 4. The reading budget is one for the rule, whatever the number of its alternatives.
-ALTERNATIVES = [r"(?i)!*\s*zorbit now", r"(?i)!*\s*zorbit now\b",
-                r"(?i)!*\s*zorbit now(?=$|\W)", r"(?i)!*[ ]*zorbit now"]
+ALTERNATIVES = [r"(?i)'*\s*zorbit now", r"(?i)'*\s*zorbit now\b",
+                r"(?i)'*\s*zorbit now(?=$|\W)", r"(?i)'*[ ]*zorbit now"]
 
 
 def _decision(alternatives, run):
-    result = _rule(regex=ALTERNATIVES[:alternatives]).scan("Never " + "!" * run + " zorbit now", channel="message")
+    result = _rule(regex=ALTERNATIVES[:alternatives]).scan("Never " + "'" * run + " zorbit now", channel="message")
     return "covered" if _covered(result) else result.decision
 
 

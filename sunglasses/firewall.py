@@ -2240,7 +2240,7 @@ def _check_warn_budget(budget, timeout):
 _check_warn_budget(_WARN_LANE_BUDGET_S, _HOOK_TIMEOUT)
 
 
-def build_hook_entry(interpreter: str = None) -> dict:
+def build_hook_entry(interpreter: str = None, fail_open: bool = False) -> dict:
     """The PreToolUse entry we write into settings.json.
 
     `interpreter` defaults to the ABSOLUTE `sys.executable` of whatever python is
@@ -2248,6 +2248,11 @@ def build_hook_entry(interpreter: str = None) -> dict:
     time, which under pipx/venv/conda can be a different interpreter with no
     `sunglasses` installed — the hook then fails on every call, invisibly, and
     the firewall is off while looking on.
+
+    The entry asks the host to block the tool call when the hook itself fails (a
+    timeout, a command that cannot start, output the host cannot read). The host's
+    own default lets the call go ahead, which is the same silent "off while looking
+    on". `fail_open=True` leaves the key out and so keeps that default.
     """
     import shlex
     import sys as _sys
@@ -2257,26 +2262,33 @@ def build_hook_entry(interpreter: str = None) -> dict:
     # for anyone whose username has a space) would otherwise be split into two
     # words, breaking both the hook and its own self-test.
     interpreter = shlex.quote(interpreter)
+    hook = {
+        "type": "command",
+        "command": f"{interpreter} -m {HOOK_MARKER}",
+        # The schema default is 600s. A hook that can hang for ten minutes
+        # on every tool call is a worse outage than the attacks it prevents.
+        "timeout": _HOOK_TIMEOUT,
+    }
+    if not fail_open:
+        hook["onFailure"] = "block"
     return {
         # Everything, not just egress tools: policy `blocked_paths` has to cover
         # Read/Edit as well, and the module filters in ~0.2ms anyway.
         "matcher": ".*",
-        "hooks": [{
-            "type": "command",
-            "command": f"{interpreter} -m {HOOK_MARKER}",
-            # The schema default is 600s. A hook that can hang for ten minutes
-            # on every tool call is a worse outage than the attacks it prevents.
-            "timeout": _HOOK_TIMEOUT,
-        }],
+        "hooks": [hook],
     }
 
 
-def self_test_hook(command: str) -> "tuple":
+def self_test_hook(command: str, timeout: float = 30) -> "tuple":
     """Spawn the exact command we are about to write and check it answers.
 
     Returns (ok, detail). This is the difference between finding a broken wire
     at install time and finding it at 3am — a misconfigured hook fails open, so
     without this check the failure mode is completely silent.
+
+    With `onFailure: block` the same broken wire refuses every tool call instead,
+    so the install judges the command by the host's own time limit: pass
+    `timeout=_HOOK_TIMEOUT` and a hook the host would kill fails here.
     """
     import json as _json
     import subprocess
@@ -2289,7 +2301,7 @@ def self_test_hook(command: str) -> "tuple":
     })
     try:
         proc = subprocess.run(command, shell=True, input=probe,
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, timeout=timeout)
     except Exception as exc:  # noqa: BLE001
         return False, f"could not run the hook command: {exc}"
     if proc.returncode != 0:
@@ -2361,7 +2373,7 @@ def _strip_our_hooks(pre_tool_use: list) -> list:
     return kept
 
 
-def install_hook(settings_path, interpreter: str = None) -> dict:
+def install_hook(settings_path, interpreter: str = None, fail_open: bool = False) -> dict:
     """Add (or refresh) our PreToolUse hook. Idempotent, merging, backed up."""
     data = _read_settings(settings_path)
     hooks = data.setdefault("hooks", {})
@@ -2370,7 +2382,7 @@ def install_hook(settings_path, interpreter: str = None) -> dict:
     # Strip first, then append: a re-run after the user moved their venv must
     # FIX the stale interpreter, not add a second entry pointing at a dead one.
     pre = _strip_our_hooks(pre)
-    pre.append(build_hook_entry(interpreter))
+    pre.append(build_hook_entry(interpreter, fail_open=fail_open))
     hooks["PreToolUse"] = pre
     _write_settings(settings_path, data)
     return data

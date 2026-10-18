@@ -24,11 +24,14 @@ Install: pip install sunglasses[pdf]  (requires PyPDF2)
 """
 
 import contextlib
+import io
 import os
 import re
 import sys
 import zlib
 from typing import List, Optional, Tuple
+
+from .member import Member
 
 
 def _check_deps():
@@ -965,7 +968,7 @@ class PDFExtractor:
         """
         import PyPDF2
 
-        if not os.path.exists(pdf_path):
+        if not isinstance(pdf_path, Member) and not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF not found: {pdf_path}")
 
         results = []
@@ -976,7 +979,8 @@ class PDFExtractor:
         # first check reads anything so every later check charges the same budget.
         self._reset_document_state()
 
-        with open(pdf_path, 'rb') as f:
+        with (io.BytesIO(pdf_path) if isinstance(pdf_path, Member)
+              else open(pdf_path, 'rb')) as f:
             reader = PyPDF2.PdfReader(f)
 
             # The guard on compressed object streams stands before the first read

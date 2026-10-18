@@ -12,10 +12,13 @@ Usage:
 """
 
 import argparse
+import errno
 import hashlib
 import json
 import os
+import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -24,6 +27,7 @@ import time
 from . import __version__
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
+from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .sarif import to_sarif
 
@@ -180,6 +184,159 @@ _SKIP_DIRS = {
     '.tox', '.mypy_cache', '.pytest_cache', 'egg-info',
 }
 
+# Generated dependency lists. Thousands of lines of hashes and URLs, no prose an agent
+# would read, and the biggest single cost of scanning a JavaScript repo. They are scanned
+# like any other file unless `--skip-lockfiles` is given; then each one is NAMED in
+# `skipped` and, being unread, makes the scan incomplete like every other skip.
+_LOCKFILES = {
+    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+    'poetry.lock', 'Cargo.lock', 'go.sum',
+}
+_LOCKFILE_SKIP_REASON = "lockfile (generated dependency list), left out by --skip-lockfiles — not inspected"
+
+# A link is not followed: its target may sit outside the tree being scanned (a local
+# `--dir` would read whatever it points at) and the scan would report the target's path
+# as if it were part of the tree.
+_SYMLINK_SKIP_REASON = "symbolic link — not followed, not inspected"
+_CHANGED_SKIP_REASON = ("changed while the scan ran (replaced by a link, or removed) — "
+                        "not followed, not inspected")
+
+# The tree is read through directory descriptors. The scan root is opened ONCE, refusing a
+# link, and that one descriptor is held for the whole scan: every listing and every read
+# starts from it and opens each step relative to the one before it, refusing a link
+# (O_NOFOLLOW). Re-opening the root by its path would follow a link swapped in for it. The
+# walk also records each folder's device and inode, and an open that finds a different
+# folder than the one the walk listed names it as changed instead of listing what it holds
+# now. Where the platform has no such opens (Windows) the walk and the read fall back to a
+# link check plus a containment check, a weaker guarantee that the documentation says so.
+_POSIX = sys.platform != "win32"
+_FD_SAFE = _POSIX and os.open in os.supports_dir_fd and os.scandir in os.supports_fd
+_OPEN_FLAGS = os.O_CLOEXEC if _POSIX else 0
+_NONBLOCK = os.O_NONBLOCK if _POSIX else 0
+_ESTALE = errno.ESTALE if _POSIX else errno.EINVAL
+_READ_LIMIT = 1_000_000
+_CHANGED_ERRNOS = (errno.ELOOP, errno.ENOTDIR, errno.ENOENT, _ESTALE)
+
+
+def _open_root(root):
+    """The one no-follow descriptor for the scan root (None where there are no safe opens).
+
+    Raises OSError when the root is a link, is gone, or is not a directory.
+    """
+    if not _FD_SAFE:
+        return None
+    return os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | _OPEN_FLAGS)
+
+
+def _ident(st):
+    return (st.st_dev, st.st_ino)
+
+
+def _open_chain(root_fd, parts, leaf_flags, idents=None):
+    """File descriptor for parts below the held root, no link followed. Raises OSError.
+
+    With `idents` ({parts: (dev, ino)} recorded by the walk) every folder on the way must
+    still be the folder the walk saw, or the open fails with ESTALE.
+    """
+    fd = os.dup(root_fd)
+    try:
+        if idents is not None and idents.get(()) not in (None, _ident(os.fstat(fd))):
+            raise OSError(_ESTALE, "scan root is not the folder the walk listed")
+        for i, part in enumerate(parts):
+            last = i == len(parts) - 1
+            flags = (leaf_flags if last else os.O_RDONLY | os.O_DIRECTORY) | os.O_NOFOLLOW | _OPEN_FLAGS
+            nfd = os.open(part, flags, dir_fd=fd)
+            os.close(fd)
+            fd = nfd
+            known = idents.get(tuple(parts[:i + 1])) if idents is not None else None
+            if known is not None and (not last or leaf_flags & os.O_DIRECTORY) \
+                    and known != _ident(os.fstat(fd)):
+                raise OSError(_ESTALE, "folder is not the one the walk listed", part)
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _list_dir(root, parts, root_fd=None, idents=None):
+    """[(name, lstat result or the OSError)] for root/parts, without following a link."""
+    if _FD_SAFE:
+        own = root_fd is None
+        if own:
+            root_fd = _open_root(root)
+        try:
+            fd = _open_chain(root_fd, parts, os.O_RDONLY | os.O_DIRECTORY, idents)
+            try:
+                with os.scandir(fd) as it:
+                    return [(e.name, _entry_stat(e)) for e in it]
+            finally:
+                os.close(fd)
+        finally:
+            if own:
+                os.close(root_fd)
+    path = os.path.join(root, *parts)
+    if os.path.islink(path):
+        raise OSError(errno.ELOOP, "is a symbolic link", path)
+    with os.scandir(path) as it:
+        return [(e.name, _entry_stat(e)) for e in it]
+
+
+def _entry_stat(entry):
+    try:
+        return entry.stat(follow_symlinks=False)
+    except OSError as exc:
+        return exc
+
+
+def _read_member(root, rel, root_fd=None, idents=None):
+    """The bytes of the regular file root/rel, read through no link at any step.
+
+    Raises OSError when a step is a link, was removed, was replaced by another folder, or
+    is not a regular file; the caller names the file as skipped. At most one byte over the
+    limit is read.
+    """
+    parts = rel.split(os.sep)
+    if _FD_SAFE:
+        own = root_fd is None
+        if own:
+            root_fd = _open_root(root)
+        try:
+            fd = _open_chain(root_fd, parts, os.O_RDONLY | _NONBLOCK, idents)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    raise OSError(errno.EINVAL, "not a regular file", rel)
+                with os.fdopen(fd, "rb", closefd=False) as fh:
+                    data = fh.read(_READ_LIMIT + 1)
+            finally:
+                os.close(fd)
+        finally:
+            if own:
+                os.close(root_fd)
+    else:
+        path = os.path.join(root, rel)
+        real_root = os.path.realpath(root)
+        if os.path.realpath(path) != os.path.join(real_root, rel) or os.path.islink(path):
+            raise OSError(errno.ELOOP, "path leaves the tree or is a link", rel)
+        with open(path, "rb") as fh:
+            # Checked again AFTER the open, against the file that was opened: a link put in
+            # place between the check above and the open would have been followed, and then
+            # the path no longer leads to the file we hold. Only the file the path names now,
+            # reached through no link, passes.
+            held = os.fstat(fh.fileno())
+            try:
+                now = os.lstat(path)
+                same = (stat.S_ISREG(now.st_mode) and _ident(now) == _ident(held)
+                        and os.path.realpath(path) == os.path.join(real_root, rel))
+            except OSError:
+                same = False
+            if not same:
+                raise OSError(errno.ELOOP, "path leaves the tree or is a link", rel)
+            data = fh.read(_READ_LIMIT + 1)
+    if len(data) > _READ_LIMIT:
+        raise OSError(errno.EFBIG, "grew past the repo-scan limit while the scan ran", rel)
+    return data
+
+
 _BINARY_EXTENSIONS = {
     '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
     '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.webm',
@@ -203,7 +360,8 @@ def _walk_repo_files(repo_dir):
         yield filepath
 
 
-def _walk_repo_files_with_skips(repo_dir):
+def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False,
+                                root_fd=None, idents=None):
     """Return (files, skips). `skips` is [(relpath, reason)], and it is the point.
 
     v0.5.6: this walker silently `continue`d past three whole classes of file —
@@ -214,33 +372,104 @@ def _walk_repo_files_with_skips(repo_dir):
     output, which is the contract's merge stop condition in one sentence:
     skipped content must not vanish.
 
-    This is NOT the walker rewrite (fstat, symlink policy, caps) — that stays
-    v0.6. It counts what it already decided to skip, and says so.
+    `excluded`, when given, collects the folders the walk does not enter (dependency,
+    build and VCS folders, see `_SKIP_DIRS`): not files, so not in `skips`, but named.
+    `.git` is left out of that list, it is metadata of the tree and not part of it.
+
+    `root_fd` is the held descriptor of the scan root (opened here when not given) and
+    `idents`, when given, is filled with each listed folder's (device, inode) so the
+    reads that follow can tell a replaced folder from the one that was walked.
     """
     files, skips = [], []
-    for root, dirs, filenames in os.walk(repo_dir):
-        # Prune skip dirs in-place
-        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.endswith('.egg-info')]
-        for f in filenames:
-            filepath = os.path.join(root, f)
-            rel = os.path.relpath(filepath, repo_dir)
-            ext = os.path.splitext(f)[1].lower()
+
+    def _skip(parts, reason):
+        skips.append((os.path.join(*parts) if parts else ".", reason))
+
+    def _lost(parts, exc):
+        # A step that was a directory a moment ago and is a link, or gone, now.
+        if exc.errno in _CHANGED_ERRNOS:
+            _skip(parts, _CHANGED_SKIP_REASON)
+        else:
+            _skip(parts, f"directory could not be read ({exc.__class__.__name__}) — not inspected")
+
+    # Our own walk, not os.walk: os.walk drops a directory that stopped being one between
+    # the listing and the descent, and a walker that cannot say what it did not enter
+    # cannot call a scan complete.
+    own_fd = None
+    if _FD_SAFE:
+        if idents is None:
+            idents = {}
+        if root_fd is None:
+            try:
+                own_fd = root_fd = _open_root(repo_dir)
+            except OSError as exc:
+                _lost((), exc)
+                return files, skips
+        try:
+            idents[()] = _ident(os.fstat(root_fd))
+        except OSError as exc:
+            _lost((), exc)
+            if own_fd is not None:
+                os.close(own_fd)
+            return files, skips
+    try:
+        _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, skips, _skip, _lost)
+    finally:
+        if own_fd is not None:
+            os.close(own_fd)
+    # os.walk order is the filesystem's. The same tree must give the same order, so a
+    # file cap leaves out the same files on every run and every machine.
+    files.sort()
+    skips.sort()
+    if excluded is not None:
+        excluded.sort()
+    return files, skips
+
+
+def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, skips, _skip, _lost):
+    pending = [()]
+    while pending:
+        parts = pending.pop()
+        try:
+            entries = _list_dir(repo_dir, parts, root_fd, idents)
+        except OSError as exc:
+            _lost(parts, exc)
+            continue
+        for name, st in entries:
+            child = parts + (name,)
+            rel = os.path.join(*child)
+            if isinstance(st, OSError):
+                _skip(child, f"could not be read ({st.__class__.__name__}) — not inspected")
+                continue
+            mode = st.st_mode
+            # A link is a link whatever its name: classify it BEFORE the folder policy, or a
+            # link called node_modules would pass as an excluded folder.
+            if stat.S_ISLNK(mode):
+                skips.append((rel, _SYMLINK_SKIP_REASON))
+                continue
+            if stat.S_ISDIR(mode):
+                if name in _SKIP_DIRS or name.endswith('.egg-info'):
+                    if excluded is not None and name != '.git':
+                        excluded.append(rel)
+                else:
+                    if idents is not None:
+                        idents[child] = _ident(st)
+                    pending.append(child)
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if skip_lockfiles and name in _LOCKFILES:
+                skips.append((rel, _LOCKFILE_SKIP_REASON))
+                continue
             if ext in _BINARY_EXTENSIONS:
                 skips.append((rel, f"binary file type ({ext}) — not inspected"))
                 continue
-            try:
-                size = os.path.getsize(filepath)
-            except OSError as exc:
-                skips.append((rel, f"could not be read ({exc.__class__.__name__}) — not inspected"))
+            if st.st_size > 1_000_000:
+                skips.append((rel, f"larger than the 1 MB repo-scan limit ({st.st_size:,} bytes) — not inspected"))
                 continue
-            if size > 1_000_000:
-                skips.append((rel, f"larger than the 1 MB repo-scan limit ({size:,} bytes) — not inspected"))
-                continue
-            if not os.path.isfile(filepath):
+            if not stat.S_ISREG(mode):
                 skips.append((rel, "not a regular file — not inspected"))
                 continue
-            files.append((filepath, None))
-    return files, skips
+            files.append((os.path.join(repo_dir, rel), None))
 
 
 def _deep_dict_to_sarif(result_dict, source):
@@ -275,8 +504,72 @@ def _wants_machine_output(args) -> bool:
     return bool(getattr(args, "json", False)) or getattr(args, "output", "human") in ("json", "sarif")
 
 
+def _check_max_files(args):
+    """`--max-files` must be a positive number; refuse before cloning or walking anything."""
+    cap = getattr(args, "max_files", None)
+    if cap is not None and cap < 1:
+        _usage_error(args, f"--max-files must be a positive number, got {cap}.",
+                     "Nothing was scanned. Leave --max-files out to read every file.")
+    return cap
+
+
+def _printable(name):
+    """A file name is data, not terminal input: escape control characters before showing it."""
+    return "".join(
+        ch if (ch.isprintable() or ch == " ") else (
+            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else f"\\u{ord(ch):04x}")
+        for ch in name)
+
+
+def _note(text):
+    """A line for the person at the terminal, on STDERR so stdout stays the one document.
+
+    With stderr closed (`2>&-`) Python starts with `sys.stderr = None`, and a print to it
+    would land on stdout and break `--json`. No stderr, no note.
+    """
+    stream = sys.stderr
+    if stream is None:
+        return
+    try:
+        print(text, file=stream, flush=True)
+    except (OSError, ValueError):
+        pass
+
+
+def _progress_line(index, total, started, rel_path):
+    """One line per file, on STDERR: stdout stays the one document a pipe expects."""
+    elapsed = time.perf_counter() - started
+    stamp = f"{elapsed * 1000:.0f}ms" if elapsed < 1 else f"{elapsed:.1f}s"
+    _note(f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}")
+
+
+def _scan_dir(args, engine):
+    """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
+    _check_max_files(args)
+    path = os.path.expanduser(args.directory)
+    shown = _printable(args.directory)
+    if not os.path.exists(path):
+        _usage_error(args, f"Directory not found: {shown}",
+                     "Nothing was scanned. Check the path.")
+    if not os.path.isdir(path):
+        _usage_error(args, f"Not a directory: {shown} is not a directory.",
+                     "Nothing was scanned. To scan one file, use --file.")
+    path = os.path.abspath(path)
+    # The same rule as every link inside the tree: not followed. Name the real directory
+    # instead of quietly scanning whatever the link points at today.
+    if os.path.islink(path):
+        _usage_error(args, f"{shown} is a symbolic link, and a link is not followed.",
+                     f"Nothing was scanned. Name the directory itself: --dir {_printable(os.path.realpath(path))}")
+    if not _wants_machine_output(args):
+        print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — directory scan")
+        print(f"  {DIM}{'─' * 50}{RESET}")
+        print(f"  {DIM}Scanning {_printable(path)}...{RESET}")
+    _scan_tree(args, engine, path, source=path, kind="directory")
+
+
 def _scan_repo(args, engine):
     """Clone a GitHub repo and scan all files."""
+    _check_max_files(args)
     repo_url = args.repo
     repo_hash = hashlib.md5(repo_url.encode()).hexdigest()[:10]
     tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
@@ -285,7 +578,7 @@ def _scan_repo(args, engine):
     if not _wants_machine_output(args):
         print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — repo scan")
         print(f"  {DIM}{'─' * 50}{RESET}")
-        print(f"  {DIM}Cloning {repo_url}...{RESET}")
+        print(f"  {DIM}Cloning {_printable(repo_url)}...{RESET}")
 
     # Clean up any previous clone
     if os.path.exists(tmp_dir):
@@ -300,7 +593,7 @@ def _scan_repo(args, engine):
             # Exit 2, not 1. The clone failed, so nothing was scanned — and
             # exit 1 means "threat found". A CI job cannot tell a typo'd URL
             # from a repo full of attacks if both answer 1.
-            _usage_error(args, f"Clone failed: {result.stderr.strip()}",
+            _usage_error(args, f"Clone failed: {_printable(result.stderr.strip())}",
                          "Nothing was scanned.")
     except subprocess.TimeoutExpired:
         _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
@@ -308,6 +601,54 @@ def _scan_repo(args, engine):
     if not _wants_machine_output(args):
         print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
+    _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo",
+               cleanup=lambda: shutil.rmtree(tmp_dir, ignore_errors=True))
+
+
+def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
+    """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
+
+    The scan holds one no-follow handle on the root (see `_open_root`) for its whole
+    length and releases it on every way out. A root that cannot be opened that way is a
+    refusal (exit 2, one document), never a half scan.
+    """
+    # The PDF, image and QR extractors (and the result writers) are imported the first time
+    # they are needed, which would be in the middle of the walk. Python writes a bytecode
+    # cache next to the module it imports, and when the folder being scanned holds that
+    # module (scanning the package's own source) that would be a write inside the tree while
+    # it is being read. Import them now, before the root is opened, so nothing is imported
+    # once the scan has started reading. (A
+    # third-party library loaded later, such as an image or PDF reader living inside the
+    # scanned folder, is outside what the scan controls; see the README.)
+    _load_extractors()
+    root_fd = None
+    try:
+        try:
+            root_fd = _open_root(tmp_dir)
+        except OSError as exc:
+            _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
+                         "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
+        return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
+    finally:
+        if root_fd is not None:
+            os.close(root_fd)
+
+
+def _load_extractors():
+    """Import the modules a scan reaches late (extractors, result and SARIF writers), so
+    none is first imported after the root folder is open."""
+    from . import result, sarif  # noqa: F401
+    from .extractors import dispatch, image, pdf, qr  # noqa: F401
+
+
+def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
+    """The scan itself; `root_fd` belongs to the caller.
+
+    `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
+    `source` is its path). Everything after the clone is the same code on purpose:
+    a local tree and its clone must come back with the same files, skips and exit.
+    """
+    repo_url = source
     # Walk and scan
     start = time.perf_counter()
     files_scanned = 0
@@ -323,21 +664,60 @@ def _scan_repo(args, engine):
     # through the same path as `--file` instead of falling through to the human screen.
     repo_results = []
 
-    walked, walker_skips = _walk_repo_files_with_skips(tmp_dir)
-    for filepath, _reason in walked:
+    excluded_folders = []
+    idents = {}
+    walked, walker_skips = _walk_repo_files_with_skips(
+        tmp_dir, excluded=excluded_folders,
+        skip_lockfiles=bool(getattr(args, "skip_lockfiles", False)),
+        root_fd=root_fd, idents=idents)
+    # The total cap. A file left out by it is a skip with the flag's name in the reason,
+    # never a silent drop, and the scan is incomplete because of it.
+    max_files = getattr(args, "max_files", None)
+    if max_files is not None and len(walked) > max_files:
+        for filepath, _reason in walked[max_files:]:
+            walker_skips.append((
+                os.path.relpath(filepath, tmp_dir),
+                f"over the --max-files {max_files} limit — not inspected"))
+        walked = walked[:max_files]
+    total_files = len(walked)
+    for index, (filepath, _reason) in enumerate(walked, 1):
         rel_path = os.path.relpath(filepath, tmp_dir)
+        _progress_line(index, total_files, start, rel_path)
+
+        # The tree can change between the walk and the read. Read the file once, through
+        # the directory descriptors (no link at any step), and judge those bytes: they go
+        # to routing and extraction as they are, in memory. Nothing is written anywhere and
+        # the file's content is not opened a second time (the folders on the way down are
+        # opened again to list them and to read the next file), so the bytes we judged are
+        # the bytes we read, whatever the tree does next.
+        data = snapshot = None   # let go of the previous file's bytes before reading the next
+        try:
+            data = _read_member(tmp_dir, rel_path, root_fd, idents)
+        except OSError as exc:
+            reason = (_SYMLINK_SKIP_REASON if exc.errno == errno.ELOOP and not _FD_SAFE
+                      else _CHANGED_SKIP_REASON if exc.errno in _CHANGED_ERRNOS
+                      else f"could not be read ({exc.__class__.__name__}) — not inspected")
+            walker_skips.append((rel_path, reason))
+            continue
+        snapshot = Member(data, rel_path)
+        data = None
 
         # Content routing, same rule as `--file` (1a-3): the walker's extension
         # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
         # at all — used to be read as text here and counted as inspected, which
         # is the original bug one level up.
         from .extractors.dispatch import identify
-        kind, label = identify(filepath)
-        if kind in ("opaque", "media"):
+        try:
+            route, label = identify(snapshot)
+        except (OSError, UnreadableFile) as exc:
+            walker_skips.append(
+                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
+            continue
+        if route in ("opaque", "media"):
             walker_skips.append((
                 rel_path,
                 f"{label} — not inspected. Scan it directly to look inside: "
-                f"sunglasses scan --file {rel_path}"))
+                f"sunglasses scan --file {_printable(rel_path)}"))
             continue
 
         # Repo files go through the SAME extraction path as `--file`. Reading them
@@ -347,7 +727,7 @@ def _scan_repo(args, engine):
         # scanner cannot hold two opinions about one file depending on how it was
         # invoked; that divergence is audit finding C1 all over again, one level up.
         try:
-            scan_result = engine.scan_file(filepath)
+            scan_result = engine.scan_file(snapshot)
         except UnreadableFile as exc:
             # Was a silent `continue`. An unreadable file is not an absent one.
             walker_skips.append((rel_path, f"{exc} — not inspected"))
@@ -421,21 +801,28 @@ def _scan_repo(args, engine):
                 ],
             })
 
-        if not args.json and args.verbose:
+        if args.verbose and not _wants_machine_output(args):
             status = (f"{GREEN}PASS{RESET}" if scan_result.is_clean
                       else f"{RED}THREAT{RESET}" if scan_result.threat_found
                       else f"{YELLOW}INCOMPLETE{RESET}")
-            print(f"  {status}  {rel_path}")
+            print(f"  {status}  {_printable(rel_path)}")
 
     elapsed_ms = (time.perf_counter() - start) * 1000
+    # Skips were appended from three places (the walk, the cap, the reads): one sort, so the
+    # list a consumer sees is ordered by path whatever found the skip first.
+    walker_skips.sort()
 
     # Clean up
-    shutil.rmtree(tmp_dir, ignore_errors=True)
+    if cleanup:
+        cleanup()
 
     # Output
-    repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+    if kind == "repo":
+        repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+    else:
+        repo_name = os.path.basename(repo_url.rstrip(os.sep)) or repo_url
     summary = {
-        "repo": repo_url,
+        ("repo" if kind == "repo" else "directory"): repo_url,
         "repo_name": repo_name,
         "files_scanned": files_scanned,
         "files_with_threats": files_with_threats,
@@ -453,6 +840,8 @@ def _scan_repo(args, engine):
     # declined, with the reason it declined it.
     summary["files_skipped"] = len(walker_skips)
     summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
+    # The folders the walk does not enter: named, so a consumer can see what "clean" left out.
+    summary["excluded_folders"] = excluded_folders
     # Same fact, same names, in the machine document: a consumer keeping only the
     # JSON could previously see the COUNT of partly-read members and never learn
     # which they were.
@@ -460,7 +849,8 @@ def _scan_repo(args, engine):
     # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
-    incomplete = bool(files_incomplete or walker_skips or nothing_inspected)
+    unread_skips = list(walker_skips)
+    incomplete = bool(files_incomplete or unread_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
     # Through the one normalizer, like every other document. This block used to
@@ -473,7 +863,7 @@ def _scan_repo(args, engine):
         {
             "threat_found": bool(total_threats),
             "extraction_complete": not incomplete,
-            "warnings": ([f"{path}: {reason}" for path, reason in walker_skips]
+            "warnings": ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
             "channel": "file",
@@ -486,12 +876,16 @@ def _scan_repo(args, engine):
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
         sarif_doc = to_sarif(repo_results, source=repo_url)
-        not_inspected = ([f"{path}: {reason}" for path, reason in walker_skips]
+        not_inspected = ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in partially_read])
         not_inspected += [
             f"{r.source}: not fully inspected"
             for r in repo_results if not getattr(r, "inspection_complete", True)
         ]
+        if nothing_inspected:
+            not_inspected.append("no file was inspected")
+        if sarif_doc.get("runs"):
+            sarif_doc["runs"][0].setdefault("properties", {})["excludedFolders"] = excluded_folders
         if not_inspected and sarif_doc.get("runs"):
             # Without this a repo where nothing could be read emits results:[] --
             # which a SARIF consumer reads as "scanned, nothing there". The empty
@@ -510,26 +904,31 @@ def _scan_repo(args, engine):
     # Human-readable output
     print(f"\n  {BOLD}SCAN COMPLETE{RESET}")
     print(f"  {DIM}{'─' * 50}{RESET}")
-    print(f"  Repo:            {CYAN}{repo_name}{RESET} ({repo_url})")
+    print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{_printable(repo_name)}{RESET} ({_printable(repo_url)})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
-    if files_incomplete or walker_skips:
+    if files_incomplete or unread_skips:
         # The banner introduces the list. Round 5: it was printed in the verdict
         # block BELOW, so a reader met the named skips first and the header last,
         # and a header that promises a list of what went unread has to arrive
         # before the list. Caught by the round-5 `banner_without_named_scope`
         # assertion on this surface.
-        _print_coverage_banner("part of this repo was not read")
+        _print_coverage_banner("part of this repo was not read" if kind == "repo"
+                               else "part of this directory was not read")
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
         for name, reason in partially_read[:10]:
-            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(partially_read) > 10:
             print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
+    if excluded_folders:
+        shown = ", ".join(_printable(name) for name in excluded_folders[:10])
+        more = f" and {len(excluded_folders) - 10} more" if len(excluded_folders) > 10 else ""
+        print(f"  {DIM}Folders not entered (dependency/build): {shown}{more}{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
-            print(f"    {YELLOW}!{RESET} {DIM}{name}: {reason}{RESET}")
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(walker_skips) > 10:
             print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
@@ -557,7 +956,7 @@ def _scan_repo(args, engine):
             f = item["finding"]
             sev_color = RED if f["severity"] in ("critical", "high") else YELLOW if f["severity"] == "medium" else CYAN
             print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}")
-            print(f"      {DIM}File: {item['file']}{RESET}")
+            print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
             if f.get("matched_text"):
                 print(f"      {DIM}Match: \"{f['matched_text']}\"{RESET}")
             if len(shown) >= 20:
@@ -774,6 +1173,19 @@ def cmd_scan(args):
     # stdin, repo and deep — instead of four separate checks that can drift.
     if getattr(args, "output", "human") == "json":
         args.json = True
+
+    if getattr(args, "directory", None) is not None and args.repo:
+        _usage_error(args, "--dir and --repo cannot be used together.",
+                     "Nothing was scanned. Scan a clone with --repo, or a local tree with --dir.")
+    if getattr(args, "directory", None) is not None:
+        extra = [flag for flag, given in (
+            ("--file", args.file is not None), ("--text", getattr(args, "explicit_text", None) is not None),
+            ("--stdin", args.stdin), ("text to scan", bool(args.text))) if given]
+        if extra:
+            _usage_error(args, f"--dir cannot be combined with {', '.join(extra)}.",
+                         "Nothing was scanned. One input per run: a directory, a file, or text.")
+        _scan_dir(args, engine)
+        return
 
     if args.repo:
         _scan_repo(args, engine)
@@ -1859,7 +2271,7 @@ def _offer_starter_policy(args):
 
 def cmd_init(args):
     """Wire (or unwire) the SUNGLASSES firewall into Claude Code's settings.json."""
-    from .firewall import (build_hook_entry, install_hook, self_test_hook,
+    from .firewall import (_HOOK_TIMEOUT, build_hook_entry, install_hook, self_test_hook,
                            settings_path_for, uninstall_hook)
 
     path = settings_path_for(args.scope_global)
@@ -1871,13 +2283,21 @@ def cmd_init(args):
               f"sits next to the file.{RESET}\n")
         return 0
 
-    entry = build_hook_entry()
+    fail_open = bool(getattr(args, "fail_open", False))
+    # The commands printed below must act on the file just written: a global install
+    # needs --global, a project install needs the directory it was run in.
+    scope = " --global" if args.scope_global else ""
+    where = "" if args.scope_global else f"cd {shlex.quote(str(path.parent.parent))} && "
+    entry = build_hook_entry(fail_open=fail_open)
     command = entry["hooks"][0]["command"]
 
     # Self-test BEFORE writing. A hook that fails, fails open — so a broken
     # wire would leave the firewall silently off. Better to refuse to install.
     print(f"\n  {BOLD}SUNGLASSES{RESET} — self-testing the hook command...")
-    ok, detail = self_test_hook(command)
+    # A blocking hook turns "cannot answer" into "every tool call refused", so it
+    # is judged by the time limit the host will apply. The fail-open entry keeps
+    # the longer one.
+    ok, detail = self_test_hook(command) if fail_open else self_test_hook(command, timeout=_HOOK_TIMEOUT)
     if not ok:
         print(f"  {RED}{BOLD}Self-test FAILED:{RESET} {detail}")
         print(f"  {DIM}Command tried: {command}{RESET}")
@@ -1889,13 +2309,23 @@ def cmd_init(args):
     print(f"  {GREEN}Self-test passed{RESET} {DIM}(hook answered '{detail}'){RESET}")
 
     try:
-        install_hook(path)
+        install_hook(path, fail_open=fail_open)
     except Exception as exc:
         print(f"\n  {RED}Could not update {path}:{RESET} {exc}\n")
         return 1
 
     print(f"  {GREEN}{BOLD}Firewall installed{RESET} {DIM}-> {path}{RESET}")
     print(f"  {DIM}{command}{RESET}")
+    if fail_open:
+        print(f"  {DIM}Failure policy: Claude Code's default. A hook that fails opens "
+              f"(the tool call goes ahead).{RESET}")
+    else:
+        print(f"  {DIM}Failure policy: \"onFailure\": \"block\". A hook that times out or cannot "
+              f"start refuses the tool call. Claude Code reads this key from v2.1.295; "
+              f"`{where}sunglasses init{scope} --fail-open` leaves it out.{RESET}")
+        print(f"  {DIM}If the hook ever cannot start, every tool call is refused until you remove "
+              f"its entry from {path} or run `{where}sunglasses init{scope} --uninstall` "
+              f"in a terminal.{RESET}")
 
     _offer_starter_policy(args)
     print(f"\n  {DIM}{_policy_state_line()}{RESET}")
@@ -2491,13 +2921,28 @@ def main():
     )
     scan_parser.add_argument("--file", "-f", help="File to scan")
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
-    scan_parser.add_argument("--stdin", action="store_true", help="Read from stdin")
+    scan_parser.add_argument("--dir", dest="directory", metavar="PATH",
+                             help="Local directory to scan (same files, skips and exit codes as --repo, "
+                                  "no clone)")
+    scan_parser.add_argument("--max-files", dest="max_files", type=int, metavar="N",
+                             help="With --repo or --dir: read at most N files; the rest are listed "
+                                  "as skipped and the scan is incomplete (default: no cap)")
+    scan_parser.add_argument("--skip-lockfiles", dest="skip_lockfiles", action="store_true",
+                             help="With --repo or --dir: leave package-lock.json, yarn.lock, pnpm-lock.yaml, "
+                                  "poetry.lock, Cargo.lock and go.sum unread. They are named as skipped and "
+                                  "the scan is incomplete (default: they are scanned)")
+    # `--s` has always been the unique abbreviation of --stdin; --skip-lockfiles made it
+    # ambiguous, so it is spelled out like `--d` below.
+    scan_parser.add_argument("--stdin", "--s", dest="stdin", action="store_true", help="Read from stdin")
     scan_parser.add_argument("--channel", "-c", default="message",
                              choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
                              help="Where the content came from, not what the attack is. "
                                   "Patterns are scoped by channel, so this changes which "
                                   "rules apply (default: message)")
-    scan_parser.add_argument("--deep", action="store_true", help="Enable deep scan for audio/video files")
+    # `--d` has always been the unique abbreviation of --deep; adding --dir made it
+    # ambiguous (usage error). Spell it out so the old command keeps its meaning.
+    scan_parser.add_argument("--deep", "--d", dest="deep", action="store_true",
+                             help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
     scan_parser.add_argument(
@@ -2561,6 +3006,9 @@ def main():
     init_parser.add_argument(
         "--no-policy", action="store_true",
         help="Do not write ~/.sunglasses/policy.yaml at all")
+    init_parser.add_argument(
+        "--fail-open", action="store_true",
+        help="Leave onFailure out of the hook entry, so a hook that fails lets the tool call go ahead")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts

@@ -7,8 +7,9 @@
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sunglasses-dev/sunglasses/badge)](https://scorecard.dev/viewer/?uri=github.com/sunglasses-dev/sunglasses)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
+[![Listed on mcpservers.org](https://mcpservers.org/badge.svg)](https://mcpservers.org/servers/sunglasses-dev/sunglasses)
 
-**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,569 patterns across 117 categories and reports findings and incomplete scans. A Claude Code hook blocks secret material in tool calls and the paths and hosts your policy lists, before a tool runs, best effort under its 10 second timeout.
+**Open source input firewall for AI agents, beta.** A local scanner checks text, code, PDFs, images, QR codes, audio and video with 1,583 patterns across 117 categories and reports findings and incomplete scans. A Claude Code hook blocks secret material in tool calls and the paths and hosts your policy lists, before a tool runs, best effort under its 10 second timeout.
 
 **What works today**
 - Scan text, files, PDFs, images and QR codes from the CLI or from Python
@@ -419,6 +420,79 @@ sunglasses scan ./typo.txt; echo $?            # 2 — no such file; nothing was
 A path-shaped argument that does not exist is a usage error, not text. Pass
 `--text` if you really do mean to scan the string `./typo.txt` itself.
 
+### Scanning a whole directory or repository
+
+```bash
+sunglasses scan --dir ./my-project                       # a local tree, no clone
+sunglasses scan --repo https://github.com/org/repo       # clone, then the same scan
+sunglasses scan --dir ./my-project --max-files 500       # read at most 500 files
+```
+
+`scan --dir` reads a local directory the way `--repo` reads a clone: the same walker, the
+same skips, the same exit codes (a local tree can hold files a clone does not, such as
+untracked ones). It does not change anything in the tree. One progress line per file
+(`[3/120]`, the time spent, the file) goes to stderr, so `-o json` and `-o sarif` still
+leave stdout as one document.
+
+Files the scan does not read are listed in `skipped` with the reason, and the scan is then
+incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
+exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
+cannot be listed, a folder found swapped for another folder or a link found where a file or folder
+was before the scan opened or listed it (see below for what a change after that does), and every
+file past `--max-files N`.
+`--skip-lockfiles` adds `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`,
+`Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
+scanned.
+
+A link is never followed, because it can point outside the tree: a link is named as skipped
+whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
+itself a link, naming the real directory to use instead (the parent folders of the path as you
+typed it are resolved by the operating system as usual). The scan opens the root folder once,
+refusing a link, and keeps that one handle for the whole run; every folder and file below it is
+opened relative to the step before, refusing a link at every step, and the scan checks each
+folder's identity (device and inode) when it opens it and when it lists it, so a folder that was
+swapped for another one, or for a link, before one of those steps is named as changed and not
+read. A folder replaced after the scan has already opened it is still the one the scan holds, and
+the scan judges what it read from that handle; it does not report the later change. A regular file
+replaced by another regular file is not a detected change either: the scan judges the bytes it
+actually opened. Each file (at
+most 1 MB) is read once through those handles, and the scan judges exactly those bytes: they are
+held in memory and go straight to content routing and extraction, so the scan writes no copy of
+any file, anywhere (no temporary file or folder, nothing inside the scanned folder; the PDF,
+image and QR extractors are imported before the folder is opened, so none is first loaded in the
+middle of the walk), and no file's content is opened
+a second time by routing or extraction (the folders on the way down are opened again to list
+them and to read the next file). The findings carry the file's path in the tree. A file that
+changes after it was read is judged as it was when it was read. The previous file's bytes are
+let go before the next file is read, and the 1 MB cap bounds each read; it is not a limit on the
+process's total memory. One caveat outside the scan itself: reading text out of an image with
+the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
+your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside
+a folder you scan. Two limits of the same kind: if the folder you scan holds sunglasses' own source
+and you start the scan with `python -m sunglasses`, Python can cache sunglasses' own modules there
+at start-up, before any scanning code runs; and an image or PDF library that is first loaded
+during the scan and lives inside the folder you scan can be cached there by Python. Set
+`PYTHONDONTWRITEBYTECODE=1` for either case. If the scan is interrupted (Ctrl-C) the process
+exits and the operating system closes its folder handle; a program that calls the scan as a
+library and swallows that interrupt keeps the handle open until it exits.
+
+Where the platform has no such handles (Windows) the scan checks for a link and for a path that
+leaves the tree before it reads and again against the file it opened. That is a weaker guarantee
+against a tree that changes while the scan runs, and it has not been exercised on Windows.
+In a `--repo` scan a link inside the clone is a named skip, so a repository that holds one and
+used to come back clean (exit `0`) now exits `3`.
+
+Dependency and build folders (`node_modules`, `venv`, `dist`, `build` and the like) are not
+entered. Their files are neither scanned nor listed one by one; the folders are named in
+`excluded_folders` (and under `excludedFolders` in SARIF; the human report shows the first ten)
+and are not counted as skipped files. SARIF `notInspected` lists every file in `skipped`.
+The files that were read, the results and the skipped list are sorted by path (the order the
+folders are visited in is not part of that promise). File names shown to a person (progress lines, results, the banner)
+have control characters escaped. A path that is not a directory is refused with exit `2`, and so
+is `--dir` together with `--file` (even an empty value), `--text`, `--stdin` or text to scan.
+`--file` still refuses a directory: scanning a tree is a different claim from scanning one file,
+and `--dir` is where it is made.
+
 ### Deep Scan Setup (Audio & Video)
 
 Deep scan transcribes audio to text using Whisper, then scans the transcript for attacks. Two extra steps:
@@ -500,8 +574,8 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency, typical attack string (median of 38) | ~4.2 ms |
 | Scan latency, real README (median of 76, ~8.1 KB) | ~311 ms |
 | Sustained throughput | ~26 KB/sec, single-threaded |
-| Patterns | 1,569 |
-| Keywords | 6,964 unique declared (7,786 entries across all patterns); the pre-screen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
+| Patterns | 1,583 |
+| Keywords | 6,964 unique declared (7,864 entries across all patterns); the pre-screen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
 | Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 117 |
 | Normalization techniques | 17 |
@@ -510,7 +584,7 @@ result = scanner.scan_auto("any_file.ext")
 | pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
 | False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 77 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
-| Platforms | Mac, Windows, Linux (anywhere Python runs) |
+| Platforms | macOS and Linux supported (CI runs on Linux; macOS is tested by hand). Windows is not supported yet: signed receipts use `fcntl` and the proxy supervisor uses process groups, and neither exists there. The text scanner and the CLI import without `fcntl` (checked by hiding it, not on a Windows machine) but are untested there. Windows reports are welcome. |
 
 _Performance numbers are regenerated by `tools/gen_perf_stats.py` against a public in-repo corpus (no network, no randomness) and written to `stats/current.json` with the machine and timestamp they were measured on. Reproduce with `python3 tools/gen_perf_stats.py`. Last measured 2026-08-30. Your hardware will differ._
 
@@ -534,7 +608,7 @@ Both runs print which engine they measured. `--installed` refuses to run when th
 
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 77 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
 
-| Metric (v0.6.5) | Value |
+| Metric (v0.6.9) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
@@ -552,7 +626,7 @@ shipped patterns, counted from `sunglasses/patterns.py`:
 
 | tier | languages | what exists |
 |---|---|---|
-| **English** | English | the full 1,569-pattern ruleset |
+| **English** | English | the full 1,583-pattern ruleset |
 | **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** ("ignore previous instructions" and one credential-exfiltration shape) |
 | **Keyword-level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English-scoped patterns; **no dedicated pattern** |
 | **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** (previously listed as covered) |
@@ -567,7 +641,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 ## What Works Today
 
-- ✅ Text scanning: 1,569 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
+- ✅ Text scanning: 1,583 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
