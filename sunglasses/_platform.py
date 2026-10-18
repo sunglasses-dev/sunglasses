@@ -11,9 +11,9 @@ The check is made before any such command does anything, and it asks the two
 facts that matter, not a platform name: the interpreter says it is Windows, or
 `fcntl` cannot be imported. Hiding `fcntl` (`sys.modules["fcntl"] = None`) is
 therefore the same answer as Windows, which is how the tests reach it. A Python
-built without `fcntl` gets the same refusal, so the line names what is missing
-and does not claim every such interpreter is Windows. Not every refused command
-uses both pieces; it is refused when either one is absent.
+built without `fcntl` gets the same refusal, so the line says what it saw and does
+not claim every such interpreter is Windows. Process groups are not probed here:
+the six commands are refused on those two facts, whichever pieces each one uses.
 """
 import os
 import sys
@@ -43,15 +43,15 @@ def posix_pieces_missing():
 def refusal_line(command):
     """The one line printed instead of a traceback."""
     return (f"sunglasses {command} cannot run on this Python: it needs POSIX file locks (fcntl) "
-            "or process groups, and they are missing here (Windows has neither). "
+            "or process groups, and this Python reports Windows or has no fcntl. "
             "`sunglasses scan` uses neither but is untested on Windows. See Platforms in the README.")
 
 
 def process_record_line():
     """The one line for the bundled echo server's `--proc` option."""
     return ("sunglasses.proxy.echo_server --proc cannot run on this Python: it records the process "
-            "group (os.getpgid), which is missing here (Windows has no process groups). "
-            "Nothing was written.")
+            "group with os.getpgid, which this Python does not have (Windows has no process groups). "
+            "Nothing was opened.")
 
 
 def _process_groups_readable():
@@ -63,12 +63,13 @@ def _process_groups_readable():
 
 
 def refuse_process_record(stderr=None):
-    """None when the process group can be read, else EXIT_UNSUPPORTED, before any file is opened.
+    """None when `os.getpgid` exists, else EXIT_UNSUPPORTED, before any file is opened.
 
     `echo_server --proc FILE` used to open and truncate FILE and then fail on the missing
-    `os.getpgid`, so the refusal has to come first.
+    `os.getpgid`, so the refusal has to come first. It asks only for what the server uses:
+    a Python with no `fcntl` but with `os.getpgid` still runs it.
     """
-    if _process_groups_readable() and not posix_pieces_missing():
+    if _process_groups_readable():
         return None
     out = stderr if stderr is not None else sys.stderr
     out.write(process_record_line() + "\n")
