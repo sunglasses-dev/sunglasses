@@ -5,6 +5,8 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.10] — 2026-10-19
+
 ### Changed
 
 - A control character that is neither whitespace nor escape (NUL, bell, delete and the C1 range) no
