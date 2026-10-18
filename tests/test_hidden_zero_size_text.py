@@ -1295,3 +1295,66 @@ def test_the_nested_tag_shapes_through_the_engine_finish_in_bounded_time(engine,
     t = time.perf_counter()
     engine.scan(doc, channel=channel)
     assert time.perf_counter() - t < 8.0
+
+
+# Round 4: every block kind has its own copy of every bound, and the declaration reader (earlier declarations) and the two
+# override readers (a later declaration, a later !important one) each carry a copy of them. At its limit a block is one token;
+# one past it the block cannot be read, so an earlier declaration cannot be skipped (a miss) and a later declaration cannot be
+# seen (the zero stays live). A block holds up to 100 items, a block inside it up to 50, a string up to 100 characters.
+_OPEN_CLOSE = {"paren": ("(", ")"), "bracket": ("[", "]"), "brace": ("{", "}")}
+_ZERO_OF = {"font-size": "12px", "opacity": "1"}
+
+
+def _blk(kind, body):
+    o, c = _OPEN_CLOSE[kind]
+    return o + body + c
+
+
+def _block_bodies(kind, form):
+    out = [("items", lambda n: "x" * n, 100, 101)]
+    if form != "unquoted":
+        out.append(("nested", lambda n: _blk(kind, "x" * n), 50, 51))
+        q = "'" if form == "double" else '"'
+        out.append(("string", lambda n: q + "x" * n + q, 100, 101))
+    return out
+
+
+def _reader_value(mode, prop, block):
+    if mode == "earlier":
+        return "a:u" + block + ";" + prop + ":0"
+    if mode == "later":
+        return prop + ":0;a:u" + block + ";" + prop + ":" + _ZERO_OF[prop]
+    return prop + ":0!important;a:u" + block + ";" + prop + ":" + _ZERO_OF[prop] + "!important"
+
+
+_READER_CASES = []
+# An unquoted value is read by a shorter reader: parentheses of up to 100 characters only, a later declaration found within a
+# 200-character window; a brace or a bracket in it is not a token, so the zero after one is not read (a miss).
+for _mode in ("earlier", "later", "later-important"):
+    for _prop in ("font-size", "opacity"):
+        for _form in ("double", "single", "unquoted"):
+            for _kind in _OPEN_CLOSE:
+                if _form == "unquoted" and (_mode != "earlier" or _kind != "paren"):
+                    continue
+                for _what, _body, _at, _past in _block_bodies(_kind, _form):
+                    _READER_CASES.append(("%s %s %s %s %s" % (_mode, _prop, _form, _kind, _what), _form, _mode,
+                                          _reader_value(_mode, _prop, _blk(_kind, _body(_at))),
+                                          _reader_value(_mode, _prop, _blk(_kind, _body(_past)))))
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("name,form,mode,at,past", _READER_CASES)
+def test_every_block_bound_is_read_at_its_limit_and_not_past_it_by_each_reader(engine, name, form, mode, at, past, channel):
+    live_at = (mode == "earlier")           # an earlier declaration read: the zero is a hit; a later one read: it overrides
+    assert flagged(engine, _in_value(form, at), channel) is live_at, name
+    assert flagged(engine, _in_value(form, past), channel) is (not live_at), name
+
+
+@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("prop", ["font-size", "opacity"])
+@pytest.mark.parametrize("kind", ["bracket", "brace"])
+def test_an_unquoted_value_reads_a_brace_or_a_bracket_block_like_the_quoted_forms(engine, prop, kind, channel):
+    # a zero AFTER the block is live; a zero INSIDE the block is not a declaration, in every attribute form
+    for form in ("double", "unquoted"):
+        assert flagged(engine, _in_value(form, "a:u" + _blk(kind, "x") + ";" + prop + ":0"), channel), form
+        assert not flagged(engine, _in_value(form, "--x:" + _blk(kind, "a;" + prop + ":0")), channel), form
