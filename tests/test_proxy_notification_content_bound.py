@@ -50,22 +50,32 @@ SHAPES = [
 CAP = bounds.CONTENT_BYTES
 EDGES = {"under": CAP - 1, "at": CAP, "over": CAP + 1}
 PLACEMENTS = ["params", "extra", "split"]
+TOOL_NAME = "t"
 
 
 def _counted(message):
     """The decoded content bytes a frame carries, worked out here and not through
     the selector under test: the only string leaves `_build` puts in a frame are
-    `params.data` and the top-level `extra`; the envelope (`jsonrpc`, `id`,
-    `method`) and every key name are not content."""
+    `params.data`, `params.name` (on a `tools/call` request, see `_build`) and the
+    top-level `extra`; the envelope (`jsonrpc`, `id`, `method`) and every key name
+    are not content."""
     params = message.get("params", {})
     return (len(params.get("data", "").encode("utf-8"))
+            + len(params.get("name", "").encode("utf-8"))
             + len(message.get("extra", "").encode("utf-8")))
 
 
 def _build(method, placement, total, filler="a", request_id=None):
     """A frame whose counted content is exactly `total` bytes, by construction: the
     filler is one byte a character and it is the only content in the frame. No id
-    by default; `request_id` makes it a request."""
+    by default; `request_id` makes it a request. A `tools/call` request names its
+    tool (one byte, counted, taken out of the filler): a call with no usable name is
+    refused before the content bound is reached, which would hide what these tests
+    pin."""
+    named = method == "tools/call" and request_id is not None
+    if named:
+        total -= len(TOOL_NAME)
+
     def text(n):
         return filler * n
 
@@ -75,6 +85,8 @@ def _build(method, placement, total, filler="a", request_id=None):
             msg["id"] = request_id
         if placement in ("params", "split"):
             msg["params"] = {"data": text(first)}
+        if named:
+            msg.setdefault("params", {})["name"] = TOOL_NAME
         if placement in ("extra", "split"):
             msg["extra"] = text(second)
         return msg
@@ -87,7 +99,7 @@ def _build(method, placement, total, filler="a", request_id=None):
     else:
         parts = (spare // 2, spare - spare // 2)
     built = message(*parts)
-    assert _counted(built) == total
+    assert _counted(built) == total + (len(TOOL_NAME) if named else 0)
     return frame(**built)
 
 
@@ -279,8 +291,13 @@ def test_several_extras_on_a_request_share_one_content_bound(
     if with_params:
         message["params"] = {"data": "c"}
         message["second"] = message["second"][:-1]
-    assert (len(message["extra"]) + len(message["second"])
-            + len(message.get("params", {}).get("data", ""))) == total
+    if method == "tools/call":
+        # a call with no usable name is refused before the bound is reached
+        message.setdefault("params", {})["name"] = TOOL_NAME
+        message["second"] = message["second"][:-len(TOOL_NAME)]
+    params = message.get("params", {})
+    assert (len(message["extra"]) + len(message["second"]) + len(params.get("data", ""))
+            + len(params.get("name", ""))) == total
     engine, upstream, client, scans = make_route(tmp_path)
     raw = frame(**message)
     engine.client_frame(raw)
