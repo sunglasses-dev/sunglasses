@@ -71,7 +71,8 @@ All notable changes to Sunglasses are documented here.
   conjunction ("never log, store or transmit X") is not read as a list, and the stop-word lists are
   finite. This supersedes the earlier line saying negated lists keep their old severity. (#409)
 
-- Scan startup is about 6x faster (engine build 699 ms to 65 ms). The shipped rules' regular
+- Scan startup is about 6x faster (`sunglasses scan --text hello` 0.78 s to 0.13 s) and the engine
+  build about 11x faster (699 ms to 65 ms). The shipped rules' regular
   expressions are no longer compiled when the engine starts; each compiles the first time a scan
   reaches it. On one Mac (Python 3.14.7) `sunglasses scan --text hello` took 0.78 s before and 0.13
   s after, and `sunglasses scan` of a one-line file took 1,430 ms before and 171 ms after; nothing
@@ -111,6 +112,14 @@ All notable changes to Sunglasses are documented here.
   its own server only. These are checks made at entry, not protection against a process that changes
   the config while a command runs. (#377)
 
+- `sunglasses install` and `uninstall` recovery now reads a sibling claim, a canonical record and a
+  take note through one no-follow, non-blocking descriptor: the type is checked with `fstat` on that
+  descriptor and the bytes are read from it, so an entry swapped for a FIFO or a link between the
+  look and the read cannot block the read or be followed. A paired standby copy that is a symbolic
+  link is no longer moved. Known limits: the name is not re-checked between the read and a later
+  rename, so a substituted recovery copy is not detected, and where the platform has no no-follow
+  flag the read is refused unless the descriptor is the same file the name check saw. (#382)
+
 - A client `initialize` whose `protocolVersion` is not a string (a number, null, a list, an object,
   a boolean) was forwarded to the server. The proxy now withholds it, answers once with
   `UNSUPPORTED_PROTOCOL` and closes the session. A string offer, whatever its value, still goes
@@ -131,6 +140,17 @@ All notable changes to Sunglasses are documented here.
   is scanned or sent. A request whose only member beside the envelope is `params` counts what it
   counted. What a scan reads is not changed; the extra members are counted, not scanned. (#404)
 
+- The proxy now reads every extra top-level member of a client frame, not only `params`. A
+  `tools/call`, `initialize`, `resources/read`, `prompts/get` or forwarded notification that carried
+  a member beside `params` was scanned on `params` alone and then forwarded whole, so the member
+  reached the server unread. Everything except `jsonrpc`, `id` and `method` is now content, and a
+  flagged extra member is refused in the request's own id. A frame with no extra member is read
+  exactly as before, and a clean extra member still passes byte for byte. It counts toward the
+  content bound on a request. This supersedes the earlier line saying the extra members are counted,
+  not scanned. Found by fuzzing the frames; no host path is shown and no client survey was done. A
+  `tools/list` request and a cancellation notification are not forwarded, so they are out of scope.
+  (#393)
+
 
 - A `server/discover` probe is answered method-not-found and receipted as a probe decline only when
   the proxy refused it as an unknown method. A probe that reused an id the client had already
@@ -148,6 +168,18 @@ All notable changes to Sunglasses are documented here.
   Two per-id tables that nothing read are removed, an admission time is dropped when its request
   leaves pending, and a cancel for an id no request ever used is ignored. Memory still grows with
   the number of distinct requests a client sends; no per-request size is claimed. (#379)
+
+- The PreToolUse hook now ends as a hook failure on an input it cannot read as a tool call: empty
+  stdin, text that is not JSON, a number past Python's digit limit, a `tool_name` that is not a
+  string, or a `tool_input` that is not an object. Before, these answered `{}` with exit 0, so the
+  host saw no hook failure and the install's `onFailure` setting never applied. Now stdout stays
+  empty, one reason line goes to stderr and the hook exits 1, and the host applies `onFailure`:
+  `"block"` refuses the call, anything else is the normal permission flow, with a hook-error notice
+  in the transcript. Valid JSON that is not an object (an array, a number, a string, `null`, a
+  boolean) still asks with exit 0, now with a message that says why. Both groups write an in-flight
+  and a decision record under `GLS-FW-MALFORMED-EVENT` with the reason and `degraded: true`, and
+  nothing the sender wrote is logged. A readable envelope is unchanged. Exit 1 follows the host's
+  documented contract; it was not run in an authenticated Claude Code session. (#389)
 
 ### Housekeeping
 
@@ -174,10 +206,9 @@ All notable changes to Sunglasses are documented here.
   from an unchanged "6,675 keywords". Other counts it looked at are left alone and listed in its
   output. (#411)
 
-- CI: the table of measured seconds per test file that splits each interpreter's run into two parts
-  (`tests/ci_shard.py`) is re-measured from a green main run, and `tools/ci_durations.py <run-id>`
-  reads one finished run and prints the job wall clocks, the 20 slowest tests and a COST block to
-  paste into that table. Tests and tooling only. (#413)
+- CI: the shard cost table is re-measured, `tools/ci_durations.py <run-id>` reads one finished run,
+  the negation test file is dealt by test across the two shard parts, and the shard invariant is
+  pinned on real quick and full runs. Tests and tooling only. (#413, #417, #418)
 
 ## [0.6.9] — 2026-10-15
 
