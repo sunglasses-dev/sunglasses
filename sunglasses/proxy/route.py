@@ -119,11 +119,6 @@ class _NoId:
 NO_ID = _NoId()
 
 
-def _typed(request_id):
-    """T6.R6's identity, for the sets this module keeps: the JSON type is part
-    of it, so `"1"` and `1` are different held items here too."""
-    return (type(request_id).__name__, request_id)
-
 RULE_ADMISSION = "S1"
 RULE_RESOURCE = "S3"
 RULE_APPROVAL = "S4"
@@ -173,7 +168,6 @@ class Route:
         # decides whether a result may be released, and a check that lives in
         # the middle of the release path is a check the next release path
         # forgets to make.
-        self._cancelled = set()
         self._invalidated_reason = None
 
     # ── one frame from the client ──────────────────────────────────────────
@@ -671,7 +665,7 @@ class Route:
             rule_ids=settlement.rule_ids if settlement else (),
             catalog=self.catalog,
             **self._approval_hint(reason))
-        return ((json.dumps(body, separators=(",", ":")) + "\n").encode("utf-8"),
+        return ((json.dumps(body, separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8"),
                 reason, rule)
     def _approval_hint(self, reason):
         """The two ids `proxy approve` needs, for the one reason it answers.
@@ -1089,7 +1083,16 @@ class Route:
         if target is None and not (isinstance(params, dict)
                                    and "requestId" in params):
             return
-        self._cancelled.add(_typed(target))
+        if not framing.valid_id(target):
+            # Not a string, a number or null, so it names no request, and a
+            # list or an object cannot be a key of the sets below. A cancel is
+            # a notification and is owed no answer; there is nothing to cancel.
+            return
+        if not self.session.was_issued(target, origin=CLIENT):
+            # No request with this id was ever admitted, so there is nothing to
+            # cancel, and recording it would grow the tables below by one entry
+            # for every id a peer cares to invent.
+            return
         # R-168-R4a. Accepted in the session, under ITS lock, so a reader
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
@@ -1414,6 +1417,12 @@ class Route:
             return REASON_APPROVAL_REQUIRED
         params = message.get("params")
         name = params.get("name") if isinstance(params, dict) else None
+        if not isinstance(name, str) or not name:
+            # A tool name is a non-empty string. Anything else, a missing name
+            # included, names no approved tool, cannot be looked up in the
+            # tables below, and must not start the activation (which writes a
+            # control request upstream) on its way to being refused.
+            return REASON_APPROVAL_REQUIRED
         self._activate_once()
         if self._state_fault is not None:
             return REASON_STATE_IO_ERROR
@@ -1530,7 +1539,7 @@ class Route:
         CALLER, which is the party that knows its token, immediately before
         calling this. `_withhold` and `_cancel` both do.
         """
-        self.client_write((json.dumps(body, separators=(",", ":")) + "\n")
+        self.client_write((json.dumps(body, separators=(",", ":"), allow_nan=False) + "\n")
                           .encode("utf-8"))
         self._record("FRAME_OUT", direction="upstream_to_client",
                      raw_len=len(json.dumps(body)))
