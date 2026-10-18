@@ -185,20 +185,23 @@ _CLIENT_ENVELOPE = frozenset({"jsonrpc", "id", "method"})
 
 
 def client_surface(method, message):
-    """What a scan reads of a CLIENT frame: its `params`, as always.
+    """What a scan reads of a CLIENT frame: its `params`, and any member beside
+    it.
 
-    For the two zero-leaf methods it is every member beside the envelope. A
-    ping or an initialized notification with an extra top-level member and no
-    params left the shortcut because of the member, and then the scan read an
-    empty `params`, so the member still crossed unread. Other methods keep
-    reading `params` only; that is not changed here.
+    Every member that is not the envelope (`jsonrpc`, `id`, `method`) is
+    content. A frame with a member other than `params` is read as one object
+    holding all of them, so the extra member is scanned with the rest; a frame
+    without one is read as its `params`, unwrapped, as it always was. Reading
+    `params` alone let a member beside it cross to the server unscanned, on
+    every method, and left a ping or an initialized notification with nothing
+    but that member holding an empty `params` to read. `method` is not needed to
+    decide this and stays in the signature for the callers.
     """
     params = message.get("params")
-    if method in _ZERO_LEAF_METHODS:
-        extras = {key: value for key, value in message.items()
-                  if key not in _CLIENT_ENVELOPE}
-        if set(extras) - {"params"}:
-            return extras
+    extras = {key: value for key, value in message.items()
+              if key not in _CLIENT_ENVELOPE}
+    if set(extras) - {"params"}:
+        return extras
     return params if isinstance(params, (dict, list)) else {}
 
 

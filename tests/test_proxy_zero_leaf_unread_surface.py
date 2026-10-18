@@ -57,6 +57,9 @@ def test_a_ping_answer_with_content_never_reaches_the_client(tmp_path, body):
     assert not _crossed(client), client.bytes
     answers = client.messages()
     assert len(answers) == 1 and "result" not in answers[0], answers
+    if "error" in body:
+        assert [s["channel"] for s in scans] == ["api_response"]
+        assert answers[0]["error"]["data"]["reason_code"] == "PROHIBITED_CONTENT"
 
 
 def test_a_withheld_ping_answer_is_answered_once_with_a_refusal(tmp_path):
@@ -289,14 +292,6 @@ def test_a_clean_extra_member_is_read_then_forwarded_byte_exact(
     assert [s["channel"] for s in scans] == ["message"]
     assert scans[0]["params"] == extra
     assert upstream.bytes == raw and client.bytes == b""
-
-
-def test_the_scan_surface_of_a_nonzero_leaf_method_is_still_params_only():
-    """Not changed here: another client method with an extra top-level member
-    is read the way it always was."""
-    message = {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
-               "params": {"name": "x"}, "extra": "y"}
-    assert selector.client_surface("tools/call", message) == {"name": "x"}
 
 
 @pytest.mark.parametrize("message,expected", [
