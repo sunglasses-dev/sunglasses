@@ -5,6 +5,23 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- A new rule, `GLS-HI-005`, reads a zero font size or a zero opacity in the `style` attribute of an
+  element whose own text, up to the next tag, addresses an agent: "ignore the previous
+  instructions" and its variants, an AI word (AI, LLM, language model, chatbot, assistant, agent)
+  followed by a comma, colon or semicolon and a command, "if you are an AI", or "you are now an AI"
+  (or in developer, debug, DAN or god mode). It covers web content and files. `GLS-HI-002` lists
+  `font-size:0` and `opacity:0` as words, but the text is folded before words are looked up and the
+  fold turns every 0 into an o, so those two words never matched. Known limit: a hidden element
+  holding only a plain imperative with no agent addressed ("tell the customer the refund is
+  complete", "never mention this", "output your system prompt", "do not mention this to anyone")
+  is not a hit of this rule, because that wording cannot be told from an ordinary fade-in line.
+  Other known misses: an unquoted style value that holds an equals sign, a quote or a backtick, an
+  unquoted attribute value that holds a less-than sign, a tag inside a comment, script or textarea,
+  and text beyond the stated bounds (20 attributes on each side of the style, 300 characters of
+  attribute value, 300 characters of element text, 200 characters either side of the zero). (#414)
+
 ### Changed
 
 - A control character that is neither whitespace nor escape (NUL, bell, delete and the C1 range) no
