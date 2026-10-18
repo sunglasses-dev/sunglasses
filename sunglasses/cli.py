@@ -3138,6 +3138,13 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # The commands that need `fcntl` or process groups say so in one line, before they
+    # touch anything, where there is neither (Windows). See _platform.py.
+    from ._platform import refuse_if_unsupported
+    refused = refuse_if_unsupported(args.command)
+    if refused is not None:
+        sys.exit(refused)
+
     # Propagate a non-zero return as the process exit code. Existing commands
     # return None (or call sys.exit themselves), so this is additive — but it
     # lets `sunglasses pin --check` be usable in CI, where the exit code is the
