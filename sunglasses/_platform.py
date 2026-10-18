@@ -10,7 +10,10 @@ they had started writing. `sunglasses scan` needs none of it.
 The check is made before any such command does anything, and it asks the two
 facts that matter, not a platform name: the interpreter says it is Windows, or
 `fcntl` cannot be imported. Hiding `fcntl` (`sys.modules["fcntl"] = None`) is
-therefore the same answer as Windows, which is how the tests reach it.
+therefore the same answer as Windows, which is how the tests reach it. A Python
+built without `fcntl` gets the same refusal, so the line names what is missing
+and does not claim every such interpreter is Windows. Not every refused command
+uses both pieces; it is refused when either one is absent.
 """
 import os
 import sys
@@ -39,9 +42,37 @@ def posix_pieces_missing():
 
 def refusal_line(command):
     """The one line printed instead of a traceback."""
-    return (f"sunglasses {command} is not supported on Windows yet: it needs file locks (fcntl) "
-            "and process groups, which Windows does not have. `sunglasses scan` uses neither "
-            "but is untested there. See Platforms in the README.")
+    return (f"sunglasses {command} cannot run on this Python: it needs POSIX file locks (fcntl) "
+            "or process groups, and they are missing here (Windows has neither). "
+            "`sunglasses scan` uses neither but is untested on Windows. See Platforms in the README.")
+
+
+def process_record_line():
+    """The one line for the bundled echo server's `--proc` option."""
+    return ("sunglasses.proxy.echo_server --proc cannot run on this Python: it records the process "
+            "group (os.getpgid), which is missing here (Windows has no process groups). "
+            "Nothing was written.")
+
+
+def _process_groups_readable():
+    try:
+        os.getpgid
+    except AttributeError:
+        return False
+    return True
+
+
+def refuse_process_record(stderr=None):
+    """None when the process group can be read, else EXIT_UNSUPPORTED, before any file is opened.
+
+    `echo_server --proc FILE` used to open and truncate FILE and then fail on the missing
+    `os.getpgid`, so the refusal has to come first.
+    """
+    if _process_groups_readable() and not posix_pieces_missing():
+        return None
+    out = stderr if stderr is not None else sys.stderr
+    out.write(process_record_line() + "\n")
+    return EXIT_UNSUPPORTED
 
 
 def refuse_if_unsupported(command, stderr=None):

@@ -5,8 +5,11 @@ Windows is not reachable from CI, so "Windows" here is the two facts the code as
 `fcntl` cannot be imported, and the POSIX-only names of `os` and `signal` are gone.
 The subprocess tests hide them in a fresh interpreter; the unit tests drive the
 check with the interpreter's own answer (`os.name == "nt"`) replaced. This is a model
-of Windows, not a run on it, and the README says so.
+of Windows, not a run on it, and the README says so. Each child also records, with an
+audit hook, every open/list/create/remove/rename under the sandbox HOME, XDG_CONFIG_HOME
+and TMPDIR, so "before it reads or writes anything" is asserted and not only "left no file".
 """
+import json
 import os
 import pathlib
 import re
@@ -29,6 +32,22 @@ for name in ("killpg", "getpgid", "setpgid", "setsid", "fchmod", "getuid", "gete
 for name in ("SIGKILL", "SIGALRM", "pthread_sigmask", "alarm", "SIGHUP", "SIGUSR1"):
     if hasattr(signal, name):
         delattr(signal, name)
+import atexit, json
+_roots = [os.path.realpath(r) for r in os.environ["SANDBOX_ROOTS"].split(os.pathsep)]
+_seen, _busy = [], []
+_EVENTS = {"open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename", "os.rmdir", "glob.glob"}
+def _hook(event, args):
+    if event not in _EVENTS or _busy or not args or not isinstance(args[0], (str, bytes, os.PathLike)):
+        return
+    _busy.append(1)
+    try:
+        path = os.path.realpath(os.fsdecode(args[0]))
+        if any(path == r or path.startswith(r + os.sep) for r in _roots):
+            _seen.append([event, path])
+    finally:
+        _busy.pop()
+sys.addaudithook(_hook)
+atexit.register(lambda: (_busy.append(1), open(os.environ["AUDIT_LOG"], "w").write(json.dumps(_seen))))
 module = sys.argv[1]
 sys.argv = [module] + sys.argv[2:]
 runpy.run_module(module, run_name="__main__")
@@ -53,13 +72,33 @@ REFUSED = [
 NOT_GUARDED = ("scan", "check", "info", "firewall-hook", "pin", "demo", "report", "config", "mcp")
 
 
-def _run(tmp_path, module, *args, stdin=""):
+def _run(tmp_path, module, *args, stdin="", env_extra=None):
+    """Run `module` in a child with the POSIX pieces removed. `.accessed` lists what it touched."""
     home = tmp_path / "home"
-    home.mkdir(exist_ok=True)
+    xdg = tmp_path / "xdg"
+    tmpdir = tmp_path / "tmp"
+    for d in (home, xdg, tmpdir):
+        d.mkdir(exist_ok=True)
+    log = tmp_path.parent / (tmp_path.name + "_audit.json")
     env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "PYTHONPATH": str(ROOT),
-           "SUNGLASSES_HOME": str(home / ".sunglasses"), "NO_COLOR": "1"}
-    return subprocess.run([sys.executable, "-c", _RUNNER, module, *args], cwd=tmp_path, env=env,
-                          input=stdin, capture_output=True, text=True, timeout=120)
+           "SUNGLASSES_HOME": str(home / ".sunglasses"), "XDG_CONFIG_HOME": str(xdg),
+           "TMPDIR": str(tmpdir), "PYTHONDONTWRITEBYTECODE": "1", "NO_COLOR": "1",
+           "SANDBOX_ROOTS": os.pathsep.join(str(d) for d in (home, xdg, tmpdir)), "AUDIT_LOG": str(log)}
+    env.update(env_extra or {})
+    done = subprocess.run([sys.executable, "-c", _RUNNER, module, *args], cwd=tmp_path, env=env,
+                          input=stdin, capture_output=True, text=True, timeout=60)
+    try:
+        done.accessed = json.loads(log.read_text())
+    except (OSError, ValueError):
+        done.accessed = None
+    return done
+
+
+def _nothing_touched(tmp_path, done):
+    """No file under the sandbox existed afterwards, and none was opened, listed or changed."""
+    left = [p for d in ("home", "xdg", "tmp") for p in (tmp_path / d).rglob("*")]
+    assert not left, left
+    assert done.accessed == [], done.accessed          # [] and not None: the hook ran and saw nothing
 
 
 @pytest.mark.parametrize("args", REFUSED, ids=lambda a: " ".join(a))
@@ -69,15 +108,62 @@ def test_a_posix_only_command_prints_one_line_and_does_nothing(tmp_path, args):
     assert done.stdout == ""
     lines = done.stderr.splitlines()
     assert len(lines) == 1, done.stderr
-    assert "not supported on Windows" in lines[0] and "Traceback" not in done.stderr
+    assert "cannot run on this Python" in lines[0] and "Traceback" not in done.stderr
     assert lines[0] == _platform.refusal_line(args[0])
-    assert not list((tmp_path / "home").rglob("*")), list((tmp_path / "home").rglob("*"))   # nothing written before the refusal
+    _nothing_touched(tmp_path, done)       # nothing read, listed or written before the refusal
 
 
 def test_python_dash_m_proxy_refuses_the_same_way(tmp_path):
     done = _run(tmp_path, "sunglasses.proxy", "--", "echo", "hi")
     assert done.returncode == 2 and done.stdout == ""
     assert done.stderr.splitlines() == [_platform.refusal_line("proxy")]
+    _nothing_touched(tmp_path, done)
+
+
+# ── the bundled echo server: a direct module route that is not a subcommand ──────────
+
+def test_echo_server_proc_refuses_before_it_opens_the_record_file(tmp_path):
+    existing = tmp_path / "home" / "record.json"
+    (tmp_path / "home").mkdir()
+    existing.write_text("keep me")
+    absent = tmp_path / "home" / "absent.json"
+    for target in (existing, absent):
+        done = _run(tmp_path, "sunglasses.proxy.echo_server", "--proc", str(target))
+        assert done.returncode == 2 and done.stdout == "", (done.returncode, done.stdout, done.stderr)
+        assert done.stderr.splitlines() == [_platform.process_record_line()], done.stderr
+        assert existing.read_text() == "keep me"      # the old behaviour truncated it to zero bytes
+        assert not absent.exists()
+        assert done.accessed == [], done.accessed      # the file was never opened, and nothing else was either
+
+
+def test_echo_server_without_proc_still_runs_in_the_model(tmp_path):
+    request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
+    done = _run(tmp_path, "sunglasses.proxy.echo_server", stdin=request)
+    assert done.returncode == 0 and "Traceback" not in done.stderr, (done.stdout, done.stderr)
+    assert json.loads(done.stdout.splitlines()[0])["id"] == 1
+
+
+def test_echo_server_proc_still_writes_the_record_where_process_groups_exist(tmp_path):
+    from sunglasses.proxy import echo_server
+    target = tmp_path / "record.json"
+    assert echo_server.main(["--proc", str(target)], stdin=iter(()), stdout=None) == 0
+    record = json.loads(target.read_text())
+    assert record["pid"] == os.getpid() and record["pgid"] == os.getpgid(0)
+
+
+@pytest.mark.parametrize("hide", ["getpgid", "fcntl", "nt"])
+def test_echo_server_main_refuses_in_process_before_opening(tmp_path, monkeypatch, hide):
+    from sunglasses.proxy import echo_server
+    if hide == "getpgid":
+        monkeypatch.delattr(os, "getpgid")
+    elif hide == "fcntl":
+        monkeypatch.setitem(sys.modules, "fcntl", None)
+    else:
+        monkeypatch.setattr(_platform, "_os_name", lambda: "nt")
+    target = tmp_path / "record.json"
+    target.write_text("keep me")
+    assert echo_server.main(["--proc", str(target)], stdin=iter(()), stdout=None) == _platform.EXIT_UNSUPPORTED
+    assert target.read_text() == "keep me"
 
 
 def test_scan_still_runs_end_to_end_and_finds_what_it_finds(tmp_path):
@@ -147,8 +233,8 @@ def test_only_the_posix_only_commands_are_refused(monkeypatch, hide):
         assert _platform.refuse_if_unsupported(command, out) is None and out.text == ""
 
 
-def test_the_line_is_one_plain_line_with_no_name_but_the_command():
+def test_the_line_is_one_plain_line_and_names_what_is_missing():
     for command in _platform.POSIX_ONLY_COMMANDS:
         line = _platform.refusal_line(command)
-        assert "\n" not in line and line.isascii() and line.startswith(f"sunglasses {command} is not supported on Windows")
+        assert "\n" not in line and line.isascii() and line.startswith(f"sunglasses {command} cannot run on this Python")
         assert "—" not in line

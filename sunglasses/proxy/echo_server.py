@@ -152,6 +152,13 @@ def main(argv=None, stdin=None, stdout=None):
     options = parse(sys.argv[1:] if argv is None else argv)
     stdin = stdin if stdin is not None else sys.stdin.buffer
     stdout = stdout if stdout is not None else sys.stdout.buffer
+    if options.get("proc"):
+        # Before `_announce` opens the file: where there is no process group the
+        # open would truncate it and the call after it would then fail.
+        from .._platform import refuse_process_record
+        refused = refuse_process_record()
+        if refused is not None:
+            return refused
     _announce(options.get("proc"))
     for raw in stdin:
         _ingress(options.get("ingress"), raw)
