@@ -2234,9 +2234,10 @@ def _receipts_unwritable(decision, error, receipts, exc):
                  f"unsigned on a guess. Fix its permissions (chmod 700).")
         if getattr(exc, "blocked_by", None) is not None:
             # R62: the thing in the way is what to fix, not the path under it.
+            from .receipts._shown import shown_path
             check = (f"A receipts directory {exc}, and a signed log never "
-                     f"turns unsigned on a guess. Fix it: make {exc.blocked_by} "
-                     f"a directory, chmod 700.")
+                     f"turns unsigned on a guess. Fix it: make "
+                     f"{shown_path(exc.blocked_by)[0]} a directory, chmod 700.")
     from .receipts import chain as _chain
     if isinstance(exc, _chain.MarkerUnwritable):
         # R62 B: which marker, why, and that the next call tries again.

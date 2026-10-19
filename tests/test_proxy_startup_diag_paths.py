@@ -16,8 +16,9 @@ stderr:
   not a traceback.
 
 Exit codes at the command line are unchanged: 1 for the receipt log, EXIT_FAULT for the
-approval store. Two cases call the display helpers directly and thirty give what is shown to
-the system bash (3.2) and zsh and compare the bytes they read back; the rest run `serve.main`.
+approval store. A few cases call the display helpers or the key code directly, thirty give what
+is shown to the system bash (3.2) and zsh and compare the bytes they read back, and the rest
+run `serve.main` (or `sunglasses receipts --verify`) in a child interpreter.
 """
 import os
 import shlex
@@ -27,7 +28,7 @@ import sys
 import pytest
 
 from sunglasses.proxy import receipts, serve
-from sunglasses.receipts import keys, optin
+from sunglasses.receipts import _fs, keys, optin
 
 TREE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = [sys.executable, "-c", "import sys; sys.stdin.read()"]
@@ -375,3 +376,84 @@ def test_a_missing_extra_names_the_key_directory_as_escapes(tmp_path, monkeypatc
     message = str(raised.value)
     assert f"the signing key in {_written(str(home / 'keys'))} needs" in message
     assert message.endswith(receipts.ESCAPED_NOTE) and message.isprintable()
+
+
+# ---------------------------------------------------------------------------
+# the hook chain: no key, and a file where the chain directory should be
+# ---------------------------------------------------------------------------
+
+def _home_with_a_file_for_the_chain(tmp_path, name):
+    """A signing home with no key whose hook-chain directory is a regular file."""
+    home = tmp_path / name
+    (home / "receipts").mkdir(parents=True)
+    (home / "receipts" / "hook").write_text("not a directory\n")
+    return home
+
+
+@pytest.mark.parametrize("kind", sorted(HIDDEN))
+def test_a_hook_chain_that_cannot_be_listed_is_named_as_escapes_through_the_proxy(tmp_path, kind):
+    home = _home_with_a_file_for_the_chain(tmp_path, "home-" + HIDDEN[kind])
+    p = _run(tmp_path, str(tmp_path / "user" / "proxy"), home=home)
+    assert p.returncode == 1, p.stderr[-400:]
+    line = _one_safe_line(p.stderr)
+    assert f"{_written(str(home / 'receipts' / 'hook'))} cannot be listed" in line
+    assert NOTE in line
+    assert line.count(NOTE) == 1
+
+
+@pytest.mark.parametrize("pair", COLLIDING, ids=["esc-order", "esc-vs-text", "invisible"])
+def test_two_different_hook_chain_homes_do_not_print_alike(tmp_path, pair):
+    lines = []
+    for n, name in enumerate(pair):
+        sub = tmp_path / str(n)
+        sub.mkdir()
+        home = _home_with_a_file_for_the_chain(sub, "home-" + name)
+        p = _run(sub, str(sub / "user" / "proxy"), home=home)
+        assert p.returncode == 1, p.stderr[-400:]
+        lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
+    assert lines[0] != lines[1], lines
+
+
+def test_a_hook_chain_with_spaces_is_shell_quoted_and_has_no_note(tmp_path):
+    home = _home_with_a_file_for_the_chain(tmp_path, "my home")
+    p = _run(tmp_path, str(tmp_path / "user" / "proxy"), home=home)
+    line = _one_safe_line(p.stderr)
+    assert f"{shlex.quote(str(home / 'receipts' / 'hook'))} cannot be listed" in line
+    assert "control or invisible" not in line
+
+
+def test_a_chain_under_a_file_names_both_paths_as_escapes_and_the_note_once(tmp_path):
+    above = tmp_path / "above-\x1b"
+    above.write_text("a file\n")
+    home = above / "deeper"
+    with pytest.raises(_fs.Unlistable) as raised:
+        optin._chain_open(optin.hook_log(home))
+    message = str(raised.value)
+    assert _written(str(above)) in message
+    assert _written(str(home / "receipts" / "hook")) in message
+    assert message.endswith(NOTE + ")")
+    assert message.count(NOTE) == 1
+    assert message.isprintable()
+
+
+# ---------------------------------------------------------------------------
+# `sunglasses receipts --verify` prints the same message it was given
+# ---------------------------------------------------------------------------
+
+def _verify(home):
+    env = {**os.environ, "SUNGLASSES_HOME": str(home), "PYTHONPATH": TREE,
+           "PYTHONDONTWRITEBYTECODE": "1"}
+    return subprocess.run([sys.executable, "-m", "sunglasses.cli", "receipts", "--verify"],
+                          env=env, capture_output=True, timeout=60, cwd=str(home.parent))
+
+
+@pytest.mark.parametrize("make", [_home_with_a_file_for_keys, _home_with_a_file_for_the_chain],
+                         ids=["key-directory", "hook-chain"])
+def test_verify_prints_the_escapes_once_and_keeps_the_note(tmp_path, make):
+    home = make(tmp_path, "home-\x1b[2Jb\\x1b")
+    out = _verify(home).stdout.decode("utf-8")
+    shown = _written(str(home / ("keys" if make is _home_with_a_file_for_keys else "receipts/hook")))
+    assert shown in out, out
+    assert NOTE in out, out
+    assert shown.replace("\\", "\\\\") not in out, out     # not escaped a second time
+    assert "\x1b" not in out.replace("\x1b[1;31m", "").replace("\x1b[0m", "").replace("\x1b[2m", ""), out

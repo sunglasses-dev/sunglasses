@@ -19,6 +19,8 @@ import fnmatch
 import os
 import pathlib
 
+from ._shown import ESCAPED_NOTE, shown_path
+
 
 class Unlistable(OSError):
     """Something is at the path and its entries cannot be read. Never "empty"."""
@@ -27,9 +29,16 @@ class Unlistable(OSError):
         self.directory = pathlib.Path(directory)
         self.cause = cause
         self.blocked_by = None if blocked_by is None else pathlib.Path(blocked_by)
-        text = f"{self.directory} cannot be listed ({type(cause).__name__})"
+        # The paths come from a flag, a config file or a directory another account
+        # made, so each is named through shown_path and the note ends the message once.
+        shown, escaped = shown_path(self.directory)
+        text = f"{shown} cannot be listed ({type(cause).__name__})"
         if self.blocked_by is not None:
-            text += f": {self.blocked_by} above it is not a directory that can be listed"
+            above, above_escaped = shown_path(self.blocked_by)
+            escaped = escaped or above_escaped
+            text += f": {above} above it is not a directory that can be listed"
+        if escaped:
+            text += ESCAPED_NOTE
         super().__init__(cause.errno, text)
 
     def __str__(self):

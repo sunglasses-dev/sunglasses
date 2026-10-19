@@ -8,6 +8,12 @@ between $'...' as byte escapes that bash (3.2 included) and zsh read back as the
 so the line stays one line and two different names never print the same. Several paths in
 one message are each written this way and the message adds `ESCAPED_NOTE` once if any was
 escaped. `printable` is for text that is not a path.
+
+The producers that use it: the five key messages in `optin`, `_fs.Unlistable` (so a key or
+hook-chain directory that cannot be listed names itself the same way in the proxy, the
+command line and the hook), and the proxy's two startup refusals. It does not rewrite the
+native text of an `OSError` raised elsewhere, which the signed-header failure keeps as it
+was (cut at 200 characters).
 """
 import os
 import shlex
