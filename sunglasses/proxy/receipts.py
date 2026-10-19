@@ -604,29 +604,54 @@ class _Closed:
 _CLOSED = _Closed()
 
 
+# Characters that print as nothing or as part of their neighbour, so a name using them
+# can look like a different name. `str.isprintable()` rejects most of them (zero-width
+# and bidi controls are "Format"); these are the default-ignorable ones it lets through.
+_INVISIBLE = ((0x034F, 0x034F), (0x115F, 0x1160), (0x17B4, 0x17B5),
+              (0x180B, 0x180F), (0x2800, 0x2800), (0x3164, 0x3164),
+              (0xFE00, 0xFE0F), (0xFFA0, 0xFFA0), (0xE0100, 0xE01EF))
+
+
+def _hidden(char):
+    """True for a character a diagnostic must write out rather than print."""
+    return (not char.isprintable()
+            or any(low <= ord(char) <= high for low, high in _INVISIBLE))
+
+
+def _escape(char):
+    """`char` as bash/zsh `$'...'` reads it: `\\xNN` for ASCII, `\\uNNNN` or `\\UNNNNNNNN`
+    above it (a `\\xNN` past 0x7f would be a byte, not the character)."""
+    code = ord(char)
+    return (f"\\x{code:02x}" if code < 0x80 else
+            f"\\u{code:04x}" if code < 0x10000 else f"\\U{code:08x}")
+
+
 def printable(text):
-    """`text` with every character a terminal could act on written out as
-    `\\xNN`, `\\uNNNN` or `\\UNNNNNNNN`. A path is user-controlled (a flag, a
-    config file, a directory someone else named), so a line that echoes one
-    must not let it move the cursor, rewrite the line or end it early. A name
-    that was already all printable comes back unchanged."""
-    return "".join(
-        c if c.isprintable() else
-        f"\\x{ord(c):02x}" if ord(c) < 0x100 else
-        f"\\u{ord(c):04x}" if ord(c) < 0x10000 else f"\\U{ord(c):08x}"
-        for c in str(text))
+    """`text` with every hidden character written out as an escape. For a message
+    whose text is not a path (a path goes through `shown_path`, which also keeps two
+    different names from printing the same). Output is ASCII-safe to print, and
+    running it again changes nothing."""
+    return "".join(_escape(c) if _hidden(c) else c for c in str(text))
 
 
 def shown_path(path):
-    """(text, quoted): how a diagnostic names `path`. A printable path comes
-    back shell-quoted, so the "Fix it" line can be pasted whole. One with
-    control characters comes back escaped, which no shell would read back as
-    the same name, so `quoted` is False and the caller says so instead of
-    offering it as a command argument."""
+    """(text, escaped): how a diagnostic names `path`, one way everywhere.
+
+    A name with nothing hidden in it comes back shell-quoted, so the argument is
+    exactly what a shell reads back (and a plain name is unchanged). One with a
+    control or invisible character comes back between `$'...'` with those characters
+    written as escapes and with `\\` and `'` escaped, so it is delimited, one line,
+    and no other name prints the same. `escaped` tells the caller to say so."""
     text = os.fspath(path)
-    if text.isprintable():
-        return shlex.quote(text), True
-    return printable(text), False
+    if not any(_hidden(c) for c in text):
+        return shlex.quote(text), False
+    body = "".join("\\\\" if c == "\\" else "\\'" if c == "'" else
+                   _escape(c) if _hidden(c) else c for c in text)
+    return "$'" + body + "'", True
+
+
+ESCAPED_NOTE = (" (the name has control or invisible characters, so it is written "
+                 "between $'...' as escapes)")
 
 
 def _make_receipts_dir(root):
@@ -634,9 +659,10 @@ def _make_receipts_dir(root):
     the receipts directory, at the state root or above it made `mkdir` raise
     out of `serve.main` as a traceback with no cause named. It is a receipt
     failure like any other: raised before the session opens, naming what is
-    in the way. Paths are shown shell-quoted, or escaped when they carry
-    control characters (see `shown_path`); a name that cannot even be passed
-    to the operating system (a NUL) is the same failure, not a traceback."""
+    in the way. Every path in the message goes through `shown_path`, and the
+    escaped-name note is added whenever any of them was escaped; a name that
+    cannot even be passed to the operating system (a NUL) is the same failure,
+    not a traceback."""
     try:
         root.mkdir(parents=True, exist_ok=True)
     except (OSError, ValueError) as cause:
@@ -644,16 +670,16 @@ def _make_receipts_dir(root):
         if isinstance(cause, (FileExistsError, NotADirectoryError)):
             from ..receipts import _fs
             blocked = root if os.path.lexists(root) else _fs.obstruction(root)
+        root_text, escaped = shown_path(root)
         where = ""
         if blocked is not None:
-            text, quoted = shown_path(blocked)
-            where = (f": {text} is not a directory. Fix it: make {text} a "
-                     f"directory, chmod 700" if quoted else
-                     f": {text} is not a directory (its name has control "
-                     f"characters, shown escaped). Fix it: make that a "
-                     f"directory you own, chmod 700")
-        raise ReceiptIOError(f"the receipts directory {printable(root)} cannot "
-                             f"be made ({type(cause).__name__}){where}") from None
+            blocked_text, blocked_escaped = shown_path(blocked)
+            escaped = escaped or blocked_escaped
+            where = (f": {blocked_text} is not a directory. Fix it: make "
+                     f"{blocked_text} a directory, chmod 700")
+        raise ReceiptIOError(f"the receipts directory {root_text} cannot be made "
+                             f"({type(cause).__name__}){where}"
+                             f"{ESCAPED_NOTE if escaped else ''}") from None
 
 
 def _chain_for(directory, home):

@@ -3,19 +3,23 @@
 `serve.main` stops before it spawns anything when the receipt log or the approval store
 cannot be made, and says which path is in the way. That path comes from `--state-root`, a
 config file or a parent directory somebody else named, so it can carry an escape sequence, a
-newline or bytes that are not text. Echoed raw, it could split the line, rewrite what the
-terminal already showed, or fail the write. These cases run the real entry point in a child
-interpreter and read the real stderr:
+newline, a character that prints as nothing, or bytes that are not text. Echoed raw, it could
+split the line, rewrite what the terminal already showed, make one directory read as another,
+or fail the write. These cases run the real entry point in a child interpreter and read its
+stderr:
 
-* a name with control characters is shown escaped, on one line, with a sentence saying so, and
-  the "Fix it" line does not pretend the escaped form is an argument a shell would read back;
-* a name with spaces is still named, shell-quoted, so the sentence can be pasted whole;
+* a name with a control or invisible character is written between $'...' with those
+  characters as escapes (a backslash and a quote escaped too), on one line, with a sentence
+  saying so, and two different names never print the same;
+* any other name is shell-quoted, at every place the message names a path;
 * a name that cannot be handed to the operating system at all (a NUL) is the same refusal,
   not a traceback.
 
-Exit codes are unchanged: 1 for the receipt log, EXIT_FAULT for the approval store.
+Exit codes at the command line are unchanged: 1 for the receipt log, EXIT_FAULT for the
+approval store. The last two cases call the display helpers directly; the rest run `serve.main`.
 """
 import os
+import shlex
 import subprocess
 import sys
 
@@ -25,6 +29,7 @@ from sunglasses.proxy import receipts, serve
 
 TREE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = [sys.executable, "-c", "import sys; sys.stdin.read()"]
+NOTE = "the name has control or invisible characters, so it is written between $'...' as escapes"
 
 # One name per class of character a terminal acts on; each sits inside the directory name.
 CONTROLS = {
@@ -35,10 +40,19 @@ CONTROLS = {
     "del": "a\x7fb",
     "c1": "a\x85b",
     "line-separator": "a b",
+    "bidi-override": "a‮b",
+    "zero-width-space": "a​b",
 }
+# Printable to Python, invisible on a screen: they can make one name read as another.
+INVISIBLE = {
+    "combining-grapheme-joiner": "a͏b",
+    "variation-selector": "a️b",
+    "variation-selector-supplement": "a\U000e0100b",
+}
+HIDDEN = {**CONTROLS, **INVISIBLE}
 
 
-def _run(tmp_path, state, opted=False):
+def _run(tmp_path, state):
     """serve.main in a child with `state` (a str, written into the script as an escaped literal)."""
     home = tmp_path / "sunglasses-home"
     home.mkdir(exist_ok=True)
@@ -49,10 +63,6 @@ def _run(tmp_path, state, opted=False):
            "PYTHONPATH": TREE, "PYTHONDONTWRITEBYTECODE": "1"}
     return subprocess.run([sys.executable, "-c", script], input=b"", cwd=str(tmp_path),
                           env=env, capture_output=True, timeout=60)
-
-
-def _state(tmp_path, name):
-    return str(tmp_path / "user" / name)
 
 
 def _blocked_receipts(tmp_path, name):
@@ -71,11 +81,22 @@ def _blocked_approvals(tmp_path, name):
     return state, state / "approvals"
 
 
-def _escaped(text):
-    """What the line must show for `text`: each non-printable character as its escape, written
-    here independently of the code under test."""
-    return "".join(c if c.isprintable() else
-                   "\\x%02x" % ord(c) if ord(c) < 0x100 else "\\u%04x" % ord(c) for c in text)
+def _written(text):
+    """What a diagnostic must show for a name with something hidden in it, built here
+    independently of the code under test: $'...', backslash and quote escaped, each hidden
+    character as \\xNN (ASCII) or \\uNNNN / \\UNNNNNNNN."""
+    out = []
+    for c in text:
+        if c == "\\":
+            out.append("\\\\")
+        elif c == "'":
+            out.append("\\'")
+        elif c.isprintable() and c not in "͏️\U000e0100":
+            out.append(c)
+        else:
+            n = ord(c)
+            out.append("\\x%02x" % n if n < 0x80 else "\\u%04x" % n if n < 0x10000 else "\\U%08x" % n)
+    return "$'" + "".join(out) + "'"
 
 
 def _one_safe_line(err):
@@ -87,33 +108,65 @@ def _one_safe_line(err):
 
 
 # ---------------------------------------------------------------------------
-# control characters
+# control and invisible characters
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("kind", sorted(CONTROLS))
-def test_receipt_log_refusal_escapes_the_name_and_stays_one_line(tmp_path, kind):
-    state, blocked = _blocked_receipts(tmp_path, "proxy-" + CONTROLS[kind])
+@pytest.mark.parametrize("kind", sorted(HIDDEN))
+def test_receipt_log_refusal_writes_the_name_as_escapes_on_one_line(tmp_path, kind):
+    state, blocked = _blocked_receipts(tmp_path, "proxy-" + HIDDEN[kind])
     p = _run(tmp_path, str(state))
     assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
     assert "the receipt log could not be opened" in line
-    assert "its name has control characters, shown escaped" in line
-    assert _escaped(str(blocked)) in line
-    assert "chmod 700" in line
+    # both places the message names a path: the root and the thing in the way
+    assert f"the receipts directory {_written(str(blocked))}" in line
+    assert f"Fix it: make {_written(str(blocked))} a directory, chmod 700" in line
+    assert NOTE in line
 
 
-@pytest.mark.parametrize("kind", sorted(CONTROLS))
-def test_approval_store_refusal_escapes_the_name_and_stays_one_line(tmp_path, kind):
-    state, blocked = _blocked_approvals(tmp_path, "proxy-" + CONTROLS[kind])
+@pytest.mark.parametrize("kind", sorted(HIDDEN))
+def test_approval_store_refusal_writes_the_name_as_escapes_on_one_line(tmp_path, kind):
+    state, blocked = _blocked_approvals(tmp_path, "proxy-" + HIDDEN[kind])
     p = _run(tmp_path, str(state))
     assert p.returncode == serve.EXIT_FAULT, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
-    assert "the approval store at" in line and "could not be made" in line
-    assert _escaped(str(blocked)) in line
-    assert "its name has control characters, shown escaped" in line
+    assert f"the approval store at {_written(str(blocked))} could not be made" in line
+    assert f"Fix it: make {_written(str(blocked))} a directory you own, chmod 700." in line
+    assert NOTE in line
 
 
-def test_a_name_that_is_not_text_is_escaped_not_a_write_failure(tmp_path):
+def test_two_names_that_differ_only_by_a_backslash_do_not_print_alike(tmp_path):
+    """A literal backslash-x-1-b in a name and a real ESC must not produce the same line."""
+    lines = []
+    for n, name in enumerate(["proxy-a\x1bb", "proxy-a\\x1bb"]):
+        sub = tmp_path / str(n)
+        sub.mkdir()
+        state, _ = _blocked_receipts(sub, name)
+        p = _run(sub, str(state))
+        assert p.returncode == 1, p.stderr[-400:]
+        lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
+    assert lines[0] != lines[1], lines
+    # and the same for the approval store
+    lines = []
+    for n, name in enumerate(["proxy-a\x1bb", "proxy-a\\x1bb"]):
+        sub = tmp_path / f"s{n}"
+        sub.mkdir()
+        state, _ = _blocked_approvals(sub, name)
+        p = _run(sub, str(state))
+        assert p.returncode == serve.EXIT_FAULT, p.stderr[-400:]
+        lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
+    assert lines[0] != lines[1], lines
+
+
+def test_a_backslash_and_a_quote_in_a_name_are_escaped_inside_the_delimiters(tmp_path):
+    state, blocked = _blocked_receipts(tmp_path, "proxy-it's\\\x1b")
+    p = _run(tmp_path, str(state))
+    line = _one_safe_line(p.stderr)
+    assert _written(str(blocked)) in line
+    assert "it\\'s\\\\\\x1b" in line
+
+
+def test_a_name_that_is_not_text_is_escaped_with_the_note(tmp_path):
     """Bytes that are not UTF-8 reach Python as lone surrogates; the line must still be written."""
     state = str(tmp_path / "user" / "proxy-\udc80\udcff")
     p = _run(tmp_path, state)
@@ -121,27 +174,30 @@ def test_a_name_that_is_not_text_is_escaped_not_a_write_failure(tmp_path):
     line = _one_safe_line(p.stderr)
     assert "the receipt log could not be opened" in line
     assert "\\udc80\\udcff" in line
+    assert NOTE in line
 
 
-def test_a_nul_in_the_state_root_is_a_refusal_not_a_traceback(tmp_path):
-    p = _run(tmp_path, _state(tmp_path, "proxy-\x00-x"))
+def test_a_nul_in_the_state_root_is_a_refusal_with_the_note_not_a_traceback(tmp_path):
+    p = _run(tmp_path, str(tmp_path / "user" / "proxy-\x00-x"))
     assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
     assert "the receipt log could not be opened" in line
-    assert "\\x00" in line
+    assert "proxy-\\x00-x" in line
+    assert NOTE in line
 
 
 # ---------------------------------------------------------------------------
-# spaces: still a sentence a person can paste
+# anything else: shell-quoted everywhere, no note
 # ---------------------------------------------------------------------------
 
-def test_receipt_log_refusal_quotes_a_path_with_spaces(tmp_path):
+def test_receipt_log_refusal_quotes_a_path_with_spaces_at_every_place(tmp_path):
     state, blocked = _blocked_receipts(tmp_path, "my proxy state")
     p = _run(tmp_path, str(state))
     assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
-    assert f"Fix it: make '{blocked}' a directory, chmod 700" in line
-    assert "control characters" not in line
+    assert f"the receipts directory {shlex.quote(str(blocked))} cannot be made" in line
+    assert f"{shlex.quote(str(blocked))} is not a directory. Fix it: make {shlex.quote(str(blocked))} " in line
+    assert "control or invisible" not in line
 
 
 def test_approval_store_refusal_quotes_a_path_with_spaces(tmp_path):
@@ -149,29 +205,35 @@ def test_approval_store_refusal_quotes_a_path_with_spaces(tmp_path):
     p = _run(tmp_path, str(state))
     assert p.returncode == serve.EXIT_FAULT, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
-    assert f"Fix it: make '{blocked}' a directory you own, chmod 700." in line
-    assert "control characters" not in line
+    assert f"the approval store at {shlex.quote(str(blocked))} could not be made" in line
+    assert f"Fix it: make {shlex.quote(str(blocked))} a directory you own, chmod 700." in line
+    assert "control or invisible" not in line
 
 
 def test_a_plain_path_is_named_exactly_as_before(tmp_path):
     state, blocked = _blocked_receipts(tmp_path, "proxy")
     p = _run(tmp_path, str(state))
+    assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
     assert f"Fix it: make {blocked} a directory, chmod 700" in line
-    assert "'" not in line
+    assert "'" not in line and "control or invisible" not in line
 
 
 # ---------------------------------------------------------------------------
 # the helpers
 # ---------------------------------------------------------------------------
 
-def test_printable_leaves_text_alone_and_escapes_the_rest():
+def test_printable_leaves_text_alone_escapes_the_hidden_and_is_idempotent():
     assert receipts.printable("/a b/ü/é") == "/a b/ü/é"
-    assert receipts.printable("a\x1bb\n\x7f\x85 \udc80\U0001f600") == \
-        "a\\x1bb\\x0a\\x7f\\x85\\u2028\\udc80\U0001f600"
+    once = receipts.printable("a\x1bb\n\x7f\x85 \udc80͏️\U0001f600")
+    assert once == "a\\x1bb\\x0a\\x7f\\u0085\\u2028\\udc80\\u034f\\ufe0f\U0001f600"
+    assert receipts.printable(once) == once
 
 
-def test_shown_path_quotes_a_clean_path_and_escapes_a_dirty_one():
-    assert receipts.shown_path("/a b") == ("'/a b'", True)
-    assert receipts.shown_path("/ab") == ("/ab", True)
-    assert receipts.shown_path("/a\x1bb") == ("/a\\x1bb", False)
+def test_shown_path_quotes_a_clean_path_and_delimits_a_hidden_one():
+    assert receipts.shown_path("/a b") == ("'/a b'", False)
+    assert receipts.shown_path("/ab") == ("/ab", False)
+    assert receipts.shown_path("/a\x1bb") == ("$'/a\\x1bb'", True)
+    assert receipts.shown_path("/a\\x1bb") == ("'/a\\x1bb'", False)
+    assert receipts.shown_path("/a͏b") == ("$'/a\\u034fb'", True)
+    assert receipts.shown_path("/it's\x1b") == ("$'/it\\'s\\x1b'", True)

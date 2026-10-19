@@ -217,13 +217,12 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         where = getattr(failure, "filename", None) or state_root(root)
         what = ("capture store" if pathlib.Path(where).name == "captures"
                 else "approval store")
-        text, quoted = receipts.shown_path(where)
+        text, escaped = receipts.shown_path(where)
         stderr.write(f"sunglasses proxy: the {what} at {text} could "
                      f"not be made, so nothing was started "
-                     f"({type(failure).__name__}). Fix it: make "
-                     + (f"{text} a directory you own, chmod 700.\n" if quoted else
-                        "that a directory you own, chmod 700 (its name has "
-                        "control characters, shown escaped).\n"))
+                     f"({type(failure).__name__}). Fix it: make {text} a "
+                     f"directory you own, chmod 700."
+                     f"{receipts.ESCAPED_NOTE if escaped else ''}\n")
         _record_refusal(log, "STATE_IO_ERROR")
         return EXIT_FAULT
 
