@@ -6,14 +6,16 @@ of every rule regex and holds the line as a ratchet:
 
   * a rule id that shows the shape and is NOT in GRANDFATHERED fails the build;
   * a GRANDFATHERED id that no longer shows the shape fails the build, so a rewritten
-    rule must leave the list and the list only shrinks.
+    rule must leave the list; contributors must not add new exceptions.
 
 GRANDFATHERED is meant to reach empty. It is not empty today: take ids off it as the
 rewrites merge.
 
 "Wide" means a single-node repeat body that can match nearly any character: `.`, a
 negated class, a negated single character, or a class holding both halves of \\s \\S,
-\\d \\D or \\w \\W. Lookaround bodies are checked on their own path.
+\\d \\D or \\w \\W, with or without a capture, flag or atomic group around it. A lookaround
+body is checked on its own path, wherever the lookaround sits. A repeat that can run zero
+times is skipped.
 """
 import re
 
@@ -32,7 +34,7 @@ from sunglasses.patterns import PATTERNS
 UNBOUNDED = C.MAXREPEAT
 _ATOMIC = getattr(C, "ATOMIC_GROUP", None)
 _POSSESSIVE = getattr(C, "POSSESSIVE_REPEAT", None)
-_REPEATS = (C.MAX_REPEAT, C.MIN_REPEAT)
+_REPEATS = tuple(o for o in (C.MAX_REPEAT, C.MIN_REPEAT, _POSSESSIVE) if o is not None)
 
 _REWRITE_PENDING = "2026-10-19 rewrite to a single read is in review"
 _REVIEWED = "2026-10-18 reviewed, no action needed"
@@ -62,8 +64,22 @@ GRANDFATHERED.update(dict.fromkeys((
 ), _UNREVIEWED))
 
 
+def _unwrap(body):
+    """Strip groups that only wrap one node, so a captured or flagged body is judged as itself."""
+    while len(body) == 1:
+        op, av = body[0]
+        if op == C.SUBPATTERN:
+            body = av[3]
+        elif _ATOMIC is not None and op == _ATOMIC:
+            body = av
+        else:
+            break
+    return body
+
+
 def _wide(body):
     """True when the repeated body is one node that can match almost any character."""
+    body = _unwrap(body)
     if len(body) != 1:
         return False
     op, av = body[0]
@@ -80,55 +96,43 @@ def _wide(body):
     return any(a in cats and b in cats for a, b in halves)
 
 
-def _path_repeats(seq):
-    """Most wide unbounded repeats that one match path through seq can run in sequence."""
-    n = 0
+def _scan(seq):
+    """Return (most wide unbounded repeats one match path through seq runs in sequence,
+    most found on the path inside any lookaround nested anywhere in seq)."""
+    n = worst = 0
     for op, av in seq:
         if op in _REPEATS:
             _lo, hi, body = av
-            inner = _path_repeats(body)
+            if hi == 0:
+                continue  # the body can never run
+            inner, w = _scan(body)
+            worst = max(worst, w)
             if hi >= UNBOUNDED and _wide(body):
                 n += 1
             elif inner and hi > 1:
                 n += 2 * inner  # a repeated group re-enters its inner repeat
             else:
                 n += inner
-        elif op == C.SUBPATTERN:
-            n += _path_repeats(av[3])
+        elif op == C.SUBPATTERN or (_ATOMIC is not None and op == _ATOMIC):
+            inner, w = _scan(av[3] if op == C.SUBPATTERN else av)
+            n += inner
+            worst = max(worst, w)
         elif op == C.BRANCH:
-            n += max([_path_repeats(b) for b in av[1]] + [0])
-        elif _ATOMIC is not None and op == _ATOMIC:
-            n += _path_repeats(av)
-        elif _POSSESSIVE is not None and op == _POSSESSIVE:
-            _lo, hi, body = av
-            n += _path_repeats(body) + (1 if hi >= UNBOUNDED and _wide(body) else 0)
+            arms = [_scan(arm) for arm in av[1]]
+            n += max([a for a, _ in arms] + [0])
+            worst = max([worst] + [w for _, w in arms])
         elif op == C.GROUPREF_EXISTS:
-            n += max(_path_repeats(av[1]), _path_repeats(av[2]) if av[2] else 0)
-        # ASSERT / ASSERT_NOT run separately: _worst() checks their bodies on their own
-    return n
-
-
-def _worst(seq):
-    """Max over the main path and the path inside every lookaround, however deep."""
-    worst = _path_repeats(seq)
-    stack = [seq]
-    while stack:
-        cur = stack.pop()
-        for op, av in cur:
-            if op in (C.ASSERT, C.ASSERT_NOT):
-                worst = max(worst, _path_repeats(av[1]))
-                stack.append(av[1])
-            elif op in _REPEATS:
-                stack.append(av[2])
-            elif op == C.SUBPATTERN:
-                stack.append(av[3])
-            elif op == C.BRANCH:
-                stack.extend(av[1])
-    return worst
+            arms = [_scan(arm) for arm in (av[1], av[2]) if arm]
+            n += max([a for a, _ in arms] + [0])
+            worst = max([worst] + [w for _, w in arms])
+        elif op in (C.ASSERT, C.ASSERT_NOT):
+            inner, w = _scan(av[1])
+            worst = max(worst, inner, w)  # a lookaround body is its own path
+    return n, worst
 
 
 def has_stacked_repeats(source):
-    return _worst(P.parse(source, re.IGNORECASE)) >= 2
+    return max(_scan(P.parse(source, re.IGNORECASE))) >= 2
 
 
 def _flagged_ids():
@@ -148,8 +152,29 @@ def _flagged_ids():
     r"(?:.*a)+b",
     r"(?=.*a.*b)",
     r"x(?:.*a|b).*c",
+    r"(.)*a.*b",
+    r"(?:.)*a.*b",
+    r"(?s:.)*a.*b",
+    r"(.*)a(.*)b",
+    r"(a)?(?(1)(?=.*b.*c)|d)",
+    r"(a)?(?(1)x|(?=.*b.*c))",
+    r"(?:.*a.*b)?",
 ])
 def test_walker_flags_stacked_wide_repeats(source):
+    assert has_stacked_repeats(source)
+
+
+@pytest.mark.skipif(_ATOMIC is None, reason="atomic groups and possessive repeats parse on 3.11+")
+@pytest.mark.parametrize("source", [
+    r"(?>(?=.*a.*b))",
+    r"(?>.*a)(?>.*b)",
+    r"(?:(?=.*a.*b))*+x",
+    r"(?:(?=.*a.*b))?+x",
+    r"(?:(?>.*a)){2}b",
+    r"(?:.*a)*+b",
+    r"(?:.*a)++b",
+])
+def test_walker_flags_atomic_and_possessive_containers(source):
     assert has_stacked_repeats(source)
 
 
@@ -161,6 +186,10 @@ def test_walker_flags_stacked_wide_repeats(source):
     r"\w+\s*x\s+y",
     r"a.*b",
     r"[a-z]*a[a-z]*b",
+    r"(?:.*a.*b){0}c",
+    r"(?:(?=.*a.*b)){0}c",
+    r"(.)a(.)b",
+    r"(?:(?!a).)*a(?:(?!b).)*b",
 ])
 def test_walker_passes_bounded_shapes(source):
     assert not has_stacked_repeats(source)
