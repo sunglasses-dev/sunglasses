@@ -922,14 +922,53 @@ def test_the_pr_step_refuses_an_edit_outside_the_two_top_level_values(tmp_path, 
     # the two stamped keys swapped places
     ('', lambda text: text.replace('  "last_updated": "2026-10-19T07:26:03-07:00",\n  "last_updated_by": "release.yml",\n',
                                    '  "last_updated_by": "release.yml",\n  "last_updated": "2026-10-19T07:26:03-07:00",\n')),
+    # the whole file converted from LF to CRLF: same parsed document, every line differs
+    ('', lambda text: text.replace("\n", "\r\n")),
 ])
 def test_the_pr_step_keeps_json_types_and_every_other_line(tmp_path, extra, edit):
     repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml", extra)
     assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
     path = repo / "stats" / "current.json"
-    before = path.read_text()
-    path.write_text(edit(before))
-    assert path.read_text() != before
+    before = path.read_bytes().decode()
+    # bytes, not read_text/write_text: those translate CRLF and would hide the very edit under test
+    path.write_bytes(edit(before).encode())
+    assert path.read_bytes() != before.encode()
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tmp_path, origin)
+
+
+def _committed_with_endings(tmp_path, ending):
+    """A stats file committed with CRLF (or one CRLF line among LF ones), before any stamp."""
+    repo, origin, env = _stats_env(tmp_path, 3)
+    path = repo / "stats" / "current.json"
+    lf = path.read_bytes()
+    committed = lf.replace(b"\n", b"\r\n") if ending == "crlf" else lf.replace(b'"version": "1.2.3",\n', b'"version": "1.2.3",\r\n')
+    assert committed != lf
+    path.write_bytes(committed)
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", *ident, "commit", "-q", "-am", "endings"], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=repo, check=True)
+    return repo, origin, env, committed
+
+
+def _stamped(data):
+    return data.replace(b'"last_updated": "old"', b'"last_updated": "new"').replace(
+        b'"last_updated_by": "old"', b'"last_updated_by": "release.yml"')
+
+
+@pytest.mark.parametrize("ending", ["crlf", "mixed"])
+def test_the_pr_step_accepts_a_stamp_that_keeps_the_endings_it_found(tmp_path, ending):
+    repo, origin, env, committed = _committed_with_endings(tmp_path, ending)
+    (repo / "stats" / "current.json").write_bytes(_stamped(committed))
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 0 and "REFUSED" not in r.stdout, (r.stdout, r.stderr)
+    assert "pr create --repo o/r --base main" in (tmp_path / "gh.log").read_text()
+
+
+def test_the_pr_step_refuses_a_stamp_that_turns_committed_crlf_into_lf(tmp_path):
+    repo, origin, env, committed = _committed_with_endings(tmp_path, "crlf")
+    (repo / "stats" / "current.json").write_bytes(_stamped(committed).replace(b"\r\n", b"\n"))
     r = _run_step(repo, env, "gh pr create")
     assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
     assert _no_pr_and_no_branch(tmp_path, origin)
