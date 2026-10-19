@@ -277,6 +277,79 @@ jobs:
             sleep "$PAUSE"
           done
 
+  stats:
+    name: open the stats pull request this upload owes
+    # An upload from this workflow never ran the local publish script, the only thing that
+    # wrote stats/current.json `last_updated`. Until it is written, `released` is ahead of
+    # `last_updated` and the site stamp gate stops on it (0.6.10 cost a hand-typed pull
+    # request and a CI hour). This job writes that one fix and opens it as a pull request.
+    #
+    # It never merges and never writes to main: the change reaches main only by a person
+    # merging the pull request. A failure turns this run red and does nothing else; nothing
+    # depends on this job, and the upload, the SBOM and the checksums do not wait for it.
+    # Two repository facts shape it (both are in the pull request text it opens):
+    #   - "Allow GitHub Actions to create and approve pull requests" must be ON, or the
+    #     branch is pushed and the job prints a compare link instead of opening the pull
+    #     request;
+    #   - a pull request opened with the workflow token does not start CI, so someone closes
+    #     and reopens it once before it can merge.
+    # `version-homes-agree.py --post-pypi` stays as the backstop that says the fix is due.
+    # Guarded by tests/test_release_workflow.py.
+    needs: pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          # The push below needs the token the checkout leaves in the git config.
+          persist-credentials: true
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Write last_updated from the PyPI upload time
+        id: stamp
+        run: |
+          # Exit 3 from the script = this tree already carries the upload time (nothing to
+          # do). Exit 2 = it refused (the version, `released` or the file shape does not fit),
+          # which is a person's decision, not a retry, so the run goes red.
+          VERSION="${GITHUB_REF_NAME#v}"
+          rc=0
+          python3 scripts/stats_last_updated.py "$VERSION" --wait "${STATS_WAIT:-300}" --pause "${STATS_PAUSE:-20}" || rc=$?
+          case "$rc" in
+            0) echo "changed=true" >> "$GITHUB_OUTPUT" ;;
+            3) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "FAILED: the stats script exited $rc, no pull request opened"; exit 1 ;;
+          esac
+      - name: Push the branch and open the pull request
+        if: steps.stamp.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BRANCH="stats/${VERSION}-last-updated"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "$BRANCH already exists on origin, leaving it alone (no force). Look at that branch first."
+            exit 0
+          fi
+          # One file, two lines changed, or nothing is committed.
+          SHAPE="$(git diff --numstat | tr '\t' ' ')"
+          [ "$SHAPE" = "2 2 stats/current.json" ] || { echo "REFUSED: unexpected change: $SHAPE"; exit 1; }
+          TITLE="stats: ${VERSION} last_updated is the PyPI upload time"
+          BODY="Stats only (one file, two fields). The release workflow uploaded ${VERSION} to PyPI, so the local publish script never wrote last_updated, and the site stamp gate requires last_updated to fall on the same day as released. last_updated is the wheel's PyPI upload time in Pacific time and last_updated_by names the uploader that ran. This pull request was opened by the workflow with its own token, so CI does not start on it: close and reopen it once, then merge when it is green."
+          git switch -c "$BRANCH"
+          git -c user.name="AZ Rollin" -c user.email="263686995+azrollin@users.noreply.github.com" \
+            commit -q -m "$TITLE" -- stats/current.json
+          git push origin "HEAD:refs/heads/$BRANCH"
+          if gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"; then
+            echo "opened the pull request for $BRANCH"
+          else
+            echo "::warning::$BRANCH is pushed but the pull request was not opened (is Allow GitHub Actions to create and approve pull requests off?). Open it here: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1"
+          fi
+
   release-assets:
     name: attach the SBOM and SHA256SUMS to the GitHub Release
     # NOT `needs: [pypi, ...]`. These files describe the BUILT artifacts and
