@@ -128,6 +128,9 @@ RULE_PROTOCOL = "S5"
 class Route:
     """One MCP client on stdin, one mediated server on the other side."""
 
+    # How many (server id, snapshot) pairs the approve-command notice remembers.
+    NOTICE_HISTORY = 256
+
     def __init__(self, *, session, log, upstream_write, client_write,
                  scan=None, catalog=None, approvals=None,
                  descriptor_sha_for=None, control=None, server_identity=None,
@@ -138,7 +141,7 @@ class Route:
         # caller decides where the line goes (the proxy command writes it to its
         # own stderr); a route built without one stays silent, as before.
         self.approval_notice = approval_notice
-        self._noticed = set()
+        self._noticed = {}
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
@@ -716,7 +719,12 @@ class Route:
         key = (hint["server_id"], hint["snapshot_sha256"])
         if key in self._noticed:
             return
-        self._noticed.add(key)
+        # Server-controlled churn (a new snapshot per list) must not grow this for the
+        # life of the proxy: keep the newest pairs. The cost of forgetting an old pair
+        # is that it is announced once more if that exact snapshot comes back.
+        self._noticed[key] = None
+        while len(self._noticed) > self.NOTICE_HISTORY:
+            del self._noticed[next(iter(self._noticed))]
         try:
             notice(*key)
         except Exception:  # noqa: BLE001

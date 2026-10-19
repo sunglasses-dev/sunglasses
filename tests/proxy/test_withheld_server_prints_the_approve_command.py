@@ -8,6 +8,7 @@ pair to an optional notice callback once, and the proxy command prints the
 approve command with both ids filled in.
 """
 import io
+import os
 import shlex
 import types
 
@@ -132,3 +133,93 @@ def test_only_approval_required_announces(tmp_path, monkeypatch):
     engine, _ = _route(tmp_path, monkeypatch, lambda *ids: seen.append(ids))
     assert engine._approval_hint("UNINSPECTED_METHOD") == {}
     assert seen == []
+
+
+def test_a_relative_root_is_printed_absolute_so_the_command_works_from_anywhere(tmp_path, monkeypatch):
+    """The proxy was started in one directory, the person pastes in another."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    started_in = tmp_path / "proxy cwd"
+    started_in.mkdir()
+    monkeypatch.chdir(started_in)
+    err = io.StringIO()
+    engine, _ = _route(tmp_path, monkeypatch, serve.approval_notice(err, root="state"))
+    monkeypatch.chdir(elsewhere)
+    _call(engine)
+    line = err.getvalue().splitlines()[0]
+    argv = shlex.split(line.split("run: ", 1)[1].split(" (it shows", 1)[0])
+    root = argv[argv.index("--state-root") + 1]
+    assert os.path.isabs(root) and root == os.path.join(str(started_in), "state"), argv
+
+
+def test_the_printed_command_approves_the_capture_from_another_directory(tmp_path, monkeypatch):
+    """The whole loop, not just 'it parses': a capture is written under the proxy's
+    relative --state-root, the notice prints the command, and that command run from a
+    DIFFERENT directory approves exactly that snapshot (a relative root used to say
+    'no stored capture')."""
+    from sunglasses.proxy import approvals
+
+    started_in = tmp_path / "proxy cwd"
+    started_in.mkdir()
+    monkeypatch.chdir(started_in)
+    other = approvals.Store("state", server_id="b" * 12)
+    other.capture("e" * 64, {"sha256": "e" * 64, "tools_by_name": {"other": {"descriptor_sha256": "0" * 64}}})
+    store = approvals.Store("state", server_id=SERVER)
+    store.capture(SNAPSHOT, {"sha256": SNAPSHOT, "tools_by_name": {"echo": {"descriptor_sha256": "d" * 64}}})
+    err = io.StringIO()
+    serve.approval_notice(err, root="state")(SERVER, SNAPSHOT)
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    line = err.getvalue().splitlines()[0]
+    argv = shlex.split(line.split("run: ", 1)[1].split(" (it shows", 1)[0])
+    out, errs = io.StringIO(), io.StringIO()
+    rc = commands.main(argv[2:], stdout=out, stderr=errs, confirm=lambda: True)
+    assert rc == 0 and out.getvalue().rstrip().endswith("approved"), (rc, out.getvalue(), errs.getvalue())
+    assert "echo" in out.getvalue() and f"snapshot {SNAPSHOT}" in out.getvalue()
+    record = (started_in / "state" / "approvals" / f"{SERVER}.json")
+    assert record.exists() and SNAPSHOT in record.read_text()
+    assert not (started_in / "state" / "approvals" / ("b" * 12 + ".json")).exists()
+    assert not (elsewhere / "state").exists(), "nothing was created in the directory the command ran in"
+
+
+@pytest.mark.parametrize("hostile", ["a\nb", "a\x1b[2Jb", "a\rb", "a\x00b", "a\x7fb", "a\u2028b"])
+def test_a_root_with_control_characters_is_never_printed(tmp_path, monkeypatch, hostile):
+    err = io.StringIO()
+    engine, client = _route(tmp_path, monkeypatch, serve.approval_notice(err, root=hostile))
+    _call(engine)
+    out = err.getvalue()
+    assert len(out.splitlines()) == 1 and out.endswith("\n"), repr(out)
+    assert out.isprintable() or out.rstrip("\n").isprintable(), repr(out)
+    assert "\x1b" not in out and hostile not in out
+    assert f"sunglasses proxy approve {SERVER} --snapshot {SNAPSHOT}" in out
+    assert "control characters" in out and "not printed" in out
+    assert client.messages()[0]["error"]["data"]["reason_code"] == "APPROVAL_REQUIRED"
+
+
+def test_an_ordinary_root_with_spaces_and_quotes_is_still_printed(tmp_path, monkeypatch):
+    err = io.StringIO()
+    root = str(tmp_path / "it's a state dir")
+    engine, _ = _route(tmp_path, monkeypatch, serve.approval_notice(err, root=root))
+    _call(engine)
+    assert f"--state-root {shlex.quote(root)}" in err.getvalue()
+    assert "control characters" not in err.getvalue()
+
+
+def test_the_notice_memory_is_bounded_and_a_forgotten_pair_is_announced_again(tmp_path, monkeypatch):
+    seen = []
+    engine, _ = _route(tmp_path, monkeypatch, lambda *ids: seen.append(ids))
+    cap = engine.NOTICE_HISTORY
+    for n in range(cap + 40):
+        engine.approvals.pending_snapshot = format(n, "x").rjust(64, "0")
+        _call(engine, n + 1)
+    assert len(seen) == cap + 40
+    assert len(engine._noticed) == cap
+    # the newest pair is still remembered, the oldest was forgotten
+    engine.approvals.pending_snapshot = format(cap + 39, "x").rjust(64, "0")
+    _call(engine, 10_000)
+    assert len(seen) == cap + 40
+    engine.approvals.pending_snapshot = format(0, "x").rjust(64, "0")
+    _call(engine, 10_001)
+    assert len(seen) == cap + 41

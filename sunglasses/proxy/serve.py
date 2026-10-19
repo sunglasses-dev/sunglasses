@@ -123,15 +123,33 @@ def approval_notice(stderr, root=None):
     ids already filled in, plus `--state-root` only when this proxy was given
     one (the command's own default is the proxy's default root, so a line
     without it would point at the wrong store). The ids are digests the route
-    has already checked are alphanumeric; the root is quoted.
+    has already checked are alphanumeric.
+
+    The root is made absolute HERE, in the proxy's own working directory,
+    because the person pastes the command into a terminal that is somewhere
+    else: a relative root would name a different, empty store. It is then
+    shell-quoted. Quoting does not make a path safe to print: a root with a
+    control character (a newline splits the line, an escape byte rewrites the
+    terminal) is chosen by whoever wrote the launch configuration, so such a
+    root is never echoed; the line says so and leaves the flag to the person.
     """
+    shown = os.path.abspath(str(root)) if root else None
+    unsafe = shown is not None and not shown.isprintable()
+
     def notice(server_id, snapshot_sha256):
-        where = f" --state-root {shlex.quote(str(root))}" if root else ""
+        if unsafe:
+            where = (" (this proxy was started with a --state-root whose name has "
+                     "control characters, so it is not printed: add the same "
+                     "--state-root to the command)")
+            tail = ""
+        else:
+            where = ""
+            tail = f" --state-root {shlex.quote(shown)}" if shown else ""
         stderr.write(
             "sunglasses proxy: this server's tools are withheld until you approve "
             "them. At a terminal, run: sunglasses proxy approve "
-            f"{server_id} --snapshot {snapshot_sha256}{where} "
-            "(it shows the tools and asks before approving)\n")
+            f"{server_id} --snapshot {snapshot_sha256}{tail} "
+            f"(it shows the tools and asks before approving){where}\n")
         stderr.flush()
     return notice
 
