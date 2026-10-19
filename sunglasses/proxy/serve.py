@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import threading
@@ -115,8 +116,28 @@ def install_records_home(override=None):
     return state_root(override).parent
 
 
+def approval_notice(stderr, root=None):
+    """The one line a person needs when a server's tools are withheld.
+
+    It is the same command `sunglasses proxy approve` documents, with the two
+    ids already filled in, plus `--state-root` only when this proxy was given
+    one (the command's own default is the proxy's default root, so a line
+    without it would point at the wrong store). The ids are digests the route
+    has already checked are alphanumeric; the root is quoted.
+    """
+    def notice(server_id, snapshot_sha256):
+        where = f" --state-root {shlex.quote(str(root))}" if root else ""
+        stderr.write(
+            "sunglasses proxy: this server's tools are withheld until you approve "
+            "them. At a terminal, run: sunglasses proxy approve "
+            f"{server_id} --snapshot {snapshot_sha256}{where} "
+            "(it shows the tools and asks before approving)\n")
+        stderr.flush()
+    return notice
+
+
 def build_route(*, session, log, upstream_argv, upstream_write, client_write,
-                root=None, worker=None, store=None):
+                root=None, worker=None, store=None, stderr=None):
     """The wiring, separated so it can be inspected without spawning anything.
 
     The approval store is the REAL one and not a bypass. T5.R2 refuses calls
@@ -141,7 +162,10 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
         return route.Route(session=session, log=log,
                            upstream_write=upstream_write,
                            client_write=client_write, approvals=store,
-                           control=channel, server_identity=identity, **extra)
+                           control=channel, server_identity=identity,
+                           approval_notice=(approval_notice(stderr, root)
+                                            if stderr is not None else None),
+                           **extra)
     except BaseException as error:
         # The spare is running already and the teardown that closes it only
         # runs once a session exists, so a Route that fails to build would
@@ -260,7 +284,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         engine = build_route(session=session, log=log,
                              upstream_argv=upstream_argv,
                              upstream_write=to_upstream, client_write=to_client,
-                             root=root, worker=worker, store=store)
+                             root=root, worker=worker, store=store,
+                             stderr=stderr)
     except BaseException as failure:
         _abandon(child, log, stderr, failure)
         if not isinstance(failure, Exception):

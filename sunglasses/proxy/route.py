@@ -130,8 +130,15 @@ class Route:
 
     def __init__(self, *, session, log, upstream_write, client_write,
                  scan=None, catalog=None, approvals=None,
-                 descriptor_sha_for=None, control=None, server_identity=None):
+                 descriptor_sha_for=None, control=None, server_identity=None,
+                 approval_notice=None):
         self.session = session
+        # Called once per (server id, snapshot sha) the first time an
+        # APPROVAL_REQUIRED answer is built for it, with those two ids. The
+        # caller decides where the line goes (the proxy command writes it to its
+        # own stderr); a route built without one stays silent, as before.
+        self.approval_notice = approval_notice
+        self._noticed = set()
         self.log = log
         self.upstream_write = upstream_write
         self.client_write = client_write
@@ -690,7 +697,30 @@ class Route:
         pending = getattr(self.approvals, "pending_snapshot", None)
         if isinstance(pending, str) and pending.isalnum():
             hint["snapshot_sha256"] = pending
+        self._announce_approval(hint)
         return hint
+
+    def _announce_approval(self, hint):
+        """Tell the operator, once per snapshot, what to type.
+
+        The two ids ride in the JSON error for a client that parses it, but a
+        person who just wrapped a server looks at the terminal, where the proxy
+        printed nothing: a refusal with an empty stderr. Only when BOTH ids are
+        known, so the line never names a snapshot that was not captured, and
+        never for a failure of its own: a closed stderr must not turn a refusal
+        the client is owed into an exception.
+        """
+        notice = self.approval_notice
+        if notice is None or "server_id" not in hint or "snapshot_sha256" not in hint:
+            return
+        key = (hint["server_id"], hint["snapshot_sha256"])
+        if key in self._noticed:
+            return
+        self._noticed.add(key)
+        try:
+            notice(*key)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _withhold_refusal(self, request_id, attempt):
         """The answer to an admission that was REFUSED, and nothing else.
