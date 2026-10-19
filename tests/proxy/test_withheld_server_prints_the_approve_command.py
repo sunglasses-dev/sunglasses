@@ -4,8 +4,9 @@ The first refusal of a freshly wrapped server (APPROVAL_REQUIRED) carried the
 server id and the snapshot sha in its JSON error, but the proxy's own stderr
 stayed empty, so someone who had just wrapped a server and was looking at their
 terminal had nothing to act on. The route now offers each (server id, snapshot)
-pair to an optional notice callback once, and the proxy command prints the
-approve command with both ids filled in.
+pair to an optional notice callback (once while the pair is remembered, again
+after it has been evicted), and the proxy command prints the approve command
+with both ids filled in.
 """
 import io
 import os

@@ -137,9 +137,10 @@ class Route:
                  approval_notice=None):
         self.session = session
         # Called the first time an APPROVAL_REQUIRED answer is built for a
-        # (server id, snapshot sha) pair that is not in the last NOTICE_HISTORY seen, with those two ids. The
-        # caller decides where the line goes (the proxy command writes it to its
-        # own stderr); a route built without one stays silent, as before.
+        # (server id, snapshot sha) pair that is not among the last
+        # NOTICE_HISTORY newly seen, with those two ids. The caller decides
+        # where the line goes (the proxy command writes it to its own stderr);
+        # a route built without one stays silent, as before.
         self.approval_notice = approval_notice
         self._noticed = {}
         self.log = log
