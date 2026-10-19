@@ -20,6 +20,7 @@ import json
 import os
 import re
 import pathlib
+import shlex
 import threading
 import time
 import uuid
@@ -603,24 +604,56 @@ class _Closed:
 _CLOSED = _Closed()
 
 
+def printable(text):
+    """`text` with every character a terminal could act on written out as
+    `\\xNN`, `\\uNNNN` or `\\UNNNNNNNN`. A path is user-controlled (a flag, a
+    config file, a directory someone else named), so a line that echoes one
+    must not let it move the cursor, rewrite the line or end it early. A name
+    that was already all printable comes back unchanged."""
+    return "".join(
+        c if c.isprintable() else
+        f"\\x{ord(c):02x}" if ord(c) < 0x100 else
+        f"\\u{ord(c):04x}" if ord(c) < 0x10000 else f"\\U{ord(c):08x}"
+        for c in str(text))
+
+
+def shown_path(path):
+    """(text, quoted): how a diagnostic names `path`. A printable path comes
+    back shell-quoted, so the "Fix it" line can be pasted whole. One with
+    control characters comes back escaped, which no shell would read back as
+    the same name, so `quoted` is False and the caller says so instead of
+    offering it as a command argument."""
+    text = os.fspath(path)
+    if text.isprintable():
+        return shlex.quote(text), True
+    return printable(text), False
+
+
 def _make_receipts_dir(root):
     """T9 ruling 63 (b). A file, a dangling symlink or a symlink to a file at
     the receipts directory, at the state root or above it made `mkdir` raise
     out of `serve.main` as a traceback with no cause named. It is a receipt
     failure like any other: raised before the session opens, naming what is
-    in the way."""
+    in the way. Paths are shown shell-quoted, or escaped when they carry
+    control characters (see `shown_path`); a name that cannot even be passed
+    to the operating system (a NUL) is the same failure, not a traceback."""
     try:
         root.mkdir(parents=True, exist_ok=True)
-    except OSError as cause:
+    except (OSError, ValueError) as cause:
         blocked = None
         if isinstance(cause, (FileExistsError, NotADirectoryError)):
             from ..receipts import _fs
             blocked = root if os.path.lexists(root) else _fs.obstruction(root)
-        where = ("" if blocked is None else
-                 f": {blocked} is not a directory. Fix it: make {blocked} a "
-                 f"directory, chmod 700")
-        raise ReceiptIOError(f"the receipts directory {root} cannot be made "
-                             f"({type(cause).__name__}){where}") from None
+        where = ""
+        if blocked is not None:
+            text, quoted = shown_path(blocked)
+            where = (f": {text} is not a directory. Fix it: make {text} a "
+                     f"directory, chmod 700" if quoted else
+                     f": {text} is not a directory (its name has control "
+                     f"characters, shown escaped). Fix it: make that a "
+                     f"directory you own, chmod 700")
+        raise ReceiptIOError(f"the receipts directory {printable(root)} cannot "
+                             f"be made ({type(cause).__name__}){where}") from None
 
 
 def _chain_for(directory, home):
