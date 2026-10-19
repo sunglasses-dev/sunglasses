@@ -136,8 +136,8 @@ class Route:
                  descriptor_sha_for=None, control=None, server_identity=None,
                  approval_notice=None):
         self.session = session
-        # Called once per (server id, snapshot sha) the first time an
-        # APPROVAL_REQUIRED answer is built for it, with those two ids. The
+        # Called the first time an APPROVAL_REQUIRED answer is built for a
+        # (server id, snapshot sha) pair that is not in the last NOTICE_HISTORY seen, with those two ids. The
         # caller decides where the line goes (the proxy command writes it to its
         # own stderr); a route built without one stays silent, as before.
         self.approval_notice = approval_notice
@@ -704,7 +704,7 @@ class Route:
         return hint
 
     def _announce_approval(self, hint):
-        """Tell the operator, once per snapshot, what to type.
+        """Tell the operator what to type, once per recently seen snapshot.
 
         The two ids ride in the JSON error for a client that parses it, but a
         person who just wrapped a server looks at the terminal, where the proxy

@@ -184,6 +184,35 @@ def test_the_printed_command_approves_the_capture_from_another_directory(tmp_pat
     assert not (elsewhere / "state").exists(), "nothing was created in the directory the command ran in"
 
 
+def test_a_root_through_a_symlink_and_its_parent_still_names_the_same_store(tmp_path, monkeypatch):
+    """`link/../store` means 'the parent of what link points at', not 'next to link'.
+    A lexical clean-up (abspath) printed the second, an empty store, and the pasted
+    command said 'no stored capture'."""
+    from sunglasses.proxy import approvals
+
+    started_in = tmp_path / "proxy cwd"
+    (started_in / "real" / "inner").mkdir(parents=True)
+    (started_in / "link").symlink_to(started_in / "real" / "inner")
+    monkeypatch.chdir(started_in)
+    root = "link/../store"
+    store = approvals.Store(root, server_id=SERVER)
+    store.capture(SNAPSHOT, {"sha256": SNAPSHOT, "tools_by_name": {"echo": {"descriptor_sha256": "d" * 64}}})
+    assert (started_in / "real" / "store").is_dir() and not (started_in / "store").exists()
+    err = io.StringIO()
+    serve.approval_notice(err, root=root)(SERVER, SNAPSHOT)
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    line = err.getvalue().splitlines()[0]
+    argv = shlex.split(line.split("run: ", 1)[1].split(" (it shows", 1)[0])
+    out, errs = io.StringIO(), io.StringIO()
+    rc = commands.main(argv[2:], stdout=out, stderr=errs, confirm=lambda: True)
+    assert rc == 0 and out.getvalue().rstrip().endswith("approved"), (rc, out.getvalue(), errs.getvalue())
+    assert (started_in / "real" / "store" / "approvals" / f"{SERVER}.json").exists()
+    assert not (started_in / "store").exists()
+
+
 @pytest.mark.parametrize("hostile", ["a\nb", "a\x1b[2Jb", "a\rb", "a\x00b", "a\x7fb", "a\u2028b"])
 def test_a_root_with_control_characters_is_never_printed(tmp_path, monkeypatch, hostile):
     err = io.StringIO()

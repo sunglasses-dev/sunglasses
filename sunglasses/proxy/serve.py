@@ -125,15 +125,17 @@ def approval_notice(stderr, root=None):
     without it would point at the wrong store). The ids are digests the route
     has already checked are alphanumeric.
 
-    The root is made absolute HERE, in the proxy's own working directory,
-    because the person pastes the command into a terminal that is somewhere
-    else: a relative root would name a different, empty store. It is then
-    shell-quoted. Quoting does not make a path safe to print: a root with a
+    The root is anchored HERE to the proxy's own working directory, because
+    the person pastes the command into a terminal that is somewhere else: a
+    relative root would name a different, empty store. It is joined to the
+    working directory and NOT normalised: `link/../store` goes through the
+    symlink and then up from its target, which a lexical clean-up would turn
+    into a different directory. It is then shell-quoted. Quoting does not make a path safe to print: a root with a
     control character (a newline splits the line, an escape byte rewrites the
     terminal) is chosen by whoever wrote the launch configuration, so such a
     root is never echoed; the line says so and leaves the flag to the person.
     """
-    shown = os.path.abspath(str(root)) if root else None
+    shown = os.path.join(os.getcwd(), str(root)) if root else None
     unsafe = shown is not None and not shown.isprintable()
 
     def notice(server_id, snapshot_sha256):
