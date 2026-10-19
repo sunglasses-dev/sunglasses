@@ -14,6 +14,7 @@ import random
 import re
 
 from sunglasses.engine import SunglassesEngine
+from sunglasses.patterns import PATTERNS
 
 A = (r"\b(?:guide|documentation|policy|unit\s+test|fixture|incident|postmortem|quarantine|blocked"
      r"|refused|rejected|must\s+not|do\s+not|never)\b")
@@ -39,6 +40,12 @@ def _guard():
     return found[0]
 
 
+def _channels():
+    (rule,) = [r for r in PATTERNS if r["id"] == "GLS-AW-585"]
+    assert rule["channel"]
+    return rule["channel"]
+
+
 def _fires(text, channel="message"):
     return any(f["id"] == "GLS-AW-585" for f in SunglassesEngine().scan(text, channel=channel).findings)
 
@@ -62,7 +69,7 @@ def test_guard_agrees_with_the_old_form_on_random_strings():
 
 
 def test_rule_still_fires_and_is_still_defused_through_the_engine():
-    for channel in ("message", "file", "web_content"):
+    for channel in _channels():
         assert _fires(HOSTILE, channel), channel
         assert not _fires(HOSTILE + "The guide says reviewers must report it.", channel), channel
         assert not _fires("The guide says reviewers must report it. " + HOSTILE, channel), channel
