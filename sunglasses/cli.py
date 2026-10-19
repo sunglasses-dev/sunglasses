@@ -1421,12 +1421,27 @@ def cmd_scan(args):
     _emit_scan_result(args, result, source)
 
 
+CHECK_HELP = """List what is installed. Core text scanning needs nothing else.
+
+Every ✗ is an OPTIONAL extra (image text, audio/video, QR codes) that is not
+installed. A missing extra is not a failure and `check` does not treat it as
+one.
+
+EXIT CODES
+  0  it ran and printed the list, whatever is or is not installed
+"""
+
+
 def cmd_check(args):
     """Check what's installed on the user's system."""
     print(f"\n  {BOLD}SUNGLASSES — System Check{RESET}")
     print(f"  {DIM}{'─' * 50}{RESET}\n")
 
     all_good = True
+    # Every row below the core line is an OPTIONAL extra. The cross used to say only
+    # "needed for ...", which read as "your install is broken" on a machine that
+    # had just been installed correctly.
+    missing = []
 
     # Core (always available)
     print(f"  {GREEN}✓{RESET} SUNGLASSES core installed")
@@ -1438,18 +1453,20 @@ def cmd_check(args):
     if shutil.which("tesseract"):
         print(f"  {GREEN}✓{RESET} Tesseract (image OCR)")
     else:
-        print(f"  {YELLOW}✗{RESET} Tesseract {DIM}— needed for image text scanning{RESET}")
+        print(f"  {YELLOW}✗{RESET} Tesseract (optional) {DIM}— needed for image text scanning{RESET}")
         print(f"    {DIM}Install: brew install tesseract (Mac) or apt install tesseract-ocr (Linux){RESET}")
         all_good = False
+        missing.append("Tesseract")
 
     # Whisper
     try:
         import whisper
         print(f"  {GREEN}✓{RESET} Whisper (audio transcription)")
     except ImportError:
-        print(f"  {YELLOW}✗{RESET} Whisper {DIM}— needed for audio/video scanning{RESET}")
+        print(f"  {YELLOW}✗{RESET} Whisper (optional) {DIM}— needed for audio/video scanning{RESET}")
         print(f"    {DIM}Install: pip install sunglasses[all]{RESET}")
         all_good = False
+        missing.append("Whisper")
 
     # FFmpeg
     if shutil.which("ffmpeg"):
@@ -1460,24 +1477,28 @@ def cmd_check(args):
         except Exception:
             print(f"  {GREEN}✓{RESET} FFmpeg")
     else:
-        print(f"  {YELLOW}✗{RESET} FFmpeg {DIM}— needed for audio/video scanning{RESET}")
+        print(f"  {YELLOW}✗{RESET} FFmpeg (optional) {DIM}— needed for audio/video scanning{RESET}")
         print(f"    {DIM}Install: brew install ffmpeg (Mac) or apt install ffmpeg (Linux){RESET}")
         all_good = False
+        missing.append("FFmpeg")
 
     # pyzbar (QR codes)
     try:
         import pyzbar
         print(f"  {GREEN}✓{RESET} pyzbar (QR code scanning)")
     except ImportError:
-        print(f"  {YELLOW}✗{RESET} pyzbar {DIM}— needed for QR code scanning{RESET}")
+        print(f"  {YELLOW}✗{RESET} pyzbar (optional) {DIM}— needed for QR code scanning{RESET}")
         print(f"    {DIM}Install: pip install pyzbar{RESET}")
         all_good = False
+        missing.append("pyzbar")
 
     print(f"\n  {DIM}{'─' * 50}{RESET}")
     if all_good:
         print(f"  {GREEN}{BOLD}All systems ready.{RESET} FAST + DEEP scanning available.\n")
     else:
-        print(f"  {YELLOW}{BOLD}Some optional features unavailable.{RESET}")
+        count = len(missing)
+        print(f"  {YELLOW}{BOLD}{count} optional {'extra' if count == 1 else 'extras'} not installed "
+              f"({', '.join(missing)}).{RESET} Core text scanning is ready.")
         print(f"  {DIM}Core text scanning works without any extras.{RESET}")
         print(f"  {DIM}Install missing tools to unlock image/audio/video/QR scanning.{RESET}\n")
 
@@ -2954,7 +2975,11 @@ def main():
     scan_parser.set_defaults(func=cmd_scan)
 
     # check
-    check_parser = subparsers.add_parser("check", help="Check what's installed on your system")
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Check what's installed on your system",
+        description=CHECK_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     check_parser.set_defaults(func=cmd_check)
 
     # info
@@ -3443,6 +3468,21 @@ def cmd_doctor(args, _run=None):
         print(f"  {DIM}No server entries found.{RESET}")
 
     print()
+    # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
+    # was tried and nothing failed. Say which it is, only when that is exactly the
+    # case: the self-test is unavailable and nothing else the report holds is
+    # wrong. Any FAIL, unreadable source or unusable key keeps its own wording.
+    only_unproven = (
+        st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE
+        and not st["failed"]
+        and all(w["result"] != "FAIL" for w in rendered["per_wrapper"])
+        and rendered["receipts_key"]["status"] != "KEY_UNUSABLE"
+        and not any(row.get("detail") for row in rendered["inventory"]))
+    if only_unproven:
+        print(f"  {BOLD}No check failed, and none could run.{RESET} This build has no live self-test, so "
+              f"`doctor` cannot show that a route goes through the proxy. Exit 1 here means "
+              f"\"not proven\", not \"failed\".")
+        print()
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
     print()
     sys.exit(rendered["exit_code"])
