@@ -83,9 +83,16 @@ def test_already_stamped_is_nothing_to_do(tmp_path):
 @pytest.mark.parametrize("text, needle", [
     ((STATS % "2026-10-19").replace('"version": "0.6.10"', '"version": "0.6.9"'), "did not bump"),
     (STATS % "2026-10-18", "Pacific upload date"),
-    ((STATS % "2026-10-19").replace('"last_updated_by": "sunglasses-publish-sh",', ""), "exactly one"),
+    ((STATS % "2026-10-19").replace('"last_updated_by": "sunglasses-publish-sh",', ""), "top-level strings"),
     ((STATS % "2026-10-19").replace('"team_size": 5,',
-                                    '"team_size": 5, "last_updated": "2026-01-01T00:00:00-08:00",'), "exactly one"),
+                                    '"team_size": 5, "last_updated": "2026-01-01T00:00:00-08:00",'), "strict JSON"),
+    # a root field plus a nested copy of the same name: the depth-blind edit would be ambiguous
+    ((STATS % "2026-10-19").replace('"team_size": 5,', '"team_size": {"last_updated": "z"},'), "exactly one"),
+    # the only timestamp is nested: the text edit would hit it, the root still has none
+    ('{\n  "version": "0.6.10",\n  "nested": {\n    "last_updated": "x",\n    "last_updated_by": "y"\n  },\n'
+     '  "released": "2026-10-19"\n}\n', "top-level strings"),
+    # a root field that is not a string
+    ((STATS % "2026-10-19").replace('"last_updated_by": "sunglasses-publish-sh"', '"last_updated_by": null'), "top-level strings"),
 ])
 def test_refusals_leave_the_file_untouched(tmp_path, text, needle):
     path = tree(tmp_path, text)
@@ -138,3 +145,11 @@ def test_main_reports_and_returns_the_code(tmp_path, capsys):
     rc = sla.main(["x", V, "--root", str(tmp_path), "--wait", "0"], fetch=served())
     assert rc == 0
     assert "last_updated 2026-10-19T07:26:03-07:00 by release.yml" in capsys.readouterr().out
+
+
+def test_a_duplicate_key_in_the_file_is_refused_and_the_file_untouched(tmp_path):
+    text = (STATS % "2026-10-19").replace('"team_size": 5,', '"team_size": 5,\n  "released": "2026-10-19",')
+    path = tree(tmp_path, text)
+    code, message = sla.stamp(tmp_path, V, fetch=served(), sleep=no_sleep)
+    assert code == 2 and "not strict JSON" in message, message
+    assert path.read_text() == text

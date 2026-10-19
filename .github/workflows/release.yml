@@ -340,14 +340,41 @@ jobs:
             echo "$BRANCH already exists on origin, leaving it alone (no force). Look at that branch first."
             exit 0
           fi
-          # Only stats/current.json may differ, and only its last_updated / last_updated_by
-          # lines: a first stamp changes both, a later release usually changes just the
-          # time. Anything else, or no change at all, is not committed.
+          # Only stats/current.json may differ, and only the TOP-LEVEL values of last_updated
+          # and last_updated_by in it: a first stamp changes both, a later release usually
+          # changes just the time. The two parsed documents are compared, so a nested key,
+          # another property on the same line, or a reformatting cannot ride along; the line
+          # counts keep the change to the lines of those two fields.
           FILES="$(git diff --name-only)"
-          LINES="$(git diff -U0 -- stats/current.json | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' || true)"
-          OTHER="$(printf '%s\n' "$LINES" | grep -Ev '^[-+][[:space:]]*"last_updated(_by)?":' | grep -v '^$' || true)"
-          if [ "$FILES" != "stats/current.json" ] || [ -z "$LINES" ] || [ -n "$OTHER" ]; then
-            echo "::error::REFUSED: unexpected change: files [$FILES], lines outside the two fields [$OTHER]"
+          CHECK=0
+          python3 - <<'PY' || CHECK=$?
+          import json, subprocess, sys
+          FIELDS = ("last_updated", "last_updated_by")
+          def strict(pairs):
+              keys = [k for k, _ in pairs]
+              if len(set(keys)) != len(keys):
+                  raise ValueError("a duplicate key (the parser would keep only the last)")
+              return dict(pairs)
+          try:
+              old = json.loads(subprocess.check_output(["git", "show", "HEAD:stats/current.json"], text=True), object_pairs_hook=strict)
+              new = json.loads(open("stats/current.json", encoding="utf-8").read(), object_pairs_hook=strict)
+          except ValueError as error:
+              sys.exit(f"stats/current.json is not strict JSON: {error}")
+          if not (isinstance(old, dict) and isinstance(new, dict)):
+              sys.exit("the stats file is not a JSON object")
+          if not all(isinstance(d.get(k), str) for d in (old, new) for k in FIELDS):
+              sys.exit("a stamped field is missing or not a top-level string")
+          rest = lambda d: {k: v for k, v in d.items() if k not in FIELDS}
+          if rest(old) != rest(new):
+              sys.exit("a property other than the two stamped fields changed")
+          if all(old[k] == new[k] for k in FIELDS):
+              sys.exit("no stamped field changed")
+          stat = subprocess.check_output(["git", "diff", "--numstat", "--", "stats/current.json"], text=True).split()
+          if not (stat and int(stat[0]) <= 2 and int(stat[1]) <= 2):
+              sys.exit(f"more than the two field lines changed: {stat[:2]}")
+          PY
+          if [ "$FILES" != "stats/current.json" ] || [ "$CHECK" -ne 0 ]; then
+            echo "::error::REFUSED: unexpected change: files [$FILES], field check exit $CHECK"
             exit 1
           fi
           TITLE="stats: ${VERSION} last_updated is the PyPI upload time"

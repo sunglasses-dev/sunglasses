@@ -8,7 +8,8 @@ site stamp gate, which requires the two dates to agree, stops on it. This writes
 the two fields the workflow's upload could not:
 
     last_updated     the wheel's PyPI upload time, in Pacific time
-    last_updated_by  "release.yml" (the uploader that actually ran)
+    last_updated_by  "release.yml", the label for releases cut by the release workflow
+                     (a label, not proof of who uploaded; --by changes it)
 
     python3 scripts/stats_last_updated.py <version> [--root DIR] [--by NAME]
                                           [--wait SECONDS] [--pause SECONDS]
@@ -18,7 +19,8 @@ Exit codes
     3  nothing to do: the file already carries this upload time
     2  refused, nothing written: PyPI never listed a wheel for the version, the tree's
        stats `version` is not <version>, `released` is not the wheel's Pacific date,
-       or the two fields are not present exactly once
+       the two fields are not both ROOT-level strings present exactly once, or the
+       edited document is not the old one with only those two root values replaced
     64 bad arguments
 
 It edits the file in place and does nothing else: committing, pushing and opening
@@ -36,6 +38,15 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 PT = ZoneInfo("America/Los_Angeles")
+FIELDS = ("last_updated", "last_updated_by")
+
+
+def strict(pairs):
+    """json object hook: a duplicate key is refused, because the parser would keep only the last."""
+    keys = [k for k, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise ValueError("duplicate key")
+    return dict(pairs)
 
 
 def fetch_json(url):
@@ -76,7 +87,10 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
     except LookupError as error:
         return 2, f"REFUSED: {error}"
     text = path.read_text(encoding="utf-8")
-    current = json.loads(text)
+    try:
+        current = json.loads(text, object_pairs_hook=strict)
+    except ValueError as error:
+        return 2, f"REFUSED: stats/current.json is not strict JSON ({error})"
     if current.get("version") != version:
         return 2, (f"REFUSED: stats/current.json says version {current.get('version')!r}, not {version}: "
                    "the release PR did not bump it")
@@ -84,6 +98,9 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
         return 2, (f"REFUSED: released {current.get('released')!r} is not the wheel's Pacific upload date "
                    f"{pt_date!r}; a last_updated edit would not satisfy the site stamp gate, so a person "
                    "has to look at `released`")
+    if not isinstance(current, dict) or not all(isinstance(current.get(k), str) for k in FIELDS):
+        return 2, ("REFUSED: stats/current.json must carry last_updated and last_updated_by as "
+                   "top-level strings; a nested or missing field is not edited")
     if current.get("last_updated") == pt_iso and current.get("last_updated_by") == by:
         return 3, f"NOTHING TO DO: last_updated is already {pt_iso} by {by}"
     new = text
@@ -92,7 +109,10 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
         if len(pattern.findall(new)) != 1:
             return 2, f'REFUSED: expected exactly one "{key}" in stats/current.json'
         new = pattern.sub(lambda m: f'{m.group(1)}"{value}"', new, count=1)
-    json.loads(new)
+    # The text edit is depth-blind, so prove it did what was meant: the new document is the
+    # old one with exactly the two top-level values replaced, nothing else moved.
+    if json.loads(new, object_pairs_hook=strict) != {**current, "last_updated": pt_iso, "last_updated_by": by}:
+        return 2, "REFUSED: the edit changed something other than the two top-level values"
     path.write_text(new, encoding="utf-8")
     return 0, f"last_updated {pt_iso} by {by} (wheel uploaded {utc})"
 

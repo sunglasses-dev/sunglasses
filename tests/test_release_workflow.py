@@ -572,8 +572,8 @@ def check_stats(doc):
             problems.append(f"{STATS} must open the pull request against main")
         if not re.search(r"::error::[^\n]*unexpected change", pr):
             problems.append(f"{STATS} does not annotate an unexpected change with ::error::")
-        if "git diff --name-only" not in pr or 'last_updated(_by)?' not in pr:
-            problems.append(f"{STATS} does not confine the change to the last_updated fields of stats/current.json")
+        if "git diff --name-only" not in pr or "HEAD:stats/current.json" not in pr or "rest(old) != rest(new)" not in pr:
+            problems.append(f"{STATS} does not confine the change to the top-level last_updated fields of stats/current.json")
         if "263686995+azrollin@users.noreply.github.com" not in pr:
             problems.append(f"{STATS} commits under the wrong identity")
 
@@ -669,6 +669,7 @@ def test_check_stats_catches_a_step_that_does_more_than_open_a_pull_request(line
     ('ls-remote', 'rev-parse', "already exists"),
     ('--base main', '--base release', "against main"),
     ('git diff --name-only', 'git diff --stat', "confine the change"),
+    ('rest(old) != rest(new)', 'rest(old) == rest(old)', "confine the change"),
     ('263686995+azrollin@users.noreply.github.com', 'ci@example.com', "identity"),
 ])
 def test_check_stats_catches_a_weakened_pull_request_step(old, new, needle):
@@ -860,3 +861,59 @@ def test_an_unchanged_tree_is_not_committed(tmp_path):
     repo, origin, env = _stats_env(tmp_path, 3)
     r = _run_step(repo, env, "gh pr create")
     assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+
+
+# the boundary cases the guard has to hold, each through the real step blocks
+
+def _no_pr_and_no_branch(tmp_path, origin):
+    refs = subprocess.run(["git", "-C", str(origin), "for-each-ref", "--format=%(refname:short)", "refs/heads"],
+                          capture_output=True, text=True).stdout.split()
+    return refs == ["main"] and not (tmp_path / "gh.log").exists()
+
+
+def test_a_nested_timestamp_is_refused_by_the_real_script_and_nothing_is_pushed(tmp_path):
+    repo, origin, env = _real_script_env(tmp_path, "x", "y")
+    nested = ('{\n  "version": "1.2.3",\n  "meta": {\n    "last_updated": "2026-10-12T09:00:00-07:00",\n'
+              '    "last_updated_by": "release.yml"\n  },\n  "released": "2026-10-19"\n}\n')
+    (repo / "stats" / "current.json").write_text(nested)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "nested"], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=repo, check=True)
+    stamp = _run_step(repo, env, STATS_SCRIPT)
+    assert stamp.returncode == 1 and _outputs(tmp_path) == [], (stamp.stdout, stamp.stderr)
+    assert "top-level strings" in stamp.stdout
+    assert (repo / "stats" / "current.json").read_text() == nested
+    assert _no_pr_and_no_branch(tmp_path, origin)
+
+
+def _edited_pr_step(tmp_path, edit):
+    """Stamp with the real script, then let `edit` change the file, then run the PR step."""
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml")
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    path = repo / "stats" / "current.json"
+    path.write_text(edit(path.read_text()))
+    r = _run_step(repo, env, "gh pr create")
+    return r, tmp_path, origin
+
+
+@pytest.mark.parametrize("edit", [
+    # another property on a line the old guard allowed by prefix
+    lambda text: text.replace('"last_updated_by": "release.yml",', '"last_updated_by": "release.yml", "released": "2026-10-20",'),
+    # a different value on the released line
+    lambda text: text.replace('"released": "2026-10-19"', '"released": "2026-10-20"'),
+    # a nested copy of the field name added on its own line
+    lambda text: text.replace('"released"', '"x": {"last_updated": "1"},\n  "released"'),
+    # a reformatting of the whole file that leaves the parsed document alone
+    lambda text: text.replace("\n  ", "\n      "),
+    # the stamped values removed
+    lambda text: text.replace('"last_updated_by": "release.yml",', '"last_updated_by": 7,'),
+])
+def test_the_pr_step_refuses_an_edit_outside_the_two_top_level_values(tmp_path, edit):
+    r, tp, origin = _edited_pr_step(tmp_path, edit)
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tp, origin)
+
+
+def test_the_pr_step_refuses_a_file_that_is_not_a_json_object(tmp_path):
+    r, tp, origin = _edited_pr_step(tmp_path, lambda text: "[]\n")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tp, origin)
