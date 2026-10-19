@@ -111,7 +111,9 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
         new = pattern.sub(lambda m: f'{m.group(1)}"{value}"', new, count=1)
     # The text edit is depth-blind, so prove it did what was meant: the new document is the
     # old one with exactly the two top-level values replaced, nothing else moved.
-    if json.loads(new, object_pairs_hook=strict) != {**current, "last_updated": pt_iso, "last_updated_by": by}:
+    # dumps, not ==: in Python True == 1, and the edit must not turn one into the other
+    expected = {**current, "last_updated": pt_iso, "last_updated_by": by}
+    if json.dumps(json.loads(new, object_pairs_hook=strict), sort_keys=True) != json.dumps(expected, sort_keys=True):
         return 2, "REFUSED: the edit changed something other than the two top-level values"
     path.write_text(new, encoding="utf-8")
     return 0, f"last_updated {pt_iso} by {by} (wheel uploaded {utc})"

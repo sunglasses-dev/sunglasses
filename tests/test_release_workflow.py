@@ -813,10 +813,10 @@ sys.exit(real.main(sys.argv, fetch=fetch))
 """
 
 
-def _real_script_env(tmp_path, last_updated, by):
+def _real_script_env(tmp_path, last_updated, by, extra=""):
     repo, origin, env = _stats_env(tmp_path, 3)
     (repo / "scripts" / "stats_last_updated.py").write_text(WRAPPER % str(ROOT / "scripts" / "stats_last_updated.py"))
-    (repo / "stats" / "current.json").write_text(REAL_STATS % (last_updated, by))
+    (repo / "stats" / "current.json").write_text((REAL_STATS % (last_updated, by)).replace('  "released"', extra + '  "released"'))
     ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
     subprocess.run(["git", *ident, "add", "-A"], cwd=repo, check=True)
     subprocess.run(["git", *ident, "commit", "-q", "-m", "fixture"], cwd=repo, check=True)
@@ -885,9 +885,9 @@ def test_a_nested_timestamp_is_refused_by_the_real_script_and_nothing_is_pushed(
     assert _no_pr_and_no_branch(tmp_path, origin)
 
 
-def _edited_pr_step(tmp_path, edit):
+def _edited_pr_step(tmp_path, edit, extra=""):
     """Stamp with the real script, then let `edit` change the file, then run the PR step."""
-    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml")
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml", extra)
     assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
     path = repo / "stats" / "current.json"
     path.write_text(edit(path.read_text()))
@@ -911,6 +911,28 @@ def test_the_pr_step_refuses_an_edit_outside_the_two_top_level_values(tmp_path, 
     r, tp, origin = _edited_pr_step(tmp_path, edit)
     assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
     assert _no_pr_and_no_branch(tp, origin)
+
+
+@pytest.mark.parametrize("extra, edit", [
+    # an unrelated true turned into the number 1: equal in Python, different in JSON
+    ('  "beta": true,\n', lambda text: text.replace('"beta": true', '"beta": 1')),
+    ('  "ratio": 1,\n', lambda text: text.replace('"ratio": 1', '"ratio": 1.0')),
+    # one unrelated line re-indented (inside the old two-line budget)
+    ('  "beta": true,\n', lambda text: text.replace('  "beta": true', '      "beta": true')),
+    # the two stamped keys swapped places
+    ('', lambda text: text.replace('  "last_updated": "2026-10-19T07:26:03-07:00",\n  "last_updated_by": "release.yml",\n',
+                                   '  "last_updated_by": "release.yml",\n  "last_updated": "2026-10-19T07:26:03-07:00",\n')),
+])
+def test_the_pr_step_keeps_json_types_and_every_other_line(tmp_path, extra, edit):
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml", extra)
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    path = repo / "stats" / "current.json"
+    before = path.read_text()
+    path.write_text(edit(before))
+    assert path.read_text() != before
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tmp_path, origin)
 
 
 def test_the_pr_step_refuses_a_file_that_is_not_a_json_object(tmp_path):

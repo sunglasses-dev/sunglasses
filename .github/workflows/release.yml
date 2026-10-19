@@ -342,13 +342,14 @@ jobs:
           fi
           # Only stats/current.json may differ, and only the TOP-LEVEL values of last_updated
           # and last_updated_by in it: a first stamp changes both, a later release usually
-          # changes just the time. The two parsed documents are compared, so a nested key,
-          # another property on the same line, or a reformatting cannot ride along; the line
-          # counts keep the change to the lines of those two fields.
+          # changes just the time. The two parsed documents are compared with their JSON
+          # types kept (true is not 1), so a nested key or another property cannot change;
+          # then every changed line must be one of those two fields' own lines, same key,
+          # same indentation, same position, so no other line is reformatted either.
           FILES="$(git diff --name-only)"
           CHECK=0
           python3 - <<'PY' || CHECK=$?
-          import json, subprocess, sys
+          import json, re, subprocess, sys
           FIELDS = ("last_updated", "last_updated_by")
           def strict(pairs):
               keys = [k for k, _ in pairs]
@@ -356,22 +357,31 @@ jobs:
                   raise ValueError("a duplicate key (the parser would keep only the last)")
               return dict(pairs)
           try:
-              old = json.loads(subprocess.check_output(["git", "show", "HEAD:stats/current.json"], text=True), object_pairs_hook=strict)
-              new = json.loads(open("stats/current.json", encoding="utf-8").read(), object_pairs_hook=strict)
+              old_text = subprocess.check_output(["git", "show", "HEAD:stats/current.json"], text=True)
+              new_text = open("stats/current.json", encoding="utf-8").read()
+              old = json.loads(old_text, object_pairs_hook=strict)
+              new = json.loads(new_text, object_pairs_hook=strict)
           except ValueError as error:
               sys.exit(f"stats/current.json is not strict JSON: {error}")
           if not (isinstance(old, dict) and isinstance(new, dict)):
               sys.exit("the stats file is not a JSON object")
           if not all(isinstance(d.get(k), str) for d in (old, new) for k in FIELDS):
               sys.exit("a stamped field is missing or not a top-level string")
-          rest = lambda d: {k: v for k, v in d.items() if k not in FIELDS}
+          # dumps, not ==: in Python True == 1, which would hide a boolean turned into a number
+          rest = lambda d: json.dumps({k: v for k, v in d.items() if k not in FIELDS}, sort_keys=True)
           if rest(old) != rest(new):
               sys.exit("a property other than the two stamped fields changed")
           if all(old[k] == new[k] for k in FIELDS):
               sys.exit("no stamped field changed")
-          stat = subprocess.check_output(["git", "diff", "--numstat", "--", "stats/current.json"], text=True).split()
-          if not (stat and int(stat[0]) <= 2 and int(stat[1]) <= 2):
-              sys.exit(f"more than the two field lines changed: {stat[:2]}")
+          old_lines, new_lines = old_text.split("\n"), new_text.split("\n")
+          if len(old_lines) != len(new_lines):
+              sys.exit("the number of lines changed")
+          field_line = lambda s: re.fullmatch(r'(\s*"(?:last_updated|last_updated_by)":\s*)"[^"]*"(,?\s*)', s)
+          for a, b in zip(old_lines, new_lines):
+              if a != b:
+                  x, y = field_line(a), field_line(b)
+                  if not (x and y and x.groups() == y.groups()):
+                      sys.exit(f"a line other than a stamped field's own line changed: {a!r} -> {b!r}")
           PY
           if [ "$FILES" != "stats/current.json" ] || [ "$CHECK" -ne 0 ]; then
             echo "::error::REFUSED: unexpected change: files [$FILES], field check exit $CHECK"
