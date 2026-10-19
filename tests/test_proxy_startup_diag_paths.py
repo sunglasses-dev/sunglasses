@@ -16,7 +16,8 @@ stderr:
   not a traceback.
 
 Exit codes at the command line are unchanged: 1 for the receipt log, EXIT_FAULT for the
-approval store. The last two cases call the display helpers directly; the rest run `serve.main`.
+approval store. Two cases call the display helpers directly and thirty give what is shown to
+the system bash (3.2) and zsh and compare the bytes they read back; the rest run `serve.main`.
 """
 import os
 import shlex
@@ -84,18 +85,21 @@ def _blocked_approvals(tmp_path, name):
 def _written(text):
     """What a diagnostic must show for a name with something hidden in it, built here
     independently of the code under test: $'...', backslash and quote escaped, each hidden
-    character as \\xNN (ASCII) or \\uNNNN / \\UNNNNNNNN."""
+    character as a hex byte escape for each of its bytes (a lone surrogate is the one byte it
+    stands for)."""
+    invisible = "͏️\U000e0100"
     out = []
     for c in text:
+        n = ord(c)
         if c == "\\":
             out.append("\\\\")
         elif c == "'":
             out.append("\\'")
-        elif c.isprintable() and c not in "͏️\U000e0100":
+        elif c.isprintable() and c not in invisible:
             out.append(c)
         else:
-            n = ord(c)
-            out.append("\\x%02x" % n if n < 0x80 else "\\u%04x" % n if n < 0x10000 else "\\U%08x" % n)
+            raw = bytes([n - 0xDC00]) if 0xDC80 <= n <= 0xDCFF else c.encode("utf-8", "surrogatepass")
+            out.append("".join("\\x%02x" % byte for byte in raw))
     return "$'" + "".join(out) + "'"
 
 
@@ -135,25 +139,25 @@ def test_approval_store_refusal_writes_the_name_as_escapes_on_one_line(tmp_path,
     assert NOTE in line
 
 
-def test_two_names_that_differ_only_by_a_backslash_do_not_print_alike(tmp_path):
-    """A literal backslash-x-1-b in a name and a real ESC must not produce the same line."""
+COLLIDING = [
+    # a real ESC beside the text \x1b, in either order: one line if a backslash is left alone
+    ("proxy-p\x1b\\x1bq", "proxy-p\\x1b\x1bq"),
+    ("proxy-a\x1bb", "proxy-a\\x1bb"),
+    ("proxy-a͏b", "proxy-a\\xcd\\x8fb"),
+]
+
+
+@pytest.mark.parametrize("pair", COLLIDING, ids=["esc-order", "esc-vs-text", "invisible"])
+@pytest.mark.parametrize("blocker", [_blocked_receipts, _blocked_approvals],
+                         ids=["receipt-log", "approval-store"])
+def test_two_different_names_do_not_print_alike(tmp_path, pair, blocker):
     lines = []
-    for n, name in enumerate(["proxy-a\x1bb", "proxy-a\\x1bb"]):
+    for n, name in enumerate(pair):
         sub = tmp_path / str(n)
         sub.mkdir()
-        state, _ = _blocked_receipts(sub, name)
+        state, _ = blocker(sub, name)
         p = _run(sub, str(state))
-        assert p.returncode == 1, p.stderr[-400:]
-        lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
-    assert lines[0] != lines[1], lines
-    # and the same for the approval store
-    lines = []
-    for n, name in enumerate(["proxy-a\x1bb", "proxy-a\\x1bb"]):
-        sub = tmp_path / f"s{n}"
-        sub.mkdir()
-        state, _ = _blocked_approvals(sub, name)
-        p = _run(sub, str(state))
-        assert p.returncode == serve.EXIT_FAULT, p.stderr[-400:]
+        assert p.returncode in (1, serve.EXIT_FAULT), p.stderr[-400:]
         lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
     assert lines[0] != lines[1], lines
 
@@ -173,7 +177,7 @@ def test_a_name_that_is_not_text_is_escaped_with_the_note(tmp_path):
     assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
     assert "the receipt log could not be opened" in line
-    assert "\\udc80\\udcff" in line
+    assert "proxy-\\x80\\xff" in line
     assert NOTE in line
 
 
@@ -226,14 +230,35 @@ def test_a_plain_path_is_named_exactly_as_before(tmp_path):
 def test_printable_leaves_text_alone_escapes_the_hidden_and_is_idempotent():
     assert receipts.printable("/a b/ü/é") == "/a b/ü/é"
     once = receipts.printable("a\x1bb\n\x7f\x85 \udc80͏️\U0001f600")
-    assert once == "a\\x1bb\\x0a\\x7f\\u0085\\u2028\\udc80\\u034f\\ufe0f\U0001f600"
+    assert once == ("a\\x1bb\\x0a\\x7f\\xc2\\x85\\xe2\\x80\\xa8\\x80\\xcd\\x8f\\xef\\xb8\\x8f"
+                    "\U0001f600")
     assert receipts.printable(once) == once
 
 
 def test_shown_path_quotes_a_clean_path_and_delimits_a_hidden_one():
     assert receipts.shown_path("/a b") == ("'/a b'", False)
     assert receipts.shown_path("/ab") == ("/ab", False)
-    assert receipts.shown_path("/a\x1bb") == ("$'/a\\x1bb'", True)
-    assert receipts.shown_path("/a\\x1bb") == ("'/a\\x1bb'", False)
-    assert receipts.shown_path("/a͏b") == ("$'/a\\u034fb'", True)
-    assert receipts.shown_path("/it's\x1b") == ("$'/it\\'s\\x1b'", True)
+    assert receipts.shown_path("/a\x1bb") == (r"$'/a\x1bb'", True)
+    assert receipts.shown_path("/a\\x1bb") == (r"'/a\x1bb'", False)
+    assert receipts.shown_path("/a͏b") == (r"$'/a\xcd\x8fb'", True)
+    assert receipts.shown_path("/it's\x1b") == (r"$'/it\'s\x1b'", True)
+
+
+SHELLS = [s for s in ("/bin/bash", "/bin/zsh", "/opt/homebrew/bin/bash", "/usr/local/bin/bash")
+          if os.path.exists(s)]
+ROUND_TRIP = [
+    "/a\x1bb", "/a\nb", "/p\x1b\\x1bq", "/it's\\\x1b", "/a b\x7f", "/c1\x85", "/ls ",
+    "/cgj͏", "/vs️", "/vs-sup\U000e0100", "/ü\x1bé", "/plain space", "/it's",
+    os.fsdecode(b"/raw\x80\xff"), os.fsdecode(b"/mix\x1b\xc3\xa9\x80"),
+]
+
+
+@pytest.mark.skipif(not SHELLS, reason="no bash or zsh to read the notation back")
+@pytest.mark.parametrize("shell", SHELLS)
+@pytest.mark.parametrize("name", ROUND_TRIP, ids=range(len(ROUND_TRIP)))
+def test_what_is_shown_is_what_a_shell_reads_back(shell, name):
+    """The shown form, given to bash (3.2 included) or zsh, is the name's own bytes."""
+    text, _ = receipts.shown_path(name)
+    out = subprocess.run([shell, "-c", f"printf %s {text}"], capture_output=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout == os.fsencode(name)

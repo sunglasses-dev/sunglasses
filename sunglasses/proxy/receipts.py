@@ -619,17 +619,21 @@ def _hidden(char):
 
 
 def _escape(char):
-    """`char` as bash/zsh `$'...'` reads it: `\\xNN` for ASCII, `\\uNNNN` or `\\UNNNNNNNN`
-    above it (a `\\xNN` past 0x7f would be a byte, not the character)."""
+    """`char` as the bytes it stands for, each written `\\xNN`, which bash (3.2 too)
+    and zsh read inside `$'...'` as those bytes. A character is its UTF-8 bytes; a
+    lone surrogate from `os.fsdecode` is the one non-UTF-8 byte it replaced."""
     code = ord(char)
-    return (f"\\x{code:02x}" if code < 0x80 else
-            f"\\u{code:04x}" if code < 0x10000 else f"\\U{code:08x}")
+    if 0xDC80 <= code <= 0xDCFF:
+        raw = bytes([code - 0xDC00])
+    else:
+        raw = char.encode("utf-8", "surrogatepass")
+    return "".join(f"\\x{byte:02x}" for byte in raw)
 
 
 def printable(text):
     """`text` with every hidden character written out as an escape. For a message
     whose text is not a path (a path goes through `shown_path`, which also keeps two
-    different names from printing the same). Output is ASCII-safe to print, and
+    different names from printing the same). Output holds no terminal control character, and
     running it again changes nothing."""
     return "".join(_escape(c) if _hidden(c) else c for c in str(text))
 
