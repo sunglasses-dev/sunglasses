@@ -27,6 +27,7 @@ import sys
 import pytest
 
 from sunglasses.proxy import receipts, serve
+from sunglasses.receipts import keys, optin
 
 TREE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UPSTREAM = [sys.executable, "-c", "import sys; sys.stdin.read()"]
@@ -53,9 +54,9 @@ INVISIBLE = {
 HIDDEN = {**CONTROLS, **INVISIBLE}
 
 
-def _run(tmp_path, state):
+def _run(tmp_path, state, home=None):
     """serve.main in a child with `state` (a str, written into the script as an escaped literal)."""
-    home = tmp_path / "sunglasses-home"
+    home = home or tmp_path / "sunglasses-home"
     home.mkdir(exist_ok=True)
     (tmp_path / "user").mkdir(exist_ok=True)
     script = ("import sys\nfrom sunglasses.proxy import serve\n"
@@ -262,3 +263,115 @@ def test_what_is_shown_is_what_a_shell_reads_back(shell, name):
     out = subprocess.run([shell, "-c", f"printf %s {text}"], capture_output=True, timeout=30)
     assert out.returncode == 0, out.stderr
     assert out.stdout == os.fsencode(name)
+
+
+# ---------------------------------------------------------------------------
+# the signing home: the key errors name it the same way
+# ---------------------------------------------------------------------------
+
+def _home_with_a_file_for_keys(tmp_path, name):
+    home = tmp_path / name
+    home.mkdir()
+    (home / "keys").write_text("not a directory\n")
+    return home
+
+
+@pytest.mark.parametrize("kind", sorted(HIDDEN))
+def test_a_key_directory_that_cannot_be_listed_is_named_as_escapes_through_the_proxy(tmp_path, kind):
+    home = _home_with_a_file_for_keys(tmp_path, "home-" + HIDDEN[kind])
+    p = _run(tmp_path, str(tmp_path / "user" / "proxy"), home=home)
+    assert p.returncode == 1, p.stderr[-400:]
+    line = _one_safe_line(p.stderr)
+    assert "the receipt log could not be opened" in line
+    assert f"the key directory {_written(str(home / 'keys'))} cannot be listed" in line
+    assert NOTE in line
+
+
+def test_two_different_signing_homes_do_not_print_alike(tmp_path):
+    lines = []
+    for n, name in enumerate(["home-p\x1b\\x1bq", "home-p\\x1b\x1bq"]):
+        sub = tmp_path / str(n)
+        sub.mkdir()
+        home = _home_with_a_file_for_keys(sub, name)
+        p = _run(sub, str(sub / "user" / "proxy"), home=home)
+        assert p.returncode == 1, p.stderr[-400:]
+        lines.append(_one_safe_line(p.stderr).replace(str(sub), "<T>"))
+    assert lines[0] != lines[1], lines
+
+
+def test_a_key_directory_with_spaces_is_shell_quoted_in_both_places(tmp_path):
+    home = _home_with_a_file_for_keys(tmp_path, "my home")
+    p = _run(tmp_path, str(tmp_path / "user" / "proxy"), home=home)
+    line = _one_safe_line(p.stderr)
+    quoted = shlex.quote(str(home / "keys"))
+    assert f"the key directory {quoted} cannot be listed" in line
+    assert f"Fix it: make {quoted} a directory, chmod 700" in line
+    assert "control or invisible" not in line
+
+
+def test_a_key_directory_under_a_file_names_the_thing_in_the_way_escaped(tmp_path):
+    above = tmp_path / "above-\x1b"
+    above.write_text("a file\n")
+    home = above / "deeper"
+    with pytest.raises(optin.KeyUnusable) as raised:
+        optin.has_key(home)
+    message = str(raised.value)
+    assert f"{_written(str(above))} above it is not a directory that can be listed" in message
+    assert f"Fix it: make {_written(str(above))} a directory, chmod 700" in message
+    assert message.endswith(receipts.ESCAPED_NOTE)
+    assert message.isprintable()
+
+
+def _signing_home(tmp_path, name):
+    home = tmp_path / name
+    home.mkdir()
+    keys.init(home)
+    return home
+
+
+def test_a_key_that_is_not_private_is_named_as_escapes(tmp_path):
+    home = _signing_home(tmp_path, "home-\x1b")
+    os.chmod(keys.private_path(home), 0o644)
+    with pytest.raises(optin.KeyUnusable) as raised:
+        optin.signer(home)
+    message = str(raised.value)
+    shown = _written(str(keys.private_path(home)))
+    assert f"the signing key {shown} is not private to you. Fix it: chmod 600 {shown}" in message
+    assert message.endswith(receipts.ESCAPED_NOTE) and message.isprintable()
+
+
+def test_a_key_that_cannot_be_read_is_named_as_escapes(tmp_path, monkeypatch):
+    home = _signing_home(tmp_path, "home-͏")
+
+    def unreadable(_home):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(keys, "load", unreadable)
+    with pytest.raises(optin.KeyUnusable) as raised:
+        optin.signer(home)
+    message = str(raised.value)
+    shown = _written(str(keys.private_path(home)))
+    assert f"the signing key {shown} cannot be read (PermissionError). Fix it: chmod 600 {shown}" in message
+    assert message.endswith(receipts.ESCAPED_NOTE) and message.isprintable()
+
+
+def test_a_key_that_is_gone_is_named_as_escapes(tmp_path):
+    home = tmp_path / "home-️"
+    (home / "keys").mkdir(parents=True)
+    with pytest.raises(optin.KeyUnusable) as raised:
+        optin.signer(home)
+    message = str(raised.value)
+    assert f"the signing key is gone from {_written(str(home / 'keys'))}" in message
+    assert message.endswith(receipts.ESCAPED_NOTE) and message.isprintable()
+
+
+def test_a_missing_extra_names_the_key_directory_as_escapes(tmp_path, monkeypatch):
+    home = tmp_path / "home-\x7f"
+    home.mkdir()
+    monkeypatch.setitem(sys.modules, "sunglasses.receipts.keys", None)
+    monkeypatch.delattr(sys.modules["sunglasses.receipts"], "keys")   # `from . import keys` finds the attribute first
+    with pytest.raises(optin.KeyUnusable) as raised:
+        optin.signer(home)
+    message = str(raised.value)
+    assert f"the signing key in {_written(str(home / 'keys'))} needs" in message
+    assert message.endswith(receipts.ESCAPED_NOTE) and message.isprintable()

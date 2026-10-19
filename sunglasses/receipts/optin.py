@@ -24,6 +24,7 @@ import pathlib
 import time
 
 from . import _fs, wire
+from ._shown import ESCAPED_NOTE, shown_path
 
 KEY_DIR = "keys"
 KEY_GLOB = "receipt-*.ed25519"
@@ -43,6 +44,12 @@ class KeyUnusable(Exception):
     and the command that clears it; it never carries key material."""
 
 
+def _shown(path):
+    """(how the path is named in a message, the note to end the message with)."""
+    text, escaped = shown_path(path)
+    return text, ESCAPED_NOTE if escaped else ""
+
+
 def has_key(home) -> bool:
     """R56: a key directory that cannot be listed is not "no key". Whether a
     key is there cannot be known, so the key cannot sign, said by name."""
@@ -57,14 +64,19 @@ def _key_dir_unlistable(home, unlistable) -> KeyUnusable:
     # R62: when something above the key directory is in the way, that is the
     # path to name and to fix, not the key directory under it.
     blocked = getattr(unlistable, "blocked_by", None)
-    where = "" if blocked is None else f": {blocked} above it is not a directory that can be listed"
-    fix = home / KEY_DIR if blocked is None else blocked
+    keys_dir, note = _shown(home / KEY_DIR)
+    where = ""
+    fix = keys_dir
+    if blocked is not None:
+        fix, blocked_note = _shown(blocked)
+        note = note or blocked_note
+        where = f": {fix} above it is not a directory that can be listed"
     return KeyUnusable(
-        f"the key directory {home / KEY_DIR} cannot be listed "
+        f"the key directory {keys_dir} cannot be listed "
         f"({type(unlistable.cause).__name__}){where}, so whether the key is "
         f"there cannot be known, and a signed log never turns unsigned on a "
         f"guess. Fix it: make {fix} a directory, chmod 700 "
-        f"(or `{OFF}` to stop signing)")
+        f"(or `{OFF}` to stop signing){note}")
 
 
 def signer(home):
@@ -74,27 +86,31 @@ def signer(home):
     try:
         from . import keys
     except ImportError:
+        keys_dir, note = _shown(home / KEY_DIR)
         raise KeyUnusable(
-            f"the signing key in {home / KEY_DIR} needs {EXTRA}, which is not "
+            f"the signing key in {keys_dir} needs {EXTRA}, which is not "
             f"installed. Install it: pip install '{EXTRA}' (or `{OFF}` to "
-            f"stop signing)") from None
+            f"stop signing){note}") from None
     try:
         path = keys.private_path(home)
         found = keys.load(home)
     except _fs.Unlistable as unlistable:
         raise _key_dir_unlistable(home, unlistable) from None
     except keys.KeyUnsafe:
+        shown, note = _shown(path)
         raise KeyUnusable(
-            f"the signing key {path} is not private to you. Fix it: "
-            f"chmod 600 {path} (or `{OFF}` to stop signing)") from None
+            f"the signing key {shown} is not private to you. Fix it: "
+            f"chmod 600 {shown} (or `{OFF}` to stop signing){note}") from None
     except (OSError, ValueError) as failed:
+        shown, note = _shown(path)
         raise KeyUnusable(
-            f"the signing key {path} cannot be read ({type(failed).__name__}). "
-            f"Fix it: chmod 600 {path} (or `{OFF}` to stop signing)") from None
+            f"the signing key {shown} cannot be read ({type(failed).__name__}). "
+            f"Fix it: chmod 600 {shown} (or `{OFF}` to stop signing){note}") from None
     if found is None:
+        keys_dir, note = _shown(home / KEY_DIR)
         raise KeyUnusable(
-            f"the signing key is gone from {home / KEY_DIR}, and a signed log "
-            f"never turns unsigned by itself. Restore the key, or run `{OFF}`")
+            f"the signing key is gone from {keys_dir}, and a signed log "
+            f"never turns unsigned by itself. Restore the key, or run `{OFF}`{note}")
     return found
 
 
