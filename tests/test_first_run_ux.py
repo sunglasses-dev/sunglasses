@@ -6,10 +6,11 @@ and `doctor` printed five NOT RUN lines and `exit 1` with nothing saying that no
 had failed. The reports below must say what each cross and each exit 1 means. Exit
 codes keep their meaning: `check` still exits 0, `doctor` still exits 1 on this build.
 
-Each case runs the real CLI entry point in a child interpreter. The "fresh install"
-shape is made, not assumed: PATH holds no tesseract or ffmpeg, and `whisper` and
-`pyzbar` are blocked from importing, so the result does not depend on what the machine
-running the tests has installed.
+Seven cases run the real CLI entry point in a child interpreter; five call `cmd_doctor`
+with an injected report. The "fresh install" shape of the child is made, not assumed: PATH
+holds no tesseract or ffmpeg, and `whisper` and `pyzbar` are blocked from importing, so the
+result does not depend on what the machine running the tests has installed. Two cases
+deliberately supply some or all of the extras.
 """
 import json
 import os
@@ -39,7 +40,11 @@ main()
 """
 
 
-def _run(tmp_path, args, blocked="whisper,pyzbar", path_dirs=(), pythonpath=()):
+# The same child with the monotonic clock held at zero, for output that prints a measured duration.
+_CHILD_CLOCK_AT_ZERO = "import time\ntime.monotonic_ns = lambda: 0\n" + _CHILD
+
+
+def _run(tmp_path, args, blocked="whisper,pyzbar", path_dirs=(), pythonpath=(), child=_CHILD, text=True):
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     empty = tmp_path / "emptybin"
@@ -49,8 +54,8 @@ def _run(tmp_path, args, blocked="whisper,pyzbar", path_dirs=(), pythonpath=()):
         "PATH": os.pathsep.join([str(p) for p in path_dirs] + [str(empty)]),
         "PYTHONPATH": os.pathsep.join([str(ROOT)] + [str(p) for p in pythonpath]),
     }
-    return subprocess.run([sys.executable, "-c", _CHILD, blocked, *args],
-                          capture_output=True, text=True, cwd=str(tmp_path), env=env)
+    return subprocess.run([sys.executable, "-c", child, blocked, *args],
+                          capture_output=True, text=text, cwd=str(tmp_path), env=env)
 
 
 def _fake_tool(directory, name, body="echo fake"):
@@ -130,13 +135,46 @@ def test_doctor_on_a_fresh_install_says_nothing_failed_and_still_exits_one(tmp_p
     assert out.index("No check failed") < out.index("ROUTE_UNVERIFIED")
 
 
+# What `doctor --json` printed on a fresh install before this change, byte for byte (the same
+# bytes on main and on the patched tree). The report carries a measured duration, so the test
+# below runs the child with its monotonic clock held at zero; nothing else in it depends on the
+# machine.
+_DOCTOR_JSON_FRESH = """{
+  "self_test": {
+    "valid": false,
+    "controls": {},
+    "checks": {
+      "initialized": "NOT_RUN",
+      "s1_forward_byte_equal": "NOT_RUN",
+      "s2_block_schema": "NOT_RUN",
+      "deadline": "NOT_RUN",
+      "disconnect": "NOT_RUN"
+    },
+    "failed": [],
+    "failure_class": "SELF_TEST_UNAVAILABLE",
+    "detail": "SELF_TEST_UNAVAILABLE",
+    "measured_ms": 0,
+    "bound_ms": 2250,
+    "deadline": "deadline 0 ms measured against a 2250 ms bound"
+  },
+  "per_wrapper": [],
+  "inventory": [],
+  "aggregate": "ROUTE_UNVERIFIED",
+  "route_checks": {},
+  "receipts_key": {
+    "status": "OFF",
+    "cause": ""
+  },
+  "exit_code": 1
+}
+"""
+
+
 def test_doctor_json_is_byte_for_byte_the_report_it_was(tmp_path):
-    proc = _run(tmp_path, ["doctor", "--json"])
-    data = json.loads(proc.stdout)
-    assert proc.returncode == 1 and data["exit_code"] == 1
-    assert data["aggregate"] == "ROUTE_UNVERIFIED"
-    assert set(data) == {"self_test", "per_wrapper", "inventory", "aggregate",
-                         "route_checks", "receipts_key", "exit_code"}
+    # text=False: the bytes the process wrote, not text with its line endings translated
+    proc = _run(tmp_path, ["doctor", "--json"], child=_CHILD_CLOCK_AT_ZERO, text=False)
+    assert proc.returncode == 1
+    assert proc.stdout == _DOCTOR_JSON_FRESH.encode("utf-8")
 
 
 def test_doctor_help_still_documents_exit_one_as_not_proven(tmp_path):
@@ -162,9 +200,9 @@ def _text(report, monkeypatch, capsys, mutate=None):
 
     monkeypatch.setattr(doctor, "render", render)
     args = type("A", (), {"config": None, "json": False})()
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as raised:
         cli.cmd_doctor(args, _run=lambda **kw: report)
-    return _ANSI.sub("", capsys.readouterr().out)
+    return _ANSI.sub("", capsys.readouterr().out), raised.value.code
 
 
 def _fail_a_route(rendered):
@@ -184,7 +222,8 @@ def _a_failed_self_test_check(rendered):
 
 
 def test_the_sentence_is_printed_when_that_is_the_whole_story(tmp_path, monkeypatch, capsys):
-    out = _text(_unavailable_report(tmp_path), monkeypatch, capsys)
+    out, code = _text(_unavailable_report(tmp_path), monkeypatch, capsys)
+    assert code == 1
     assert "No check failed, and none could run." in out
 
 
@@ -192,6 +231,7 @@ def test_the_sentence_is_printed_when_that_is_the_whole_story(tmp_path, monkeypa
                                     _an_unreadable_source, _a_failed_self_test_check])
 def test_the_sentence_is_never_printed_beside_a_real_failure(tmp_path, monkeypatch, capsys, mutate):
     """Reassurance is only true when the unavailable self-test is the only reason for exit 1."""
-    out = _text(_unavailable_report(tmp_path), monkeypatch, capsys, mutate)
+    out, code = _text(_unavailable_report(tmp_path), monkeypatch, capsys, mutate)
+    assert code == 1
     assert "No check failed" not in out
-    assert "exit" in out
+    assert "exit 1" in out
