@@ -288,14 +288,15 @@ jobs:
     # merging the pull request. Nothing depends on this job, and the upload, the SBOM and
     # the checksums do not wait for it. `continue-on-error` is on the JOB (never on a step):
     # the release chain reads this run's conclusion, and a stats problem must not make a
-    # good upload read as a failed release. A failure still shows as a red job with an
-    # `::error::` annotation on the run page; only the run's own conclusion stays green.
-    # Two repository facts shape it (both are in the pull request text it opens):
+    # good upload read as a failed release. A failing job still shows red on the run page,
+    # and the two explicit refusals below carry `::error::` annotations; only the run's own
+    # conclusion stays green.
+    # Two repository facts shape it:
     #   - "Allow GitHub Actions to create and approve pull requests" must be ON, or the
-    #     branch is pushed and the job prints a compare link instead of opening the pull
-    #     request;
+    #     branch is pushed and the job prints a warning with a compare link instead of
+    #     opening the pull request;
     #   - a pull request opened with the workflow token does not start CI, so someone closes
-    #     and reopens it once before it can merge.
+    #     and reopens it once before it can merge (the pull request text says so).
     # `version-homes-agree.py --post-pypi` stays as the backstop that says the fix is due.
     # Guarded by tests/test_release_workflow.py.
     needs: pypi
@@ -319,7 +320,7 @@ jobs:
         run: |
           # Exit 3 from the script = this tree already carries the upload time (nothing to
           # do). Exit 2 = it refused (the version, `released` or the file shape does not fit),
-          # which is a person's decision, not a retry, so the run goes red.
+          # which is a person's decision, not a retry, so the job fails.
           VERSION="${GITHUB_REF_NAME#v}"
           rc=0
           python3 scripts/stats_last_updated.py "$VERSION" --wait "${STATS_WAIT:-300}" --pause "${STATS_PAUSE:-20}" || rc=$?
@@ -339,11 +340,18 @@ jobs:
             echo "$BRANCH already exists on origin, leaving it alone (no force). Look at that branch first."
             exit 0
           fi
-          # One file, two lines changed, or nothing is committed.
-          SHAPE="$(git diff --numstat | tr '\t' ' ')"
-          [ "$SHAPE" = "2 2 stats/current.json" ] || { echo "::error::REFUSED: unexpected change: $SHAPE"; exit 1; }
+          # Only stats/current.json may differ, and only its last_updated / last_updated_by
+          # lines: a first stamp changes both, a later release usually changes just the
+          # time. Anything else, or no change at all, is not committed.
+          FILES="$(git diff --name-only)"
+          LINES="$(git diff -U0 -- stats/current.json | grep -E '^[-+]' | grep -Ev '^(\+\+\+|---)' || true)"
+          OTHER="$(printf '%s\n' "$LINES" | grep -Ev '^[-+][[:space:]]*"last_updated(_by)?":' | grep -v '^$' || true)"
+          if [ "$FILES" != "stats/current.json" ] || [ -z "$LINES" ] || [ -n "$OTHER" ]; then
+            echo "::error::REFUSED: unexpected change: files [$FILES], lines outside the two fields [$OTHER]"
+            exit 1
+          fi
           TITLE="stats: ${VERSION} last_updated is the PyPI upload time"
-          BODY="Stats only (one file, two fields). The release workflow uploaded ${VERSION} to PyPI, so the local publish script never wrote last_updated, and the site stamp gate requires last_updated to fall on the same day as released. last_updated is the wheel's PyPI upload time in Pacific time and last_updated_by names the uploader that ran. This pull request was opened by the workflow with its own token, so CI does not start on it: close and reopen it once, then merge when it is green."
+          BODY="Stats only (one file, the last_updated and last_updated_by fields). The local publish script, which used to write last_updated, does not run for a release cut by the release workflow, and the site stamp gate requires last_updated to fall on the same day as released. last_updated is the PyPI upload time of the ${VERSION} wheel in Pacific time, and last_updated_by is release.yml, the workflow that opened this pull request. It was opened with the workflow token, so CI does not start on it: close and reopen it once, then merge when it is green."
           git switch -c "$BRANCH"
           git -c user.name="AZ Rollin" -c user.email="263686995+azrollin@users.noreply.github.com" \
             commit -q -m "$TITLE" -- stats/current.json
