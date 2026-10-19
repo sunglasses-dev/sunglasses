@@ -482,7 +482,10 @@ def test_the_loop_stops_retrying_when_a_retry_turns_into_a_content_difference(tm
 # A workflow upload never writes stats/current.json `last_updated`, so the stats job runs
 # scripts/stats_last_updated.py after the upload and opens a pull request with the two-line
 # fix. It may push ONE new branch and open ONE pull request. It never merges, never pushes to
-# main, never forces, and nothing waits for it.
+# main, never forces, and nothing waits for it. The JOB carries continue-on-error so a stats
+# problem cannot turn the release run red (the release chain reads the run's conclusion and
+# would read a good upload as a failed release); no STEP may carry it, so the job itself still
+# fails visibly with an ::error:: annotation.
 
 STATS = "stats"
 STATS_SCRIPT = "scripts/stats_last_updated.py"
@@ -514,8 +517,10 @@ def check_stats(doc):
     cond = str(job.get("if") or "")
     if re.search(r"always\(\)|failure\(\)|cancelled\(\)", cond):
         problems.append(f"{STATS} runs after a failed publish: its `if` is `{cond}`")
-    if job.get("continue-on-error") is True or any((s or {}).get("continue-on-error") is True for s in job.get("steps") or []):
-        problems.append(f"{STATS} can fail without turning the run red (continue-on-error)")
+    if job.get("continue-on-error") is not True:
+        problems.append(f"{STATS} must set continue-on-error: true on the job, or a stats failure turns a good release run red")
+    if any((s or {}).get("continue-on-error") is True for s in job.get("steps") or []):
+        problems.append(f"{STATS} has a step with continue-on-error: the job must fail visibly, not hide the failure inside a green job")
 
     for other, spec in jobs.items():
         n = (spec or {}).get("needs") or []
@@ -552,6 +557,8 @@ def check_stats(doc):
             problems.append(f"{STATS} does not treat exit 3 (already stamped) as nothing to do")
         if not re.search(r"\*\)[^\n]*exit 1", stamp):
             problems.append(f"{STATS} does not fail on a refusal from the script")
+        if not re.search(r"\*\)[^\n]*::error::", stamp):
+            problems.append(f"{STATS} does not annotate a refusal from the script with ::error::")
 
     pr = _stats_run(doc, "gh pr create")
     if pr is None:
@@ -563,6 +570,8 @@ def check_stats(doc):
             problems.append(f"{STATS} does not check whether the branch already exists before pushing")
         if "--base main" not in pr:
             problems.append(f"{STATS} must open the pull request against main")
+        if not re.search(r"::error::[^\n]*unexpected change", pr):
+            problems.append(f"{STATS} does not annotate an unexpected change with ::error::")
         if "2 2 stats/current.json" not in pr:
             problems.append(f"{STATS} does not check that exactly two lines of stats/current.json changed")
         if "263686995+azrollin@users.noreply.github.com" not in pr:
@@ -593,6 +602,14 @@ def test_the_write_permissions_are_scoped_to_the_stats_job():
     assert [j for j, s in doc["jobs"].items() if (s.get("permissions") or {}).get("pull-requests") == "write"] == [STATS]
 
 
+def test_the_stats_job_cannot_turn_the_release_run_red():
+    """T9's ruling: the release chain reads this run's conclusion."""
+    doc = load()
+    assert doc["jobs"][STATS]["continue-on-error"] is True
+    assert not [s for s in doc["jobs"][STATS]["steps"] if "continue-on-error" in s]
+    assert "continue-on-error" not in {k for j, spec in doc["jobs"].items() if j != STATS for k in spec}
+
+
 def test_the_stats_job_uses_only_pinned_actions():
     uses = [s["uses"] for s in load()["jobs"][STATS]["steps"] if s.get("uses")]
     assert uses and all(PINNED.match(u) for u in uses), uses
@@ -611,7 +628,14 @@ def test_check_stats_negative_controls():
     assert broken(lambda d: d["jobs"].pop(STATS)) == [f"{STATS} job is missing"]
     assert any("must need" in p for p in broken(lambda d: d["jobs"][STATS].update(needs=["build"])))
     assert any("failed publish" in p for p in broken(lambda d: d["jobs"][STATS].update({"if": "always()"})))
-    assert any("continue-on-error" in p for p in broken(lambda d: d["jobs"][STATS].update({"continue-on-error": True})))
+    assert any("must set continue-on-error" in p for p in broken(lambda d: d["jobs"][STATS].pop("continue-on-error")))
+    assert any("must set continue-on-error" in p for p in broken(lambda d: d["jobs"][STATS].update({"continue-on-error": False})))
+    assert any("a step with continue-on-error" in p for p in broken(
+        lambda d: d["jobs"][STATS]["steps"][2].update({"continue-on-error": True})))
+    assert any("::error::" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("::error::", "")) for s in d["jobs"][STATS]["steps"] if STATS_SCRIPT in (s.get("run") or "")]))
+    assert any("::error::" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("::error::REFUSED", "REFUSED")) for s in d["jobs"][STATS]["steps"] if "gh pr create" in (s.get("run") or "")]))
     assert any(f"{ATTACH} depends on {STATS}" in p for p in broken(
         lambda d: d["jobs"][ATTACH].update(needs=["build", "sbom", STATS])))
     assert any("asks for more" in p for p in broken(lambda d: d["jobs"][STATS]["permissions"].update({"id-token": "write"})))
@@ -722,6 +746,7 @@ def test_the_stamp_step_goes_red_on_a_refusal(tmp_path, rc):
     repo, _, env = _stats_env(tmp_path, rc)
     r = _run_step(repo, env, STATS_SCRIPT)
     assert r.returncode == 1 and _outputs(tmp_path) == [], (r.stdout, r.stderr)
+    assert f"::error::the stats script exited {rc}" in r.stdout
 
 
 def test_the_pr_step_pushes_one_new_branch_and_opens_the_pull_request(tmp_path):
@@ -770,5 +795,5 @@ def test_a_change_of_the_wrong_shape_is_not_committed(tmp_path):
     path = repo / "stats" / "current.json"
     path.write_text(path.read_text().replace('"released": "2026-10-19"', '"released": "2026-10-20"'))
     r = _run_step(repo, env, "gh pr create")
-    assert r.returncode == 1 and "REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
     assert subprocess.run(["git", "-C", str(origin), "for-each-ref", "--format=%(refname:short)", "refs/heads"], capture_output=True, text=True).stdout.split() == ["main"]

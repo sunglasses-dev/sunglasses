@@ -285,8 +285,11 @@ jobs:
     # request and a CI hour). This job writes that one fix and opens it as a pull request.
     #
     # It never merges and never writes to main: the change reaches main only by a person
-    # merging the pull request. A failure turns this run red and does nothing else; nothing
-    # depends on this job, and the upload, the SBOM and the checksums do not wait for it.
+    # merging the pull request. Nothing depends on this job, and the upload, the SBOM and
+    # the checksums do not wait for it. `continue-on-error` is on the JOB (never on a step):
+    # the release chain reads this run's conclusion, and a stats problem must not make a
+    # good upload read as a failed release. A failure still shows as a red job with an
+    # `::error::` annotation on the run page; only the run's own conclusion stays green.
     # Two repository facts shape it (both are in the pull request text it opens):
     #   - "Allow GitHub Actions to create and approve pull requests" must be ON, or the
     #     branch is pushed and the job prints a compare link instead of opening the pull
@@ -296,6 +299,7 @@ jobs:
     # `version-homes-agree.py --post-pypi` stays as the backstop that says the fix is due.
     # Guarded by tests/test_release_workflow.py.
     needs: pypi
+    continue-on-error: true
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -322,7 +326,7 @@ jobs:
           case "$rc" in
             0) echo "changed=true" >> "$GITHUB_OUTPUT" ;;
             3) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "FAILED: the stats script exited $rc, no pull request opened"; exit 1 ;;
+            *) echo "::error::the stats script exited $rc, no pull request opened. Run scripts/stats_last_updated.py by hand or open the stats pull request yourself"; exit 1 ;;
           esac
       - name: Push the branch and open the pull request
         if: steps.stamp.outputs.changed == 'true'
@@ -337,7 +341,7 @@ jobs:
           fi
           # One file, two lines changed, or nothing is committed.
           SHAPE="$(git diff --numstat | tr '\t' ' ')"
-          [ "$SHAPE" = "2 2 stats/current.json" ] || { echo "REFUSED: unexpected change: $SHAPE"; exit 1; }
+          [ "$SHAPE" = "2 2 stats/current.json" ] || { echo "::error::REFUSED: unexpected change: $SHAPE"; exit 1; }
           TITLE="stats: ${VERSION} last_updated is the PyPI upload time"
           BODY="Stats only (one file, two fields). The release workflow uploaded ${VERSION} to PyPI, so the local publish script never wrote last_updated, and the site stamp gate requires last_updated to fall on the same day as released. last_updated is the wheel's PyPI upload time in Pacific time and last_updated_by names the uploader that ran. This pull request was opened by the workflow with its own token, so CI does not start on it: close and reopen it once, then merge when it is green."
           git switch -c "$BRANCH"
