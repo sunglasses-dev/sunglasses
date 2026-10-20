@@ -968,6 +968,34 @@ def test_a_frame_that_never_finishes_arriving_is_a_deadline():
     assert session.closed_with() == ("SCAN_DEADLINE", "S3")
 
 
+@pytest.mark.parametrize("name", ["frame_assembly", "upstream_response"])
+def test_a_deadline_is_enforced_at_its_limit_not_a_few_seconds_after(name):
+    """AR10, AR11. The process rows in tests/proxy/test_artifact_review.py wait
+    for the reply with a generous allowance, because a slow runner delays the
+    reply without the proxy being wrong. That allowance also lets a proxy that
+    enforces late pass them, so lateness is pinned here, on the clock the
+    session reads, where no machine can move it.
+
+    The clock is injected and the start pinned to 0.0 so that `(now - start) *
+    1000` is exact (see the row above). One millisecond past the limit must
+    already be a breach, for each deadline, and the reply may not be waiting
+    for the watchdog's slack: a sweep that only closes seconds late fails
+    here."""
+    from sunglasses.proxy import bounds
+
+    limit = bounds.DEADLINES[name] / 1000
+    just_after = limit + 0.001
+    session = pump.Session()
+    if name == "frame_assembly":
+        breach = session.sweep_deadlines(partial_since=0.0, now=just_after)
+    else:
+        assert session.admit_request(41, method="tools/call", origin="client")
+        session._admitted_at[pump.key("client", 41)] = 0.0
+        breach = session.sweep_deadlines(now=just_after)
+    assert breach and breach.reason == "SCAN_DEADLINE", name
+    assert session.closed_with() == ("SCAN_DEADLINE", "S3")
+
+
 def test_a_settled_request_no_longer_counts_against_the_response_deadline():
     """An item that has been answered is not waiting on anybody, and leaving it
     in the clock's view would close healthy sessions on the age of work that
