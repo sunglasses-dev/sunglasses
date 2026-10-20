@@ -1,7 +1,7 @@
 from pathlib import Path
 import ast,os,sys,json,time,subprocess,signal,threading,queue,hashlib
 import pytest
-from sunglasses.proxy import approvals
+from sunglasses.proxy import approvals, bounds
 from sunglasses.proxy.echo_server import TOOLS
 R=Path(__file__).resolve().parents[1]
 def specimen(name):
@@ -58,9 +58,10 @@ class Artifact:
 
   So: the bound exists only so a runner cannot hang, not to express a speed
   requirement, and it is generous and overridable rather than tight.
-  AR10 and AR11 keep their explicit timeouts, because there the wait IS the
-  subject -- they assert the recorded `SCAN_DEADLINE`, which is the shape this
-  one should have had all along: bound the wait, assert the outcome.
+  AR10 and AR11 time a proxy deadline, so they go through `deadline_answer`,
+  which takes its bound from the deadline itself and asserts the recorded
+  `SCAN_DEADLINE` -- the shape this one should have had all along: bound the
+  wait, assert the outcome.
 
   And when it does expire it now reports the RECORDED OUTCOME -- the ids that
   did arrive, how many frames, whether the proxy is still running -- because a
@@ -167,13 +168,50 @@ def test_AR09_content_limit_applies_to_call(artifact):
  a=artifact();a.approve();a.send(call(text='a'*262145));ans=a.answer(1)
  assert ans.get('error',{}).get('data',{}).get('reason_code')=='OVER_BUDGET'
 
+def deadline_answer(a,m,name):
+ """AR10 and AR11: the reply a proxy DEADLINE produces, timed by the proxy's clock.
+
+ 2026-09-27: AR10 went red on main (run 36304908593, 3.14) with `timeout=3`
+ against a 2,000 ms frame-assembly deadline. Three seconds of the RUNNER'S
+ clock, counted from our send, was standing in for the proxy's deadline, so a
+ slow leg failed a row whose subject is not speed. AR11 had the same shape,
+ 61 s against 60 s.
+
+ The subject is the deadline, so the bounds come from `bounds`, the numbers the
+ proxy applies, and each side is one a slow runner cannot trip:
+ * NOT EARLY. The server starts the frame only after it receives our request,
+   so the proxy's clock starts after ours. An answer sooner than the deadline
+   after our send fired early, however fast or slow the machine. The helper
+   SENDS the request itself and reads the clock BEFORE the write: read after
+   it, a test descheduled between the two had its clock start late, and a
+   correct deadline measured as early.
+ * NOT NEVER. The wait is the deadline, plus the watchdog slack the proxy
+   itself allows past it (R10), plus a margin for the runner
+   (SUNGLASSES_TEST_DEADLINE_MARGIN, default 30 s). Late is not what this row
+   measures, and a hang still fails.
+ * RECORDED. The request's SETTLED receipt carries SCAN_DEADLINE, so the row
+   reads what the proxy wrote down and not only what reached the wire.
+ On expiry the failure also lists the reason codes the receipts DID record.
+ """
+ limit=bounds.DEADLINES[name]/1000
+ wait=limit+bounds.WATCHDOG_SLACK_MS/1000+float(os.environ.get('SUNGLASSES_TEST_DEADLINE_MARGIN','30'))
+ i=m['id'];sent=time.monotonic();a.send(m)
+ try:ans=a.answer(i,timeout=wait)
+ except AssertionError as e:
+  codes=[r.get('reason_code') for r in a.receipts() if r.get('reason_code')]
+  raise AssertionError(f"{e} receipts reason_codes={codes[-8:]} (the {name} deadline is {limit:g}s)") from None
+ took=time.monotonic()-sent
+ assert took>=limit,f"{name}: SCAN_DEADLINE after {took:.3f}s, sooner than its {limit:g}s deadline"
+ assert ans['error']['data']['reason_code']=='SCAN_DEADLINE',ans
+ settled=[r for r in a.receipts() if r.get('kind')=='SETTLED']
+ assert any(r.get('reason_code')=='SCAN_DEADLINE' for r in settled),settled[-3:]
+ return ans
+
 def test_AR10_partial_upstream_line_deadline(artifact):
- a=artifact(partial=True);a.send(req(1));ans=a.answer(1,timeout=3)
- assert ans['error']['data']['reason_code']=='SCAN_DEADLINE'
+ a=artifact(partial=True);deadline_answer(a,req(1),'frame_assembly')
 
 def test_AR11_upstream_response_deadline(artifact):
- a=artifact(silent=True);a.send(req(1));ans=a.answer(1,timeout=61)
- assert ans['error']['data']['reason_code']=='SCAN_DEADLINE'
+ a=artifact(silent=True);deadline_answer(a,req(1),'upstream_response')
 
 def test_AR12_approve_command_exists(tmp_path):
  p=subprocess.run([sys.executable,'-B','-m','sunglasses.proxy','approve','review-id','--snapshot','a'*64,'--state-root',str(tmp_path)],capture_output=True)
@@ -220,7 +258,7 @@ def test_AR17_approval_after_failed_first_activation_retries(artifact):
  a.send(call(2));assert 'result' in a.answer(2)
 
 def test_AR18_null_id_call_receives_its_credential_refusal(artifact):
- a=artifact();a.approve();a.send(call(i=None,text=specimen('SECRET')));ans=a.answer(None,timeout=3)
+ a=artifact();a.approve();a.send(call(i=None,text=specimen('SECRET')));ans=a.answer(None)
  assert ans['error']['data']['reason_code']=='PROHIBITED_SECRET'
  assert specimen('SECRET').encode() not in a.arrived()
 
