@@ -116,12 +116,12 @@ def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
 
 @_pytest.fixture(autouse=True)
 def _no_trace_outlives_its_test():
-    """A trace function set by a thread that then ends stays in force after it.
+    """Tracing a thread that then ends leaves later Python work slower on CPython 3.12.
 
-    The proxy tests that watch a line from a reader thread call sys.settrace there and
-    let the thread end. On CPython 3.12 every Python loop that runs after that, in the
-    same process, stays several times slower until sys.settrace(None) is called, and a
-    shard has tens of thousands of tests after them. Put back what was set before the test.
+    The proxy tests that watch a line from a reader thread call sys.settrace there and let
+    the thread end. Python-heavy work that runs after that, in the same process, can stay
+    several times slower on 3.12 until sys.settrace(None) is called from the main thread, and
+    a shard has tens of thousands of tests after them. Put back what was set before the test.
     """
     import sys
     before = sys.gettrace()
