@@ -21107,9 +21107,9 @@ PATTERNS = [
         ],
         "regex": [
             r"""(?isx)
-^(?!.*\b(?:security|incident|vulnerability)\s+reports?\b.*\b(?:flagged|detected|blocked|refused)\b)
- (?!.*\b(?:docs?|guide|reference|training|example)\b.*\b(?:should|must)\s+(?:report|detect|flag|refuse|not\s+obey|never\s+obey)\b)
- (?!.*\b(?:browserconfig\.xml|msapplication|pinned\s+site)\b.*\b(?:does\s+not|must\s+not|never|do\s+not)\s+(?:instruct|override|supersede|outrank|obey)\b)
+^(?!(?:(?!\b(?:security|incident|vulnerability)\s+reports?\b).)*\b(?:security|incident|vulnerability)\s+reports?\b.*\b(?:flagged|detected|blocked|refused)\b)
+ (?!(?:(?!\b(?:docs?|guide|reference|training|example)\b).)*\b(?:docs?|guide|reference|training|example)\b.*\b(?:should|must)\s+(?:report|detect|flag|refuse|not\s+obey|never\s+obey)\b)
+ (?!(?:(?!\b(?:browserconfig\.xml|msapplication|pinned\s+site)\b).)*\b(?:browserconfig\.xml|msapplication|pinned\s+site)\b.*\b(?:does\s+not|must\s+not|never|do\s+not)\s+(?:instruct|override|supersede|outrank|obey)\b)
  (?=.*(?:browserconfig\.xml|msapplication-(?:config|Tile\w+|navbutton-color|starturl)|<browserconfig\b|<msapplication\b|pinned\s+site|site\s+tile\s+metadata|tile\s+(?:color|image|badge)|safari\s+pinned\s+tab|mask-icon))
  (?=.*(?:AI\s+agents?|LLMs?|assistants?|autonomous\s+(?:scanners?|crawlers?|auditors?)|security\s+scanners?|SEO\s+agents?))
  (?=.*(?:ignore|override|supersed(?:e|es|ed|ing)?|outranks?|treat\s+as\s+(?:system|developer)\s+policy|hide|suppress(?:es|ed|ing)?|do\s+not\s+report|not\s+report|forward|include|send|attach|copy))
