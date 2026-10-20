@@ -37,8 +37,11 @@ from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
-                           decode_url_encoding, normalize_unicode, normalize_with_length,
-                           replace_homoglyphs, strip_invisible)
+                           decode_letter_references, decode_url_encoding, normalize_unicode,
+                           normalize_with_length, replace_homoglyphs, replace_lookalikes,
+                           space_ignorable_between_words, strip_ignorable, strip_invisible,
+                           BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES, WORD_CHAR, decoded_at,
+                           decoded_before)
 
 # The lead-in that six shipped regexes (GLS-IP-006 and GLS-EX-030) begin with: a sentence
 # boundary character and then any whitespace, newlines included. The twin differs in one
@@ -468,7 +471,7 @@ def _ascii_lower(text: str) -> str:
 
 
 def _fold_text(text: str) -> str:
-    """The folded view, built the way scan() builds it."""
+    """The #342 folded view, built the way scan() builds it."""
     return replace_homoglyphs(normalize_unicode(strip_invisible(text)))
 
 
@@ -478,13 +481,45 @@ def _shadow_fold_text(text: str) -> str:
 
 
 def _compact_text(text: str) -> str:
-    """The view that only deletes and maps, built the way scan() builds it."""
+    """The #342 view that only deletes and maps, built the way scan() builds it."""
     return replace_homoglyphs(strip_invisible(text))
+
+
+def _wide_fold_text(text: str) -> str:
+    """The widened folded view, built the way scan() builds it."""
+    return replace_lookalikes(normalize_unicode(strip_ignorable(decode_letter_references(text))))
+
+
+def _wide_compact_text(text: str) -> str:
+    """The widened view that only deletes and maps, built the way scan() builds it."""
+    return replace_lookalikes(strip_ignorable(decode_letter_references(text)))
+
+
+def _spaced_text(text: str) -> str:
+    """The raw text with each invisible run between two letters or digits read
+    as a space, the way scan() reads it for its second folded reading."""
+    decoded = decode_letter_references(text)
+    spaced = space_ignorable_between_words(decoded)
+    return decoded if spaced is None else spaced
+
+
+def _fold_spaced_text(text: str) -> str:
+    """The folded view of the spaced reading, built the way scan() builds it."""
+    return replace_lookalikes(normalize_unicode(strip_ignorable(_spaced_text(text))))
+
+
+def _compact_spaced_text(text: str) -> str:
+    """The compact view of the spaced reading, built the way scan() builds it."""
+    return replace_lookalikes(strip_ignorable(_spaced_text(text)))
 
 
 def _normal_text(text: str) -> str:
     """The normalized view, built the way scan() builds it."""
     return normalize_with_length(text)[0]
+
+
+def _braille(ch: str) -> bool:
+    return "\u2800" <= ch <= "\u28ff" if ch else False
 
 
 class _Walk:
@@ -508,7 +543,7 @@ class _Walk:
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
                  "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard",
-                 "mark_i", "mark_j")
+                 "mark_i", "mark_j", "run")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -528,6 +563,7 @@ class _Walk:
         self.hard = set()  # view indexes with any other cut; one of these ends the tolerance there
         self.mark_i = [0]  # view index where an identical run starts ...
         self.mark_j = [0]  # ... and the raw index it starts at
+        self.run = None     # the last ignorable run looked at (see _run_sides)
         self.active = None  # raw offsets where an escape the pipeline decodes begins
         self.cursor = 0     # index into active of the first offset not yet passed
         self.guards = None  # raw offsets of a start character in front of an escape of the same run
@@ -850,9 +886,17 @@ class _Walk:
                     self.dead = True
                     break
             if INVISIBLE_CHARS.match(c):
-                self.cuts.append(i)
-                self.hard.add(i)
-                self.j = j + 1
+                end = self._spaced_run(i, j)
+                if end is not None:
+                    # A widened reading put a space where this run is (see _widened);
+                    # the #342 fold never holds one there.
+                    self.changed.append(i)
+                    self.i = i + 1
+                    self.j = end
+                else:
+                    self.cuts.append(i)
+                    self.hard.add(i)
+                    self.j = j + 1
                 self._mark()
                 continue
             if c.isspace():
@@ -886,7 +930,77 @@ class _Walk:
                     self._mark()
                     break
             else:
-                self.dead = True
+                if not self._widened(i, j):
+                    self.dead = True
+
+    def _widened(self, i: int, j: int) -> bool:
+        """One step of the regex lane's widened fold (preprocessor.strip_ignorable,
+        replace_lookalikes, space_ignorable_between_words), tried only where every
+        step above has failed, so a walk that the #342 fold explains is walked as
+        it was. A run of characters that render as nothing is either deleted, or
+        read as the one space the view holds in its place; a punctuation look-alike
+        or a blank-drawn character is mapped to the one ASCII character it reads
+        as. The run is read as a space only where a builder puts one (see
+        _spaced_run). True when the step was taken."""
+        raw, view = self.raw, self.view
+        c = raw[j]
+        m = IGNORABLE_CHARS.match(raw, j)
+        if m:
+            end = self._spaced_run(i, j)
+            if end is not None:
+                self.changed.append(i)
+                self.i = i + 1
+                self.j = end
+            elif self._between_braille(j):
+                # strip_ignorable reads this run as a space in every widened reading.
+                return False
+            else:
+                self.cuts.append(i)
+                self.hard.add(i)
+                self.j = m.end()
+            self._mark()
+            return True
+        mapped = PUNCT_LOOKALIKES.get(c) or BLANKS.get(c)
+        if mapped is not None and view[i] == mapped:
+            self.changed.append(i)
+            self.i = i + 1
+            self.j = j + 1
+            self._mark()
+            return True
+        return False
+
+    def _run_sides(self, j: int):
+        """The ignorable run that holds raw[j]: its end, and the characters that
+        decode_letter_references puts on either side of it. The walk asks once
+        per character of a run it deletes one at a time, so the run is kept."""
+        run = self.run
+        if run is not None and run[0] <= j < run[1]:
+            return run[1], run[2], run[3]
+        raw = self.raw
+        end = IGNORABLE_CHARS.match(raw, j).end()
+        lo = j
+        while lo > 0 and IGNORABLE_CHARS.match(raw, lo - 1, lo):
+            lo -= 1
+        self.run = (lo, end, decoded_before(raw, lo), decoded_at(raw, end))
+        return self.run[1], self.run[2], self.run[3]
+
+    def _between_braille(self, j: int) -> bool:
+        _, before, after = self._run_sides(j)
+        return _braille(before) and _braille(after)
+
+    def _spaced_run(self, i: int, j: int):
+        """End of the ignorable run at raw[j] if it is read as the space at view[i],
+        else None. A builder reads a run as a space only between two Braille cells
+        (strip_ignorable) or between two letters or digits (the spaced reading);
+        anywhere else it deleted the run, and a space after it came from what
+        follows the run."""
+        if self.view[i] != " " or not IGNORABLE_CHARS.match(self.raw, j, j + 1):
+            return None
+        end, before, after = self._run_sides(j)
+        if (_braille(before) and _braille(after)) or (
+                WORD_CHAR.match(before) is not None and WORD_CHAR.match(after) is not None):
+            return end
+        return None
 
     def _plain_run(self, j: int) -> bool:
         """True if raw[j] is a space that follows another one in a run of blanks that is all
@@ -3654,52 +3768,96 @@ class SunglassesEngine:
                 shadow_folded = None
             else:
                 shadow_folded_present = self._literal_index.present(_prefilter.fold(shadow_folded))
-        # The raw text with three of the preprocessor's character folds applied:
-        # invisible characters deleted, NFKC (which composes some sequences and
-        # expands some code points), homoglyphs mapped to their ASCII look-alike. The
-        # keyword lane has always matched on a view that had these folds; this
-        # lane never did, so one zero-width space per word, a soft hyphen or a
-        # Cyrillic look-alike letter blinded every rule that lives on its regex
-        # (all GLS-MECH-* and every carrier without a usable keyword). Only
-        # these three folds: the decoding, leet, whitespace-collapse and ROT13 /
-        # reversed steps change length and meaning, and on a long document
-        # they re-create the spread-text false positives the co-occurrence
-        # window exists to prevent (see step 3.5). Only one of the three
-        # changes ASCII: deleting an ASCII control character (a NUL, a bell,
-        # a delete byte). Plain ASCII input (the common case) is therefore
-        # never folded and never pays a second pass, and neither is non-ASCII
-        # input that folds to itself. Bounded like the raw text: NFKC can expand (one code point
-        # to as many as 18), so the folded view is cut at max_scan_bytes and
-        # the cut is recorded as a truncated scan, the same way step 0 records
-        # a cut of the raw text. Dropping NFKC instead would let expanding
-        # padding switch the fold off for the whole document and return a
-        # clean, complete result for a payload the fold would have found. In
-        # that expanding case the two folds that cannot grow (delete, map) are
+        # The raw text with the preprocessor's character folds applied:
+        # characters that render as nothing deleted, NFKC (which composes some
+        # sequences and expands some code points), look-alike letters and
+        # punctuation mapped to their ASCII character, a blank-drawn character
+        # read as a space, and a numeric character reference that spells an
+        # ASCII letter or digit decoded (preprocessor.IGNORABLE_RANGES,
+        # PUNCT_LOOKALIKES, BLANKS, decode_letter_references). Without them a
+        # TAG-block code point, a Hangul filler, a bidi control or a variation
+        # selector in each word, a minus sign for a hyphen or one character
+        # reference per word blinded every rule that lives on its regex (all
+        # GLS-MECH-* and every carrier without a usable keyword). The keyword
+        # lane's view is unchanged: it deletes only INVISIBLE_CHARS and maps
+        # only HOMOGLYPHS. Only these folds: the
+        # decoding, leet, whitespace-collapse and ROT13 / reversed steps
+        # change length and meaning, and on a long document they re-create
+        # the spread-text false positives the co-occurrence window exists to
+        # prevent (see step 3.5). Two of them change ASCII: the letter
+        # reference, and deleting an ASCII control character (a NUL, a bell, a
+        # delete byte). ASCII input without "&#" or a control (the common case)
+        # is therefore never folded and never pays a second pass; input that
+        # folds to itself does not either.
+        #
+        # Deleting an invisible character restores a word it was hidden in,
+        # but where it stands IN PLACE OF the space between two words it glues
+        # them ("ignore" + U+200B + "all" -> "ignoreall") and a rule's \s+
+        # fails. Which of the two it was cannot be told from the text, so when
+        # an invisible run sits between two letters or digits the fold is
+        # also built once more with that run read as a space, as a subject of
+        # its own after the first. Text without such a run gets no third pass.
+        #
+        # Bounded like the raw text: NFKC can expand (one code point to as
+        # many as 18), so a folded view is cut at max_scan_bytes and the cut
+        # is recorded as a truncated scan, the same way step 0 records a cut
+        # of the raw text. Dropping NFKC instead would let expanding padding
+        # switch the fold off for the whole document and return a clean,
+        # complete result for a payload the fold would have found. In that
+        # expanding case the folds that cannot grow (delete, decode, map) are
         # also kept as a subject of their own, in full, so padding cannot push
         # a payload hidden with invisible characters past the cut either.
-        folded = None
-        folded_cut = False
-        folded_present = None
-        compact = None
-        compact_present = None
+        #
+        # The #342 fold (INVISIBLE_CHARS deleted, NFKC, HOMOGLYPHS) is kept as
+        # it was, first and in full, and the widened readings come after it as
+        # subjects of their own. They do not replace it: a widened reading sees
+        # different text, so a match only the #342 fold made would otherwise be
+        # lost, and adding subjects can only add to what a rule finds (raw is
+        # decided first, an uncovered hit ends a rule's loop, a covered one can
+        # only be strengthened by a later subject). A widened view equal to the
+        # raw text or to an earlier subject is not read twice.
+        #
+        # Every prefilter presence is computed once per scan; the per-pattern
+        # loop below only reads them. Each subject also keeps the function that
+        # built it from the raw text and whether it was cut, for its raw frame
+        # (see _raw_frame), which is made the first time a rule reads it.
+        folded_subjects = []
         if not text.isascii() or CONTROL_CHARS.search(text):
             stripped = strip_invisible(text)
             folded = replace_homoglyphs(normalize_unicode(stripped))
+            compact = None
+            folded_cut = False
             if self.max_scan_bytes and len(folded) > self.max_scan_bytes:
                 compact = replace_homoglyphs(stripped)
                 if compact == text:
                     compact = None
-                else:
-                    # Once per scan, like the other subjects: the per-pattern
-                    # loop below only reads it.
-                    compact_present = self._literal_index.present(_prefilter.fold(compact))
                 folded = folded[: self.max_scan_bytes]
-                folded_cut = True
-                truncated = True
+                folded_cut = truncated = True
             if folded == text:
                 folded = None
-            else:
-                folded_present = self._literal_index.present(_prefilter.fold(folded))
+            for view, build, cut in ((folded, _fold_text, folded_cut), (compact, _compact_text, False)):
+                if view is not None:
+                    folded_subjects.append(
+                        [view, self._literal_index.present(_prefilter.fold(view)), build, cut, None])
+        if not text.isascii() or "&#" in text or CONTROL_CHARS.search(text):
+            decoded = decode_letter_references(text)
+            readings = [(strip_ignorable(decoded), _wide_fold_text, _wide_compact_text)]
+            spaced = space_ignorable_between_words(decoded)
+            if spaced is not None:
+                readings.append((strip_ignorable(spaced), _fold_spaced_text, _compact_spaced_text))
+            for stripped, fold_build, compact_build in readings:
+                folded = replace_lookalikes(normalize_unicode(stripped))
+                compact = None
+                folded_cut = False
+                if self.max_scan_bytes and len(folded) > self.max_scan_bytes:
+                    compact = replace_lookalikes(stripped)
+                    folded = folded[: self.max_scan_bytes]
+                    folded_cut = truncated = True
+                for view, build, cut in ((folded, fold_build, folded_cut), (compact, compact_build, False)):
+                    if view is None or view == text or any(view == sub[0] for sub in folded_subjects):
+                        continue
+                    folded_subjects.append(
+                        [view, self._literal_index.present(_prefilter.fold(view)), build, cut, None])
         # A rule may declare `match_on: "normalized"`. Step 3.5 already gives the
         # normalized view to keyword CANDIDATES, but a rule reaches that pass only
         # if one of its keywords is in the index, and the index drops anything on
@@ -3709,7 +3867,7 @@ class SunglassesEngine:
         # unreachable by design rather than by oversight. Those rules ask for the
         # normalized view directly here instead.
         normalized_present = None
-        folded_frame = compact_frame = shadow_folded_frame = None
+        shadow_folded_frame = None
         copies = _RawCopies(text, self._check_negation)
         norm_frame = self._raw_frame(align, copies, normalized, _normal_text, shape=True)
         for pattern, regexes in self._regex_patterns:
@@ -3733,19 +3891,15 @@ class SunglassesEngine:
                     shadow_folded_frame = self._raw_frame(
                         align, copies, shadow_folded, _shadow_fold_text, cut=shadow_folded_cut)
                 subjects.append((shadow_folded, shadow_folded_present, shadow_folded_frame))
-            if folded is not None:
-                # Raw decided first; this is the second look. The match offsets are
-                # offsets into the folded view. The fold can lengthen the text
-                # between a negator and its target, so the view's negation check
-                # also reads the raw text at the offset the match came from (see
-                # _resolve_cover).
-                if folded_frame is None:
-                    folded_frame = self._raw_frame(align, copies, folded, _fold_text, cut=folded_cut)
-                subjects.append((folded, folded_present, folded_frame))
-            if compact is not None:
-                if compact_frame is None:
-                    compact_frame = self._raw_frame(align, copies, compact, _compact_text)
-                subjects.append((compact, compact_present, compact_frame))
+            # Raw decided first; the folded views are the second look. The match
+            # offsets are offsets into the view. A fold can lengthen the text
+            # between a negator and its target, so the view's negation check also
+            # reads the raw text at the offset the match came from (see
+            # _resolve_cover).
+            for sub in folded_subjects:
+                if sub[4] is None:
+                    sub[4] = self._raw_frame(align, copies, sub[0], sub[2], cut=sub[3])
+                subjects.append((sub[0], sub[1], sub[4]))
             if pattern.get("match_on") == "normalized":
                 if normalized_present is None:
                     normalized_present = self._literal_index.present(
