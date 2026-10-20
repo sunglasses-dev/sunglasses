@@ -114,6 +114,21 @@ def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
 
 
+@_pytest.fixture(autouse=True)
+def _no_trace_outlives_its_test():
+    """A trace function set by a thread that then ends stays in force after it.
+
+    The proxy tests that watch a line from a reader thread call sys.settrace there and
+    let the thread end. On CPython 3.12 every Python loop that runs after that, in the
+    same process, stays several times slower until sys.settrace(None) is called, and a
+    shard has tens of thousands of tests after them. Put back what was set before the test.
+    """
+    import sys
+    before = sys.gettrace()
+    yield
+    sys.settrace(before)
+
+
 def pytest_collection_modifyitems(config, items):
     """CI_SHARD="i/n": keep part i of the collected suite (see tests/ci_shard.py)."""
     import ci_shard
