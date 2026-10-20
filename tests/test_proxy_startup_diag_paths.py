@@ -174,8 +174,16 @@ def test_a_backslash_and_a_quote_in_a_name_are_escaped_inside_the_delimiters(tmp
 
 def test_a_name_that_is_not_text_is_escaped_with_the_note(tmp_path):
     """Bytes that are not UTF-8 reach Python as lone surrogates; the line must still be written."""
-    state = str(tmp_path / "user" / "proxy-\udc80\udcff")
-    p = _run(tmp_path, state)
+    state = tmp_path / "user" / "proxy-\udc80\udcff"
+    # macOS refuses a name that is not UTF-8 on its own, so the receipt log cannot be made there.
+    # Linux accepts it and would start fine, so block the receipts directory the way the other
+    # cases do wherever the name can be created.
+    try:
+        state.mkdir(parents=True)
+        (state / "receipts").write_text("not a directory\n")
+    except OSError:
+        pass
+    p = _run(tmp_path, str(state))
     assert p.returncode == 1, p.stderr[-400:]
     line = _one_safe_line(p.stderr)
     assert "the receipt log could not be opened" in line
