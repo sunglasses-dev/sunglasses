@@ -473,6 +473,25 @@ def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, sk
             files.append((os.path.join(repo_dir, rel), None))
 
 
+def _annotate_deep_findings(node):
+    """Give every finding in a deep-scan result its taxonomy, at the point of printing.
+
+    The deep path prints a plain dict, not a ScanResult, so `ScanResult.to_dict` never
+    sees it. The walk reaches nested findings too (the transcript's own scan result). It
+    only adds a key to a finding that has a category; no value the scan decided changes.
+    """
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in ("findings", "threats") and isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict) and "category" in item:
+                        item.setdefault("taxonomy", for_category(item["category"]))
+            _annotate_deep_findings(value)
+    elif isinstance(node, list):
+        for item in node:
+            _annotate_deep_findings(item)
+
+
 def _deep_dict_to_sarif(result_dict, source):
     """Serialise a deep-scan result as SARIF.
 
@@ -1326,6 +1345,7 @@ def cmd_scan(args):
                         sys.exit(exit_code)
 
                     if args.json or args.output == "json":
+                        _annotate_deep_findings(result_dict)
                         print(json.dumps(result_dict))
                         sys.exit(exit_code)
 

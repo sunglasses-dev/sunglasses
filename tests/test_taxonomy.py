@@ -16,6 +16,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import wave
 
 import pytest
 
@@ -197,6 +198,31 @@ def test_a_clean_sarif_run_has_no_taxonomies_key(engine):
     assert run["tool"]["driver"]["rules"] == []
 
 
+def test_every_source_has_its_own_guid():
+    guids = [src["guid"] for src in taxonomy.SOURCES.values()]
+    assert all(re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", g)
+               for g in guids), guids
+    assert len(set(guids)) == len(guids)
+
+
+def test_sarif_links_resolve_by_guid_to_a_component_in_the_same_run(engine):
+    # SARIF identifies a taxonomy component by its guid; a name alone is not an identity.
+    run = to_sarif([engine.scan(ATTACK)], source="inline")["runs"][0]
+    components = {c["guid"]: c for c in run["taxonomies"]}
+    assert len(components) == len(run["taxonomies"])
+    rules = run["tool"]["driver"]["rules"]
+    assert rules
+    seen = 0
+    for rule in rules:
+        for rel in rule["relationships"]:
+            ref = rel["target"]["toolComponent"]
+            component = components[ref["guid"]]
+            assert component["name"] == ref["name"], (rule["id"], ref)
+            assert rel["target"]["id"] in {t["id"] for t in component["taxa"]}, (rule["id"], rel)
+            seen += 1
+    assert seen
+
+
 def test_the_sarif_document_is_plain_json(engine):
     sarif = to_sarif([engine.scan(ATTACK)])
     assert json.loads(json.dumps(sarif)) == sarif
@@ -227,6 +253,96 @@ def test_file_scan_sarif_validates_its_own_links(tmp_path):
     run = json.loads(proc.stdout)["runs"][0]
     assert run["taxonomies"]
     assert all(r["relationships"] for r in run["tool"]["driver"]["rules"])
+
+
+def _fake_transcript(monkeypatch, text):
+    """Stand in for Whisper: the file's transcript is `text`, so no model is needed.
+
+    Everything after the transcript (the engine scan, the fold into one result, the CLI
+    branch that prints it) is the real code.
+    """
+    from sunglasses.extractors import audio
+
+    class Transcript:
+        warnings = []
+
+        def __init__(self, whisper_model="base"):
+            pass
+
+        def extract(self, path):
+            return [("transcript", text)]
+
+    monkeypatch.setattr(audio, "AudioExtractor", Transcript)
+
+
+def _deep_scan(tmp_path, capsys, *flags):
+    from sunglasses import cli
+
+    clip = tmp_path / "clip.wav"
+    with wave.open(str(clip), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(8000)
+        w.writeframes(b"\x00\x00" * 800)
+    old = sys.argv
+    sys.argv = ["sunglasses", "scan", "--file", str(clip), "--deep", *flags]
+    try:
+        with pytest.raises(SystemExit) as stop:
+            cli.main()
+    finally:
+        sys.argv = old
+    return stop.value.code, capsys.readouterr().out
+
+
+def _every_finding(node):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in ("findings", "threats") and isinstance(value, list):
+                yield from (f for f in value if isinstance(f, dict) and "category" in f)
+            yield from _every_finding(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _every_finding(item)
+
+
+def test_deep_scan_json_carries_the_taxonomy_on_every_finding_it_prints(
+        tmp_path, capsys, monkeypatch):
+    _fake_transcript(monkeypatch, ATTACK)
+    code, out = _deep_scan(tmp_path, capsys, "--json")
+    assert code == 1
+    found = list(_every_finding(json.loads(out)))
+    assert found
+    for f in found:
+        assert f["taxonomy"] == taxonomy.for_category(f["category"]), f
+
+
+def test_deep_scan_reaches_the_same_verdict_with_or_without_the_annotation(
+        tmp_path, capsys, monkeypatch):
+    _fake_transcript(monkeypatch, ATTACK)
+    code, out = _deep_scan(tmp_path, capsys, "--json")
+    doc = json.loads(out)
+
+    def bare(node):
+        if isinstance(node, dict):
+            return {k: bare(v) for k, v in node.items() if k != "taxonomy"}
+        if isinstance(node, list):
+            return [bare(i) for i in node]
+        return node
+
+    from sunglasses import cli
+
+    empty = lambda category: {"owasp_llm_top10": [], "mitre_atlas": [], "nist_ai": []}  # noqa: E731
+    monkeypatch.setattr(taxonomy, "for_category", empty)
+    monkeypatch.setattr(cli, "for_category", empty)
+    code_empty, out_empty = _deep_scan(tmp_path, capsys, "--json")
+    plain = json.loads(out_empty)
+    assert code == code_empty == 1
+    for f in _every_finding(plain):
+        assert f["taxonomy"] == {"owasp_llm_top10": [], "mitre_atlas": [], "nist_ai": []}
+    # Ignoring the key the table adds, the two documents (timing aside) are the same.
+    for d in (doc, plain):
+        d.pop("scan_time_seconds", None)
+    assert bare(doc) == bare(plain)
 
 
 # --- the published page ------------------------------------------------------------------

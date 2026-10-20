@@ -107,8 +107,9 @@ _SEVERITY_TO_SECURITY_SCORE = {
 }
 
 
-# SARIF names a taxonomy by its toolComponent name, so the short names in
-# `taxonomy.SOURCES` are what a rule's relationship points at.
+# A rule's relationship names its taxonomy by toolComponent name AND guid (SARIF 3.54), and
+# the run-level component carries the same guid, so a reader resolves the link by identity,
+# not by matching strings. Both come from `taxonomy.SOURCES`.
 _TAXONOMY_KEYS = ("owasp_llm_top10", "mitre_atlas", "nist_ai")
 
 
@@ -118,7 +119,10 @@ def _relationships(tax: dict) -> list:
         {
             "target": {
                 "id": entry["id"],
-                "toolComponent": {"name": taxonomy.SOURCES[key]["short_name"]},
+                "toolComponent": {
+                    "name": taxonomy.SOURCES[key]["short_name"],
+                    "guid": taxonomy.SOURCES[key]["guid"],
+                },
             },
             "kinds": ["relevant"],
         }
@@ -145,6 +149,7 @@ def _taxonomies(categories) -> list:
                 taxon["helpUri"] = taxonomy.owasp_url(taxon_id)
             taxa.append(taxon)
         components.append({
+            "guid": info["guid"],
             "name": info["short_name"],
             "fullName": info["name"],
             "organization": info["organization"],

@@ -17,6 +17,10 @@ the dashes in the two RMF subcategory names are ASCII). When a source publishes
 a new edition, the table is re-checked by hand against it; it is data, not detection, and
 changing it never changes a verdict.
 
+Each source carries a fixed GUID. SARIF identifies a taxonomy component by it, so a SARIF
+reader can resolve a rule's link to the component in the same run without matching names. The
+GUIDs are random constants chosen once; they stay the same until a source's version changes.
+
 The table is plain data on purpose: it is read at output time to annotate findings and is
 never consulted by the scanner when it decides anything.
 """
@@ -27,6 +31,7 @@ SOURCES = {
         "short_name": "OWASP LLM Top 10",
         "organization": "OWASP",
         "version": "2025",
+        "guid": "b3a2f5c1-6d4e-4f0a-9c27-1e8d5a7b3c01",
         "url": "https://genai.owasp.org/llm-top-10/",
     },
     "mitre_atlas": {
@@ -34,6 +39,7 @@ SOURCES = {
         "short_name": "MITRE ATLAS",
         "organization": "MITRE",
         "version": "2026.09",
+        "guid": "7e91c4d8-2a35-4b6f-8d10-5c3f9a2e6b02",
         "url": "https://github.com/mitre-atlas/atlas-data/blob/v2026.09/dist/ATLAS-latest.yaml",
     },
     "nist_ai": {
@@ -41,6 +47,7 @@ SOURCES = {
         "short_name": "NIST AI RMF",
         "organization": "NIST",
         "version": "AI 100-1 January 2023; AI 600-1 July 2024",
+        "guid": "d40f8a63-9b17-4e52-a6c8-3f1b7e5d9c03",
         "url": "https://doi.org/10.6028/NIST.AI.600-1",
     },
 }
