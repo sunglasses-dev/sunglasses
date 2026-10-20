@@ -273,6 +273,7 @@ TABLE = {
     '2976aa980e4c2c876ab54149bd86b2a282eadb90c0b605d8362f90eaf42f9eb7': (_F(('approval',)),),
     '298fc389eb42002d4ce59f3ce59d44610e4adf59968b134172b37473a024a5d1': (_F(('constructor', 'function')),),
     '29a74dd053c88204919cfee2b27dd2d78892816c185313db3a8a21946dfa572b': (_F(('fabricated', 'fake', 'forged', 'spoofed', 'synthetic')),_F(('audit', 'confidence', 'eval', 'verification')),_F(('bypass', 'circumvent', 'disable', 'evad', 'ignore', 'override', 'skip')),_F(('approval', 'execution', 'guardrail', 'policy', 'safety')),),
+    '29c3b15a4294d4e3036b7e184251d5621c480a8310722e1df96d304f1150cdc9': (_F(('"hooks"',)),_F(('"command"',)),_F(('curl', 'wget')),),
     '2a019aa48ca9997400534ae42e97d94eec48aa151fe0d18359f331fa86b3f862': (_F(('before', 'label', 'mark', 'reclassif', 'reframe', 'relabel', 'skipping', 'treat', 'without')),),
     '2a0f0557ca79b9c7ce19abd05eae38bfffcf20e2f19e5067a0843fcd2d6c29b2': (_F(('defeat', 'defense', 'hardening', 'passe', 'safe')),),
     '2a280b86811070f94ddd6a5421cead597089fb8f4d7aad548f6c727e4a8c5e1a': (_F(('display', 'ellipsis', 'masked', 'placeholder', 'redacted', 'redaction', 'rendere', 'token', 'truncated')),),

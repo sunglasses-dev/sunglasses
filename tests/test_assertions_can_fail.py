@@ -55,6 +55,11 @@ SANCTIONED_SUBSETS = [
     # a negated quotation is redacted. The question is whether a control character
     # changes that decision; the other channels never redact it.
     {"web_content", "agent_input", "tool_output"},
+    # The hook-exfil gates (credential post, hook fetch-and-run, whole-env post) judge
+    # the five channels a settings file, a plugin manifest or a command can arrive on.
+    # The rules they pin are scoped to those five on purpose, so leaving out
+    # `api_response` here is a scope, not a gap.
+    {"code", "message", "file", "tool_output", "web_content"},
 ]
 
 
