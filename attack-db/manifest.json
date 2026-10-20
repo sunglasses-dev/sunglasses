@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-16T19:36:32.692394Z",
+  "generated_at": "2026-10-20T17:07:39.884820Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1583,
+  "total_patterns": 1584,
   "categories": {
     "prompt-injection": 51,
     "data-exfiltration": 43,
@@ -20,7 +20,7 @@
     "encoding-evasion": 3,
     "invisible-unicode": 4,
     "indirect-prompt-injection": 10,
-    "agent-workflow-security": 355,
+    "agent-workflow-security": 356,
     "path-traversal": 11,
     "deserialization": 2,
     "auth-bypass": 9,
