@@ -36,14 +36,10 @@ _ATOMIC = getattr(C, "ATOMIC_GROUP", None)
 _POSSESSIVE = getattr(C, "POSSESSIVE_REPEAT", None)
 _REPEATS = tuple(o for o in (C.MAX_REPEAT, C.MIN_REPEAT, _POSSESSIVE) if o is not None)
 
-_REWRITE_PENDING = "2026-10-19 rewrite to a single read is in review"
 _REVIEWED = "2026-10-18 reviewed, no action needed"
 _UNREVIEWED = "2026-10-19 shape present, not yet reviewed for input cost"
 
 GRANDFATHERED = {
-    "GLS-AW-585": _REWRITE_PENDING,
-    "GLS-DFP-035": _REWRITE_PENDING,
-    "GLS-MR-038": _REWRITE_PENDING,
     "GLS-ADP-002": _REVIEWED,
 }
 GRANDFATHERED.update(dict.fromkeys((
