@@ -62,7 +62,9 @@ def wheel_upload(version, fetch=fetch_json):
     if not wheels:
         raise LookupError(f"PyPI lists no wheel for sunglasses {version}")
     raw = wheels[0]["upload_time_iso_8601"]
-    utc = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    # Before Python 3.11, fromisoformat takes a fraction of exactly 3 or 6 digits only.
+    stamp_text = re.sub(r"\.(\d+)", lambda m: "." + (m.group(1) + "000000")[:6], raw.replace("Z", "+00:00"))
+    utc = datetime.fromisoformat(stamp_text)
     local = utc.astimezone(PT).replace(microsecond=0)
     return local.date().isoformat(), local.isoformat(), utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
