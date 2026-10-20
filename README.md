@@ -390,6 +390,16 @@ sunglasses demo
 sunglasses info
 ```
 
+### Framework references on every finding
+
+Each finding in `--json` output carries a `taxonomy` object listing where its category sits in the
+OWASP Top 10 for LLM Applications (2025), MITRE ATLAS (2026.09) and NIST AI RMF / AI 600-1:
+`owasp_llm_top10`, `mitre_atlas` and `nist_ai`, each a list of `{"id", "name"}`. SARIF output lists
+the same entries under the run's `taxonomies`, and each rule points at them through `relationships`.
+The mapping is by category, so it says which headings an attack of that kind is discussed under, not
+that one finding is a confirmed instance of a technique. The full table is in
+[`attack-db/TAXONOMY.md`](attack-db/TAXONOMY.md), with the source and version of each list.
+
 ### Exit codes
 
 Every scan exits through one contract, on every path (text, file, repo, deep

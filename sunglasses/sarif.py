@@ -19,7 +19,7 @@ Usage:
 import json
 from typing import Iterable, Optional
 
-from . import __version__
+from . import __version__, taxonomy
 
 _SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
 _SARIF_VERSION = "2.1.0"
@@ -107,9 +107,59 @@ _SEVERITY_TO_SECURITY_SCORE = {
 }
 
 
+# SARIF names a taxonomy by its toolComponent name, so the short names in
+# `taxonomy.SOURCES` are what a rule's relationship points at.
+_TAXONOMY_KEYS = ("owasp_llm_top10", "mitre_atlas", "nist_ai")
+
+
+def _relationships(tax: dict) -> list:
+    """A rule's links to the taxonomy entries its category sits under (SARIF 3.49.15)."""
+    return [
+        {
+            "target": {
+                "id": entry["id"],
+                "toolComponent": {"name": taxonomy.SOURCES[key]["short_name"]},
+            },
+            "kinds": ["relevant"],
+        }
+        for key in _TAXONOMY_KEYS
+        for entry in tax[key]
+    ]
+
+
+def _taxonomies(categories) -> list:
+    """The run-level taxonomy components, holding only the entries a rule here points at."""
+    components = []
+    for key in _TAXONOMY_KEYS:
+        seen: dict = {}
+        for category in categories:
+            for entry in taxonomy.for_category(category)[key]:
+                seen.setdefault(entry["id"], entry["name"])
+        if not seen:
+            continue
+        info = taxonomy.SOURCES[key]
+        taxa = []
+        for taxon_id in sorted(seen):
+            taxon = {"id": taxon_id, "name": seen[taxon_id]}
+            if key == "owasp_llm_top10":
+                taxon["helpUri"] = taxonomy.owasp_url(taxon_id)
+            taxa.append(taxon)
+        components.append({
+            "name": info["short_name"],
+            "fullName": info["name"],
+            "organization": info["organization"],
+            "version": info["version"],
+            "informationUri": info["url"],
+            "isComprehensive": False,
+            "taxa": taxa,
+        })
+    return components
+
+
 def _build_rule(finding: dict) -> dict:
     """Build a SARIF rule (reportingDescriptor) from a finding."""
     severity = finding.get("severity", "medium")
+    tax = taxonomy.for_category(finding.get("category", "unknown"))
     return {
         "id": finding["id"],
         "name": finding.get("name", finding["id"]),
@@ -129,10 +179,12 @@ def _build_rule(finding: dict) -> dict:
                 "ai-agent-security",
                 f"category:{finding.get('category', 'unknown')}",
             ],
+            "taxonomy": tax,
         },
         "defaultConfiguration": {
             "level": _SEVERITY_TO_LEVEL.get(severity, "warning"),
         },
+        "relationships": _relationships(tax),
     }
 
 
@@ -258,7 +310,11 @@ def to_sarif(
         "roles": ["analysisTarget"],
     }
 
-    return {
+    run_taxonomies = _taxonomies(
+        {f.get("category", "unknown") for r in results for f in r.findings}
+    )
+
+    doc = {
         "$schema": _SARIF_SCHEMA,
         "version": _SARIF_VERSION,
         "runs": [
@@ -284,6 +340,9 @@ def to_sarif(
             }
         ],
     }
+    if run_taxonomies:
+        doc["runs"][0]["taxonomies"] = run_taxonomies
+    return doc
 
 
 def to_sarif_json(results, source: str = "inline", indent: int = 2) -> str:

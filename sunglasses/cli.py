@@ -30,6 +30,7 @@ from .extractors.dispatch import UnreadableFile
 from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .sarif import to_sarif
+from .taxonomy import for_category
 
 
 # ANSI colors for terminal output
@@ -782,6 +783,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
                         "severity": finding["severity"],
                         "category": finding.get("category", "unknown"),
                         "matched_text": finding.get("matched_text", ""),
+                        "taxonomy": for_category(finding.get("category", "unknown")),
                     },
                 })
 
@@ -796,6 +798,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
                         "severity": f["severity"],
                         "category": f.get("category", "unknown"),
                         "matched_text": f.get("matched_text", ""),
+                        "taxonomy": for_category(f.get("category", "unknown")),
                     }
                     for f in scan_result.findings
                 ],

@@ -32,7 +32,7 @@ try:
 except ImportError:
     HAS_AHOCORASICK = False
 
-from . import policy
+from . import policy, taxonomy
 from .mechanisms import MECHANISM_PATTERNS
 from .patterns import PATTERNS
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
@@ -201,6 +201,7 @@ class ScanResult:
                     "matched_text": f.get("matched_text", ""),
                     "reason": f.get("description", ""),
                     "also_matched": f.get("also_matched", []),
+                    "taxonomy": taxonomy.for_category(f["category"]),
                 }
                 for f in self.reported_findings()
             ],
