@@ -389,9 +389,9 @@ up. C1 was fixed by giving both surfaces one owner; the walker was not part of t
 
 **Why it is a gap and not a false clean:** every skipped member is named, in every output
 format (`skipped`, `notInspected`, and the human `INCOMPLETE SCAN` list), and the scan exits
-3, not 0. Nothing claims to have read them. As of round 5 the skip line also says what to do
-about it — `Scan it directly to look inside: sunglasses scan --file <path>` — because
-"binary file type (.gif) — not inspected" told a reader what happened and not what closes it.
+3, not 0. Nothing claims to have read them. For an archive the skip line also says what to do
+about it — `SUNGLASSES does not extract this format, so nothing inside it was scanned. Unpack it
+and scan the files inside.` — so a reader learns what happened and what closes it.
 
 **Why it is deferred:** reconciling the lists means the walker runs OCR over every committed
 image, which changes what a repo scan costs (seconds per image, per frame) and what it
