@@ -29,7 +29,7 @@ def _real_paths():
     return sorted(paths)
 
 
-@pytest.mark.parametrize("n", [1, 2, 3])
+@pytest.mark.parametrize("n", [1, 2, 3, 4])
 def test_parts_are_a_partition_of_the_collected_items(n):
     items = _items(_real_paths())
     seen = []
@@ -107,6 +107,16 @@ def test_the_two_parts_are_within_ten_percent_by_cost():
     parts = ci_shard.assign(_real_paths(), 2)
     # a dealt file adds the same share to every part, so it is left out of the sum
     load = {1: 0, 2: 0}
+    for p, k in parts.items():
+        load[k] += ci_shard.COST.get(p, ci_shard.DEFAULT_COST)
+    assert max(load.values()) <= 1.1 * min(load.values()), load
+
+
+def test_the_four_parts_are_within_ten_percent_by_cost():
+    # 3.12 runs four parts; the negation file is dealt by test, so each part
+    # carries an equal share of it and it is left out of the sum
+    parts = ci_shard.assign(_real_paths(), 4)
+    load = {k: 0 for k in range(1, 5)}
     for p, k in parts.items():
         load[k] += ci_shard.COST.get(p, ci_shard.DEFAULT_COST)
     assert max(load.values()) <= 1.1 * min(load.values()), load
