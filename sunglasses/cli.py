@@ -118,7 +118,7 @@ def print_result(result, verbose=False):
             print(f"  {fc}{i}. [{f['severity'].upper()}] {f['name']}{RESET}")
             print(f"     {DIM}ID: {f['id']} | Category: {f['category']}{RESET}")
             if f.get("matched_text"):
-                print(f"     {DIM}Matched: \"{f['matched_text']}\"{RESET}")
+                print(f"     {DIM}Matched: \"{_printable_match(f['matched_text'])}\"{RESET}")
             if f.get("also_matched"):
                 # Named, not hidden: the reader can still see everything that
                 # fired on this span.
@@ -605,6 +605,19 @@ def _printable(name):
         ch if (ch.isprintable() or ch == " ") else (
             f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else f"\\u{ord(ch):04x}")
         for ch in name)
+
+
+def _printable_match(text):
+    """A quoted match is file content: escape controls, and the backslash that spells them.
+
+    Every escape has a fixed width (`\\xNN`, `\\uNNNN`, `\\UNNNNNNNN`) and a literal
+    backslash is doubled, so two different texts never read the same.
+    """
+    return "".join(
+        ch if (ch.isprintable() or ch == " ") else (
+            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else
+            f"\\u{ord(ch):04x}" if ord(ch) < 0x10000 else f"\\U{ord(ch):08x}")
+        for ch in text.replace("\\", "\\\\"))
 
 
 def _note(text):
@@ -1120,7 +1133,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
             print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}{marker}")
             print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
             if f.get("matched_text"):
-                print(f"      {DIM}Match: \"{f['matched_text']}\"{RESET}")
+                print(f"      {DIM}Match: \"{_printable_match(f['matched_text'])}\"{RESET}")
             if len(shown) >= 20:
                 remaining = len(all_findings) - 20
                 if remaining > 0:
@@ -1692,7 +1705,7 @@ def cmd_scan(args):
                     else:
                         print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
                         for t in threats:
-                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {t.get('matched_text', '')}")
+                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {_printable_match(str(t.get('matched_text', '')))}")
                         # A finding does not cancel a coverage failure. The human
                         # threat screen used to drop the warnings entirely, so a
                         # partially transcribed file with one finding read as a
