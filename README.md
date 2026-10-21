@@ -497,8 +497,8 @@ and `--dir` is where it is made.
 
 ```bash
 sunglasses scan --dir . --fail-on high                      # exit 1 only for high or critical
-sunglasses scan --dir . --write-baseline sunglasses.baseline.json
-sunglasses scan --dir . --baseline sunglasses.baseline.json  # exit 1 only for findings not listed
+sunglasses scan --dir . --write-baseline ../sunglasses.baseline.json    # keep it outside the scan root
+sunglasses scan --dir . --baseline ../sunglasses.baseline.json  # exit 1 only for findings not listed (a critical one stays new unless --accept-critical names its rule)
 ```
 
 These four options change when a scan fails CI. They do not remove a finding from any report.
@@ -514,7 +514,7 @@ Findings below the `--fail-on` level are still printed and still in the JSON and
 a `--dir` or `--repo` scan each new finding under the level carries `below_fail_on` (a finding the
 baseline lists is marked known instead). For `--file`, `--text` and
 stdin the JSON carries `fail_on` and marks each finding under the level with `below_fail_on`; the
-human screen prints a `Fails on:` line. SARIF output keeps every finding and does not mark them.
+human screen prints a `Fails on:` line. SARIF output keeps every finding and does not mark the ones below the level.
 A level given explicitly (even `--fail-on any`) turns the extra JSON keys on; a scan without these
 options produces the same documents as before.
 
