@@ -511,6 +511,14 @@ class Session:
         # requests, one response.
         self._unanswered: set = set()
         self._answered_final: set = set()
+        # Not bounded, on purpose. `_generation` keeps one counter per request identity
+        # (every admission raises it, refusals included, and the proxy's own control
+        # requests too); this set keeps one final mark per attempt whose last answer was
+        # confirmed. `_cancelled_ids`, `_cancelled_at` and `_control_answers` are not
+        # cleared either; the cancel pair can only name ids already admitted. Dropping a
+        # final mark would let a late writer answer an id twice. The tombstones are the one
+        # table with a hard cap (TOMBSTONE_LIMIT); the others grow with the number of
+        # distinct ids the peers send. See KNOWN_VERSION_GAPS.md, "Documented bound".
         # R-168-R9/(a). WHICH obligation the frame just yielded discharges.
         #
         # The consumer cannot work it out from the frame: an id can have two
@@ -572,7 +580,7 @@ class Session:
         # assume it was theirs, so one request got two frames; whoever takes it
         # first under `_settlement` owns it and the other finds nothing to do.
         self._delivering: set = set()
-        self._generation: dict = {}       # key -> how many times it has been issued
+        self._generation: dict = {}       # identity -> how many times it has been issued; unbounded, see `_answered_final`
         self._closed: tuple | None = None
 
     # ── admission ───────────────────────────────────────────────────────────
