@@ -72,6 +72,13 @@ CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=tr
 # the `full_matrix` marker. A pull request that cannot have changed a renderer
 # (classify's `lane` step says quick=true) deselects that marker; every other
 # event keeps the bare command. The expression is the ONLY thing added.
+# 3.12 is the slowest interpreter, so it is split four ways and the rest two.
+# The env expression and these numbers are one fact written twice; the check in
+# check_workflow ties the legs to them.
+SHARD_ENV = "${{ matrix.shard }}/${{ matrix.python-version == '3.12' && 4 || 2 }}"
+SHARD_PARTS = {"3.12": 4}
+SHARD_PARTS_DEFAULT = 2
+SHARD_INCLUDE = [{"python-version": "3.12", "shard": "3"}, {"python-version": "3.12", "shard": "4"}]
 INTEGRITY_SUITE_CMD = ("pytest -q --durations=0 "
                        "${{ needs.classify.outputs.quick == 'true' && '-m \"not full_matrix\"' || '' }}")
 
@@ -296,13 +303,26 @@ def check_workflow(doc) -> list[str]:
     strat = integrity.get("strategy") or {}
     if set(strat.keys()) - {"fail-fast", "matrix"} or strat.get("fail-fast") is not False:
         p.append(f"integrity strategy keys/fail-fast changed: {strat}")
-    if set((strat.get("matrix") or {}).keys()) != {"python-version", "shard"}:
-        p.append(f"integrity matrix has extra keys (include/exclude?): {sorted((strat.get('matrix') or {}).keys())}")
-    if (strat.get("matrix") or {}).get("shard") != ["1", "2"]:
-        p.append(f"integrity shard axis changed: {(strat.get('matrix') or {}).get('shard')}")
+    matrix = strat.get("matrix") or {}
+    if set(matrix.keys()) != {"python-version", "shard", "include"}:
+        p.append(f"integrity matrix has extra keys (exclude?): {sorted(matrix.keys())}")
+    if matrix.get("shard") != ["1", "2"]:
+        p.append(f"integrity shard axis changed: {matrix.get('shard')}")
+    if matrix.get("include") != SHARD_INCLUDE:
+        p.append(f"integrity matrix include must be exactly the extra 3.12 parts {SHARD_INCLUDE}: got {matrix.get('include')}")
     suite_steps = [s for s in integrity.get("steps", []) if s.get("run", "").strip() == INTEGRITY_SUITE_CMD]
-    if len(suite_steps) != 1 or suite_steps[0].get("env") != {"CI_SHARD": "${{ matrix.shard }}/2"}:
-        p.append("the integrity full-suite step must carry exactly env CI_SHARD: ${{ matrix.shard }}/2 (the two parts together are the suite)")
+    if len(suite_steps) != 1 or suite_steps[0].get("env") != {"CI_SHARD": SHARD_ENV}:
+        p.append(f"the integrity full-suite step must carry exactly env CI_SHARD: {SHARD_ENV} (the parts together are the suite)")
+    else:
+        # The parts of one interpreter are only the suite if they are numbered
+        # 1..n for the n that interpreter's CI_SHARD names. A leg left out, or an
+        # extra one, drops tests or runs them twice.
+        for ver in matrix.get("python-version") or []:
+            parts = SHARD_PARTS.get(ver, SHARD_PARTS_DEFAULT)
+            have = sorted(set(matrix.get("shard") or [])
+                          | {i["shard"] for i in matrix.get("include") or [] if i.get("python-version") == ver})
+            if have != [str(k) for k in range(1, parts + 1)]:
+                p.append(f"python {ver} runs parts {have} but CI_SHARD splits it into {parts}")
     # Exact fast-suite command shape: every token allowed, nothing positional.
     if len(suite) == 1:
         toks = shlex.split(suite[0].replace("\\\n", " "))
@@ -541,6 +561,42 @@ def test_control_matrix_full_suite_failure_tolerated():
     assert check_workflow(_mutate(m))
     def m2(d): d["jobs"]["integrity"]["continue-on-error"] = True
     assert check_workflow(_mutate(m2))
+
+
+def _integrity_matrix(d):
+    return d["jobs"]["integrity"]["strategy"]["matrix"]
+
+
+def test_control_a_312_part_is_dropped():
+    # four parts named by CI_SHARD, three legs: a quarter of the suite runs nowhere
+    def m(d): _integrity_matrix(d)["include"].pop()
+    assert check_workflow(_mutate(m))
+
+
+def test_control_a_312_part_is_added_twice():
+    def m(d): _integrity_matrix(d)["include"].append({"python-version": "3.12", "shard": "2"})
+    assert check_workflow(_mutate(m))
+
+
+def test_control_another_interpreter_gets_an_extra_part():
+    def m(d): _integrity_matrix(d)["include"].append({"python-version": "3.11", "shard": "3"})
+    assert check_workflow(_mutate(m))
+
+
+def test_control_the_suite_step_splits_312_in_two_again():
+    def m(d):
+        for s in d["jobs"]["integrity"]["steps"]:
+            if s.get("run", "").strip() == INTEGRITY_SUITE_CMD:
+                s["env"] = {"CI_SHARD": "${{ matrix.shard }}/2"}
+    assert check_workflow(_mutate(m))
+
+
+def test_control_the_suite_step_splits_every_interpreter_in_four():
+    def m(d):
+        for s in d["jobs"]["integrity"]["steps"]:
+            if s.get("run", "").strip() == INTEGRITY_SUITE_CMD:
+                s["env"] = {"CI_SHARD": "${{ matrix.shard }}/4"}
+    assert check_workflow(_mutate(m))
 
 
 def test_control_matrix_excludes_a_version():

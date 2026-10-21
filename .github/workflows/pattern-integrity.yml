@@ -351,10 +351,18 @@ jobs:
         # EXCLUDE the graded interpreter prove compatibility, not reproduction.
         # 3.14 is fully blocking here — never informational, never continue-on-error.
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
-        # Each interpreter runs the full suite as two jobs that together are
+        # Each interpreter runs the full suite as jobs that together are
         # exactly the suite (tests/ci_shard.py), because the slowest
         # interpreter's single job outgrew GitHub's six-hour job limit.
+        # Two parts each; 3.12 runs four, the two extra parts added below,
+        # because its parts are the longest jobs in the run and every pull
+        # request waits for the slowest one.
         shard: ["1", "2"]
+        include:
+          - python-version: "3.12"
+            shard: "3"
+          - python-version: "3.12"
+            shard: "4"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -509,7 +517,7 @@ jobs:
         # which is the difference between a suspicion and a fix. The cost is
         # log lines on a job that already runs for over two hours.
         env:
-          CI_SHARD: ${{ matrix.shard }}/2
+          CI_SHARD: ${{ matrix.shard }}/${{ matrix.python-version == '3.12' && 4 || 2 }}
         run: pytest -q --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
 
   coverage:
