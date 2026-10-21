@@ -466,6 +466,16 @@ when it is a complete scan result or one of the process's three error reports (a
 cannot be read, an operating-system error, a fault), each with all of its fields; any other
 reply is treated as a failed process, which is stopped, and the file is reported as not read.
 
+`--jobs N` reads up to N files at once with `--dir` and `--repo` (a whole number from 1 to 64;
+default 1, one file at a time). The report on stdout is byte-identical to `--jobs 1` apart from
+the timing fields, for any N. Files are counted in the order the walk lists them, so the findings,
+the lists, the exit code and the progress lines come out as they do with one file at a time, and
+each file has the whole
+`--file-deadline` to itself. `--jobs 1` reads one file at a time. `scan --file --jobs` is refused
+with exit `2`, and so is a value that is not a whole number from 1 to 64. The pool needs a file
+deadline above 0 and a platform that can stop a process group; without them the files are read one
+at a time, and an explicit `--jobs` prints a note saying so.
+
 A link is never followed, because it can point outside the tree: a link is named as skipped
 whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
 itself a link, naming the real directory to use instead (the parent folders of the path as you

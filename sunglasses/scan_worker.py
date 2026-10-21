@@ -384,6 +384,16 @@ class ScanWorker:
                     pass
             self._stop()
 
+    def abort(self):
+        """Stop the child's process group now, from another thread, without waiting for `scan_file`.
+
+        The thread reading from the child sees its stream end and reports the file as not read;
+        `close` then releases what is left.
+        """
+        child = self._child
+        if child is not None:
+            supervisor.stop_group(child.pid, grace_ms=self.grace_ms, handle=child)
+
     def __enter__(self):
         return self
 
