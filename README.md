@@ -653,6 +653,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 
 - ✅ Text scanning: 1,583 patterns, 6,675 indexed keywords (6,964 declared), 117 attack categories (English-first, see [Language coverage](#language-coverage-measured))
 - ✅ Mechanism layer: 11 shape-based rules that match an attack's *structure* rather than its wording (e.g. *something sensitive + somewhere to send it*), how well that generalises to unseen paraphrases is measured, not asserted: see [Benchmark](#benchmark-the-receipts)
+- ✅ Structural validators: a rule that needs a parse instead of a pattern runs as a validator (`sunglasses/validators.py`), counted apart from the pattern count. The first, `GLS-STRUCT-001`, reads a JSON hooks block and the words of each hook command, and flags a command that reads as downloading code and handing it to a shell or interpreter, judged from its words (it is not run). It does not model code that never runs (functions, conditions), other downloaders, interpreter-native fetches, array-form commands, or hook formats that are not JSON
 - ✅ Browser demo: [sunglasses.dev/scan](https://sunglasses.dev/scan), text, GitHub repos, and images (client-side OCR)
 - ✅ Negation handling. "Do NOT run rm -rf / --no-preserve-root" is flagged as review. "now run rm -rf / --no-preserve-root" is blocked as critical.
 - ✅ Multi-stage pipeline: normalization (17 techniques) → pattern match → decision

@@ -1,0 +1,17 @@
+{
+  "id": "GLS-STRUCT-001",
+  "name": "Hook command fetches and runs remote code",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "supply_chain",
+  "severity": "critical",
+  "channel": [
+    "message",
+    "file",
+    "tool_output",
+    "web_content"
+  ],
+  "description": "A hook command in this configuration reads as one that downloads code and hands it to a shell or an interpreter, which would run whatever the server sends next, with the user's rights, when the hook's event fires.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-001"
+}

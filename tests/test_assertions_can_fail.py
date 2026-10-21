@@ -55,6 +55,10 @@ SANCTIONED_SUBSETS = [
     # a negated quotation is redacted. The question is whether a control character
     # changes that decision; the other channels never redact it.
     {"web_content", "agent_input", "tool_output"},
+    # The structural validator's own reach: the four channels it declares, plus
+    # `code` (the alias of `file`). The three channels it does not read are asserted
+    # clear on their own, from the complementary list above.
+    {"message", "file", "web_content", "tool_output", "code"},
 ]
 
 

@@ -34,6 +34,7 @@ except ImportError:
 
 from . import policy, taxonomy
 from .mechanisms import MECHANISM_PATTERNS
+from .validators import VALIDATORS
 from .patterns import PATTERNS
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
@@ -1865,7 +1866,8 @@ class SunglassesEngine:
                                 "'": "'", "`": "`", "「": "」", "『": "』"}
 
     def __init__(self, patterns: Optional[list] = None, extra_patterns: Optional[list] = None,
-                 mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES):
+                 mechanisms: bool = True, max_scan_bytes: int = MAX_SCAN_BYTES,
+                 validators: bool = True):
         # 0 disables the cap. Configurable because a batch job scanning archives has
         # different tolerances from a hook in front of an agent, and picking one
         # number for both is how a default becomes something people work around.
@@ -1879,6 +1881,11 @@ class SunglassesEngine:
         # trip the version check and overstate the pattern database.
         self._mechanisms = list(MECHANISM_PATTERNS) if mechanisms else []
         self._patterns = list(carriers) + self._mechanisms
+        # The structural validators (validators.py) read structure a regular
+        # expression cannot: which object a field belongs to, which word of a shell
+        # command is the program. They are counted separately from patterns for the
+        # same reason the mechanisms are: `patterns` is a published number.
+        self._validators = tuple(VALIDATORS) if validators else ()
         if extra_patterns:
             self._patterns = self._patterns + extra_patterns
 
@@ -4054,6 +4061,23 @@ class SunglassesEngine:
                 < self.SEVERITY_ORDER.get(f["severity"], 0)
             ]
 
+        # Step 3c: Structural validators. They read the raw (capped) text, not a
+        # normalized view: a config is literal, and a parse of a rewritten copy
+        # would judge text the file does not contain. Each validator pre-gates on
+        # substrings first, so a text that cannot carry the structure costs nothing.
+        # A validator that raises must not take the scan down with it: the findings already
+        # made stand, and the result says the inspection is not complete.
+        validator_failures = []
+        for validator in self._validators:
+            if not match_channels.intersection(validator.channel):
+                continue
+            try:
+                if validator.pregate(text):
+                    findings.extend(validator.run(text))
+            except Exception as exc:
+                validator_failures.append(
+                    f"validator {validator.id} failed ({type(exc).__name__}); its check was skipped")
+
         # Step 4: Determine decision based on worst finding severity
         if not findings:
             decision = "allow"
@@ -4076,6 +4100,9 @@ class SunglassesEngine:
         )
         result.truncated = truncated
         result.bytes_scanned = len(text)
+        if validator_failures:
+            result.extraction_complete = False
+            result.extraction_warnings = list(validator_failures)
         return result
 
     def scan_file(self, filepath: str) -> ScanResult:
@@ -4094,8 +4121,8 @@ class SunglassesEngine:
 
         extraction = extract_file_sources(filepath)
         result = self.scan(extraction.text, channel="file")
-        result.extraction_complete = extraction.complete
-        result.extraction_warnings = list(extraction.warnings)
+        result.extraction_complete = extraction.complete and result.extraction_complete
+        result.extraction_warnings = list(extraction.warnings) + list(result.extraction_warnings)
         result.extraction_sources = extraction.labels
         return result
 
@@ -4105,6 +4132,7 @@ class SunglassesEngine:
             "version": __import__('sunglasses').__version__,
             "patterns": self._pattern_count,
             "mechanisms": self._mechanism_count,
+            "validators": len(self._validators),
             # the pre-screen index (excludes the generic keywords listed above)
             "keywords": self._keyword_count,
             # what the patterns declare, which is the number the README quotes
