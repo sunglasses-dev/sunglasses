@@ -5,6 +5,49 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.11] — 2026-10-21
+
+### Changed
+
+- Text that hides words behind characters that draw nothing is read in more shapes on the regex lane. The folded view now deletes the Unicode Default_Ignorable_Code_Point set and the format characters renderers do not draw, reads a blank braille cell or a blank-drawn space between words as a space, maps 17 look-alike hyphen, bar, slash and colon characters, and decodes a numeric character reference only when it spells an ASCII letter or digit. Some texts that were allowed are now blocked. Rules that use keywords only do not read these characters yet; format characters that do render (Arabic number signs and similar) and unassigned code points are left alone; en dash, em dash and box-drawing lines are not mapped. (#380)
+
+- When a wrapped server's tools are withheld until you approve them, `sunglasses proxy` now prints one line on its own stderr with the exact `sunglasses proxy approve <server_id> --snapshot <sha>` command, both ids filled in. `--state-root` is added only when the proxy was started with one, as an absolute path. The line is attempted, not guaranteed, and nothing about the JSON answer to the client changes. (#424)
+
+- `sunglasses check` marks every missing optional extra `(optional)` on its own row and adds one footer line that counts and names them. `sunglasses doctor` prints a short paragraph when its self-test is unavailable and nothing else failed: no check failed and none could run. Exit codes are unchanged: `check` exits 0 whatever is installed, and `doctor` still exits 1 on a build with no live self-test, which means not proven, not failed. (#429)
+
+- The negation guards of GLS-MR-038, GLS-AW-585 and GLS-DFP-035 are rewritten to describe the same documents. Each rule has an equivalence test against its old form. No pattern is added; the count stays 1,583. (#427, #428, #419)
+
+- `sunglasses scan --dir` no longer ends the not-inspected line for an archive it cannot open with "scan it directly". It says the format is not extracted, nothing inside was scanned, and to unpack the archive and scan the files inside. Which files count as skipped, the exit codes and the JSON shape are unchanged. (#439)
+
+### Added
+
+- Every finding's `taxonomy` in `sunglasses scan --json`, and `taxonomies` with a `relationships` entry on each rule in SARIF output, name the OWASP Top 10 for LLM Applications 2025, MITRE ATLAS 2026.09 and NIST AI RMF / AI 600-1 entries the finding's category sits under. It is a category-level mapping: it says which headings an attack of this kind is discussed under, not that one finding is a confirmed instance of a technique, and no decision reads it. `attack-db/TAXONOMY.md` lists all 120 categories. (#438)
+
+### Fixed
+
+- When the proxy cannot create its receipt log or approval store, the startup refusal names each path shell-quoted, or between `$'...'` as byte escapes when it holds a control or invisible character, and says so. A NUL in the state root is the same refusal, no longer a traceback. The list of invisible characters is fixed; it is not a claim that every look-alike is caught. (#430)
+
+### Internal
+
+- The release workflow has a `stats` job that pushes `stats/<version>-last-updated` and opens a pull request that writes `last_updated` from the wheel's PyPI upload time. It never merges. With the repository setting "Allow GitHub Actions to create and approve pull requests" off, it pushes the branch and prints the compare link instead of opening the pull request; a pull request opened with the workflow token does not start CI until it is closed and reopened. (#426)
+
+- `stats/current.json` carries the 0.6.10 release date and, as `last_updated`, the time the
+  release workflow uploaded the wheel to PyPI. (#423)
+
+- The README benchmark table header says `Metric (v0.6.10)` instead of `v0.6.9`. The values in the
+  table already matched the measured run, so no figure changes. (#422)
+
+- CI: the compile timer writes its table periodically and on SIGTERM, so a run that is cut at the
+  job cap still leaves a table instead of nothing (#390). The 3.12 integrity job runs as four parts,
+  so the matrix has fourteen integrity jobs, and the gate test pins that each interpreter's parts are
+  exactly the ones its shard names (#445). Workflow, test tooling and tests only.
+
+- Tests only: AR10 and AR11 wait on the proxy's own deadline constants instead of a fixed number of
+  seconds (#431); one fixture puts the trace function back after every test, so a tracer left behind
+  by a reader thread cannot slow the tests that follow (#432); each wall-clock bound in the
+  pattern-integrity suite is timed up to three times and the fastest counts, with the limits
+  unchanged (#442).
+
 ## [0.6.10] — 2026-10-19
 
 ### Changed
