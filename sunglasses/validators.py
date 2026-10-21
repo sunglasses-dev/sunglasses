@@ -69,6 +69,9 @@ object (a prose example around a config, two documents, a comment, a trailing co
 file) is not read, and neither is any key that is not at the top of the document: the same keys in
 a schema, a template, a fixture or a nested object are not settings. Keys and values are compared
 after the JSON parse, so a key or a value written with ``\\uXXXX`` escapes is the setting it spells.
+``NaN`` and ``Infinity`` are not JSON, so a text that holds one is not a document. No setting is a
+number: a long integer is read as 0 and a port is measured by its digits before it is converted, so
+the answer and the cost of a very long number are the same on every interpreter.
 
 Three shapes are reported, each at most once: ``permissions.defaultMode`` set to the string
 ``bypassPermissions`` or ``skipDangerousModePermissionPrompt`` set to ``true`` (the prompts are
@@ -86,9 +89,11 @@ finding is shown and nothing is blocked or quarantined. The rule reads ``file`` 
 ``code``) and ``tool_output``; it is not read on ``message`` or ``web_content``, where tutorials
 quote these keys.
 
-Not read, by design: JSON with comments, a settings object inside a larger text, an address written
-as a number or with fewer than four parts, an IPv4-mapped IPv6 address, a host name that resolves
-to an address, and the other places a prompt can be turned off.
+Not read, by design: JSON with comments, a settings object inside a larger text, a URL that is not
+``http`` or ``https``, an address written as a number or with fewer than four parts or with a
+leading zero, an IPv4-mapped IPv6 address, an IPv6 address with a zone, a host name that resolves
+to an address (a tunnel name is the one kind of name that is reported), and the other places a
+prompt can be turned off.
 
 This is a reader of words, not a shell. It does not model reachability beyond a few
 word-level cases (``false && ...``, ``exit``), heredoc bodies, functions, other downloaders,
@@ -1336,7 +1341,15 @@ _MAX_HOST = 253
 
 
 def _is_port(text):
-    return text == "" or (text.isascii() and text.isdigit() and int(text) <= 65535)
+    """An empty port, or ASCII digits whose value is at most 65535. The digits are measured before
+    they are converted, so a very long run costs the same on every interpreter (those from 3.11 on
+    refuse to convert more than 4300 digits, earlier ones do the work and take quadratic time)."""
+    if text == "":
+        return True
+    if not (text.isascii() and text.isdigit()):
+        return False
+    digits = text.lstrip("0")
+    return len(digits) <= 5 and int(digits or "0") <= 65535
 
 
 def _v4(host):
@@ -1392,12 +1405,23 @@ def _host_kind(url):
     return None
 
 
+def _not_json(constant):
+    """``parse_constant`` hook: NaN, Infinity and -Infinity are not JSON."""
+    raise ValueError(constant)
+
+
+def _small_int(digits):
+    """``parse_int`` hook: no setting is a number, so a long integer is read as 0 rather than
+    converted (the conversion is the part that is slow, and that some interpreters refuse)."""
+    return int(digits) if len(digits) <= 18 else 0
+
+
 def _settings_document(text):
     """The text as one JSON object, else None."""
     if text.startswith("\ufeff"):
         text = text[1:]
     try:
-        document = json.loads(text)
+        document = json.loads(text, parse_constant=_not_json, parse_int=_small_int)
     except (ValueError, RecursionError):
         return None
     return document if isinstance(document, dict) else None
