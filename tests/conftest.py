@@ -115,6 +115,26 @@ def _isolated_sunglasses_home(tmp_path_factory, monkeypatch):
 
 
 @_pytest.fixture(autouse=True)
+def network_violations(request, monkeypatch):
+    """No test connects to a host that is not this machine (tests/network_guard.py).
+
+    A refusal raises inside the test and is also recorded here, so code that
+    catches the error cannot make the attempt disappear: a test that leaves the
+    list non-empty fails at teardown. The test that proves the guard works
+    clears the list itself. Tests marked `network` run child processes that
+    fetch packages and are the only exemption.
+    """
+    import network_guard
+
+    if request.node.get_closest_marker("network"):
+        yield []
+        return
+    refused = network_guard.install(monkeypatch)
+    yield refused
+    assert not refused, f"the test tried to leave this machine: {refused}"
+
+
+@_pytest.fixture(autouse=True)
 def _no_trace_outlives_its_test():
     """Tracing a thread that then ends leaves later Python work slower on CPython 3.12.
 
