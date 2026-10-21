@@ -56,7 +56,9 @@ def stub_engine(monkeypatch):
 
 def run(capsys, monkeypatch, *argv):
     """Run `sunglasses scan ...` in-process. Returns (exit code, stdout, stderr)."""
-    monkeypatch.setattr(sys, "argv", ["sunglasses", "scan", *argv])
+    # the stub engine lives in this process; a scanner child would load the real rules
+    deadline = [] if "--file-deadline" in argv else ["--file-deadline", "0"]
+    monkeypatch.setattr(sys, "argv", ["sunglasses", "scan", *argv, *deadline])
     capsys.readouterr()
     try:
         cli.main()

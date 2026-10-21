@@ -454,6 +454,18 @@ file past `--max-files N`.
 `Cargo.lock` and `go.sum` (matched by exact file name) to that list; without it they are
 scanned.
 
+A file the scanner cannot finish within `--file-deadline SECONDS` (default 120, `0` = no
+deadline) is reported in `partially_read` with the reason and the scan moves on. That file is
+not called clean: the scan is incomplete (exit `3`), unless a threat is found elsewhere (exit
+`1`). The flag also applies to `scan --file`, where there is one file and the reason is in the
+result's `extraction_warnings`. A `--deep` scan of an audio or video file has no process to
+stop, so it refuses an explicit deadline with exit `2`; a value that is not a number of seconds,
+0 or more, is refused with exit `2` for any file. If the scanner process cannot be started, each
+file it was meant for is reported as not read (exit `3`) and never as clean. A reply counts only
+when it is a complete scan result or one of the process's three error reports (a file that
+cannot be read, an operating-system error, a fault), each with all of its fields; any other
+reply is treated as a failed process, which is stopped, and the file is reported as not read.
+
 A link is never followed, because it can point outside the tree: a link is named as skipped
 whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
 itself a link, naming the real directory to use instead (the parent folders of the path as you
