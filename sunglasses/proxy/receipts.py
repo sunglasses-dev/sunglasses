@@ -603,24 +603,36 @@ class _Closed:
 _CLOSED = _Closed()
 
 
+from ..receipts._shown import (ESCAPED_NOTE, _escape, _hidden,  # noqa: F401
+                              printable, shown_path)
+
+
 def _make_receipts_dir(root):
     """T9 ruling 63 (b). A file, a dangling symlink or a symlink to a file at
     the receipts directory, at the state root or above it made `mkdir` raise
     out of `serve.main` as a traceback with no cause named. It is a receipt
     failure like any other: raised before the session opens, naming what is
-    in the way."""
+    in the way. Every path in the message goes through `shown_path`, and the
+    escaped-name note is added whenever any of them was escaped; a name that
+    cannot even be passed to the operating system (a NUL) is the same failure,
+    not a traceback."""
     try:
         root.mkdir(parents=True, exist_ok=True)
-    except OSError as cause:
+    except (OSError, ValueError) as cause:
         blocked = None
         if isinstance(cause, (FileExistsError, NotADirectoryError)):
             from ..receipts import _fs
             blocked = root if os.path.lexists(root) else _fs.obstruction(root)
-        where = ("" if blocked is None else
-                 f": {blocked} is not a directory. Fix it: make {blocked} a "
-                 f"directory, chmod 700")
-        raise ReceiptIOError(f"the receipts directory {root} cannot be made "
-                             f"({type(cause).__name__}){where}") from None
+        root_text, escaped = shown_path(root)
+        where = ""
+        if blocked is not None:
+            blocked_text, blocked_escaped = shown_path(blocked)
+            escaped = escaped or blocked_escaped
+            where = (f": {blocked_text} is not a directory. Fix it: make "
+                     f"{blocked_text} a directory, chmod 700")
+        raise ReceiptIOError(f"the receipts directory {root_text} cannot be made "
+                             f"({type(cause).__name__}){where}"
+                             f"{ESCAPED_NOTE if escaped else ''}") from None
 
 
 def _chain_for(directory, home):

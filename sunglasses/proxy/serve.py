@@ -245,7 +245,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         # T9.R4, ruling 24b(a). No receipt, no mediation: the server is never
         # started, and the user is told what is wrong and how to clear it.
         stderr.write(f"sunglasses proxy: the receipt log could not be opened, "
-                     f"so nothing was started. {failure}\n")
+                     f"so nothing was started. {receipts.printable(failure)}\n")
         return 1
 
     # T9 ruling 64 (a). The approval store is made BEFORE the server is
@@ -257,14 +257,16 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     try:
         store = approvals.Store(state_root(root),
                                 server_id=_identity(upstream_argv))
-    except OSError as failure:
-        where = failure.filename or state_root(root)
+    except (OSError, ValueError) as failure:
+        where = getattr(failure, "filename", None) or state_root(root)
         what = ("capture store" if pathlib.Path(where).name == "captures"
                 else "approval store")
-        stderr.write(f"sunglasses proxy: the {what} at {where} could "
+        text, escaped = receipts.shown_path(where)
+        stderr.write(f"sunglasses proxy: the {what} at {text} could "
                      f"not be made, so nothing was started "
-                     f"({type(failure).__name__}). Fix it: make {where} a "
-                     f"directory you own, chmod 700.\n")
+                     f"({type(failure).__name__}). Fix it: make {text} a "
+                     f"directory you own, chmod 700."
+                     f"{receipts.ESCAPED_NOTE if escaped else ''}\n")
         _record_refusal(log, "STATE_IO_ERROR")
         return EXIT_FAULT
 

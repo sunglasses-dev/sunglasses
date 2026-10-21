@@ -660,7 +660,8 @@ _SITE_RESTORES = {
     # R21. These two print an exception's text, not a receipt field.
     "off_failure": ("_display(f'{type(exc).__name__}: {exc}', limit=200)",
                     "f'{type(exc).__name__}: {exc}'"),
-    "verify_key_unusable": ("_display(str(cause), limit=400)", "str(cause)"),
+    "verify_key_unusable": (
+        "_display(str(cause), limit=400, written=_names_its_paths(cause))", "str(cause)"),
     # R47 `--verify --log`: a path or an OS error the verifier was handed, not
     # a receipt field, and printed on the same terminal.
     "received_log": ("--log {_display(str(log), limit=200)}", "--log {str(log)}"),
@@ -672,7 +673,9 @@ _SITE_RESTORES = {
                           "{RED}{str(source)}{RESET}: not a public"),
     # R57: PATH_UNREADABLE names the path it could not list, and a path is
     # whatever the directory tree or the caller's --log put in it.
-    "path_unreadable": ("_display(str(unreadable), limit=300)", "str(unreadable)"),
+    "path_unreadable": (
+        "_display(str(unreadable), limit=300, written=_names_its_paths(unreadable))",
+        "str(unreadable)"),
 }
 
 # The R21 sites say what a failure said, and a failure's text is whatever the
@@ -702,7 +705,11 @@ _CAUSE_SITES = {
         "_real = _fs.listing\n"
         "def _fail(directory, pattern):\n"
         "    if pattern == '*.jsonl':\n"
-        "        raise _fs.Unlistable(pathlib.Path({payload!r}), PermissionError(13, 'denied'))\n"
+        # Unlistable now writes its own paths as escapes; the site must still hold when the
+        # text it is handed is not that, so the payload replaces the message itself.
+        "        failure = _fs.Unlistable(pathlib.Path('x'), PermissionError(13, 'denied'))\n"
+        "        failure.strerror = {payload!r}\n"
+        "        raise failure\n"
         "    return _real(directory, pattern)\n"
         "_fs.listing = _fail\n", None),
 }

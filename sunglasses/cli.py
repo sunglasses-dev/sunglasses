@@ -1631,7 +1631,14 @@ def _verify_lifecycle(rows, directory, unparseable=()):
     return 1
 
 
-def _display(value, limit: int = 96) -> str:
+def _names_its_paths(cause) -> bool:
+    """A key or listing error builds its message with each path already written as
+    shell-safe escapes and ends it with a note saying so (`receipts._shown`)."""
+    from .receipts import _fs, optin
+    return isinstance(cause, (optin.KeyUnusable, _fs.Unlistable))
+
+
+def _display(value, limit: int = 96, written: bool = False) -> str:
     """The ONE way a receipt-supplied string reaches a terminal on this path.
 
     Round 4 said `sanitize_receipt_field` was "the same function every other
@@ -1662,6 +1669,11 @@ def _display(value, limit: int = 96) -> str:
     if value is None:
         return ""
     text = value if isinstance(value, str) else str(value)
+    if written:
+        # Paths in this text are already escapes; repr would write each backslash twice and
+        # `limit` could cut the closing note off. Anything still hidden is escaped, once.
+        from .receipts._shown import printable
+        return printable(text)
     return sanitize_receipt_field(repr(text)[1:-1], limit=limit) or ""
 
 
@@ -1758,7 +1770,7 @@ def _verify_key(home):
             return 0
         optin.signer(home)
     except (optin.KeyUnusable, OSError) as cause:
-        print(f"\n  {RED}KEY_UNUSABLE{RESET} {_display(str(cause), limit=400)}")
+        print(f"\n  {RED}KEY_UNUSABLE{RESET} {_display(str(cause), limit=400, written=_names_its_paths(cause))}")
         return 1
     return 0
 
@@ -1911,7 +1923,7 @@ def _path_unreadable(unreadable):
     both modes, naming the path and the OS cause."""
     from .receipts import codes
     print(f"\n  {RED}PATH_UNREADABLE{RESET} {DIM}-- "
-          f"{_display(str(unreadable), limit=300)}. Something is on disk there "
+          f"{_display(str(unreadable), limit=300, written=_names_its_paths(unreadable))}. Something is on disk there "
           f"and cannot be read, so nothing under it was verified.{RESET}\n")
     return codes.exit_for("PATH_UNREADABLE")
 
