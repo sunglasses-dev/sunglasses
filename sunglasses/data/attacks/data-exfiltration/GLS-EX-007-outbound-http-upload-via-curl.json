@@ -7,9 +7,11 @@
   "channels": [
     "message",
     "file",
-    "code"
+    "code",
+    "web_content",
+    "tool_output"
   ],
-  "description": "Detects curl commands used for outbound data upload, a common exfiltration technique in agent workflows.",
+  "description": "Detects a curl command uploading a credential file (.env, .npmrc, SSH or AWS credentials, tokens) to a remote endpoint \u2014 the payload shape of agent-workflow exfiltration. A plain upload of ordinary data is not flagged.",
   "keywords": [
     "curl POST",
     "curl PUT",
@@ -19,7 +21,9 @@
     "curl --upload-file"
   ],
   "regex": [
-    "curl\\b[^\\n]{0,200}\\b(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary)?\\b|-F\\b|--upload-file\\b)"
+    "curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:-X\\s+(?:POST|PUT|PATCH)|--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)(?:\\b|(?!\\S))[^\\n]{0,160}?@[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))(?=[^\\s/;|&)\\\"']*(?:[\\s;|&)\\\"']|$))(?![-.](?:(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub)\\b|(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))|curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:--upload-file|-T)(?:\\b|(?!\\S))\\s+[^\\s;|&]{0,120}?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))(?=[^\\s/;|&)\\\"']*(?:[\\s;|&)\\\"']|$))(?![-.](?:(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub)\\b|(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))",
+    "curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)(?:\\b|(?!\\S))[^\\n]{0,80}?\\$\\(\\s*cat\\s+(?:-\\S+\\s+){0,3}[\\\"']?(?:[^\\s/;|&)\\\"']{0,80}/){0,8}(?![^\\s/;|&)\\\"']*?(?:(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub|md|rst|adoc)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))[^\\s/;|&)\\\"']*?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))(?=[^\\s/;|&)\\\"']*(?:[\\s;|&)\\\"']|$))",
+    "\\bcat\\s+(?:-\\S+\\s+){0,3}[\\\"']?(?:[^\\s/;|&)\\\"']{0,80}/){0,8}(?![^\\s/;|&)\\\"']*?(?:(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub|md|rst|adoc)(?![A-Za-z0-9])|(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))[^\\s/;|&)\\\"']*?(?:\\.env|\\.npmrc|\\.pypirc|\\.netrc|\\.git-credentials|\\.aws/credentials|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))(?:\\b|(?!\\S))(?=[^\\s/;|&)\\\"']*(?:[\\s;|&)\\\"']|$))[^\\n|;&]{0,40}\\|\\s*curl\\b[^\\n]{0,200}?(?:\\b|(?<!\\S))(?:(?:--data(?:-binary|-urlencode)?|--json|-d)(?:\\b|(?!\\S))\\s*[\\\"']?@-(?![\\w./-])|(?:--form|-F)(?:\\b|(?!\\S))\\s*[\\\"']?[^\\s\\\"'=@]{1,40}=@-(?![\\w./-])|(?:--upload-file|-T)(?:\\b|(?!\\S))\\s*-(?![\\w./-]))"
   ],
   "examples": {
     "malicious": [],
@@ -27,6 +31,6 @@
   },
   "references": [],
   "contributed_by": "Sunglasses Team",
-  "date_added": "2026-04-08",
+  "date_added": "2026-06-06",
   "source": "patterns.py:GLS-EX-007"
 }

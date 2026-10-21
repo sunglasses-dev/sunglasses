@@ -1385,7 +1385,10 @@ def test_ordinary_curl_upload_is_not_a_finding(command):
 def _ex007_regexes():
     sys.path.insert(0, REPO_ROOT)
     from sunglasses import patterns
-    return [p for p in patterns.PATTERNS if p["id"] == "GLS-EX-007"][0]["regex"]
+    entries = [p for p in patterns.PATTERNS if p["id"] == "GLS-EX-007"][0]["regex"]
+    # The two upload forms below are the rule's first entry. The read-into-payload and
+    # piped forms are separate entries (tests/test_credential_post_channels.py).
+    return entries[:1]
 
 
 _EX007_SPELLINGS = frozenset({

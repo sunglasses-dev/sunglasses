@@ -2348,7 +2348,7 @@ PATTERNS = [
         "name": "Outbound HTTP upload via curl",
         "category": "exfiltration",
         "severity": "high",
-        "channel": ["message", "file", "code"],
+        "channel": ["message", "file", "code", "web_content", "tool_output"],
         "keywords": [
             "curl POST",
             "curl PUT",
@@ -2382,7 +2382,11 @@ PATTERNS = [
             r"(?:\b|(?!\S))[^\n]{0,160}?@[^\s;|&]{0,120}?"
             r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
             r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
-            r"(?:\b|(?!\S))"
+            r"(?:\b|(?!\S))(?=[^\s/;|&)\"']*(?:[\s;|&)\"']|$))"
+            # A name that says it is a placeholder or a document about the file
+            # (`.env.example`, `credentials-schema.json`, `id_rsa.pub`) is not the file.
+            r"(?![-.](?:(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub)\b"
+            r"|(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))"
             # Branch B — `-T` / `--upload-file` take a BARE path, no `@`. Kept separate
             # and anchored directly to the flag: allowing a bare path in branch A would
             # let any later word in a URL satisfy it.
@@ -2390,7 +2394,41 @@ PATTERNS = [
             r"[^\s;|&]{0,120}?"
             r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
             r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
-            r"(?:\b|(?!\S))",
+            r"(?:\b|(?!\S))(?=[^\s/;|&)\"']*(?:[\s;|&)\"']|$))"
+            r"(?![-.](?:(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub)\b"
+            r"|(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))"
+            ,
+            # Branch C — the payload is the output of reading the file: `-d "$(cat <file>)"`.
+            # Its own expression so its literals gate it separately from branch A/B.
+            # The name is read one path segment at a time: some segment holds a credential
+            # word and none of that segment's words says the file is a public artifact or a
+            # document about the credential (`example`, `schema`, `docs`, `pub`, `.md`).
+            r"curl\b[^\n]{0,200}?(?:\b|(?<!\S))"
+            r"(?:--data(?:-binary|-raw|-urlencode)?|--form|-d|-F)"
+            r"(?:\b|(?!\S))[^\n]{0,80}?\$\(\s*cat\s+(?:-\S+\s+){0,3}[\"']?"
+            r"(?:[^\s/;|&)\"']{0,80}/){0,8}"
+            r"(?![^\s/;|&)\"']*?(?:(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub|md|rst|adoc)(?![A-Za-z0-9])"
+            r"|(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))"
+            r"[^\s/;|&)\"']*?"
+            r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
+            r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
+            r"(?:\b|(?!\S))(?=[^\s/;|&)\"']*(?:[\s;|&)\"']|$))"
+            ,
+            # Branch D — the file is piped into the upload and the upload reads its input from
+            # the pipe (`@-`, or `-T -`): `cat <file> | curl --data-binary @- ...`. A piped file
+            # that the request never reads is not an upload of it. Same name reading as branch C.
+            r"\bcat\s+(?:-\S+\s+){0,3}[\"']?"
+            r"(?:[^\s/;|&)\"']{0,80}/){0,8}"
+            r"(?![^\s/;|&)\"']*?(?:(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy|dist|pub|md|rst|adoc)(?![A-Za-z0-9])"
+            r"|(?<![A-Za-z0-9])(?:example|sample|template|schema|docs?|documentation|audit|report|fixture|mock|dummy)s(?:\.[A-Za-z0-9]{1,5})?(?![A-Za-z0-9_-])))"
+            r"[^\s/;|&)\"']*?"
+            r"(?:\.env|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials"
+            r"|id_rsa|id_ed25519|credentials|secret(?:s|)|api(?:_key|-key|key)|access(?:_token|-token|token))"
+            r"(?:\b|(?!\S))(?=[^\s/;|&)\"']*(?:[\s;|&)\"']|$))"
+            r"[^\n|;&]{0,40}\|\s*curl\b[^\n]{0,200}?(?:\b|(?<!\S))"
+            r"(?:(?:--data(?:-binary|-urlencode)?|--json|-d)(?:\b|(?!\S))\s*[\"']?@-(?![\w./-])"
+            r"|(?:--form|-F)(?:\b|(?!\S))\s*[\"']?[^\s\"'=@]{1,40}=@-(?![\w./-])"
+            r"|(?:--upload-file|-T)(?:\b|(?!\S))\s*-(?![\w./-]))",
         ],
         "description": "Detects a curl command uploading a credential file (.env, .npmrc, SSH or AWS credentials, tokens) to a remote endpoint — the payload shape of agent-workflow exfiltration. A plain upload of ordinary data is not flagged."
     },
