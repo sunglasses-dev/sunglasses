@@ -367,10 +367,11 @@ def test_the_oserror_names_the_child_can_send_are_all_rebuilt(worker_cls):
 
 # ── 6. a child that answers badly, cannot start, or is signalled early ──────
 
-def _talker(reply_json, *, header_only=None):
+def _talker(reply_json, *, header_only=None, raw_reply=None, raw_ready=None):
     """A stand-in child that says ready, reads one request, answers with `reply_json`, then waits.
 
-    `header_only=N` sends just a header that claims N bytes and no body.
+    `header_only=N` sends just a header that claims N bytes and no body. `raw_reply` and
+    `raw_ready` are bytes sent as the answer, or as the ready message, exactly as given.
     """
     return textwrap.dedent(f"""
         import json, struct, sys, time
@@ -378,12 +379,20 @@ def _talker(reply_json, *, header_only=None):
             body = json.dumps(value).encode()
             sys.stdout.buffer.write(struct.pack(">I", len(body)) + body)
             sys.stdout.buffer.flush()
-        put({{"ready": True}})
+        def put_raw(body):
+            sys.stdout.buffer.write(struct.pack(">I", len(body)) + body)
+            sys.stdout.buffer.flush()
+        if {raw_ready!r} is not None:
+            put_raw({raw_ready!r})
+        else:
+            put({{"ready": True}})
         size = struct.unpack(">I", sys.stdin.buffer.read(4))[0]
         sys.stdin.buffer.read(size)
         if {header_only!r} is not None:
             sys.stdout.buffer.write(struct.pack(">I", {header_only!r}))
             sys.stdout.buffer.flush()
+        elif {raw_reply!r} is not None:
+            put_raw({raw_reply!r})
         else:
             put(json.loads({json.dumps(reply_json)!r}))
         time.sleep(60)
@@ -507,6 +516,47 @@ def test_an_error_reply_the_child_does_write_is_still_raised_as_the_engine_raise
 def test_an_error_reply_the_child_could_not_have_written_gives_an_incomplete_json_report(
         rig, worker_cls, target, shape):
     (rig / "talker.py").write_text(_talker(_BAD_ERROR_REPLIES[shape]))
+    path = _file(rig, CLEAN, "target.txt") if target == "--file" else _tree(rig, {"a.txt": CLEAN})
+    proc = subprocess.run(
+        [sys.executable, str(rig / "launcher.py"), str(rig / "talker.py"), "scan", target, str(path),
+         "-o", "json", "--file-deadline", "30"],
+        cwd=rig / "cwd", env=_env(rig, 60), capture_output=True, text=True, timeout=120)
+    assert proc.returncode == EXIT_INCOMPLETE, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr, proc.stderr
+    report = json.loads(proc.stdout)
+    if target == "--file":
+        assert report["extraction_complete"] is False and report["is_clean"] is False, report
+    else:
+        assert report["partially_read"], report
+
+
+# Bytes the decoder cannot turn into a value: not JSON at all, or JSON nested past what the
+# decoder accepts (the decoder's own limit differs between interpreters, so the nesting is far
+# past all of them).
+_UNDECODABLE = {
+    "not_json": b"not json",
+    "not_utf8": b"\xff\xfe\x00",
+    "nested_object": b'{"a":' * 20000 + b"1" + b"}" * 20000,
+    "nested_list": b"[" * 40000 + b"]" * 40000,
+}
+
+
+@pytest.mark.parametrize("stage", ["ready", "answer"])
+@pytest.mark.parametrize("name", sorted(_UNDECODABLE))
+def test_a_message_the_decoder_cannot_read_is_a_failed_child_not_an_exception(rig, worker_cls, name, stage):
+    script = _talker({}, **{"raw_ready" if stage == "ready" else "raw_reply": _UNDECODABLE[name]})
+    with worker_cls.ScanWorker(30, argv=[sys.executable, "-c", script], startup_s=10) as worker:
+        result = worker.scan_file(str(_file(rig, CLEAN)))       # must not raise
+        assert not result.is_clean
+        assert result.extraction_complete is False
+        assert worker.pid is None, "a child that answered badly must not be kept for the next file"
+
+
+@pytest.mark.parametrize("stage", ["ready", "answer"])
+@pytest.mark.parametrize("target", ["--file", "--dir"])
+def test_a_message_the_decoder_cannot_read_gives_an_incomplete_json_report(rig, worker_cls, target, stage):
+    script = _talker({}, **{"raw_ready" if stage == "ready" else "raw_reply": _UNDECODABLE["nested_object"]})
+    (rig / "talker.py").write_text(script)
     path = _file(rig, CLEAN, "target.txt") if target == "--file" else _tree(rig, {"a.txt": CLEAN})
     proc = subprocess.run(
         [sys.executable, str(rig / "launcher.py"), str(rig / "talker.py"), "scan", target, str(path),

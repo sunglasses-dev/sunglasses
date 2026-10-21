@@ -416,8 +416,8 @@ class ScanWorker:
             raise _Gone()                    # a second answer is not an answer
         try:
             value = json.loads(bytes(buffer[_HEADER.size:]).decode("utf-8"))
-        except ValueError:
-            raise _Gone()
+        except (ValueError, RecursionError):
+            raise _Gone()               # not JSON, or nested past what the decoder will take
         if not isinstance(value, dict):
             raise _Gone()
         return value
