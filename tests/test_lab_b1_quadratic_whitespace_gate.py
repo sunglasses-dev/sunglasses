@@ -277,6 +277,20 @@ def _timed(fn, cap):
     return seconds, over
 
 
+def _best_timed(fn, cap, tries=3):
+    """The best of up to `tries` runs of _timed, stopping at the first one inside `cap`.
+    A busy machine only adds time, so one slow run says little; a quadratic entry is over
+    the cap on every try."""
+    best = None
+    for _ in range(tries):
+        seconds, over = _timed(fn, cap)
+        if best is None or (over, seconds) < (best[1], best[0]):
+            best = (seconds, over)
+        if not over and seconds <= cap:
+            break
+    return best
+
+
 def _seeds(requirement):
     """Seeds for the timed probe. The joined seed (one literal per CNF clause)
     makes the rule findable; each single literal (longest eight) placed right
@@ -441,8 +455,37 @@ def test_regex_entry_is_linear_on_whitespace_runs(rule_id, index, mode, rx, guar
     texts = _probe_texts(seeds)
     texts.update(_shape_texts(_shape_seeds(rx, guards, mode)))
     for shape, text in texts.items():
-        seconds, over = _timed(lambda: ENGINE._eval_regex(mode, rx, guards, text), CAP_S)
+        seconds, over = _best_timed(lambda: ENGINE._eval_regex(mode, rx, guards, text), CAP_S)
         if over or seconds > CAP_S:
             slow.append(f"on {shape}: {'over' if over else ''} {seconds:.2f} s")
     assert not slow, (f"{rule_id} #{index} ({mode}) exceeded {CAP_S} s at "
                       f"{PROBE_LEN} characters:\n" + "\n".join(slow))
+
+
+def test_one_slow_run_among_fast_ones_is_not_over_the_cap():
+    if not hasattr(signal, "SIGALRM") or threading.current_thread() is not threading.main_thread():
+        pytest.skip("the per-probe budget needs SIGALRM on the main thread")
+    calls = []
+
+    def sometimes_slow():
+        calls.append(1)
+        if len(calls) == 1:
+            time.sleep(0.4)
+
+    seconds, over = _best_timed(sometimes_slow, 0.1)
+    assert not over and seconds <= 0.1
+    assert len(calls) == 2
+
+
+def test_a_run_that_is_over_the_cap_every_time_is_still_over():
+    if not hasattr(signal, "SIGALRM") or threading.current_thread() is not threading.main_thread():
+        pytest.skip("the per-probe budget needs SIGALRM on the main thread")
+    calls = []
+
+    def always_slow():
+        calls.append(1)
+        time.sleep(0.4)
+
+    _seconds, over = _best_timed(always_slow, 0.1)
+    assert over
+    assert len(calls) == 3

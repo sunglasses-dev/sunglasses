@@ -121,6 +121,19 @@ def _seconds(fn, limit):
         signal.signal(signal.SIGALRM, old)
 
 
+def _best_seconds(fn, limit, tries=3):
+    """The fastest of up to `tries` runs, stopping at the first one under `limit`.
+    A busy machine only ever adds time, so one slow run says little; a rule whose cost
+    grows with the square of the run is over the limit on every try."""
+    best = None
+    for _ in range(tries):
+        taken = _seconds(fn, limit)
+        best = taken if best is None else min(best, taken)
+        if best < limit:
+            break
+    return best
+
+
 def _shared_engine():
     global _engine
     if _engine is None:
@@ -169,7 +182,7 @@ def test_a_long_run_of_blank_space_after_the_literal_stays_under_the_cap(key, bl
     text = literal + blank * PROBE_LEN
     if shape == "token_in_the_run":
         text += token + blank * PROBE_LEN
-    assert _seconds(lambda: _eval(key, text), CAP_S) < CAP_S
+    assert _best_seconds(lambda: _eval(key, text), CAP_S) < CAP_S
 
 
 @pytest.mark.parametrize("key", KEYS, ids=lambda k: f"{k[0]}-{k[1]}")
@@ -181,7 +194,7 @@ def test_the_cost_does_not_grow_with_the_square_of_the_run(key, blank, n):
     # far under it at every size, while a quadratic one costs four times as much each
     # time the run doubles and goes over it.
     limit = 0.25 * n / 16_000
-    assert _seconds(lambda: _eval(key, text), limit) < limit
+    assert _best_seconds(lambda: _eval(key, text), limit) < limit
 
 
 @pytest.mark.parametrize("key", KEYS, ids=lambda k: f"{k[0]}-{k[1]}")
@@ -190,7 +203,7 @@ def test_the_engine_scans_the_probe_under_the_cap(key):
     channel = sorted(_RULES[key[0]]["channel"])[0]
     for blank in (" ", "\n"):
         text = SEED[key][0] + blank * PROBE_LEN
-        assert _seconds(lambda: eng.scan(text, channel), CAP_S * 4) < CAP_S * 4
+        assert _best_seconds(lambda: eng.scan(text, channel), CAP_S * 4) < CAP_S * 4
 
 
 FIXTURES = {
@@ -391,3 +404,35 @@ def test_the_entry_still_matches_and_the_rule_still_detects_on_every_channel(key
     assert _eval(key, text) is not None
     result = _shared_engine().scan(text, channel)
     assert key[0] in {f["id"] for f in result.findings}
+
+
+# --- the timing helper itself -------------------------------------------------------------
+
+
+def test_one_slow_run_among_fast_ones_does_not_fail_the_bound():
+    calls = []
+
+    def sometimes_slow():
+        calls.append(1)
+        if len(calls) == 1:
+            time.sleep(0.4)
+
+    assert _best_seconds(sometimes_slow, 0.1) < 0.1
+    assert len(calls) == 2
+
+
+def test_a_run_that_is_over_the_limit_every_time_still_fails_the_bound():
+    calls = []
+
+    def always_slow():
+        calls.append(1)
+        time.sleep(0.4)
+
+    assert _best_seconds(always_slow, 0.1) >= 0.1
+    assert len(calls) == 3
+
+
+def test_a_fast_run_is_measured_once():
+    calls = []
+    assert _best_seconds(lambda: calls.append(1), 0.1) < 0.1
+    assert len(calls) == 1
