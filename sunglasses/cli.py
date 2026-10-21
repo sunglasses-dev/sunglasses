@@ -734,10 +734,13 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             continue
         if route in ("opaque", "media"):
+            # `--file` gives the same answer for these bytes (nothing here extracts them),
+            # so the line says what is true and, for an archive, what does get it read.
+            hint = (" Unpack it and scan the files inside." if route == "opaque" else "")
             walker_skips.append((
                 rel_path,
-                f"{label} — not inspected. Scan it directly to look inside: "
-                f"sunglasses scan --file {_printable(rel_path)}"))
+                f"{label} — not inspected. SUNGLASSES does not extract this format, "
+                f"so nothing inside it was scanned.{hint}"))
             continue
 
         # Repo files go through the SAME extraction path as `--file`. Reading them

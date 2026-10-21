@@ -1239,3 +1239,40 @@ def test_the_fallback_read_refuses_a_link_put_in_place_after_its_check(work, mon
     assert code == EXIT_INCOMPLETE
     assert os.path.join("sub", "a.md") in _skipped(doc)
     assert "previous instructions" not in json.dumps(doc)
+
+
+# ── a skipped archive is told what really helps ────────────────────────────
+
+def _disguised_archives():
+    import gzip
+    import io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("inside.txt", THREAT)
+    return {"ok.txt": CLEAN, "pack.txt": buf.getvalue(), "log.txt": gzip.compress(THREAT.encode())}
+
+
+def test_a_skipped_archive_is_not_told_that_scanning_it_directly_would_look_inside(work):
+    # `--file` on the same bytes answers "not inspected" too: nothing here extracts an
+    # archive. The skip line used to send the reader there anyway.
+    root = _local(work, "disguised-archives", _disguised_archives())
+    proc = _run_dir(work, root, "-o", "json")
+    skipped = _skipped(_doc(proc))
+    assert {"pack.txt", "log.txt"} <= set(skipped)
+    for name in ("pack.txt", "log.txt"):
+        reason = skipped[name]
+        assert "not inspected" in reason
+        assert "Scan it directly" not in reason and "look inside" not in reason
+        assert "unpack" in reason.lower()
+    assert proc.returncode == EXIT_INCOMPLETE
+
+
+def test_the_file_mode_answer_the_skip_line_points_at_is_the_same_refusal(work):
+    root = _local(work, "disguised-archives", _disguised_archives())
+    for name in ("pack.txt", "log.txt"):
+        proc = subprocess.run(
+            [sys.executable, "-m", "sunglasses", "scan", "--file", str(root / name)],
+            cwd=work, env={**os.environ, "PYTHONPATH": str(REPO), "NO_COLOR": "1"},
+            capture_output=True, text=True, timeout=120)
+        assert "does not extract this format" in proc.stdout
+        assert proc.returncode == EXIT_INCOMPLETE
