@@ -33,9 +33,14 @@ WORKFLOW = "pattern-integrity"
 
 # The legs that must have RUN and SUCCEEDED for a tree to be publishable.
 # `integrity` is a matrix, so its legs are matched by prefix.
-REQUIRED_EXACT = {"classify", "fast", "coverage", "certify"}
+REQUIRED_EXACT = {"classify", "coverage", "certify"}
 REQUIRED_MATRIX_PREFIX = "integrity"
 REQUIRED_MATRIX_LEGS = 12         # 3.9 through 3.14, two shards each
+# `fast` is the suite in four parts, `fast (1)` to `fast (4)`. A bare `fast`
+# does not satisfy this: a run from before the split cannot stand in for one
+# with all four parts, and a missing part is a quarter of the suite not run.
+REQUIRED_FAST_PREFIX = "fast ("
+REQUIRED_FAST_LEGS = 4
 
 
 def refuse(reason: str) -> None:
@@ -126,6 +131,16 @@ def main() -> int:
             f"{REQUIRED_MATRIX_PREFIX}: {len(legs)} legs ran, "
             f"{REQUIRED_MATRIX_LEGS} required — a skipped leg is not a pass")
     for j in legs:
+        if j.get("conclusion") != "success":
+            problems.append(f"{j.get('name')}: {j.get('conclusion') or j.get('status')}")
+
+    fast_legs = [j for n, js in by_name.items()
+                 if n.startswith(REQUIRED_FAST_PREFIX) for j in js]
+    if len(fast_legs) < REQUIRED_FAST_LEGS:
+        problems.append(
+            f"fast: {len(fast_legs)} parts ran, "
+            f"{REQUIRED_FAST_LEGS} required — a missing part is not a pass")
+    for j in fast_legs:
         if j.get("conclusion") != "success":
             problems.append(f"{j.get('name')}: {j.get('conclusion') or j.get('status')}")
 
