@@ -63,9 +63,9 @@ site JSON-LD and package metadata are generated from it.
 not.** See [CONTRIBUTING.md](CONTRIBUTING.md) for the worked example.
 
 A pattern with only a positive test has not been shown to discriminate — `.*`
-passes that bar. The benign control is the whole test. Keep `attack-db/`,
-`sunglasses/data/attacks/` and `sunglasses/patterns.py` in sync; a pattern in one
-and not the others is a half-landed change.
+passes that bar. The benign control is the whole test. Keep `attack-db/` and
+`sunglasses/patterns.py` in sync; a pattern in one and not the other is a
+half-landed change.
 
 ## The exit-code contract
 

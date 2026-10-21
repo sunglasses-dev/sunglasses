@@ -18,7 +18,7 @@ a handful of over-broad regexes. Fixed by:
 This test is the permanent guard. If a future pattern flags clean text again,
 CI and the ship preflight go red BEFORE it reaches users.
 
-It runs against BOTH engines (hardcoded patterns + the JSON database) so neither
+It runs against BOTH engines (built-in patterns + the repository JSON database) so neither
 source can regress silently. It also keeps a set of attack canaries that MUST
 still block — so nobody "fixes" a false positive by gutting real detection.
 """
@@ -27,6 +27,8 @@ import pytest
 
 from sunglasses.engine import SunglassesEngine
 from sunglasses.loader import load_attack_db
+import os
+_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attack-db", "attacks")
 
 
 from fp_corpus_data import CLEAN_CORPUS  # decoupled single source (Jun 12 T8)
@@ -84,7 +86,7 @@ ATTACK_CANARIES = [
 def _engines():
     return [
         ("hardcoded", SunglassesEngine()),
-        ("database", SunglassesEngine(patterns=load_attack_db())),
+        ("database", SunglassesEngine(patterns=load_attack_db(_DB_DIR))),
     ]
 
 
@@ -105,8 +107,8 @@ def test_clean_text_is_not_blocked(engine_name, engine, name, text, channel):
 
 # The attack canary runs against the hardcoded engine — that is the engine the
 # shipped CLI actually uses (SunglassesEngine() with no args). The JSON database
-# (load_attack_db) is a separate, currently-incomplete artifact; its coverage is
-# tracked separately. What we guard here is: the FP fix must not gut detection in
+# (load_attack_db with the repository directory) is a separate artifact; its
+# coverage is tracked separately. What we guard here is: the FP fix must not gut detection in
 # the product.
 @pytest.mark.parametrize("name,text,channel",
                          ATTACK_CANARIES,
