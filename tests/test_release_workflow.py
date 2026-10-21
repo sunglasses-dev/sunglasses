@@ -95,6 +95,7 @@ def check_release(doc):
             if not (verify and verify.start() > repack.start()):
                 problems.append("Build does not check the wheel sha256 after the repack")
     problems += check_postcondition(doc)
+    problems += check_stats(doc)
     return problems
 
 
@@ -475,3 +476,466 @@ def test_the_loop_gives_up_with_a_failure_when_pypi_never_answers(tmp_path):
 def test_the_loop_stops_retrying_when_a_retry_turns_into_a_content_difference(tmp_path):
     r, n, _ = _run_loop(tmp_path, [2, 1, 0], wait="30", pause="1")
     assert r.returncode != 0 and n == 2, (n, r.stdout, r.stderr)
+
+
+# ── the stats job: the one pull request an upload from this workflow owes ─
+# A workflow upload never writes stats/current.json `last_updated`, so the stats job runs
+# scripts/stats_last_updated.py after the upload and opens a pull request with the two-line
+# fix. It may push ONE new branch and open ONE pull request. It never merges, never pushes to
+# main, never forces, and nothing waits for it. The JOB carries continue-on-error so a stats
+# problem cannot turn the release run red (the release chain reads the run's conclusion and
+# would read a good upload as a failed release); no STEP may carry it, so the job itself still
+# fails visibly with an ::error:: annotation.
+
+STATS = "stats"
+STATS_SCRIPT = "scripts/stats_last_updated.py"
+STATS_FORBIDDEN = (r"gh pr merge", r"--admin", r"--force", r"--force-with-lease", r"git push\s+(-\w+\s+)*\S+\s+\+",
+                   r"git push[^\n]*\b(main|HEAD:main|refs/heads/main)\b", r"twine\s+upload",
+                   r"gh release", r"pypa/gh-action-pypi-publish", r"git tag", r"\byank\b",
+                   r"claude|anthropic|co-authored|generated with")
+
+
+def _stats_steps(doc):
+    return ((doc.get("jobs") or {}).get(STATS) or {}).get("steps") or []
+
+
+def _stats_run(doc, needle):
+    return next((s.get("run", "") for s in _stats_steps(doc) if needle in (s.get("run") or "")), None)
+
+
+def check_stats(doc):
+    problems = []
+    jobs = (doc or {}).get("jobs") or {}
+    job = jobs.get(STATS)
+    if not isinstance(job, dict):
+        return [f"{STATS} job is missing"]
+
+    needs = job.get("needs") or []
+    needs = [needs] if isinstance(needs, str) else list(needs)
+    if PUBLISH not in needs:
+        problems.append(f"{STATS} must need {PUBLISH}: it stamps the time PyPI recorded for the upload")
+    cond = str(job.get("if") or "")
+    if re.search(r"always\(\)|failure\(\)|cancelled\(\)", cond):
+        problems.append(f"{STATS} runs after a failed publish: its `if` is `{cond}`")
+    if job.get("continue-on-error") is not True:
+        problems.append(f"{STATS} must set continue-on-error: true on the job, or a stats failure turns a good release run red")
+    if any((s or {}).get("continue-on-error") is True for s in job.get("steps") or []):
+        problems.append(f"{STATS} has a step with continue-on-error: the job must fail visibly, not hide the failure inside a green job")
+
+    for other, spec in jobs.items():
+        n = (spec or {}).get("needs") or []
+        n = [n] if isinstance(n, str) else list(n)
+        if STATS in n:
+            problems.append(f"{other} depends on {STATS}: the upload and the evidence must not wait for a stats pull request")
+
+    # The write permissions belong to this job and release-assets, nowhere else.
+    perms = job.get("permissions") or {}
+    if perms.get("contents") != "write" or perms.get("pull-requests") != "write":
+        problems.append(f"{STATS} needs contents: write and pull-requests: write, and nothing else wider")
+    if set(perms) - {"contents", "pull-requests"}:
+        problems.append(f"{STATS} asks for more than contents and pull-requests: {sorted(set(perms) - {'contents', 'pull-requests'})}")
+    if (doc.get("permissions") or "read-all") != "read-all":
+        problems.append("the workflow-level permissions must stay read-all")
+    for other, spec in jobs.items():
+        p = (spec or {}).get("permissions") or {}
+        if other != STATS and p.get("pull-requests") == "write":
+            problems.append(f"{other} has pull-requests: write, which only {STATS} needs")
+        if other not in (STATS, ATTACH) and p.get("contents") == "write":
+            problems.append(f"{other} has contents: write, which only {STATS} and {ATTACH} need")
+
+    checkout = next((s for s in job.get("steps") or [] if "actions/checkout@" in str((s or {}).get("uses", ""))), None)
+    if not checkout or (checkout.get("with") or {}).get("ref") != "main":
+        problems.append(f"{STATS} must check out main, so the pull request holds only the stats change")
+
+    stamp = _stats_run(doc, STATS_SCRIPT)
+    if stamp is None:
+        problems.append(f"{STATS} never runs {STATS_SCRIPT}")
+    else:
+        if not re.search(r'stats_last_updated\.py\s+"\$VERSION"', stamp) or "GITHUB_REF_NAME#v" not in stamp:
+            problems.append(f"{STATS} does not pass the release version (the tag without its v) to the script")
+        if not re.search(r"\b3\)", stamp) or "changed=false" not in stamp:
+            problems.append(f"{STATS} does not treat exit 3 (already stamped) as nothing to do")
+        if not re.search(r"\*\)[^\n]*exit 1", stamp):
+            problems.append(f"{STATS} does not fail on a refusal from the script")
+        if not re.search(r"\*\)[^\n]*::error::", stamp):
+            problems.append(f"{STATS} does not annotate a refusal from the script with ::error::")
+
+    pr = _stats_run(doc, "gh pr create")
+    if pr is None:
+        problems.append(f"{STATS} never opens a pull request")
+    else:
+        if 'BRANCH="stats/' not in pr or 'HEAD:refs/heads/$BRANCH' not in pr:
+            problems.append(f"{STATS} must push only to its own stats/<version>-last-updated branch")
+        if "ls-remote" not in pr:
+            problems.append(f"{STATS} does not check whether the branch already exists before pushing")
+        if "--base main" not in pr:
+            problems.append(f"{STATS} must open the pull request against main")
+        if not re.search(r"::error::[^\n]*unexpected change", pr):
+            problems.append(f"{STATS} does not annotate an unexpected change with ::error::")
+        if "git diff --name-only" not in pr or "HEAD:stats/current.json" not in pr or "rest(old) != rest(new)" not in pr:
+            problems.append(f"{STATS} does not confine the change to the top-level last_updated fields of stats/current.json")
+        if "263686995+azrollin@users.noreply.github.com" not in pr:
+            problems.append(f"{STATS} commits under the wrong identity")
+
+    for s in job.get("steps") or []:
+        text = f"{(s or {}).get('run', '')} {(s or {}).get('uses', '')}"
+        for pat in STATS_FORBIDDEN:
+            if re.search(pat, text, re.I):
+                problems.append(f"{STATS} must only open a pull request, but a step matches `{pat}`")
+    return problems
+
+
+def test_the_workflow_has_a_sound_stats_job():
+    assert check_stats(load()) == []
+
+
+def test_the_stats_job_comes_after_the_upload_and_nothing_waits_for_it():
+    jobs = load()["jobs"]
+    assert jobs[STATS]["needs"] == PUBLISH
+    assert not [j for j, spec in jobs.items() if STATS in ([spec.get("needs")] if isinstance(spec.get("needs"), str) else spec.get("needs") or [])]
+
+
+def test_the_write_permissions_are_scoped_to_the_stats_job():
+    doc = load()
+    assert doc["permissions"] == "read-all"
+    assert doc["jobs"][STATS]["permissions"] == {"contents": "write", "pull-requests": "write"}
+    assert [j for j, s in doc["jobs"].items() if (s.get("permissions") or {}).get("pull-requests") == "write"] == [STATS]
+
+
+def test_the_stats_job_cannot_turn_the_release_run_red():
+    """The release chain reads the run's conclusion, so the job may not decide it."""
+    doc = load()
+    assert doc["jobs"][STATS]["continue-on-error"] is True
+    assert not [s for s in doc["jobs"][STATS]["steps"] if "continue-on-error" in s]
+    assert "continue-on-error" not in {k for j, spec in doc["jobs"].items() if j != STATS for k in spec}
+
+
+def test_the_stats_job_uses_only_pinned_actions():
+    uses = [s["uses"] for s in load()["jobs"][STATS]["steps"] if s.get("uses")]
+    assert uses and all(PINNED.match(u) for u in uses), uses
+
+
+def test_the_stats_job_is_in_check_release_too():
+    doc = load()
+    del doc["jobs"][STATS]
+    assert any(STATS in p for p in check_release(doc))
+
+
+def test_check_stats_negative_controls():
+    def broken(fn):
+        return check_stats(_mut(fn))
+
+    assert broken(lambda d: d["jobs"].pop(STATS)) == [f"{STATS} job is missing"]
+    assert any("must need" in p for p in broken(lambda d: d["jobs"][STATS].update(needs=["build"])))
+    assert any("failed publish" in p for p in broken(lambda d: d["jobs"][STATS].update({"if": "always()"})))
+    assert any("must set continue-on-error" in p for p in broken(lambda d: d["jobs"][STATS].pop("continue-on-error")))
+    assert any("must set continue-on-error" in p for p in broken(lambda d: d["jobs"][STATS].update({"continue-on-error": False})))
+    assert any("a step with continue-on-error" in p for p in broken(
+        lambda d: d["jobs"][STATS]["steps"][2].update({"continue-on-error": True})))
+    assert any("::error::" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("::error::", "")) for s in d["jobs"][STATS]["steps"] if STATS_SCRIPT in (s.get("run") or "")]))
+    assert any("::error::" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("::error::REFUSED", "REFUSED")) for s in d["jobs"][STATS]["steps"] if "gh pr create" in (s.get("run") or "")]))
+    assert any(f"{ATTACH} depends on {STATS}" in p for p in broken(
+        lambda d: d["jobs"][ATTACH].update(needs=["build", "sbom", STATS])))
+    assert any("asks for more" in p for p in broken(lambda d: d["jobs"][STATS]["permissions"].update({"id-token": "write"})))
+    assert any("only stats needs" in p.replace(STATS, "stats") or "only" in p for p in broken(
+        lambda d: d["jobs"][POST].update(permissions={"contents": "read", "pull-requests": "write"})))
+    assert any("has contents: write" in p for p in broken(lambda d: d["jobs"]["build"].update(permissions={"contents": "write"})))
+    assert any("read-all" in p for p in broken(lambda d: d.update(permissions="write-all")))
+    assert any("must check out main" in p for p in broken(
+        lambda d: d["jobs"][STATS]["steps"][0]["with"].update(ref="${{ github.sha }}")))
+    assert any("never runs" in p for p in broken(
+        lambda d: [s.update(run="echo") for s in d["jobs"][STATS]["steps"] if STATS_SCRIPT in (s.get("run") or "")]))
+    assert any("exit 3" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("changed=false", "changed=true")) for s in d["jobs"][STATS]["steps"] if STATS_SCRIPT in (s.get("run") or "")]))
+    assert any("does not fail on a refusal" in p for p in broken(
+        lambda d: [s.update(run=s["run"].replace("exit 1", "exit 0")) for s in d["jobs"][STATS]["steps"] if STATS_SCRIPT in (s.get("run") or "")]))
+
+
+@pytest.mark.parametrize("line", [
+    "gh pr merge --squash --admin", "git push --force origin HEAD:refs/heads/stats/x", "git push origin HEAD:main",
+    "git push origin +HEAD:refs/heads/stats/x", "gh release delete v1 -y", "git tag -d v1",
+    "twine upload dist/*", "git commit -m 'x' -m 'Co-Authored-By: someone'",
+])
+def test_check_stats_catches_a_step_that_does_more_than_open_a_pull_request(line):
+    def f(d):
+        d["jobs"][STATS]["steps"].append({"name": "more", "run": line})
+    assert any("must only open a pull request" in p for p in check_stats(_mut(f))), line
+
+
+@pytest.mark.parametrize("old, new, needle", [
+    ('HEAD:refs/heads/$BRANCH', 'HEAD:refs/heads/main', "own stats/"),
+    ('ls-remote', 'rev-parse', "already exists"),
+    ('--base main', '--base release', "against main"),
+    ('git diff --name-only', 'git diff --stat', "confine the change"),
+    ('rest(old) != rest(new)', 'rest(old) == rest(old)', "confine the change"),
+    ('263686995+azrollin@users.noreply.github.com', 'ci@example.com', "identity"),
+])
+def test_check_stats_catches_a_weakened_pull_request_step(old, new, needle):
+    def f(d):
+        for s in d["jobs"][STATS]["steps"]:
+            if "gh pr create" in (s.get("run") or ""):
+                s["run"] = s["run"].replace(old, new)
+    assert any(needle in p for p in check_stats(_mut(f))), (old, new)
+
+
+# the stats job's own run blocks, executed: a bare origin, a shimmed gh, a stubbed script
+
+import os
+import subprocess
+import textwrap
+
+
+def _stats_env(tmp_path, script_rc, gh_rc=0):
+    """A clone of a bare origin whose stats/current.json the stub script edits (or not)."""
+    origin, repo, bin_dir = tmp_path / "origin.git", tmp_path / "repo", tmp_path / "bin"
+    git = lambda *a, cwd=None: subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True, text=True).stdout
+    git("init", "-q", "--bare", "-b", "main", str(origin))
+    git("clone", "-q", str(origin), str(repo))
+    (repo / "stats").mkdir()
+    (repo / "scripts").mkdir()
+    (repo / "stats" / "current.json").write_text('{\n  "version": "1.2.3",\n  "last_updated": "old",\n'
+                                                 '  "last_updated_by": "old",\n  "released": "2026-10-19"\n}\n')
+    (repo / "scripts" / "stats_last_updated.py").write_text(textwrap.dedent(f"""
+        import pathlib, sys
+        if {script_rc} == 0:
+            p = pathlib.Path("stats/current.json")
+            p.write_text(p.read_text().replace('"last_updated": "old"', '"last_updated": "new"')
+                                      .replace('"last_updated_by": "old"', '"last_updated_by": "release.yml"'))
+        print("stub script", sys.argv[1:])
+        sys.exit({script_rc})
+        """))
+    git("-c", "user.name=t", "-c", "user.email=t@t", "add", "-A", cwd=repo)
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base", cwd=repo)
+    git("push", "-q", "origin", "HEAD:refs/heads/main", cwd=repo)
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(f'#!/usr/bin/env bash\necho "gh $@" >> "{tmp_path}/gh.log"\n[ {gh_rc} -eq 0 ] && echo https://example.test/pull/1\nexit {gh_rc}\n')
+    gh.chmod(0o755)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "GITHUB_REF_NAME": "v1.2.3", "GITHUB_REPOSITORY": "o/r",
+           "GITHUB_SERVER_URL": "https://github.test", "GITHUB_OUTPUT": str(tmp_path / "out"),
+           "STATS_WAIT": "0", "STATS_PAUSE": "0", "GIT_CONFIG_GLOBAL": "/dev/null"}
+    (tmp_path / "out").write_text("")
+    return repo, origin, env
+
+
+def _run_step(repo, env, needle):
+    return subprocess.run(["bash", "-e", "-c", _stats_run(load(), needle)], cwd=repo, env=env,
+                          capture_output=True, text=True, timeout=60)
+
+
+def _outputs(tmp_path):
+    return (tmp_path / "out").read_text().split()
+
+
+def test_the_stamp_step_reports_a_change(tmp_path):
+    repo, _, env = _stats_env(tmp_path, 0)
+    r = _run_step(repo, env, STATS_SCRIPT)
+    assert r.returncode == 0 and _outputs(tmp_path) == ["changed=true"], (r.stdout, r.stderr)
+    assert "['1.2.3', '--wait', '0', '--pause', '0']" in r.stdout
+
+
+def test_the_stamp_step_treats_exit_3_as_nothing_to_do(tmp_path):
+    repo, _, env = _stats_env(tmp_path, 3)
+    r = _run_step(repo, env, STATS_SCRIPT)
+    assert r.returncode == 0 and _outputs(tmp_path) == ["changed=false"], (r.stdout, r.stderr)
+
+
+@pytest.mark.parametrize("rc", [1, 2, 64])
+def test_the_stamp_step_goes_red_on_a_refusal(tmp_path, rc):
+    repo, _, env = _stats_env(tmp_path, rc)
+    r = _run_step(repo, env, STATS_SCRIPT)
+    assert r.returncode == 1 and _outputs(tmp_path) == [], (r.stdout, r.stderr)
+    assert f"::error::the stats script exited {rc}" in r.stdout
+
+
+def test_the_pr_step_pushes_one_new_branch_and_opens_the_pull_request(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 0)
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    g = lambda *a: subprocess.run(["git", "-C", str(origin), *a], capture_output=True, text=True, check=True).stdout
+    assert g("for-each-ref", "--format=%(refname:short)", "refs/heads").split() == ["main", "stats/1.2.3-last-updated"]
+    assert g("diff", "--name-only", "main", "stats/1.2.3-last-updated").split() == ["stats/current.json"]
+    assert g("log", "-1", "--format=%an <%ae>|%B", "stats/1.2.3-last-updated").strip() == \
+        "AZ Rollin <263686995+azrollin@users.noreply.github.com>|stats: 1.2.3 last_updated is the PyPI upload time"
+    log = (tmp_path / "gh.log").read_text()
+    assert "pr create --repo o/r --base main --head stats/1.2.3-last-updated --title stats: 1.2.3 last_updated is the PyPI upload time" in log
+    assert not re.search(r"claude|anthropic|opus|sonnet|fable|astra|codex|gpt|co-authored|generated with|\bT(8|9|10|11)\b", log, re.I)
+
+
+def test_a_refused_pull_request_still_leaves_the_branch_and_a_compare_link(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 0, gh_rc=1)
+    _run_step(repo, env, STATS_SCRIPT)
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "::warning::stats/1.2.3-last-updated is pushed but the pull request was not opened" in r.stdout
+    assert "https://github.test/o/r/compare/main...stats/1.2.3-last-updated?expand=1" in r.stdout
+    assert "stats/1.2.3-last-updated" in subprocess.run(["git", "-C", str(origin), "branch", "--list"],
+                                                        capture_output=True, text=True).stdout
+
+
+def test_an_existing_branch_is_left_alone_without_force(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 0)
+    subprocess.run(["git", "-C", str(origin), "branch", "stats/1.2.3-last-updated", "main"], check=True)
+    before = subprocess.run(["git", "-C", str(origin), "rev-parse", "stats/1.2.3-last-updated"],
+                            capture_output=True, text=True).stdout
+    _run_step(repo, env, STATS_SCRIPT)
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 0 and "already exists on origin" in r.stdout, (r.stdout, r.stderr)
+    after = subprocess.run(["git", "-C", str(origin), "rev-parse", "stats/1.2.3-last-updated"],
+                           capture_output=True, text=True).stdout
+    assert before == after and not (tmp_path / "gh.log").exists()
+
+
+def test_a_change_of_the_wrong_shape_is_not_committed(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 0)
+    _run_step(repo, env, STATS_SCRIPT)
+    (repo / "README.md").write_text("x\n")
+    path = repo / "stats" / "current.json"
+    path.write_text(path.read_text().replace('"released": "2026-10-19"', '"released": "2026-10-20"'))
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert subprocess.run(["git", "-C", str(origin), "for-each-ref", "--format=%(refname:short)", "refs/heads"], capture_output=True, text=True).stdout.split() == ["main"]
+
+
+# the second release after the first automated stamp: last_updated_by is already release.yml,
+# so the real script changes ONE line. Real script, real step blocks, no stub.
+
+REAL_STATS = '{\n  "version": "1.2.3",\n  "last_updated": "%s",\n  "last_updated_by": "%s",\n  "released": "2026-10-19"\n}\n'
+WRAPPER = """import importlib.util, sys
+spec = importlib.util.spec_from_file_location("real", %r)
+real = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(real)
+fetch = lambda url: {"urls": [{"packagetype": "bdist_wheel", "upload_time_iso_8601": "2026-10-19T14:26:03.195413Z"}]}
+sys.exit(real.main(sys.argv, fetch=fetch))
+"""
+
+
+def _real_script_env(tmp_path, last_updated, by, extra=""):
+    repo, origin, env = _stats_env(tmp_path, 3)
+    (repo / "scripts" / "stats_last_updated.py").write_text(WRAPPER % str(ROOT / "scripts" / "stats_last_updated.py"))
+    (repo / "stats" / "current.json").write_text((REAL_STATS % (last_updated, by)).replace('  "released"', extra + '  "released"'))
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", *ident, "add", "-A"], cwd=repo, check=True)
+    subprocess.run(["git", *ident, "commit", "-q", "-m", "fixture"], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=repo, check=True)
+    return repo, origin, env
+
+
+def _branch_diff(origin):
+    return subprocess.run(["git", "-C", str(origin), "diff", "main", "stats/1.2.3-last-updated", "--", "stats/current.json"],
+                          capture_output=True, text=True, check=True).stdout
+
+
+def test_a_later_release_with_the_uploader_already_set_still_opens_its_pull_request(tmp_path):
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml")
+    stamp = _run_step(repo, env, STATS_SCRIPT)
+    assert stamp.returncode == 0 and _outputs(tmp_path) == ["changed=true"], (stamp.stdout, stamp.stderr)
+    pr = _run_step(repo, env, "gh pr create")
+    assert pr.returncode == 0, (pr.stdout, pr.stderr)
+    changed = [l for l in _branch_diff(origin).splitlines() if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+    assert changed == ['-  "last_updated": "2026-10-12T09:00:00-07:00",',
+                       '+  "last_updated": "2026-10-19T07:26:03-07:00",'], changed
+    assert "pr create --repo o/r --base main" in (tmp_path / "gh.log").read_text()
+
+
+def test_the_first_automated_stamp_still_changes_both_fields(tmp_path):
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-15T16:50:14-07:00", "sunglasses-publish-sh")
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    assert _run_step(repo, env, "gh pr create").returncode == 0
+    changed = [l for l in _branch_diff(origin).splitlines() if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+    assert len(changed) == 4 and '+  "last_updated_by": "release.yml",' in changed, changed
+
+
+def test_a_change_to_a_second_file_is_not_committed(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 0)
+    _run_step(repo, env, STATS_SCRIPT)
+    (repo / "scripts" / "stats_last_updated.py").write_text("print('edited')\n")
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+
+
+def test_an_unchanged_tree_is_not_committed(tmp_path):
+    repo, origin, env = _stats_env(tmp_path, 3)
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+
+
+# the boundary cases the guard has to hold, each through the real step blocks
+
+def _no_pr_and_no_branch(tmp_path, origin):
+    refs = subprocess.run(["git", "-C", str(origin), "for-each-ref", "--format=%(refname:short)", "refs/heads"],
+                          capture_output=True, text=True).stdout.split()
+    return refs == ["main"] and not (tmp_path / "gh.log").exists()
+
+
+def test_a_nested_timestamp_is_refused_by_the_real_script_and_nothing_is_pushed(tmp_path):
+    repo, origin, env = _real_script_env(tmp_path, "x", "y")
+    nested = ('{\n  "version": "1.2.3",\n  "meta": {\n    "last_updated": "2026-10-12T09:00:00-07:00",\n'
+              '    "last_updated_by": "release.yml"\n  },\n  "released": "2026-10-19"\n}\n')
+    (repo / "stats" / "current.json").write_text(nested)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-am", "nested"], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=repo, check=True)
+    stamp = _run_step(repo, env, STATS_SCRIPT)
+    assert stamp.returncode == 1 and _outputs(tmp_path) == [], (stamp.stdout, stamp.stderr)
+    assert "top-level strings" in stamp.stdout
+    assert (repo / "stats" / "current.json").read_text() == nested
+    assert _no_pr_and_no_branch(tmp_path, origin)
+
+
+def _edited_pr_step(tmp_path, edit, extra=""):
+    """Stamp with the real script, then let `edit` change the file, then run the PR step."""
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml", extra)
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    path = repo / "stats" / "current.json"
+    path.write_text(edit(path.read_text()))
+    r = _run_step(repo, env, "gh pr create")
+    return r, tmp_path, origin
+
+
+@pytest.mark.parametrize("edit", [
+    # another property on a line the old guard allowed by prefix
+    lambda text: text.replace('"last_updated_by": "release.yml",', '"last_updated_by": "release.yml", "released": "2026-10-20",'),
+    # a different value on the released line
+    lambda text: text.replace('"released": "2026-10-19"', '"released": "2026-10-20"'),
+    # a nested copy of the field name added on its own line
+    lambda text: text.replace('"released"', '"x": {"last_updated": "1"},\n  "released"'),
+    # a reformatting of the whole file that leaves the parsed document alone
+    lambda text: text.replace("\n  ", "\n      "),
+    # the stamped values removed
+    lambda text: text.replace('"last_updated_by": "release.yml",', '"last_updated_by": 7,'),
+])
+def test_the_pr_step_refuses_an_edit_outside_the_two_top_level_values(tmp_path, edit):
+    r, tp, origin = _edited_pr_step(tmp_path, edit)
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tp, origin)
+
+
+@pytest.mark.parametrize("extra, edit", [
+    # an unrelated true turned into the number 1: equal in Python, different in JSON
+    ('  "beta": true,\n', lambda text: text.replace('"beta": true', '"beta": 1')),
+    ('  "ratio": 1,\n', lambda text: text.replace('"ratio": 1', '"ratio": 1.0')),
+    # one unrelated line re-indented (inside the old two-line budget)
+    ('  "beta": true,\n', lambda text: text.replace('  "beta": true', '      "beta": true')),
+    # the two stamped keys swapped places
+    ('', lambda text: text.replace('  "last_updated": "2026-10-19T07:26:03-07:00",\n  "last_updated_by": "release.yml",\n',
+                                   '  "last_updated_by": "release.yml",\n  "last_updated": "2026-10-19T07:26:03-07:00",\n')),
+])
+def test_the_pr_step_keeps_json_types_and_every_other_line(tmp_path, extra, edit):
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml", extra)
+    assert _run_step(repo, env, STATS_SCRIPT).returncode == 0
+    path = repo / "stats" / "current.json"
+    before = path.read_text()
+    path.write_text(edit(before))
+    assert path.read_text() != before
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tmp_path, origin)
+
+
+def test_the_pr_step_refuses_a_file_that_is_not_a_json_object(tmp_path):
+    r, tp, origin = _edited_pr_step(tmp_path, lambda text: "[]\n")
+    assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)
+    assert _no_pr_and_no_branch(tp, origin)
