@@ -1342,8 +1342,9 @@ _MAX_HOST = 253
 
 def _is_port(text):
     """An empty port, or ASCII digits whose value is at most 65535. The digits are measured before
-    they are converted, so a very long run costs the same on every interpreter (those from 3.11 on
-    refuse to convert more than 4300 digits, earlier ones do the work and take quadratic time)."""
+    they are converted, so a very long run is read the same, and costs time in proportion to its
+    length, whether or not the interpreter limits integer string conversion (the default limit is
+    4300 digits and some runtimes have none)."""
     if text == "":
         return True
     if not (text.isascii() and text.isdigit()):
