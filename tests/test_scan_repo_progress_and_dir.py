@@ -857,7 +857,8 @@ def _state(root):
 def _args_for(root, output):
     from sunglasses import cli
     return cli.argparse.Namespace(json=(output == "json"), output=output, verbose=False, max_files=None,
-                                  directory=str(root), skip_lockfiles=False, channel="file")
+                                  directory=str(root), skip_lockfiles=False, channel="file",
+                                  file_deadline=0)   # these pin the walker, in this process
 
 
 def _scan_tree_out(root, output, capsys):

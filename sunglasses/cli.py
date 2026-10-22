@@ -534,6 +534,71 @@ def _check_max_files(args):
     return cap
 
 
+def _check_file_deadline(args):
+    """`--file-deadline` is a number of seconds, 0 or more; refuse before walking or cloning.
+
+    Returns the deadline in seconds, 0 meaning none. Not given means the default, which
+    `scan_worker` owns.
+    """
+    from . import scan_worker
+    value = getattr(args, "file_deadline", None)
+    if value is None:
+        return scan_worker.DEFAULT_FILE_DEADLINE_S
+    if not (value >= 0 and value != float("inf")):
+        _usage_error(args, f"--file-deadline must be a number of seconds, 0 or more, got {value:g}.",
+                     "Nothing was scanned. Use 0 to leave a file as long as it needs, or leave "
+                     "--file-deadline out for the default.")
+    return float(value)
+
+
+class _SigtermLeavesCleanly:
+    """While a scanner child exists, SIGTERM unwinds the stack instead of ending the process
+    where it stands, so the child is stopped and not left running with nobody to read it."""
+
+    def __enter__(self):
+        import signal
+        self._old = None
+        try:
+            self._old = signal.signal(signal.SIGTERM, lambda _n, _f: sys.exit(128 + signal.SIGTERM))
+        except (ValueError, OSError, AttributeError):
+            pass                       # not the main thread, or no SIGTERM here
+        return self
+
+    def __exit__(self, *exc):
+        if self._old is not None:
+            import signal
+            signal.signal(signal.SIGTERM, self._old)
+        return False
+
+
+def _file_scanner(args, engine):
+    """What reads one file: the engine itself with no deadline, or a stoppable child.
+
+    Both answer `scan_file(target)` the same way. The child exists only for a positive
+    deadline on a platform that can stop it; otherwise the scan runs in this process as
+    it always has, and an explicit deadline on a platform that cannot stop a child says so.
+    """
+    seconds = _check_file_deadline(args)
+    if seconds <= 0:
+        return engine
+    from . import scan_worker
+    if not scan_worker.available():
+        if getattr(args, "file_deadline", None) is not None:
+            print("  note: --file-deadline is not available on this platform; "
+                  "files are read without a deadline.", file=sys.stderr)
+        return engine
+    # No child exists yet: the worker starts it on first use, or the caller starts it with
+    # `_begin` once it is inside the block that closes the worker. Nothing is spawned in the
+    # gap between this return and that block, so a signal there leaves nothing running.
+    return scan_worker.ScanWorker(seconds)
+
+
+def _begin(scanner, engine):
+    """Start the child early, from inside the caller's cleanup block, so it loads while the walk begins."""
+    if scanner is not engine:
+        scanner.start()
+
+
 def _printable(name):
     """A file name is data, not terminal input: escape control characters before showing it."""
     return "".join(
@@ -567,6 +632,7 @@ def _progress_line(index, total, started, rel_path):
 def _scan_dir(args, engine):
     """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
     _check_max_files(args)
+    _check_file_deadline(args)
     path = os.path.expanduser(args.directory)
     shown = _printable(args.directory)
     if not os.path.exists(path):
@@ -591,6 +657,7 @@ def _scan_dir(args, engine):
 def _scan_repo(args, engine):
     """Clone a GitHub repo and scan all files."""
     _check_max_files(args)
+    _check_file_deadline(args)
     repo_url = args.repo
     repo_hash = hashlib.md5(repo_url.encode()).hexdigest()[:10]
     tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
@@ -643,16 +710,25 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
     # scanned folder, is outside what the scan controls; see the README.)
     _load_extractors()
     root_fd = None
-    try:
+    # `_scan_tree_inner` only ever asks its scanner for `scan_file`, so it takes the
+    # stoppable child where it took the engine. The child starts before the root is
+    # opened, inside the block that closes it: its modules are imported by now, and it
+    # loads while the walk begins.
+    with _SigtermLeavesCleanly():
+        scanner = _file_scanner(args, engine)
         try:
-            root_fd = _open_root(tmp_dir)
-        except OSError as exc:
-            _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
-                         "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
-        return _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd)
-    finally:
-        if root_fd is not None:
-            os.close(root_fd)
+            _begin(scanner, engine)
+            try:
+                root_fd = _open_root(tmp_dir)
+            except OSError as exc:
+                _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
+                             "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
+            return _scan_tree_inner(args, scanner, tmp_dir, source, kind, cleanup, root_fd)
+        finally:
+            if scanner is not engine:
+                scanner.close()
+            if root_fd is not None:
+                os.close(root_fd)
 
 
 def _load_extractors():
@@ -1493,8 +1569,18 @@ def cmd_scan(args):
                          f"could not read {filepath}: {exc.strerror or exc} — NOT inspected",
                          "Nothing was scanned. Check the file's permissions.")
 
+        # The deadline is checked before the file is routed anywhere, so a bad value is
+        # the same usage error for a text file, a media file and a deep scan.
+        _check_file_deadline(args)
+
         # Check if this is audio/video
         if _is_media_file(filepath):
+            if args.deep and getattr(args, "file_deadline", None) is not None:
+                # The deep scan transcribes in this process and has no stoppable child;
+                # accepting the flag would promise a bound it does not give.
+                _usage_error(args, "--file-deadline does not apply to --deep.",
+                             "Nothing was scanned. The deadline bounds the text scan; "
+                             "leave --file-deadline out of a --deep scan.")
             if not args.deep:
                 ext = os.path.splitext(filepath)[1].lower()
                 # We transcribed nothing, so we inspected nothing. Exit 0 here was
@@ -1632,7 +1718,13 @@ def cmd_scan(args):
                     )
         else:
             try:
-                result = engine.scan_file(filepath)
+                with _SigtermLeavesCleanly():
+                    scanner = _file_scanner(args, engine)
+                    try:
+                        result = scanner.scan_file(filepath)
+                    finally:
+                        if scanner is not engine:
+                            scanner.close()
             except UnreadableFile as exc:
                 # The file exists but we could not read it. That is an operational
                 # failure (exit 2), never a finding: letting the OSError escape
@@ -3250,6 +3342,11 @@ def main():
                              metavar="GLS-ID",
                              help="With --baseline: let the baseline cover critical findings of this rule "
                                   "(repeat for more rules)")
+    scan_parser.add_argument("--file-deadline", dest="file_deadline", type=float, metavar="SECONDS",
+                             help="With --file, --dir or --repo: a file the scanner cannot finish "
+                                  "in SECONDS is reported as not fully read (exit 3) and the scan "
+                                  "moves on, never called clean. 0 = no deadline "
+                                  "(default: 120). Refused with --deep on an audio or video file")
     # `--s` has always been the unique abbreviation of --stdin; --skip-lockfiles made it
     # ambiguous, so it is spelled out like `--d` below.
     scan_parser.add_argument("--stdin", "--s", dest="stdin", action="store_true", help="Read from stdin")
