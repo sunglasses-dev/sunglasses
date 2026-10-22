@@ -1562,6 +1562,8 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
         # reached it -- a failing process on PATH, no product switch.
         monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
                            + os.environ["PATH"])
+    if surface == "lib_scan_auto_true" and state == "missing_dependency":
+        _without_audio_package(monkeypatch)
     if surface in ("lib_scan_auto_true", "lib_scan_deep") and state in (
             "missing_dependency", "unreadable", "missing"):
         path = {"unreadable": space["unreadable_media"],
@@ -1605,6 +1607,18 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
     if surface == "lib_helper_text":
         return scanner._scan_text_file(path)
     raise AssertionError(surface)
+
+
+def _without_audio_package(monkeypatch):
+    """Make the audio extra absent for this cell, whatever this machine has installed.
+
+    The cell scans an .mp3 expecting the transcriber package to be missing, as it is on
+    CI. A machine that has the package really loads it and the model's tokenizer then
+    fetches its vocabulary from the internet, which no test may do. Raising from
+    `_check_deps` is the real path a user without the extra takes.
+    """
+    from sunglasses.extractors import audio as audio_mod
+    monkeypatch.setattr(audio_mod, "_check_deps", _raise_missing_package)
 
 
 def _raise_missing_package(*_a, **_kw):
@@ -2031,6 +2045,8 @@ def test_mcp_cell(surface, state, outcome, space, monkeypatch):
         if call_state == "converter_failed":
             monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
                                + os.environ["PATH"])
+        if allow_deep and call_state == "missing_dependency":
+            _without_audio_package(monkeypatch)
         if allow_deep and call_state in ("unreadable",):
             path = space["unreadable_media"]
         res = mcp._tool_scan_file({"file_path": path, "allow_deep": allow_deep})
