@@ -9,7 +9,7 @@ Run after every pattern update to keep them in sync.
 Usage:
     python scripts/export_patterns_to_attack_db.py
 
-Safety: READ-ONLY on patterns.py. Only writes to attack-db/attacks/
+Safety: READ-ONLY on patterns.py. Only writes to attack-db/attacks/ and attack-db/validators/
 """
 import json
 import os
@@ -20,6 +20,7 @@ import datetime
 # Add parent dir to path so we can import sunglasses
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from sunglasses.patterns import PATTERNS
+from sunglasses.validators import VALIDATORS
 
 # Category mapping: internal category name → folder name
 CATEGORY_FOLDERS = {
@@ -112,6 +113,27 @@ def export():
         # Stats
         stats[folder] = stats.get(folder, 0) + 1
         total += 1
+
+    # Structural validators (sunglasses/validators.py) are not patterns: they carry no
+    # regex or keywords and are not in the pattern count. Each gets a record with the
+    # same identity fields, so the published database still describes what the scanner runs.
+    validators_dir = os.path.join(base_dir, "..", "validators")
+    os.makedirs(validators_dir, exist_ok=True)
+    for validator in VALIDATORS:
+        record = {
+            "id": validator.id,
+            "name": validator.name,
+            "version": "1.0",
+            "kind": "structural-validator",
+            "category": validator.category,
+            "severity": validator.severity,
+            "channel": list(validator.channel),
+            "description": validator.description,
+            "contributed_by": "Sunglasses Team",
+            "source": f"validators.py:{validator.id}",
+        }
+        with open(os.path.join(validators_dir, f"{validator.id}.json"), "w") as f:
+            json.dump(record, f, indent=2)
 
     # Write integrity manifest
     manifest = {
