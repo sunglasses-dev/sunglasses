@@ -178,13 +178,21 @@ jobs:
       # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
       # and a decoder that is missing turns a real finding into silence.
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
-        # A stalled mirror used to hold a runner for the whole job timeout. Each attempt is
-        # capped, a second attempt follows, and the step itself is capped as a backstop.
-        timeout-minutes: 8
+        # A stalled mirror used to hold a runner for the whole job timeout. Each command is
+        # capped, and a retry against the same stuck mirror never passes, so every attempt
+        # after the first moves to the main Ubuntu archive before it tries again.
+        timeout-minutes: 10
         run: |
-          for attempt in 1 2; do
-            if sudo timeout 200 apt-get update -qq \
-                && sudo timeout 200 apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg; then
+          mirror_lines() { grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; }
+          APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
+          for attempt in 1 2 3; do
+            if [ "$attempt" -gt 1 ]; then
+              echo "apt mirror before:"; mirror_lines
+              sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+              echo "apt mirror after:"; mirror_lines
+            fi
+            if sudo timeout 200 apt-get $APT_OPTS update -qq \
+                && sudo timeout 200 apt-get $APT_OPTS install -y -qq tesseract-ocr libzbar0 ffmpeg; then
               exit 0
             fi
             echo "apt attempt $attempt did not finish; retrying" >&2
@@ -403,13 +411,21 @@ jobs:
       # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
       # and a decoder that is missing turns a real finding into silence.
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
-        # A stalled mirror used to hold a runner for the whole job timeout. Each attempt is
-        # capped, a second attempt follows, and the step itself is capped as a backstop.
-        timeout-minutes: 8
+        # A stalled mirror used to hold a runner for the whole job timeout. Each command is
+        # capped, and a retry against the same stuck mirror never passes, so every attempt
+        # after the first moves to the main Ubuntu archive before it tries again.
+        timeout-minutes: 10
         run: |
-          for attempt in 1 2; do
-            if sudo timeout 200 apt-get update -qq \
-                && sudo timeout 200 apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg; then
+          mirror_lines() { grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; }
+          APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
+          for attempt in 1 2 3; do
+            if [ "$attempt" -gt 1 ]; then
+              echo "apt mirror before:"; mirror_lines
+              sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+              echo "apt mirror after:"; mirror_lines
+            fi
+            if sudo timeout 200 apt-get $APT_OPTS update -qq \
+                && sudo timeout 200 apt-get $APT_OPTS install -y -qq tesseract-ocr libzbar0 ffmpeg; then
               exit 0
             fi
             echo "apt attempt $attempt did not finish; retrying" >&2
