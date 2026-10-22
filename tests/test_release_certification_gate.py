@@ -27,7 +27,7 @@ CERTIFIED = "7764e2287347027b23bc2c4fcb7622ad22c3f83b"
 COLLIDING = "7764e22ba1f3c8204dcc13723015cb026e8472da"
 OTHER = "35c5e775f0674a73c8de7793dd1e728efe01d2f0"
 RUN_ID = 999000159
-LEGS = ["classify", "fast", "coverage", "certify"] + [
+LEGS = ["classify", "coverage", "certify"] + [f"fast ({k})" for k in range(1, 5)] + [
     f"integrity (3.{v}, {s})" for v in range(9, 15) for s in (1, 2)
 ]
 
@@ -105,6 +105,41 @@ def test_a_detail_reply_for_a_different_head_is_refused(api):
 def test_uppercase_input_is_the_same_commit(api):
     r = gate(api, CERTIFIED.upper())
     assert r.returncode == 0, r.stderr
+
+
+def _rewrite_jobs(api, fn):
+    detail = json.loads((api / "detail.json").read_text())
+    detail["jobs"] = fn(detail["jobs"])
+    (api / "detail.json").write_text(json.dumps(detail))
+
+
+def test_a_missing_fast_part_is_refused(api):
+    _rewrite_jobs(api, lambda jobs: [j for j in jobs if j["name"] != "fast (3)"])
+    r = gate(api, CERTIFIED)
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert "fast: 3 parts ran, 4 required" in r.stderr
+
+
+def test_a_failed_fast_part_is_refused(api):
+    def fail(jobs):
+        for j in jobs:
+            if j["name"] == "fast (2)":
+                j["conclusion"] = "failure"
+        return jobs
+    _rewrite_jobs(api, fail)
+    r = gate(api, CERTIFIED)
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert "fast (2): failure" in r.stderr
+
+
+def test_a_run_with_only_the_old_single_fast_job_is_refused(api):
+    # A run from before the split has one job named `fast`; it cannot stand in
+    # for the four parts, so a tree certified that way is not release certified.
+    _rewrite_jobs(api, lambda jobs: [j for j in jobs if not j["name"].startswith("fast (")]
+                  + [{"name": "fast", "status": "completed", "conclusion": "success"}])
+    r = gate(api, CERTIFIED)
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert "fast: 0 parts ran, 4 required" in r.stderr
 
 
 def test_the_seven_character_comparison_is_gone():

@@ -76,6 +76,10 @@ CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=tr
 # The env expression and these numbers are one fact written twice; the check in
 # check_workflow ties the legs to them.
 SHARD_ENV = "${{ matrix.shard }}/${{ matrix.python-version == '3.12' && 4 || 2 }}"
+# The fast job is split the same way, four parts on one interpreter. Same rule:
+# the env expression and these numbers are one fact written twice.
+FAST_SHARD_ENV = "${{ matrix.shard }}/4"
+FAST_SHARDS = ["1", "2", "3", "4"]
 SHARD_PARTS = {"3.12": 4}
 SHARD_PARTS_DEFAULT = 2
 SHARD_INCLUDE = [{"python-version": "3.12", "shard": "3"}, {"python-version": "3.12", "shard": "4"}]
@@ -334,6 +338,16 @@ def check_workflow(doc) -> list[str]:
             p.append(f"fast suite command is not the canonical token list: {toks}")
         if suite[0].count("pytest") != 1 or ";" in suite[0] or "&&" in suite[0] or "||" in suite[0]:
             p.append("fast suite step contains more than the single pytest command")
+    # The fast job is the suite in four parts, numbered to match its CI_SHARD.
+    fstrat = fast.get("strategy") or {}
+    if set(fstrat.keys()) != {"fail-fast", "matrix"} or fstrat.get("fail-fast") is not False:
+        p.append(f"fast strategy keys/fail-fast changed: {fstrat}")
+    fmatrix = fstrat.get("matrix") or {}
+    if set(fmatrix.keys()) != {"shard"} or fmatrix.get("shard") != FAST_SHARDS:
+        p.append(f"fast matrix must be exactly shard {FAST_SHARDS} (no include/exclude): got {fmatrix}")
+    fast_suite_steps = [s for s in fast.get("steps", []) if "--ignore=" in s.get("run", "")]
+    if len(fast_suite_steps) != 1 or fast_suite_steps[0].get("env") != {"CI_SHARD": FAST_SHARD_ENV}:
+        p.append(f"the fast suite step must carry exactly env CI_SHARD: {FAST_SHARD_ENV} (the four parts together are the suite)")
     # Gate steps in fast must be byte-identical to the matrix's gate steps.
     integ_gate_runs = {r.strip() for r in integ_runs if any(g in r for g in GATE_COMMANDS)}
     fast_gate_runs = {r.strip() for r in fast_runs if any(g in r for g in GATE_COMMANDS)}
@@ -604,6 +618,47 @@ def test_control_matrix_excludes_a_version():
     assert check_workflow(_mutate(m))
     def m2(d): d["jobs"]["integrity"]["strategy"]["fail-fast"] = True
     assert check_workflow(_mutate(m2))
+
+
+def test_control_a_fast_part_is_dropped():
+    # four parts named by CI_SHARD, three legs: a quarter of the fast suite runs nowhere
+    def m(d): d["jobs"]["fast"]["strategy"]["matrix"]["shard"].pop()
+    assert check_workflow(_mutate(m))
+
+
+def test_control_a_fast_part_is_added_or_repeated():
+    def m(d): d["jobs"]["fast"]["strategy"]["matrix"]["shard"].append("5")
+    assert check_workflow(_mutate(m))
+    def m2(d): d["jobs"]["fast"]["strategy"]["matrix"]["shard"][3] = "3"
+    assert check_workflow(_mutate(m2))
+
+
+def test_control_fast_is_a_single_job_again():
+    def m(d): del d["jobs"]["fast"]["strategy"]
+    assert check_workflow(_mutate(m))
+
+
+def test_control_fast_matrix_may_not_exclude_or_include():
+    def m(d): d["jobs"]["fast"]["strategy"]["matrix"]["exclude"] = [{"shard": "4"}]
+    assert check_workflow(_mutate(m))
+    def m2(d): d["jobs"]["fast"]["strategy"]["matrix"]["include"] = [{"shard": "5"}]
+    assert check_workflow(_mutate(m2))
+    def m3(d): d["jobs"]["fast"]["strategy"]["fail-fast"] = True
+    assert check_workflow(_mutate(m3))
+
+
+def test_control_fast_suite_loses_or_changes_its_shard_env():
+    def m(d):
+        for s in d["jobs"]["fast"]["steps"]:
+            if "--ignore=" in s.get("run", ""):
+                del s["env"]
+    assert check_workflow(_mutate(m))
+    for denominator in ("2", "3", "5"):
+        def m2(d, k=denominator):
+            for s in d["jobs"]["fast"]["steps"]:
+                if "--ignore=" in s.get("run", ""):
+                    s["env"] = {"CI_SHARD": "${{ matrix.shard }}/" + k}
+        assert check_workflow(_mutate(m2))
 
 
 def test_control_fast_positional_subset_or_shell_shortcut():

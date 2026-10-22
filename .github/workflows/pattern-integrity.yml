@@ -156,6 +156,17 @@ jobs:
     # A hang must fail, not wait. Set from the first hosted measurement, not
     # from local arithmetic (ASTRA round 1); tighten once measured.
     timeout-minutes: 150
+    # Four parts that together are exactly the fast suite (tests/ci_shard.py,
+    # the same split the integrity legs use). A single fast job was the longest
+    # check on a pull request, so every merge waited on it after the integrity
+    # legs had finished. The parts are named `fast (1)` to `fast (4)`;
+    # `needs.fast.result` is success only when ALL FOUR succeed, so classify,
+    # coverage and certify read it unchanged. Every part runs the same gate
+    # steps, so no gate depends on which part it landed in.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1", "2", "3", "4"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -308,7 +319,16 @@ jobs:
       # --ignore keeps pytest.ini's testpaths in force (no path argument), so
       # the root-scope customer-zero collection is unchanged.
       # tests/test_ci_gate.py asserts this exact list.
+      #
+      # The suite is split four ways by CI_SHARD (tests/conftest.py keeps part i
+      # and reports the rest as deselected), so the last line of each part's log
+      # reads "<kept> passed, ... <deselected> deselected" and kept + deselected
+      # is the unsharded count, the same number in all four logs. The four kept
+      # counts add up to it. tests/test_ci_shard_invariant.py proves the same
+      # property on the real collection.
       - name: Fast suite (all tests except the v0.5.6 acceptance modules and tests/proxy)
+        env:
+          CI_SHARD: ${{ matrix.shard }}/4
         run: |
           pytest -q -p no:cacheprovider \
             --ignore=tests/test_v056_matrix.py \
