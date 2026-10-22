@@ -653,8 +653,12 @@ def test_a_finding_with_missing_fields_gives_an_incomplete_json_report_not_a_tra
 # "handover" = right after `_file_scanner` returns, before the caller's cleanup block;
 # "after_start" = right after the child exists. The pid of every child is written to a log.
 SIGNALLER = textwrap.dedent("""
-    import os, sys, time
+    import os, signal, sys, time
     from sunglasses import cli, scan_worker as sw
+    # A background job (nohup ... &) starts with SIGINT ignored, and Python then installs no
+    # KeyboardInterrupt handler. Put back the one an interactive shell gives, so this holds
+    # under any parent.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
     where, signum, log = sys.argv.pop(1), int(sys.argv.pop(1)), sys.argv.pop(1)
     sw.default_argv = lambda: [sys.executable, "-B", "-c", "import time; time.sleep(60)"]
     def signal_now():
