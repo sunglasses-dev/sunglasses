@@ -1,0 +1,15 @@
+{
+  "id": "GLS-STRUCT-004",
+  "name": "Claude Code settings that remove the safety prompts",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "agent_workflow_security",
+  "severity": "low",
+  "channel": [
+    "file",
+    "tool_output"
+  ],
+  "description": "A Claude Code settings file that switches the permission prompts off, allows every shell command, or sends the API traffic to a public IP address or a tunnel host. The file's owner can write the same lines, so this is a notice to look at, not a verdict.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-004"
+}

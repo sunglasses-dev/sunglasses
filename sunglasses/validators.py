@@ -61,6 +61,40 @@ and ``bash <<< "$(curl ...)"`` read the fetched bytes), a program that prints it
 (``echo``, ``printf``) ends the stream, and a later write to a downloaded file replaces what
 was downloaded.
 
+GLS-STRUCT-004 -- a Claude Code settings file that removes the safety prompts
+-------------------------------------------------------------------------------
+
+The text is read as the one JSON document a settings file is. Text that is not exactly one JSON
+object (a prose example around a config, two documents, a comment, a trailing comma, a truncated
+file) is not read, and neither is any key that is not at the top of the document: the same keys in
+a schema, a template, a fixture or a nested object are not settings. Keys and values are compared
+after the JSON parse, so a key or a value written with ``\\uXXXX`` escapes is the setting it spells.
+``NaN`` and ``Infinity`` are not JSON, so a text that holds one is not a document. No setting is a
+number: a long integer is read as 0 and a port is measured by its digits before it is converted, so
+the answer and the cost of a very long number are the same on every interpreter.
+
+Three shapes are reported, each at most once: ``permissions.defaultMode`` set to the string
+``bypassPermissions`` or ``skipDangerousModePermissionPrompt`` set to ``true`` (the prompts are
+off); an entry of ``permissions.allow`` that is the whole shell tool (``Bash``, ``Bash(*)``,
+``Bash(:*)``) or ``*``; and ``env.ANTHROPIC_BASE_URL`` pointed at a public IP address or a tunnel
+host. The base URL is split with the URL parser and the host is judged by the address parser: a
+host is an address only if it parses as one, and it is public only if it is outside the blocks that
+the address registries reserve (the list is carried here, so the answer does not depend on the
+interpreter). A tunnel host is a name under ``ngrok``, ``ngrok-free``, ``trycloudflare.com`` or
+``loca.lt``. Corporate host names, loopback, private, shared, link-local, documentation and
+reserved addresses are not reported.
+
+The owner of a settings file can write the same lines, so the severity is the lowest one: the
+finding is shown and nothing is blocked or quarantined. The rule reads ``file`` (and its alias
+``code``) and ``tool_output``; it is not read on ``message`` or ``web_content``, where tutorials
+quote these keys.
+
+Not read, by design: JSON with comments, a settings object inside a larger text, a URL that is not
+``http`` or ``https``, an address written as a number or with fewer than four parts or with a
+leading zero, an IPv4-mapped IPv6 address, an IPv6 address with a zone, a host name that resolves
+to an address (a tunnel name is the one kind of name that is reported), and the other places a
+prompt can be turned off.
+
 This is a reader of words, not a shell. It does not model reachability beyond a few
 word-level cases (``false && ...``, ``exit``), heredoc bodies, functions, other downloaders,
 interpreter-native fetches, array-form commands, or hook formats that are not JSON. Those are
@@ -68,10 +102,12 @@ documented limits; the carriers still run.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
+import urllib.parse
 
-__all__ = ["HookFetchAndRun", "VALIDATORS", "classify_command"]
+__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
 
 # ----------------------------------------------------------------------------- JSON side
 
@@ -1281,6 +1317,117 @@ def classify_command(cmd):
         return None
 
 
+# ----------------------------------------------------------------------- settings side
+
+_ALLOWS_THE_WHOLE_SHELL = frozenset(("Bash", "Bash(*)", "Bash(:*)", "*"))
+
+# Blocks that the address registries reserve, carried here so that "public" means the same
+# thing on every interpreter (the parser's own notion of a global address has moved between
+# releases). In IPv6 only 2000::/3 is global unicast; these are the blocks inside it that are not.
+_V4_NOT_PUBLIC = tuple(ipaddress.ip_network(block) for block in (
+    "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12",
+    "192.0.0.0/24", "192.0.2.0/24", "192.88.99.0/24", "192.168.0.0/16", "198.18.0.0/15",
+    "198.51.100.0/24", "203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4"))
+_V6_GLOBAL = ipaddress.ip_network("2000::/3")
+_V6_NOT_PUBLIC = tuple(ipaddress.ip_network(block) for block in (
+    "2001::/23", "2001:db8::/32", "2002::/16", "3fff::/20"))
+
+_TUNNEL_SUFFIXES = tuple(
+    f"{name}.{tld}" for name in ("ngrok", "ngrok-free") for tld in ("io", "app", "dev")
+) + ("trycloudflare.com", "loca.lt")
+
+# A host longer than this is neither a name nor an address; it is not parsed.
+_MAX_HOST = 253
+
+
+def _is_port(text):
+    """An empty port, or ASCII digits whose value is at most 65535. The digits are measured before
+    they are converted, so a very long run is read the same, and costs time in proportion to its
+    length, whether or not the interpreter limits integer string conversion (the default limit is
+    4300 digits and some runtimes have none)."""
+    if text == "":
+        return True
+    if not (text.isascii() and text.isdigit()):
+        return False
+    digits = text.lstrip("0")
+    return len(digits) <= 5 and int(digits or "0") <= 65535
+
+
+def _v4(host):
+    """The address a dotted-decimal host spells, else None. Four plain decimal parts, no leading
+    zeros: the forms that every URL parser reads the same way."""
+    parts = host.split(".")
+    if len(parts) != 4:
+        return None
+    for part in parts:
+        if not (part.isascii() and part.isdigit() and len(part) <= 3 and int(part) <= 255
+                and (part == "0" or part[0] != "0")):
+            return None
+    return ipaddress.IPv4Address(host)
+
+
+def _host_kind(url):
+    """``("public_ip" | "tunnel", host)`` when the base URL's host is one of those, else None."""
+    if any(char <= " " or char == "\x7f" or char == "\\" for char in url):
+        return None
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not parts.netloc.isascii():
+        return None
+    authority = parts.netloc.rpartition("@")[2]
+    if authority.startswith("["):
+        host, closed, rest = authority[1:].partition("]")
+        if not closed or (rest and rest[0] != ":") or not _is_port(rest[1:]):
+            return None
+        if not host or len(host) > _MAX_HOST or "%" in host:
+            return None
+        try:
+            address = ipaddress.IPv6Address(host)
+        except ValueError:
+            return None
+        if address not in _V6_GLOBAL or any(address in block for block in _V6_NOT_PUBLIC):
+            return None
+        return "public_ip", host
+    host, _, port = authority.partition(":")
+    if not host or len(host) > _MAX_HOST or not _is_port(port):
+        return None
+    host = host.lower()
+    address = _v4(host)
+    if address is not None:
+        if any(address in block for block in _V4_NOT_PUBLIC):
+            return None
+        return "public_ip", host
+    name = host[:-1] if host.endswith(".") else host
+    for suffix in _TUNNEL_SUFFIXES:
+        if name == suffix or name.endswith("." + suffix):
+            return "tunnel", name
+    return None
+
+
+def _not_json(constant):
+    """``parse_constant`` hook: NaN, Infinity and -Infinity are not JSON."""
+    raise ValueError(constant)
+
+
+def _small_int(digits):
+    """``parse_int`` hook: no setting is a number, so a long integer is read as 0 rather than
+    converted (the conversion is the part that is slow, and that some interpreters refuse)."""
+    return int(digits) if len(digits) <= 18 else 0
+
+
+def _settings_document(text):
+    """The text as one JSON object, else None."""
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    try:
+        document = json.loads(text, parse_constant=_not_json, parse_int=_small_int)
+    except (ValueError, RecursionError):
+        return None
+    return document if isinstance(document, dict) else None
+
+
 # --------------------------------------------------------------------------- validators
 
 class HookFetchAndRun:
@@ -1328,4 +1475,66 @@ class HookFetchAndRun:
         return findings
 
 
-VALIDATORS = (HookFetchAndRun(),)
+class SettingsWithoutPrompts:
+    """GLS-STRUCT-004: a Claude Code settings file removes the safety prompts."""
+
+    id = "GLS-STRUCT-004"
+    name = "Claude Code settings that remove the safety prompts"
+    category = "agent_workflow_security"
+    severity = "low"
+    channel = ["file", "tool_output"]
+    description = ("A Claude Code settings file that switches the permission prompts off, allows every "
+                   "shell command, or sends the API traffic to a public IP address or a tunnel host. "
+                   "The file's owner can write the same lines, so this is a notice to look at, "
+                   "not a verdict.")
+
+    _KEYS = ("permissions", "skipDangerousModePermissionPrompt", "ANTHROPIC_BASE_URL")
+
+    def pregate(self, text):
+        # One JSON object and nothing around it; a key may be spelled with \u escapes, so the
+        # key names are tested only when there are none.
+        body = text.strip()
+        if body.startswith("\ufeff"):
+            body = body[1:].lstrip()
+        if body[:1] != "{" or body[-1:] != "}":
+            return False
+        return "\\u" in body or any(key in body for key in self._KEYS)
+
+    def _finding(self, matched, **evidence):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "severity": self.severity,
+            "channel": list(self.channel),
+            "description": self.description,
+            "matched_text": matched[:50],
+            "structural": True,
+            "evidence": evidence,
+        }
+
+    def run(self, text):
+        document = _settings_document(text)
+        if document is None:
+            return []
+        findings = []
+        permissions = document.get("permissions")
+        if isinstance(permissions, dict) and permissions.get("defaultMode") == "bypassPermissions":
+            findings.append(self._finding("defaultMode: bypassPermissions", shape="default_mode"))
+        if document.get("skipDangerousModePermissionPrompt") is True:
+            findings.append(self._finding("skipDangerousModePermissionPrompt: true", shape="skip_prompt"))
+        if isinstance(permissions, dict) and isinstance(permissions.get("allow"), list):
+            rule = next((item for item in permissions["allow"]
+                         if isinstance(item, str) and item in _ALLOWS_THE_WHOLE_SHELL), None)
+            if rule is not None:
+                findings.append(self._finding("allow: " + rule, shape="allow_every_shell"))
+        env = document.get("env")
+        if isinstance(env, dict) and isinstance(env.get("ANTHROPIC_BASE_URL"), str):
+            judged = _host_kind(env["ANTHROPIC_BASE_URL"])
+            if judged is not None:
+                kind, host = judged
+                findings.append(self._finding("ANTHROPIC_BASE_URL: " + host, shape="base_url", host_kind=kind))
+        return findings
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts())

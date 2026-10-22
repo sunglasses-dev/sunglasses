@@ -59,6 +59,9 @@ SANCTIONED_SUBSETS = [
     # `code` (the alias of `file`). The three channels it does not read are asserted
     # clear on their own, from the complementary list above.
     {"message", "file", "web_content", "tool_output", "code"},
+    # The settings validator's reach: the channels that carry a settings file (`code` is the
+    # alias of `file`). Every other channel is asserted clear in the same test, from the full list.
+    {"file", "tool_output", "code"},
 ]
 
 

@@ -1,0 +1,642 @@
+[
+ {
+  "family": "scoped_allow",
+  "label": "0",
+  "text": "{\"permissions\": {\"allow\": [\"Bash(npm test)\"]}}"
+ },
+ {
+  "family": "scoped_allow",
+  "label": "1",
+  "text": "{\"permissions\": {\"allow\": [\"Bash(git status:*)\"]}}"
+ },
+ {
+  "family": "scoped_allow",
+  "label": "2",
+  "text": "{\"permissions\": {\"allow\": [\"Read\"]}}"
+ },
+ {
+  "family": "scoped_allow",
+  "label": "3",
+  "text": "{\"permissions\": {\"allow\": [\"Edit\"]}}"
+ },
+ {
+  "family": "scoped_allow",
+  "label": "4",
+  "text": "{\"permissions\": {\"allow\": [\"WebFetch\"]}}"
+ },
+ {
+  "family": "deny_ask",
+  "label": "0",
+  "text": "{\"permissions\": {\"deny\": [\"Bash(*)\"]}}"
+ },
+ {
+  "family": "deny_ask",
+  "label": "1",
+  "text": "{\"permissions\": {\"ask\": [\"Bash\"]}}"
+ },
+ {
+  "family": "deny_ask",
+  "label": "2",
+  "text": "{\"permissions\": {\"deny\": [\"*\"]}}"
+ },
+ {
+  "family": "deny_ask",
+  "label": "3",
+  "text": "{\"permissions\": {\"ask\": [\"Bash(:*)\"]}}"
+ },
+ {
+  "family": "documentation",
+  "label": "guide_mode",
+  "text": "Documentation example:\n{\"permissions\": {\"defaultMode\": \"bypassPermissions\"}}"
+ },
+ {
+  "family": "documentation",
+  "label": "blog_allow",
+  "text": "Blog example:\n{\"permissions\": {\"allow\": [\"Bash(*)\"]}}"
+ },
+ {
+  "family": "documentation",
+  "label": "prose",
+  "text": "The setting defaultMode selects a permission mode."
+ },
+ {
+  "family": "documentation",
+  "label": "safe_guide",
+  "text": "{\"permissions\": {\"defaultMode\": \"plan\"}}"
+ },
+ {
+  "family": "schema_template",
+  "label": "schema_default",
+  "text": "{\"properties\": {\"permissions\": {\"default\": {\"defaultMode\": \"bypassPermissions\"}}}}"
+ },
+ {
+  "family": "schema_template",
+  "label": "example_template",
+  "text": "{\"examples\": [{\"permissions\": {\"allow\": [\"Bash(*)\"]}}]}"
+ },
+ {
+  "family": "schema_template",
+  "label": "schema_type",
+  "text": "{\"properties\": {\"defaultMode\": {\"type\": \"string\"}}}"
+ },
+ {
+  "family": "schema_template",
+  "label": "template_safe",
+  "text": "{\"permissions\": {\"allow\": [\"Read\"]}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://127.0.0.1/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "1",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://localhost/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "2",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://10.1.2.3/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "3",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://192.168.1.2/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "4",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://172.16.0.1/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "5",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://169.254.1.1/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "6",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://100.64.1.2/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "7",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[::1]/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "8",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[fd00::1]/v1\"}}"
+ },
+ {
+  "family": "local_addresses",
+  "label": "9",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[fe80::1]/v1\"}}"
+ },
+ {
+  "family": "mcp_flag",
+  "label": "0",
+  "text": "{\"enableAllProjectMcpServers\": false}"
+ },
+ {
+  "family": "mcp_flag",
+  "label": "1",
+  "text": "{\"enableAllProjectMcpServers\": true}"
+ },
+ {
+  "family": "release_notes",
+  "label": "release_example",
+  "text": "Release notes example:\n{\"permissions\": {\"defaultMode\": \"bypassPermissions\"}}"
+ },
+ {
+  "family": "release_notes",
+  "label": "release_prose",
+  "text": "Release notes: permission prompts stay enabled."
+ },
+ {
+  "family": "foreign_fixture",
+  "label": "python_fixture",
+  "text": "fixture = {\"permissions\": {\"allow\": [\"Bash(*)\"]}}"
+ },
+ {
+  "family": "foreign_fixture",
+  "label": "json_fixture",
+  "text": "{\"test_fixture\": {\"permissions\": {\"defaultMode\": \"bypassPermissions\"}}}"
+ },
+ {
+  "family": "foreign_fixture",
+  "label": "other_project",
+  "text": "{\"rules\": {\"allow\": [\"Bash(*)\"]}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://100.127.255.254/v1\"}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "1",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://172.31.255.254/v1\"}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "2",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://192.168.0.1/v1\"}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "3",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[fc00::1]/v1\"}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "4",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[fe80::abcd]/v1\"}}"
+ },
+ {
+  "family": "internal_boundary",
+  "label": "5",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://10.255.255.254/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://240.0.0.1/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "1",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://198.18.0.1/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "2",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://224.0.0.1/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "3",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://256.1.1.1/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "4",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2001:db8::1]/v1\"}}"
+ },
+ {
+  "family": "invalid_reserved",
+  "label": "5",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2002::1]/v1\"}}"
+ },
+ {
+  "family": "hostnames",
+  "label": "0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://abc.ngrok.io.example.org/v1\"}}"
+ },
+ {
+  "family": "hostnames",
+  "label": "1",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://abc.ngrok.io.invalid/v1\"}}"
+ },
+ {
+  "family": "hostnames",
+  "label": "2",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://user@abc.ngrok.io.example.org/v1\"}}"
+ },
+ {
+  "family": "hostnames",
+  "label": "3",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://gateway.corp.test/v1\"}}"
+ },
+ {
+  "family": "other_objects",
+  "label": "foreign_permissions",
+  "text": "{\"app\": {\"permissions\": {\"allow\": [\"Bash(*)\"]}}}"
+ },
+ {
+  "family": "other_objects",
+  "label": "escaped_schema",
+  "text": "Schema example:\n{\"permissions\":{\"\\u0064efaultMode\":\"bypassPermissions\"}}"
+ },
+ {
+  "family": "other_objects",
+  "label": "flat_allow",
+  "text": "{\"allow\": [\"Bash(*)\"]}"
+ },
+ {
+  "family": "other_objects",
+  "label": "foreign_rules",
+  "text": "{\"rules\": {\"allow\": [\"Bash\"]}}"
+ },
+ {
+  "family": "other_objects",
+  "label": "proxy",
+  "text": "{\"HTTPS_PROXY\": \"http://93.184.216.34\"}"
+ },
+ {
+  "family": "other_objects",
+  "label": "mcp",
+  "text": "{\"mcpServers\": {}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "0_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "0_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "1_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[3::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "1_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[3::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "2_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2a::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "2_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2a::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "3_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[200::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "3_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[200::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "4_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[3ff::1]/v1\"}}"
+ },
+ {
+  "family": "short_prefix_v6",
+  "label": "4_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[3ff::1]/v1\"}}"
+ },
+ {
+  "family": "non_ascii_digits",
+  "label": "0_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://9\u0663.184.216.34/v1\"}}"
+ },
+ {
+  "family": "non_ascii_digits",
+  "label": "0_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://9\u0663.184.216.34/v1\"}}"
+ },
+ {
+  "family": "non_ascii_digits",
+  "label": "1_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://\u0663\u0664.184.216.34/v1\"}}"
+ },
+ {
+  "family": "non_ascii_digits",
+  "label": "1_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://\u0663\u0664.184.216.34/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "0_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://01.2.3.4/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "0_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://01.2.3.4/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "1_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://240.0.0.2/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "1_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://240.0.0.2/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "2_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://0.1.2.3/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "2_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://0.1.2.3/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "3_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://192.0.2.7/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "3_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://192.0.2.7/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "4_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2001:0db8::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "4_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2001:0db8::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "5_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2001::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "5_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2001::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "6_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[3fff::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "6_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[3fff::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "7_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606::1::2]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "7_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606::1::2]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "8_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:zz::1]/v1\"}}"
+ },
+ {
+  "family": "address_controls",
+  "label": "8_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:zz::1]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "0_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:1:2:3:4:5::6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "0_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:1:2:3:4:5::6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "1_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:1:2:3:4::5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "1_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:1:2:3:4::5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "2_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:1:2:3::4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "2_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:1:2:3::4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "3_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:1:2::3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "3_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:1:2::3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "4_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606:1::2:3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "4_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606:1::2:3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "5_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[2606::1:2:3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "compression_positions",
+  "label": "5_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[2606::1:2:3:4:5:6:7]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "0_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[0200::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "0_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[0200::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "1_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[03ff::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "1_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[03ff::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "2_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[4000::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "2_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[4000::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "3_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://[1fff::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "3_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://[1fff::1]/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "4_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://93.184.216.34:\u0668\u0660/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "4_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://93.184.216.34:\u0668\u0660/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "5_0",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"http://93.184.216.\u0663\u0664/v1\"}}"
+ },
+ {
+  "family": "numeric_boundaries",
+  "label": "5_1",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"http://93.184.216.\u0663\u0664/v1\"}}"
+ },
+ {
+  "family": "name_boundaries",
+  "label": "0",
+  "text": "{\"XANTHROPIC_BASE_URL\": \"http://93.184.216.34\"}"
+ },
+ {
+  "family": "name_boundaries",
+  "label": "1",
+  "text": "{\"ANTHROPIC_BASE_URL_BACKUP\": \"http://93.184.216.34\"}"
+ },
+ {
+  "family": "name_boundaries",
+  "label": "2",
+  "text": "{\"defaultModeExample\": \"bypassPermissions\"}"
+ },
+ {
+  "family": "name_boundaries",
+  "label": "3",
+  "text": "{\"skipDangerousModePermissionPromptExample\": true}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_2_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd::1234:5678:9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_2_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd::1234:5678:9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_3_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd:1234::5678:9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_3_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd:1234::5678:9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_4_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678::9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_4_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678::9abc:def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_5_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc::def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_5_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc::def0:123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_6_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc:def0::123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_6_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc:def0::123:456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_7_plain",
+  "text": "{\"env\":{\"ANTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc:def0:123::456]/\"}}"
+ },
+ {
+  "family": "compression_positions_more",
+  "label": "position_7_encoded",
+  "text": "{\"env\":{\"\\u0041NTHROPIC_BASE_URL\":\"https://[2607:abcd:1234:5678:9abc:def0:123::456]/\"}}"
+ }
+]
