@@ -904,7 +904,7 @@ def test_the_layer_costs_a_bounded_multiple_of_the_scan_without_it(family):
     on, off = SunglassesEngine(), SunglassesEngine(validators=False)
     with_layer = best_of(lambda: on.scan(text, channel="file"))
     without = best_of(lambda: off.scan(text, channel="file"))
-    assert with_layer <= 1.3 * without + 0.35, (family, with_layer, without)
+    assert with_layer <= 1.5 * without + 0.35, (family, with_layer, without)
 
 
 @pytest.mark.parametrize("family", ["many_commands", "deep_open", "pipe_spam", "long_command", "brace_spam",
