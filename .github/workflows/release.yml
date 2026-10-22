@@ -345,7 +345,8 @@ jobs:
           # changes just the time. The two parsed documents are compared with their JSON
           # types kept (true is not 1), so a nested key or another property cannot change;
           # then every changed line must be one of those two fields' own lines, same key,
-          # same indentation, same position, so no other line is reformatted either.
+          # same indentation, same position, same line ending, so no other line is
+          # reformatted either.
           FILES="$(git diff --name-only)"
           CHECK=0
           python3 - <<'PY' || CHECK=$?
@@ -357,8 +358,10 @@ jobs:
                   raise ValueError("a duplicate key (the parser would keep only the last)")
               return dict(pairs)
           try:
-              old_text = subprocess.check_output(["git", "show", "HEAD:stats/current.json"], text=True)
-              new_text = open("stats/current.json", encoding="utf-8").read()
+              # bytes in, no newline translation: a file converted between LF and CRLF
+              # must show up as changed lines, not be read back as the same text
+              old_text = subprocess.check_output(["git", "show", "HEAD:stats/current.json"]).decode("utf-8")
+              new_text = open("stats/current.json", encoding="utf-8", newline="").read()
               old = json.loads(old_text, object_pairs_hook=strict)
               new = json.loads(new_text, object_pairs_hook=strict)
           except ValueError as error:
