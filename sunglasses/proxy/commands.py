@@ -49,6 +49,13 @@ def main(argv=None, *, stdout=None, stderr=None, serve=None, confirm=None):
     if refused is not None:
         return refused
 
+    # Asking for help is not a mistake: it prints the usage to stdout and succeeds, like every
+    # other subcommand. Only the words before a separator count; after `--` they belong to the
+    # server being wrapped (`sunglasses proxy -- npx server --help` is that server's own help).
+    if _asks_for_help(argv):
+        stdout.write(USAGE)
+        return EXIT_OK
+
     if not argv:
         return _usage(stderr)
     head = argv[0]
@@ -69,6 +76,15 @@ def main(argv=None, *, stdout=None, stderr=None, serve=None, confirm=None):
     if not rest:
         return _usage(stderr)
     return _approve(rest[0], options, stdout, stderr, confirm=confirm)
+
+
+def _asks_for_help(argv):
+    for token in argv:
+        if token == SEPARATOR:
+            return False
+        if token in ("-h", "--help"):
+            return True
+    return False
 
 
 def _usage(stderr):
