@@ -178,9 +178,18 @@ jobs:
       # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
       # and a decoder that is missing turns a real finding into silence.
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        # A stalled mirror used to hold a runner for the whole job timeout. Each attempt is
+        # capped, a second attempt follows, and the step itself is capped as a backstop.
+        timeout-minutes: 8
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+          for attempt in 1 2; do
+            if sudo timeout 200 apt-get update -qq \
+                && sudo timeout 200 apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg; then
+              exit 0
+            fi
+            echo "apt attempt $attempt did not finish; retrying" >&2
+          done
+          exit 1
 
       - name: Install package + dev + media deps
         run: |
@@ -394,9 +403,18 @@ jobs:
       # Native decoders/OCR. Without these the v0.5.6 media tests cannot run at all,
       # and a decoder that is missing turns a real finding into silence.
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
+        # A stalled mirror used to hold a runner for the whole job timeout. Each attempt is
+        # capped, a second attempt follows, and the step itself is capped as a backstop.
+        timeout-minutes: 8
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg
+          for attempt in 1 2; do
+            if sudo timeout 200 apt-get update -qq \
+                && sudo timeout 200 apt-get install -y -qq tesseract-ocr libzbar0 ffmpeg; then
+              exit 0
+            fi
+            echo "apt attempt $attempt did not finish; retrying" >&2
+          done
+          exit 1
 
       - name: Install package + dev + media deps
         run: |
