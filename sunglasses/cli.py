@@ -25,6 +25,7 @@ import tempfile
 import time
 
 from . import __version__
+from . import baseline as _baseline
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .extractors.member import Member
@@ -677,6 +678,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
     partially_read = []          # (path, reason) for members read only in part
     total_threats = 0
     all_findings = []
+    # sha256 of the bytes each file was judged on, only when --fail-on / --baseline are in use.
+    policy_active = _scan_policy_requested(args)
+    sha_by_file = {}
     category_counts = {}
     severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     file_results = []
@@ -719,6 +723,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
                       else f"could not be read ({exc.__class__.__name__}) — not inspected")
             walker_skips.append((rel_path, reason))
             continue
+        if policy_active:
+            sha_by_file[rel_path] = _baseline.file_sha256(data)
         snapshot = Member(data, rel_path)
         data = None
 
@@ -878,6 +884,37 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
     incomplete = bool(files_incomplete or unread_skips or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
+    policy = None
+    if policy_active:
+        # Every finding the JSON and SARIF documents emit, in the order they emit it. The
+        # baseline is judged on these, not on the collapsed view the human screen prints,
+        # so a count, a marking and a stale entry always describe the same finding.
+        observations = [
+            {"id": f["id"], "file": _baseline.posix_path(r.source), "native_file": r.source,
+             "index": position, "file_sha256": sha_by_file.get(r.source, ""),
+             "severity": f.get("severity", "low")}
+            for r in repo_results for position, f in enumerate(r.findings)]
+        policy = _tree_policy(args, observations)
+    if policy:
+        repo_exit = _final_exit(repo_exit, policy["new_severities"], policy["fail_on"], incomplete)
+        summary.update({
+            "fail_on": policy["fail_on"],
+            "known_findings": policy["known_count"],
+            "new_findings": len(policy["new_severities"]),
+            "baseline_stale": policy["stale"],
+        })
+        if policy["write_error"]:
+            # Precedence 1 > 3 > 2 > 0: a threat or an unread file outranks the refusal, which
+            # only decides the exit when the scan itself would have passed.
+            summary["baseline_write_error"] = policy["write_error"]
+            if repo_exit == EXIT_CLEAN:
+                repo_exit = EXIT_USAGE
+        for entry in file_results:
+            for position, f in enumerate(entry["findings"]):
+                status = policy["by_position"].get((entry["file"], position), "new")
+                f["known"] = status == "known"
+                if status == "below":
+                    f["below_fail_on"] = True
     # Through the one normalizer, like every other document. This block used to
     # compute the three axes itself. It computed them CORRECTLY -- but "correct
     # duplicate of the invariant" is the exact shape the other four consumers had
@@ -896,11 +933,20 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
         source=repo_url,
     ))
     summary["exit_code"] = repo_exit
+    if policy and policy["write_error"]:
+        summary["is_clean"] = False
 
     if args.output == "sarif":
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
         sarif_doc = to_sarif(repo_results, source=repo_url)
+        if policy and policy["known_count"] and sarif_doc.get("runs"):
+            # Same order `to_sarif` used: one entry per finding of each result. A known
+            # finding stays in the document, marked as suppressed by an external list.
+            for status, res in zip(policy["statuses"], sarif_doc["runs"][0]["results"]):
+                if status == "known":
+                    res["suppressions"] = [{"kind": "external",
+                                            "justification": "listed in the baseline"}]
         not_inspected = ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in partially_read])
         not_inspected += [
@@ -911,6 +957,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
             not_inspected.append("no file was inspected")
         if sarif_doc.get("runs"):
             sarif_doc["runs"][0].setdefault("properties", {})["excludedFolders"] = excluded_folders
+            if policy and policy["write_error"]:
+                sarif_doc["runs"][0]["properties"]["baselineWriteError"] = policy["write_error"]
         if not_inspected and sarif_doc.get("runs"):
             # Without this a repo where nothing could be read emits results:[] --
             # which a SARIF consumer reads as "scanned, nothing there". The empty
@@ -957,6 +1005,13 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
         if len(walker_skips) > 10:
             print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
+    if policy:
+        print(f"  Known (baseline): {BOLD}{policy['known_count']}{RESET}   "
+              f"New: {BOLD}{len(policy['new_severities'])}{RESET}   "
+              f"Stale baseline entries: {BOLD}{policy['stale']}{RESET}")
+        print(f"  Fails on:        {BOLD}{policy['fail_on']}{RESET}")
+        if policy["write_error"]:
+            print(f"  {RED}Baseline NOT written:{RESET} {_printable(policy['write_error'])}")
     print(f"  Scan time:       {DIM}{elapsed_ms:.0f}ms{RESET}")
 
     if total_threats > 0:
@@ -980,7 +1035,13 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
             shown.add(fkey)
             f = item["finding"]
             sev_color = RED if f["severity"] in ("critical", "high") else YELLOW if f["severity"] == "medium" else CYAN
-            print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}")
+            marker = ""
+            status = policy["by_key"].get((item["file"], f["id"])) if policy else None
+            if status == "known":
+                marker = f" {CYAN}KNOWN{RESET}"
+            elif status == "below":
+                marker = f" {DIM}(below --fail-on){RESET}"
+            print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}{marker}")
             print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
             if f.get("matched_text"):
                 print(f"      {DIM}Match: \"{f['matched_text']}\"{RESET}")
@@ -1028,6 +1089,138 @@ EXIT_USAGE = 2
 EXIT_INCOMPLETE = 3
 
 
+def _fail_on(args):
+    """The --fail-on level in force: `any` unless the flag was given."""
+    return getattr(args, "fail_on", None) or "any"
+
+
+def _scan_policy_requested(args):
+    """True when --fail-on, --baseline or --write-baseline appears, whatever its value.
+
+    An option given with its default value, or with an empty value, is still "given": it is
+    judged (and refused if empty) instead of being read as absent.
+    """
+    return (getattr(args, "fail_on", None) is not None
+            or getattr(args, "baseline", None) is not None
+            or getattr(args, "write_baseline", None) is not None)
+
+
+def _final_exit(base_exit, severities, fail_on, incomplete):
+    """The exit code once --fail-on and the baseline have had their say.
+
+    Only a threat exit is ever lowered: 2 stays 2, 3 stays 3, 0 stays 0. A threat exit
+    stays 1 when some NEW finding reaches the level; otherwise the scan is judged as if it
+    had no findings, which means exit 3 when part of the input was not read. A finding
+    below the level never turns an unread file into a clean one.
+    """
+    if base_exit != EXIT_THREAT:
+        return base_exit
+    if _baseline.fails(severities, fail_on):
+        return EXIT_THREAT
+    return EXIT_INCOMPLETE if incomplete else EXIT_CLEAN
+
+
+def _prepare_scan_policy(args):
+    """Check --fail-on / --baseline / --write-baseline / --accept-critical before any scan.
+
+    Every refusal is exit 2: an option that cannot be honoured must never fall back to
+    "scan as if it were not there", because that reads as a pass.
+    """
+    args._baseline = None
+    baseline_path = getattr(args, "baseline", None)
+    write_path = getattr(args, "write_baseline", None)
+    accept = list(getattr(args, "accept_critical", None) or [])
+    if not (_scan_policy_requested(args) or accept):
+        return
+    for flag, value in (("--baseline", baseline_path), ("--write-baseline", write_path)):
+        if value is not None and not value.strip():
+            _usage_error(args, f"{flag} needs a file name; the value is empty.",
+                         "Nothing was scanned.")
+    if any(not rule.strip() for rule in accept):
+        _usage_error(args, "--accept-critical needs a rule id; the value is empty.",
+                     "Nothing was scanned.")
+    if baseline_path is not None and write_path is not None:
+        _usage_error(args, "--baseline and --write-baseline cannot be used together.",
+                     "Nothing was scanned. Write the list in one run, apply it in the next.")
+    if accept and baseline_path is None:
+        _usage_error(args, "--accept-critical needs --baseline.",
+                     "Nothing was scanned. It names a rule whose critical findings the baseline may cover.")
+    if getattr(args, "deep", False):
+        _usage_error(args, "--fail-on and the baseline options are not available with --deep.",
+                     "Nothing was scanned. Deep scans of audio and video keep today's exit codes.")
+    if baseline_path is not None or write_path is not None:
+        is_tree = getattr(args, "directory", None) is not None or bool(args.repo)
+        if not is_tree:
+            _usage_error(args, "--baseline and --write-baseline need --dir or --repo.",
+                         "Nothing was scanned. A baseline names files under a scan root; "
+                         "text, stdin and a single file have none.")
+    if write_path is not None:
+        try:
+            _baseline.check_destination(write_path)
+        except _baseline.BaselineError as exc:
+            _usage_error(args, str(exc), "Nothing was scanned.")
+    if baseline_path is not None:
+        try:
+            args._baseline = _baseline.load(baseline_path)
+        except _baseline.BaselineError as exc:
+            _usage_error(args, str(exc), "Nothing was scanned. The baseline was not applied.")
+
+
+def _tree_policy(args, observations):
+    """Judge a tree scan's findings against --fail-on and the baseline.
+
+    `observations` is one dict per finding the JSON and SARIF documents emit, in emission
+    order (id, file, native_file, index, file_sha256, severity). Returns None when no
+    policy option is in play. Each finding gets a status: `known` (listed in the baseline),
+    `below` (new, but under the --fail-on level) or `new`. `new_severities` covers every
+    finding that is not known; the exit code is decided on those. Nothing here removes a
+    finding from any output.
+    """
+    fail_on = _fail_on(args)
+    base = getattr(args, "_baseline", None)
+    write_path = getattr(args, "write_baseline", None)
+    if not _scan_policy_requested(args):
+        return None
+    write_error = None
+    if write_path is not None:
+        try:
+            _baseline.write(write_path, observations, __version__)
+            base = _baseline.Baseline(_baseline.entries_for(observations), __version__)
+        except _baseline.BaselineError as exc:
+            # The scan already ran: its findings are reported in full, judged against an empty
+            # list because nothing was recorded, and the refusal rides along as an error.
+            write_error = str(exc)
+            base = _baseline.Baseline([], __version__)
+    known, stale = _baseline.classify(observations, base, getattr(args, "accept_critical", None) or ())
+    threshold = _baseline.FAIL_ON_LEVELS[fail_on]
+    statuses, by_position, by_key = [], {}, {}
+    order = {"known": 0, "below": 1, "new": 2}
+    for item, is_known in zip(observations, known):
+        if is_known:
+            status = "known"
+        elif _baseline.SEVERITY_RANK.get(item["severity"], 1) < threshold:
+            status = "below"
+        else:
+            status = "new"
+        statuses.append(status)
+        by_position[(item["native_file"], item["index"])] = status
+        # The human screen shows one line per (file, rule): it carries the worst status of
+        # the findings behind it, so a known entry can never hide a new sibling.
+        key = (item["native_file"], item["id"])
+        if key not in by_key or order[status] > order[by_key[key]]:
+            by_key[key] = status
+    return {
+        "fail_on": fail_on,
+        "new_severities": [i["severity"] for i, k in zip(observations, known) if not k],
+        "known_count": sum(known),
+        "stale": stale,
+        "statuses": statuses,
+        "by_position": by_position,
+        "by_key": by_key,
+        "write_error": write_error,
+    }
+
+
 def _scan_exit_code(result):
     """Map a ScanResult onto the exit contract.
 
@@ -1045,6 +1238,17 @@ def _scan_exit_code(result):
     if not getattr(result, "inspection_complete", getattr(result, "extraction_complete", True)):
         return EXIT_INCOMPLETE
     return EXIT_CLEAN
+
+
+def _single_exit_code(args, result):
+    """`_scan_exit_code` with --fail-on applied, for one file or one piece of text."""
+    code = _scan_exit_code(result)
+    fail_on = _fail_on(args)
+    if fail_on == "any":
+        return code
+    incomplete = not getattr(result, "inspection_complete", getattr(result, "extraction_complete", True))
+    severities = [f.get("severity", "low") for f in result.reported_findings()]
+    return _final_exit(code, severities, fail_on, incomplete)
 
 
 def _usage_error(args, message, hint=None):
@@ -1155,6 +1359,38 @@ def _print_extraction_warnings(result, stream=None):
               f"same as clean.{RESET}", file=out)
 
 
+def _annotate_single_policy(args, output):
+    """Add the --fail-on level and the below-level markings to one scan's JSON document.
+
+    Only when --fail-on was given: a plain scan's document is unchanged. Findings stay in
+    the list; one under the level carries `below_fail_on`.
+    """
+    if getattr(args, "fail_on", None) is None:
+        return
+    level = _fail_on(args)
+    threshold = _baseline.FAIL_ON_LEVELS[level]
+    output["fail_on"] = level
+    marked = []
+    for finding in output.get("findings") or []:
+        finding = dict(finding)
+        if _baseline.SEVERITY_RANK.get(finding.get("severity", "low"), 1) < threshold:
+            finding["below_fail_on"] = True
+        marked.append(finding)
+    output["findings"] = marked
+
+
+def _print_single_policy(args, result):
+    """The human screen's one line for --fail-on on a single file or text."""
+    if getattr(args, "fail_on", None) is None:
+        return
+    level = _fail_on(args)
+    threshold = _baseline.FAIL_ON_LEVELS[level]
+    below = sum(1 for f in result.reported_findings()
+                if _baseline.SEVERITY_RANK.get(f.get("severity", "low"), 1) < threshold)
+    note = f" ({below} finding(s) below it)" if below else ""
+    print(f"  Fails on:        {BOLD}{level}{RESET}{note}")
+
+
 def _emit_scan_result(args, result, source):
     """The ONE place a scan outcome leaves the process. Never returns.
 
@@ -1169,14 +1405,15 @@ def _emit_scan_result(args, result, source):
         print(json.dumps(to_sarif([result], source=source), indent=2))
         # stdout is a machine contract here; the warning goes to stderr.
         _print_extraction_warnings(result, stream=sys.stderr)
-        sys.exit(_scan_exit_code(result))
+        sys.exit(_single_exit_code(args, result))
 
     if args.json:
         output = result.to_dict()
         output["source"] = source
+        _annotate_single_policy(args, output)
         print(json.dumps(output))
         _print_extraction_warnings(result, stream=sys.stderr)
-        sys.exit(_scan_exit_code(result))
+        sys.exit(_single_exit_code(args, result))
 
     # The channel the scan actually used, not the flag default: scan_file() forces
     # channel="file", so printing args.channel here contradicted the JSON output of
@@ -1184,8 +1421,9 @@ def _emit_scan_result(args, result, source):
     print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
+    _print_single_policy(args, result)
     _print_extraction_warnings(result)
-    sys.exit(_scan_exit_code(result))
+    sys.exit(_single_exit_code(args, result))
 
 
 def cmd_scan(args):
@@ -1198,6 +1436,8 @@ def cmd_scan(args):
     # stdin, repo and deep — instead of four separate checks that can drift.
     if getattr(args, "output", "human") == "json":
         args.json = True
+
+    _prepare_scan_policy(args)
 
     if getattr(args, "directory", None) is not None and args.repo:
         _usage_error(args, "--dir and --repo cannot be used together.",
@@ -2978,7 +3218,9 @@ def main():
              "string looks like a filename (v0.5.6: a path-shaped positional "
              "argument that does not exist is now a usage error, not a scan)",
     )
-    scan_parser.add_argument("--file", "-f", help="File to scan")
+    # `--f` has always been the unique abbreviation of --file; --fail-on made it ambiguous,
+    # so it is spelled out.
+    scan_parser.add_argument("--file", "-f", "--f", help="File to scan")
     scan_parser.add_argument("--repo", help="GitHub repo URL to clone and scan")
     scan_parser.add_argument("--dir", dest="directory", metavar="PATH",
                              help="Local directory to scan (same files, skips and exit codes as --repo, "
@@ -2990,6 +3232,24 @@ def main():
                              help="With --repo or --dir: leave package-lock.json, yarn.lock, pnpm-lock.yaml, "
                                   "poetry.lock, Cargo.lock and go.sum unread. They are named as skipped and "
                                   "the scan is incomplete (default: they are scanned)")
+    scan_parser.add_argument("--fail-on", dest="fail_on", default=None,
+                             choices=list(_baseline.FAIL_ON_LEVELS), metavar="LEVEL",
+                             help="Exit 1 only for a finding at or above LEVEL: any (default, every "
+                                  "finding), low, medium, high, critical, or none (report only). "
+                                  "Findings below the level are still shown. Exit 3 (part of the input "
+                                  "not read) is unchanged by any level")
+    scan_parser.add_argument("--baseline", metavar="FILE",
+                             help="With --dir or --repo: findings already listed in FILE (same rule, same "
+                                  "path, same file content) are marked known and do not fail the scan. "
+                                  "They are still shown. Critical findings are never covered unless "
+                                  "--accept-critical names the rule")
+    scan_parser.add_argument("--write-baseline", dest="write_baseline", metavar="FILE",
+                             help="With --dir or --repo: write FILE listing this scan's findings, then "
+                                  "judge the scan against it")
+    scan_parser.add_argument("--accept-critical", dest="accept_critical", action="append",
+                             metavar="GLS-ID",
+                             help="With --baseline: let the baseline cover critical findings of this rule "
+                                  "(repeat for more rules)")
     # `--s` has always been the unique abbreviation of --stdin; --skip-lockfiles made it
     # ambiguous, so it is spelled out like `--d` below.
     scan_parser.add_argument("--stdin", "--s", dest="stdin", action="store_true", help="Read from stdin")
