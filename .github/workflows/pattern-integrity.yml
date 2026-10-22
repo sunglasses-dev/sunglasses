@@ -180,14 +180,22 @@ jobs:
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
         # A stalled mirror used to hold a runner for the whole job timeout. Each command is
         # capped, and a retry against the same stuck mirror never passes, so every attempt
-        # after the first moves to the main Ubuntu archive before it tries again.
-        timeout-minutes: 10
+        # after the first moves to the main Ubuntu archive before it tries again. The runner
+        # picks its mirror from apt-mirrors.txt, so that list is what gets rewritten. Three
+        # stalled attempts of 200 s each plus overhead run past 10 minutes; 12 lets the
+        # third one finish before the step cap cuts in.
+        timeout-minutes: 12
         run: |
-          mirror_lines() { grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; }
+          mirror_lines() {
+            grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+            cat /etc/apt/apt-mirrors.txt 2>/dev/null || true
+          }
           APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
           for attempt in 1 2 3; do
             if [ "$attempt" -gt 1 ]; then
               echo "apt mirror before:"; mirror_lines
+              printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://security.ubuntu.com/ubuntu/\tpriority:2\n' \
+                | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
               sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
               echo "apt mirror after:"; mirror_lines
             fi
@@ -413,14 +421,22 @@ jobs:
       - name: Install native media tools (Tesseract, zbar, ffmpeg)
         # A stalled mirror used to hold a runner for the whole job timeout. Each command is
         # capped, and a retry against the same stuck mirror never passes, so every attempt
-        # after the first moves to the main Ubuntu archive before it tries again.
-        timeout-minutes: 10
+        # after the first moves to the main Ubuntu archive before it tries again. The runner
+        # picks its mirror from apt-mirrors.txt, so that list is what gets rewritten. Three
+        # stalled attempts of 200 s each plus overhead run past 10 minutes; 12 lets the
+        # third one finish before the step cap cuts in.
+        timeout-minutes: 12
         run: |
-          mirror_lines() { grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true; }
+          mirror_lines() {
+            grep -hE '^(URIs:|deb )' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+            cat /etc/apt/apt-mirrors.txt 2>/dev/null || true
+          }
           APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
           for attempt in 1 2 3; do
             if [ "$attempt" -gt 1 ]; then
               echo "apt mirror before:"; mirror_lines
+              printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://security.ubuntu.com/ubuntu/\tpriority:2\n' \
+                | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
               sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
               echo "apt mirror after:"; mirror_lines
             fi
