@@ -2289,6 +2289,35 @@ def _needs_pyzbar():
         pytest.skip(f"QR decoding unavailable: {exc}")
 
 
+def _needs_the_media_decoders():
+    """Skip, naming what is missing, when the text and QR decoders are not installed.
+
+    A complete image scan needs Pillow, pytesseract with a tesseract binary, and
+    pyzbar with libzbar. Without any of them the scanner reports the component it
+    could not read and the scan is incomplete, which is the correct answer and not
+    what the two controls below measure: they assert a COMPLETE scan, so they can
+    only run where every decoder is present. CI installs all of them, and there
+    the controls run and must pass; an environment that cannot read the file is
+    told so here instead of failing on a result the scanner was right to give.
+    """
+    missing = []
+    try:
+        from PIL import Image  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment guard
+        missing.append(f"Pillow ({exc})")
+    try:
+        import pytesseract
+        pytesseract.get_tesseract_version()
+    except Exception as exc:  # pragma: no cover - environment guard
+        missing.append(f"OCR (pytesseract and a tesseract binary: {type(exc).__name__})")
+    try:
+        import pyzbar.pyzbar  # noqa: F401
+    except Exception as exc:  # pragma: no cover - environment guard
+        missing.append(f"QR decoding (pyzbar and libzbar: {type(exc).__name__})")
+    if missing:
+        pytest.skip("a complete image scan needs every decoder; missing: " + "; ".join(missing))
+
+
 def _needs_pillow():
     try:
         from PIL import Image  # noqa: F401
@@ -2450,7 +2479,7 @@ def test_h2_absent_exif_stays_clean_and_complete():
     file incomplete, every clean image in the corpus would go incomplete — the
     exact over-correction the acceptance contract rejects a blanket rule for.
     """
-    _needs_pillow()
+    _needs_the_media_decoders()
     proc = _run([sys.executable, "-m", "sunglasses"], "--file",
                 _fixture("qr-ordinary.png"), "-o", "json", timeout=300)
     doc = _one_json_doc(proc)
@@ -2486,7 +2515,7 @@ def test_h2_an_unrelated_pillow_warning_is_not_reported_as_corrupt_metadata():
 
 def test_h3_the_control_fixture_is_a_real_finding_at_full_strength():
     """Trip evidence for H3: the control must find things, or the loss is unmeasurable."""
-    _needs_pillow()
+    _needs_the_media_decoders()
     proc = _run([sys.executable, "-m", "sunglasses"], "--file",
                 _fixture("ascii_control.jpg"), "-o", "json", timeout=300)
     doc = _one_json_doc(proc)
