@@ -284,7 +284,10 @@ def test_an_error_one_file_raises_is_counted_at_that_file_in_walk_order(rig, mon
 
 # ── 6. the flag ────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("value", ["0", "-1", "1.5", "nan", "inf", "", "two", "65", "1e1", "٣", "9" * 5000, "0" * 5000 + "1x"])
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "nan", "inf", "", "two", "65", "1e1", "٣", "9" * 5000, "0" * 5000 + "1x",
+                                   pytest.param("0" * 5000 + "1", id="5000-zeros-then-1"),
+                                   pytest.param("0" * 5000, id="5000-zeros"),
+                                   pytest.param("0" * 17 + "1", id="17-chars")])
 def test_a_value_that_is_not_a_whole_number_from_1_to_64_is_refused_before_any_scan(rig, value):
     root = _tree(rig, {"a.txt": CLEAN})
     proc = _scan(rig, "--dir", str(root), "--jobs", value)
@@ -300,7 +303,7 @@ def test_jobs_with_file_is_refused_naming_dir_and_repo(rig):
     assert _starts(rig) == []
 
 
-@pytest.mark.parametrize("value", ["2", "0", "nope"])
+@pytest.mark.parametrize("value", ["2", "0", "nope", pytest.param("0" * 5000 + "1", id="5000-zeros-then-1")])
 @pytest.mark.parametrize("mode", ["text", "stdin", "positional"])
 def test_jobs_given_to_text_is_refused_not_ignored(rig, mode, value):
     args = {"text": ["--text", "hello there"], "stdin": ["--stdin"], "positional": ["hello there"]}[mode]

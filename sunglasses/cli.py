@@ -569,11 +569,13 @@ def _check_jobs(args):
     if value is None:
         return DEFAULT_JOBS
     text = str(value).strip()
-    digits = text.lstrip("0")        # a long run of digits is refused before it is turned into a number
-    if not (text.isascii() and text.isdigit() and 0 < len(digits) <= 2 and int(digits) <= MAX_JOBS):
+    digits = text.lstrip("0")
+    # The whole text is bounded, not just what follows its zeros: a long run of zeros in front of a
+    # small number is refused here too, before anything is turned into a number.
+    if not (len(text) <= 16 and text.isascii() and text.isdigit() and 0 < len(digits) <= 2 and int(digits) <= MAX_JOBS):
         _usage_error(args, f"--jobs must be a whole number from 1 to {MAX_JOBS}, got {_printable(str(value))}.",
                      "Nothing was scanned. Use 1 to read one file at a time, or leave --jobs out.")
-    return int(text)
+    return int(digits)
 
 
 class _SigtermLeavesCleanly:
@@ -3557,8 +3559,11 @@ def main():
                                   "(default: 120). Refused with --deep on an audio or video file")
     scan_parser.add_argument("--jobs", dest="jobs", metavar="N",
                              help="With --dir or --repo: read up to N files at once, 1 to 64 "
-                                  "(default: 1, one file at a time). The report holds the same files, "
-                                  "findings and exit code as --jobs 1, in the same order; the "
+                                  "(default: 1, one file at a time). If the tree is unchanged and every "
+                                  "file is read to the end in both runs, the report holds the same "
+                                  "files, findings and exit code as --jobs 1, in the same order; a "
+                                  "file that reaches --file-deadline is reported as not read "
+                                  "(exit 3) and can differ between runs with different N. The "
                                   "timing fields and, in SARIF, the event ids differ from run to "
                                   "run as they always have. Progress lines announce a file when "
                                   "it is handed out, so they can run ahead of the results. "
