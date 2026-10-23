@@ -193,6 +193,8 @@ jobs:
           APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
           for attempt in 1 2 3; do
             if [ "$attempt" -gt 1 ]; then
+              # An install stopped by the timeout leaves dpkg half-configured; repair it so the retry can run.
+              sudo timeout 120 dpkg --configure -a >/dev/null 2>&1 || true
               echo "apt mirror before:"; mirror_lines
               printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://security.ubuntu.com/ubuntu/\tpriority:2\n' \
                 | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
@@ -434,6 +436,8 @@ jobs:
           APT_OPTS="-o Acquire::http::Timeout=30 -o Acquire::Retries=2"
           for attempt in 1 2 3; do
             if [ "$attempt" -gt 1 ]; then
+              # An install stopped by the timeout leaves dpkg half-configured; repair it so the retry can run.
+              sudo timeout 120 dpkg --configure -a >/dev/null 2>&1 || true
               echo "apt mirror before:"; mirror_lines
               printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://security.ubuntu.com/ubuntu/\tpriority:2\n' \
                 | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
