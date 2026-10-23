@@ -470,7 +470,7 @@ reply is treated as a failed process, which is stopped, and the file is reported
 default 1, one file at a time). When the tree does not change and every file is read to the end
 in both runs, the report holds the same files, findings, lists and exit code as `--jobs 1`, in the
 order the walk lists them. A file that reaches `--file-deadline` is reported as not read, which makes the
-scan incomplete (exit `3`, unless a threat is found elsewhere: exit `1`), and whether a file does
+scan incomplete (exit `3`, or exit `1` when a finding elsewhere reaches your `--fail-on` level, which at the default is any finding), and whether a file does
 can differ between runs with different N, so the two reports can differ for that file. The timing fields differ from run to run, and so does the event id in SARIF output,
 as they do between two runs with one file at a time. Each file has the whole `--file-deadline` to
 itself. A progress line is printed when a file is
