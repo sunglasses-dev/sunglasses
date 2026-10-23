@@ -121,6 +121,25 @@ def test_the_first_file_finishing_last_does_not_change_the_order_of_anything(rig
     assert [int(k) for k, _ in progress] == list(range(1, 10))
 
 
+def test_in_one_merged_stream_progress_runs_ahead_of_results_and_each_keeps_the_walk_order(rig):
+    root = _tree(rig, {"a_first.txt": SLOW, **{f"b_{i}.txt": CLEAN for i in range(8)}})
+    proc = subprocess.run(
+        [sys.executable, str(rig / "launcher.py"), str(rig / "stand_in.py"), "scan", "--dir", str(root),
+         "--verbose", "--file-deadline", "30", "--jobs", "4"],
+        cwd=rig / "cwd", env={**_env(rig, 3), "PYTHONUNBUFFERED": "1"},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+    assert proc.returncode == EXIT_CLEAN, proc.stdout
+    lines = proc.stdout.splitlines()
+    walk = ["a_first.txt"] + [f"b_{i}.txt" for i in range(8)]
+    progress = [(i, m.group(1)) for i, line in enumerate(lines) if (m := re.search(r"\[\d+/9\]\s+\S+\s+(\S+)", line))]
+    results = [(i, m.group(1)) for i, line in enumerate(lines) if (m := re.match(r"\s*(?:PASS|THREAT|INCOMPLETE)\s+(\S+)", line))]
+    assert [name for _, name in progress] == walk, lines
+    assert [name for _, name in results] == walk, lines
+    first_result = results[0][0]
+    assert any(i < first_result and name != "a_first.txt" for i, name in progress), (
+        "no later file was handed out before the slow first file had its result", lines)
+
+
 # ── 3. the deadline belongs to each child ──────────────────────────────────
 
 def test_one_file_that_does_not_finish_costs_only_itself(rig):
