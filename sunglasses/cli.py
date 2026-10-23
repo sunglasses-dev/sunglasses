@@ -375,7 +375,8 @@ def _walk_repo_files_with_skips(repo_dir, excluded=None, skip_lockfiles=False,
 
     `excluded`, when given, collects the folders the walk does not enter (dependency,
     build and VCS folders, see `_SKIP_DIRS`): not files, so not in `skips`, but named.
-    `.git` is left out of that list, it is metadata of the tree and not part of it.
+    The scan root's own `.git` is left out of that list, it is metadata of the tree and
+    not part of it; a `.git` folder anywhere below the root is named like the others.
 
     `root_fd` is the held descriptor of the scan root (opened here when not given) and
     `idents`, when given, is filled with each listed folder's (device, inode) so the
@@ -450,7 +451,9 @@ def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, sk
                 continue
             if stat.S_ISDIR(mode):
                 if name in _SKIP_DIRS or name.endswith('.egg-info'):
-                    if excluded is not None and name != '.git':
+                    # The scan root's own `.git` is metadata of the tree; one further down
+                    # is a folder of content the walk did not enter, so it is named.
+                    if excluded is not None and (name != '.git' or len(child) > 1):
                         excluded.append(rel)
                 else:
                     if idents is not None:
