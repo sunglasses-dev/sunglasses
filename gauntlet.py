@@ -309,10 +309,10 @@ def suite_c_malformed() -> dict:
 
 # ── the publishable-output gate ─────────────────────────────────────────────
 # The blanket rule "no payload strings anywhere" would fail against our own
-# package for no security gain: the wheel already ships 138 pattern files whose
-# records carry keywords and examples. That IS the product - the detection rules
-# are public by design. The line that actually matters is narrower and it is
-# checkable: never publish the text of a case we MISSED. A caught case's example
+# package for no security gain: the wheel already ships the public detection
+# definitions in patterns.py and mechanisms.py, keywords and regular expressions
+# included. That IS the product - the detection rules are public by design. The
+# line that actually matters is narrower and it is checkable: never publish the text of a case we MISSED. A caught case's example
 # is documentation. A missed case's payload is a working, unpatched exploit with
 # our own name on it.
 MISS_FIELDS = {"case_id", "class", "found", "fixed_in", "tuned_from"}

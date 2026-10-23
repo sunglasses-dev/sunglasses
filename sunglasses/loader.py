@@ -1,22 +1,33 @@
 """
-SUNGLASSES Database Loader — Loads attack patterns from JSON files.
+SUNGLASSES Database Loader — Loads attack patterns for the engine.
 
-Reads the attack-db/ directory and converts JSON patterns into the format
-the engine expects. This is what connects the "fat database" to the "thin filter."
+By default it returns the built-in pattern set; given a directory it reads the
+attack-db/ JSON files and converts them into the format the engine expects.
 """
 
+import copy
 import json
 import os
 
 
 def load_attack_db(db_path: str = None) -> list:
-    """Load all attack patterns from JSON files in the attack-db directory."""
+    """Load attack patterns in the format the engine expects.
+
+    With no path this returns every built-in pattern, the same set the engine
+    runs by default, so an engine built from it behaves like SunglassesEngine().
+    Each record has a ``keywords`` list, empty when the rule defines none.
+    With a path it reads the JSON files below that directory (the repo's
+    attack-db/attacks layout).
+    """
     if db_path is None:
-        # First try packaged data (inside the installed package)
-        packaged = os.path.join(os.path.dirname(__file__), 'data', 'attacks')
-        # Fall back to repo layout (attack-db/ next to sunglasses/)
-        repo = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'attack-db', 'attacks')
-        db_path = packaged if os.path.isdir(packaged) else repo
+        from .patterns import PATTERNS
+        # Copies, so a caller who edits a record cannot change the live rules.
+        records = copy.deepcopy(PATTERNS)
+        # Every record has always carried a keyword list here; a built-in rule that
+        # defines none gets its own empty one.
+        for record in records:
+            record.setdefault("keywords", [])
+        return records
 
     if not os.path.isdir(db_path):
         return []

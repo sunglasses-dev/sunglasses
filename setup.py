@@ -52,8 +52,7 @@ setup(
         # verify a fixture receipt without fetching either from GitHub (T9
         # ruling 47, rehearsal gap G1). Its tests and make_vectors.py are
         # pruned in MANIFEST.in (gap G2).
-        "sunglasses": ["data/attacks/**/*.json",
-                       "receipts/WIRE_SPEC.md", "receipts/VECTORS.json"],
+        "sunglasses": ["receipts/WIRE_SPEC.md", "receipts/VECTORS.json"],
     },
     entry_points={
         "console_scripts": [
