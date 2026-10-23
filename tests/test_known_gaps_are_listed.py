@@ -35,3 +35,10 @@ def test_lookalike_limit_is_listed_in_one_line_with_the_fold_mechanism():
         and re.search(r"NFKC|table", line)
     ]
     assert rows, "the look-alike limit is missing from KNOWN_VERSION_GAPS.md"
+
+
+def test_the_unbounded_proxy_id_records_are_listed_with_the_bounded_sibling():
+    assert "## Documented bound" in GAPS
+    section = GAPS[GAPS.index("## Documented bound"):]
+    assert "TOMBSTONE_LIMIT" in section
+    assert "left unbounded" in section

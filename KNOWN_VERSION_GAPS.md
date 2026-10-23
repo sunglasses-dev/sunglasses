@@ -461,3 +461,26 @@ repair. Neither is in 0.6.7.
 `tests/test_known_gaps_are_listed.py` asserts that this row stays in this file until
 the limit is repaired. The behavioral check for it is kept out of the public tree on
 purpose (lab finding E3).
+
+## Documented bound — the proxy keeps per-request-id records for the whole session
+
+A proxy session keeps several tables keyed by request id and does not trim them while it runs:
+
+- a counter for each request identity (its origin, its JSON type and its value), raised every time that
+  identity is admitted, a refused attempt included;
+- a final mark for each admitted attempt whose last answer was confirmed written;
+- the set of ids a client has cancelled, and the counter value each cancellation applied to;
+- the answer message the proxy received for each request it issued for its own use.
+
+Requests from either peer add to the counters, and so do the proxy's own requests. The cancellation
+records only ever name an id the session has already admitted, because a cancel for an unknown id is
+ignored, so a peer cannot grow them by inventing ids. The stored answers are whole messages, so their size
+depends on what the upstream sent. The size of an entry depends on the length of the id, and no
+measurement of the total is published here.
+
+They are kept on purpose. The counter is what lets a late cancellation or a late confirmation be matched
+to the request it belongs to, and the mark is what stops a late writer from sending a second response for
+an id that was already answered. Bounding them would trade that guard for a smaller footprint, so they are
+left unbounded for now. The tombstones kept for cancelled ids are the one table with a hard cap (`TOMBSTONE_LIMIT`, in
+`sunglasses/proxy/pump.py`: past the limit the session closes); the others grow with the number of distinct
+ids the peers send. This entry is revisited if a real session reports memory growth.
