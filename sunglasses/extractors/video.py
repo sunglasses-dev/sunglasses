@@ -69,8 +69,8 @@ class VideoExtractor:
 
     def _get_model(self):
         if self._model is None:
-            import whisper
-            self._model = whisper.load_model(self._model_name)
+            from sunglasses.extractors._whisper_model import load_whisper_model
+            self._model = load_whisper_model(self._model_name)
         return self._model
 
     warnings: List[str] = []
