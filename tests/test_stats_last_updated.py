@@ -153,3 +153,44 @@ def test_a_duplicate_key_in_the_file_is_refused_and_the_file_untouched(tmp_path)
     code, message = sla.stamp(tmp_path, V, fetch=served(), sleep=no_sleep)
     assert code == 2 and "not strict JSON" in message, message
     assert path.read_text() == text
+
+
+def _stamped_bytes(committed):
+    """What the stamp should produce: the committed bytes with the two values replaced."""
+    return committed.replace(b"2026-10-15T16:50:14-07:00", b"2026-10-19T07:26:03-07:00") \
+        .replace(b"sunglasses-publish-sh", b"release.yml")
+
+
+@pytest.mark.parametrize("name, edit", [
+    ("crlf", lambda raw: raw.replace(b"\n", b"\r\n")),
+    ("mixed", lambda raw: raw.replace(b'"version": "0.6.10",\n', b'"version": "0.6.10",\r\n')),
+    ("cr_only", lambda raw: raw.replace(b"\n", b"\r")),
+    ("no_final_newline", lambda raw: raw.rstrip(b"\n")),
+    ("crlf_no_final_newline", lambda raw: raw.replace(b"\n", b"\r\n").rstrip(b"\r\n")),
+])
+def test_the_stamp_keeps_every_line_ending_it_found(tmp_path, name, edit):
+    committed = edit((STATS % "2026-10-19").encode())
+    assert committed != (STATS % "2026-10-19").encode()
+    path = tree(tmp_path, "{}")
+    path.write_bytes(committed)
+    code, message = sla.stamp(tmp_path, V, fetch=served(), sleep=no_sleep)
+    assert code == 0, message
+    assert path.read_bytes() == _stamped_bytes(committed)
+
+
+def test_a_refusal_leaves_crlf_bytes_alone(tmp_path):
+    committed = (STATS % "2026-10-01").replace("\n", "\r\n").encode()
+    path = tree(tmp_path, "{}")
+    path.write_bytes(committed)
+    code, message = sla.stamp(tmp_path, V, fetch=served(), sleep=no_sleep)
+    assert code == 2 and "released" in message
+    assert path.read_bytes() == committed
+
+
+def test_a_stamp_already_in_place_on_crlf_is_nothing_to_do(tmp_path):
+    committed = _stamped_bytes((STATS % "2026-10-19").replace("\n", "\r\n").encode())
+    path = tree(tmp_path, "{}")
+    path.write_bytes(committed)
+    code, _ = sla.stamp(tmp_path, V, fetch=served(), sleep=no_sleep)
+    assert code == 3
+    assert path.read_bytes() == committed

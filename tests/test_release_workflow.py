@@ -974,6 +974,26 @@ def test_the_pr_step_refuses_a_stamp_that_turns_committed_crlf_into_lf(tmp_path)
     assert _no_pr_and_no_branch(tmp_path, origin)
 
 
+@pytest.mark.parametrize("ending", ["crlf", "mixed"])
+def test_the_real_stamp_then_the_pr_step_keep_committed_endings(tmp_path, ending):
+    repo, origin, env = _real_script_env(tmp_path, "2026-10-12T09:00:00-07:00", "release.yml")
+    path = repo / "stats" / "current.json"
+    lf = path.read_bytes()
+    committed = lf.replace(b"\n", b"\r\n") if ending == "crlf" else lf.replace(b'"version": "1.2.3",\n', b'"version": "1.2.3",\r\n')
+    assert committed != lf
+    path.write_bytes(committed)
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", *ident, "commit", "-q", "-am", "endings"], cwd=repo, check=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:refs/heads/main"], cwd=repo, check=True)
+    stamp = _run_step(repo, env, STATS_SCRIPT)
+    assert stamp.returncode == 0 and _outputs(tmp_path) == ["changed=true"], (stamp.stdout, stamp.stderr)
+    stamped = path.read_bytes()
+    assert stamped != committed and stamped.count(b"\r\n") == committed.count(b"\r\n")
+    r = _run_step(repo, env, "gh pr create")
+    assert r.returncode == 0 and "REFUSED" not in r.stdout, (r.stdout, r.stderr)
+    assert "pr create --repo o/r --base main" in (tmp_path / "gh.log").read_text()
+
+
 def test_the_pr_step_refuses_a_file_that_is_not_a_json_object(tmp_path):
     r, tp, origin = _edited_pr_step(tmp_path, lambda text: "[]\n")
     assert r.returncode == 1 and "::error::REFUSED: unexpected change" in r.stdout, (r.stdout, r.stderr)

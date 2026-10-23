@@ -88,7 +88,8 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
         pt_date, pt_iso, utc = wheel_upload_waiting(version, fetch, wait, pause, sleep)
     except LookupError as error:
         return 2, f"REFUSED: {error}"
-    text = path.read_text(encoding="utf-8")
+    # bytes, not read_text/write_text: those translate line endings, and the edit changes two values only
+    text = path.read_bytes().decode("utf-8")
     try:
         current = json.loads(text, object_pairs_hook=strict)
     except ValueError as error:
@@ -117,7 +118,7 @@ def stamp(root, version, by="release.yml", fetch=fetch_json, wait=300, pause=20,
     expected = {**current, "last_updated": pt_iso, "last_updated_by": by}
     if json.dumps(json.loads(new, object_pairs_hook=strict), sort_keys=True) != json.dumps(expected, sort_keys=True):
         return 2, "REFUSED: the edit changed something other than the two top-level values"
-    path.write_text(new, encoding="utf-8")
+    path.write_bytes(new.encode("utf-8"))
     return 0, f"last_updated {pt_iso} by {by} (wheel uploaded {utc})"
 
 
