@@ -467,14 +467,15 @@ cannot be read, an operating-system error, a fault), each with all of its fields
 reply is treated as a failed process, which is stopped, and the file is reported as not read.
 
 `--jobs N` reads up to N files at once with `--dir` and `--repo` (a whole number from 1 to 64;
-default 1, one file at a time). The report on stdout is byte-identical to `--jobs 1` apart from
-the timing fields, for any N. Files are counted in the order the walk lists them, so the findings,
-the lists, the exit code and the progress lines come out as they do with one file at a time, and
-each file has the whole
-`--file-deadline` to itself. `--jobs 1` reads one file at a time. `scan --file --jobs` is refused
-with exit `2`, and so is a value that is not a whole number from 1 to 64. The pool needs a file
+default 1, one file at a time). The report holds the same files, findings, lists and exit code as
+`--jobs 1`, for any N, in the order the walk lists them. The timing fields differ from run to run,
+and so does the event id in SARIF output, as they do between two runs with one file at a time.
+Each file has the whole `--file-deadline` to itself. A progress line is printed when a file is
+handed out, so progress lines can run ahead of the results they belong to; each stream keeps the
+walk order. `--jobs 1` reads one file at a time. `--jobs` is refused with exit `2` for a single
+file or for text, and so is a value that is not a whole number from 1 to 64. The pool needs a file
 deadline above 0 and a platform that can stop a process group; without them the files are read one
-at a time, and an explicit `--jobs` prints a note saying so.
+at a time, and a `--jobs` above 1 prints a note saying so.
 
 A link is never followed, because it can point outside the tree: a link is named as skipped
 whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is

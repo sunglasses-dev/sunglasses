@@ -11,7 +11,7 @@ What these tests pin:
 4. SIGTERM and SIGINT stop every child, including the ones in the middle of a file.
 5. No more than `2 * N` files are held at a time, and no more than N are read at a time.
 6. The flag is refused, before anything is scanned, when it is not a whole number from 1 to 64 and
-   when it is given with `--file`; without a deadline or a way to stop a child the files are read one
+   when it is given with a single file or with text; without a deadline or a way to stop a child the files are read one
    at a time and the command says so.
 
 The slow file is simulated the way `test_scan_file_deadline` does it: a stand-in child sleeps when it
@@ -284,7 +284,7 @@ def test_an_error_one_file_raises_is_counted_at_that_file_in_walk_order(rig, mon
 
 # ── 6. the flag ────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("value", ["0", "-1", "1.5", "nan", "inf", "", "two", "65", "1e1", "٣"])
+@pytest.mark.parametrize("value", ["0", "-1", "1.5", "nan", "inf", "", "two", "65", "1e1", "٣", "9" * 5000, "0" * 5000 + "1x"])
 def test_a_value_that_is_not_a_whole_number_from_1_to_64_is_refused_before_any_scan(rig, value):
     root = _tree(rig, {"a.txt": CLEAN})
     proc = _scan(rig, "--dir", str(root), "--jobs", value)
@@ -297,6 +297,18 @@ def test_jobs_with_file_is_refused_naming_dir_and_repo(rig):
     proc = _scan(rig, "--file", str(_file(rig, CLEAN)), "--jobs", "2")
     _refused_by_the_scan(proc)
     assert "--dir and --repo" in proc.stdout + proc.stderr
+    assert _starts(rig) == []
+
+
+@pytest.mark.parametrize("value", ["2", "0", "nope"])
+@pytest.mark.parametrize("mode", ["text", "stdin", "positional"])
+def test_jobs_given_to_text_is_refused_not_ignored(rig, mode, value):
+    args = {"text": ["--text", "hello there"], "stdin": ["--stdin"], "positional": ["hello there"]}[mode]
+    proc = subprocess.run(
+        [sys.executable, str(rig / "launcher.py"), str(rig / "stand_in.py"), "scan", *args, "--jobs", value],
+        cwd=rig / "cwd", env=_env(rig, 60), input="hello there", capture_output=True, text=True, timeout=120)
+    _refused_by_the_scan(proc)
+    assert "--jobs" in proc.stdout + proc.stderr
     assert _starts(rig) == []
 
 
@@ -330,7 +342,8 @@ def test_the_help_names_the_range_and_the_default(rig):
                           env={**os.environ, "PYTHONPATH": str(REPO), "COLUMNS": "200"},
                           capture_output=True, text=True, timeout=60)
     flat = " ".join(proc.stdout.split())
-    assert "--jobs N" in flat and "1 to 64" in flat and "default: 1" in flat and "byte-identical" in flat
+    assert "--jobs N" in flat and "1 to 64" in flat and "default: 1" in flat
+    assert "byte-identical" not in flat and "event ids" in flat and "ahead of the results" in flat
 
 
 # ── abort: the pool stops a child that is in the middle of a file ──────────
@@ -385,3 +398,84 @@ def test_abort_during_a_file_ends_the_read_at_once_and_leaves_no_child(rig):
     while not _is_gone(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert _is_gone(pid), "the child outlived abort and close"
+
+
+# ── abort: a worker that was aborted never starts a child again ───────────
+
+def test_a_file_handed_to_an_aborted_worker_starts_no_child(rig):
+    from sunglasses import scan_worker
+    worker = scan_worker.ScanWorker(120, argv=[sys.executable, "-c", _SILENT_CHILD], startup_s=10)
+    try:
+        worker.abort()
+        started = time.monotonic()
+        result = worker.scan_file(str(_file(rig, CLEAN)))
+        assert time.monotonic() - started < 5
+        assert not result.is_clean and result.extraction_complete is False
+        assert "stopped" in "; ".join(result.extraction_warnings)
+        assert worker.pid is None
+        worker.start()
+        assert worker.pid is None, "an aborted worker started a child"
+    finally:
+        worker.close()
+
+
+def test_abort_while_a_read_is_being_prepared_does_not_bring_a_child_back(rig, monkeypatch):
+    """The window ASTRA reproduced: the previous file ran out its deadline, the next read is still
+    building its request, the pool closes, and the read goes on to start a new child."""
+    from sunglasses import scan_worker
+    worker = scan_worker.ScanWorker(120, argv=[sys.executable, "-c", _SILENT_CHILD], startup_s=10)
+    in_prepare, release = threading.Event(), threading.Event()
+    real = scan_worker.ScanWorker._request
+
+    def slow_request(target):
+        in_prepare.set()
+        release.wait(20)
+        return real(target)
+
+    monkeypatch.setattr(scan_worker.ScanWorker, "_request", staticmethod(slow_request))
+    outcome = {}
+    path = str(_file(rig, CLEAN))
+    reader = threading.Thread(target=lambda: outcome.update(result=worker.scan_file(path)), daemon=True)
+    try:
+        reader.start()
+        assert in_prepare.wait(10)
+        assert worker.pid is None              # nothing to stop yet
+        worker.abort()
+        release.set()
+        started = time.monotonic()
+        reader.join(15)
+        assert not reader.is_alive()
+        assert time.monotonic() - started < 10, "the read waited out its deadline after abort"
+        assert worker.pid is None, "a child was started after abort"
+        assert outcome["result"].extraction_complete is False
+    finally:
+        release.set()
+        worker.close()
+
+
+def test_closing_a_pool_with_a_read_still_being_prepared_ends_at_once(rig, monkeypatch):
+    from sunglasses import cli, scan_worker
+    in_prepare, release = threading.Event(), threading.Event()
+    real = scan_worker.ScanWorker._request
+
+    def slow_request(target):
+        in_prepare.set()
+        release.wait(20)
+        return real(target)
+
+    monkeypatch.setattr(scan_worker.ScanWorker, "_request", staticmethod(slow_request))
+    monkeypatch.setattr(scan_worker, "default_argv", lambda: [sys.executable, "-c", _SILENT_CHILD])
+    pool = cli._ScanPool(120, 2)
+    path = str(_file(rig, CLEAN))
+    task = pool.submit(path)
+    try:
+        assert in_prepare.wait(10)
+        threading.Timer(0.3, release.set).start()
+        started = time.monotonic()
+        pool.close()
+        assert time.monotonic() - started < 10
+        assert task._done.wait(10)
+        assert pool._outstanding == 0
+        assert all(w.pid is None for w in pool._workers)
+    finally:
+        release.set()

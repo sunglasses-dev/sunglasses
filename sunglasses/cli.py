@@ -569,7 +569,8 @@ def _check_jobs(args):
     if value is None:
         return DEFAULT_JOBS
     text = str(value).strip()
-    if not (text.isascii() and text.isdigit() and 1 <= int(text) <= MAX_JOBS):
+    digits = text.lstrip("0")        # a long run of digits is refused before it is turned into a number
+    if not (text.isascii() and text.isdigit() and 0 < len(digits) <= 2 and int(digits) <= MAX_JOBS):
         _usage_error(args, f"--jobs must be a whole number from 1 to {MAX_JOBS}, got {_printable(str(value))}.",
                      "Nothing was scanned. Use 1 to read one file at a time, or leave --jobs out.")
     return int(text)
@@ -692,7 +693,9 @@ class _ScanPool:
     the whole per-file deadline to itself: a file that does not finish replaces that
     child only. At most `2 * jobs` files are held at a time, and a child starts only when
     every child already started has a file of its own, so a tree of three files starts
-    three children at most.
+    three children at most (one child is started ahead of the first file, so a tree with
+    nothing to read still starts one). Once `close` has stopped the children, no child is
+    started again.
     """
 
     def __init__(self, deadline_s, jobs):
@@ -762,6 +765,8 @@ class _ScanPool:
             if task is not None:
                 task.error = RuntimeError("the scan pool was closed")
                 task.snapshot = None
+                with self._lock:
+                    self._outstanding -= 1
                 task._done.set()
         for worker in workers:
             worker.abort()
@@ -1728,6 +1733,13 @@ def cmd_scan(args):
         _scan_repo(args, engine)
         return
 
+    # --jobs belongs to a tree. Every other input says so, and a bad value is a bad value there too.
+    if getattr(args, "jobs", None) is not None:
+        _check_jobs(args)
+        _usage_error(args, "--jobs applies to --dir and --repo, not to a single file or to text.",
+                     "Nothing was scanned. A file or a piece of text is read by one scanner; "
+                     "leave --jobs out.")
+
     # Explicit beats inferred: --text is the documented escape hatch from the
     # path-shape rule below, so it is checked before any filesystem guess.
     if getattr(args, "explicit_text", None) is not None:
@@ -1768,10 +1780,6 @@ def cmd_scan(args):
         # The deadline is checked before the file is routed anywhere, so a bad value is
         # the same usage error for a text file, a media file and a deep scan.
         _check_file_deadline(args)
-        if getattr(args, "jobs", None) is not None:
-            _usage_error(args, "--jobs applies to --dir and --repo, not --file.",
-                         "Nothing was scanned. A single file is read by one scanner; "
-                         "leave --jobs out of a --file scan.")
 
         # Check if this is audio/video
         if _is_media_file(filepath):
@@ -3549,8 +3557,11 @@ def main():
                                   "(default: 120). Refused with --deep on an audio or video file")
     scan_parser.add_argument("--jobs", dest="jobs", metavar="N",
                              help="With --dir or --repo: read up to N files at once, 1 to 64 "
-                                  "(default: 1, one file at a time). The report on stdout is "
-                                  "byte-identical to --jobs 1 apart from the timing fields. "
+                                  "(default: 1, one file at a time). The report holds the same files, "
+                                  "findings and exit code as --jobs 1, in the same order; the "
+                                  "timing fields and, in SARIF, the event ids differ from run to "
+                                  "run as they always have. Progress lines announce a file when "
+                                  "it is handed out, so they can run ahead of the results. "
                                   "Needs a file deadline above 0")
     # `--s` has always been the unique abbreviation of --stdin; --skip-lockfiles made it
     # ambiguous, so it is spelled out like `--d` below.
