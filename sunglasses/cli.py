@@ -13,7 +13,6 @@ Usage:
 
 import argparse
 import errno
-import hashlib
 import json
 import os
 import shlex
@@ -659,8 +658,6 @@ def _scan_repo(args, engine):
     _check_max_files(args)
     _check_file_deadline(args)
     repo_url = args.repo
-    repo_hash = hashlib.md5(repo_url.encode()).hexdigest()[:10]
-    tmp_dir = os.path.join(tempfile.gettempdir(), f"sunglasses-scan-{repo_hash}")
 
     # Clone
     if not _wants_machine_output(args):
@@ -668,32 +665,42 @@ def _scan_repo(args, engine):
         print(f"  {DIM}{'─' * 50}{RESET}")
         print(f"  {DIM}Cloning {_printable(repo_url)}...{RESET}")
 
-    # Clean up any previous clone
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
-
+    # A fresh private folder per run, removed on every way out (see the `finally` below).
     try:
-        result = subprocess.run(
-            ["git", "clone", "--depth", "1", repo_url, tmp_dir],
-            capture_output=True, text=True, timeout=120,
-        )
+        tmp_dir = tempfile.mkdtemp(prefix="sunglasses-scan-")
+    except OSError as exc:
+        _usage_error(args, f"Cannot make a folder for the clone ({exc.__class__.__name__}).",
+                     "Nothing was scanned.")
+
+    # Everything from here to the end of the scan sits under one `finally`, so the folder made
+    # above is removed on every way out: a refusal, an exception, the normal end. It removes
+    # only the folder this run made.
+    try:
+        try:
+            result = subprocess.run(
+                ["git", "clone", "--depth", "1", repo_url, tmp_dir],
+                capture_output=True, text=True, timeout=120,
+            )
+        except subprocess.TimeoutExpired:
+            _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
+        except OSError as exc:
+            _usage_error(args, f"Cannot run git ({exc.__class__.__name__}).", "Nothing was scanned.")
         if result.returncode != 0:
             # Exit 2, not 1. The clone failed, so nothing was scanned — and
             # exit 1 means "threat found". A CI job cannot tell a typo'd URL
             # from a repo full of attacks if both answer 1.
             _usage_error(args, f"Clone failed: {_printable(result.stderr.strip())}",
                          "Nothing was scanned.")
-    except subprocess.TimeoutExpired:
-        _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
 
-    if not _wants_machine_output(args):
-        print(f"  {GREEN}Cloned.{RESET} Scanning files...")
+        if not _wants_machine_output(args):
+            print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
-    _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo",
-               cleanup=lambda: shutil.rmtree(tmp_dir, ignore_errors=True))
+        _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
+def _scan_tree(args, engine, tmp_dir, source, kind):
     """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
 
     The scan holds one no-follow handle on the root (see `_open_root`) for its whole
@@ -723,7 +730,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind, cleanup=None):
             except OSError as exc:
                 _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
                              "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
-            return _scan_tree_inner(args, scanner, tmp_dir, source, kind, cleanup, root_fd)
+            return _scan_tree_inner(args, scanner, tmp_dir, source, kind, root_fd)
         finally:
             if scanner is not engine:
                 scanner.close()
@@ -738,7 +745,7 @@ def _load_extractors():
     from .extractors import dispatch, image, pdf, qr  # noqa: F401
 
 
-def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
+def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
     """The scan itself; `root_fd` belongs to the caller.
 
     `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
@@ -918,10 +925,6 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, cleanup, root_fd):
     # Skips were appended from three places (the walk, the cap, the reads): one sort, so the
     # list a consumer sees is ordered by path whatever found the skip first.
     walker_skips.sort()
-
-    # Clean up
-    if cleanup:
-        cleanup()
 
     # Output
     if kind == "repo":
