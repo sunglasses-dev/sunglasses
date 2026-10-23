@@ -466,6 +466,20 @@ when it is a complete scan result or one of the process's three error reports (a
 cannot be read, an operating-system error, a fault), each with all of its fields; any other
 reply is treated as a failed process, which is stopped, and the file is reported as not read.
 
+`--jobs N` reads up to N files at once with `--dir` and `--repo` (a whole number from 1 to 64;
+default 1, one file at a time). When the tree does not change and every file is read to the end
+in both runs, the report holds the same files, findings, lists and exit code as `--jobs 1`, in the
+order the walk lists them. A file that reaches `--file-deadline` is reported as not read (exit `3`),
+and whether a file does can differ between runs with different N, so the two reports can differ
+for that file. The timing fields differ from run to run, and so does the event id in SARIF output,
+as they do between two runs with one file at a time. Each file has the whole `--file-deadline` to
+itself. A progress line is printed when a file is
+handed out, so progress lines can run ahead of the results they belong to; each stream keeps the
+walk order. `--jobs 1` reads one file at a time. `--jobs` is refused with exit `2` for a single
+file or for text, and so is a value that is not a whole number from 1 to 64. The pool needs a file
+deadline above 0 and a platform that can stop a process group; without them the files are read one
+at a time, and a `--jobs` above 1 prints a note saying so.
+
 A link is never followed, because it can point outside the tree: a link is named as skipped
 whatever it is called (a link named `node_modules` included), and `--dir` refuses a path that is
 itself a link, naming the real directory to use instead (the parent folders of the path as you
@@ -485,8 +499,9 @@ image and QR extractors are imported before the folder is opened, so none is fir
 middle of the walk), and no file's content is opened
 a second time by routing or extraction (the folders on the way down are opened again to list
 them and to read the next file). The findings carry the file's path in the tree. A file that
-changes after it was read is judged as it was when it was read. The previous file's bytes are
-let go before the next file is read, and the 1 MB cap bounds each read; it is not a limit on the
+changes after it was read is judged as it was when it was read. With `--jobs 1` the previous
+file's bytes are let go before the next file is read; with a larger N the files read ahead are held
+until their results are written. The 1 MB cap bounds each read; it is not a limit on the
 process's total memory. One caveat outside the scan itself: reading text out of an image with
 the optional OCR extra runs the OCR library, which makes its own short-lived temporary file in
 your `TMPDIR`, as `--file` does for the same image; if you use that extra, keep `TMPDIR` outside

@@ -337,7 +337,9 @@ class ScanWorker:
         self._child = None
         self._ready = False
         self._broken = False
+        self._aborted = False
         self._lock = threading.Lock()
+        self._gate = threading.Lock()     # guards `_child` and `_aborted`; never held while waiting
 
     # -- lifecycle
 
@@ -348,21 +350,23 @@ class ScanWorker:
         same answer as one that never says ready: every file reports that the scanner
         process did not start, and nothing is called clean.
         """
-        if self._child is None and not self._broken:
-            try:
-                self._child = subprocess.Popen(
-                    self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True)
-            except (OSError, ValueError, subprocess.SubprocessError):
-                self._child = None
-                self._broken = True
+        with self._gate:
+            if self._child is None and not self._broken and not self._aborted:
+                try:
+                    self._child = subprocess.Popen(
+                        self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True)
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    self._child = None
+                    self._broken = True
 
     @property
     def pid(self):
         return None if self._child is None else self._child.pid
 
     def _stop(self):
-        child, self._child = self._child, None
+        with self._gate:
+            child, self._child = self._child, None
         self._ready = False
         if child is None:
             return
@@ -383,6 +387,20 @@ class ScanWorker:
                 except (OSError, ValueError, subprocess.TimeoutExpired):
                     pass
             self._stop()
+
+    def abort(self):
+        """Stop the child's process group now, from another thread, without waiting for `scan_file`.
+
+        The thread reading from the child sees its stream end and reports the file as not read;
+        `close` then releases what is left. An aborted worker never starts a child again: a file
+        handed to it afterwards is reported as not read, at once, so a read that was only
+        being prepared when this ran cannot bring a new child back.
+        """
+        with self._gate:
+            self._aborted = True
+            child = self._child
+        if child is not None:
+            supervisor.stop_group(child.pid, grace_ms=self.grace_ms, handle=child)
 
     def __enter__(self):
         return self
@@ -447,8 +465,13 @@ class ScanWorker:
     def scan_file(self, target):
         request = self._request(target)
         with self._lock:
+            if self._aborted:
+                return _incomplete(REASON_STOPPED)
             if not self._await_ready():
-                return _incomplete(REASON_NO_START)
+                return _incomplete(REASON_STOPPED if self._aborted else REASON_NO_START)
+            if self._aborted:
+                self._stop()
+                return _incomplete(REASON_STOPPED)
             child = self._child
             body = json.dumps(request).encode("utf-8")
             frame = _HEADER.pack(len(body)) + body

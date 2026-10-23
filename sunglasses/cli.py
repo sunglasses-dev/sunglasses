@@ -12,15 +12,18 @@ Usage:
 """
 
 import argparse
+import collections
 import errno
 import json
 import os
 import shlex
 import shutil
 import stat
+import queue
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 from . import __version__
@@ -553,6 +556,28 @@ def _check_file_deadline(args):
     return float(value)
 
 
+DEFAULT_JOBS = 1
+MAX_JOBS = 64
+
+
+def _check_jobs(args):
+    """`--jobs` is a whole number from 1 to 64; refuse before walking or cloning.
+
+    Returns how many files are read at once. Not given means 1: one file at a time.
+    """
+    value = getattr(args, "jobs", None)
+    if value is None:
+        return DEFAULT_JOBS
+    text = str(value).strip()
+    digits = text.lstrip("0")
+    # The whole text is bounded, not just what follows its zeros: a long run of zeros in front of a
+    # small number is refused here too, before anything is turned into a number.
+    if not (len(text) <= 16 and text.isascii() and text.isdigit() and 0 < len(digits) <= 2 and int(digits) <= MAX_JOBS):
+        _usage_error(args, f"--jobs must be a whole number from 1 to {MAX_JOBS}, got {_printable(str(value))}.",
+                     "Nothing was scanned. Use 1 to read one file at a time, or leave --jobs out.")
+    return int(digits)
+
+
 class _SigtermLeavesCleanly:
     """While a scanner child exists, SIGTERM unwinds the stack instead of ending the process
     where it stands, so the child is stopped and not left running with nobody to read it."""
@@ -573,25 +598,39 @@ class _SigtermLeavesCleanly:
         return False
 
 
-def _file_scanner(args, engine):
+def _file_scanner(args, engine, tree=False):
     """What reads one file: the engine itself with no deadline, or a stoppable child.
 
     Both answer `scan_file(target)` the same way. The child exists only for a positive
     deadline on a platform that can stop it; otherwise the scan runs in this process as
     it always has, and an explicit deadline on a platform that cannot stop a child says so.
+
+    For a tree (`tree=True`, from `--dir` and `--repo`) with `--jobs` above 1 the answer is a
+    pool of such children that reads that many files at once; it needs the same two
+    conditions as the child, and without them the files are read one at a time.
     """
     seconds = _check_file_deadline(args)
+    jobs = _check_jobs(args) if tree else 1
+    asked_for_jobs = tree and getattr(args, "jobs", None) is not None and jobs > 1
     if seconds <= 0:
+        if asked_for_jobs:
+            print("  note: --jobs needs a file deadline; with --file-deadline 0 "
+                  "files are read one at a time.", file=sys.stderr)
         return engine
     from . import scan_worker
     if not scan_worker.available():
         if getattr(args, "file_deadline", None) is not None:
             print("  note: --file-deadline is not available on this platform; "
                   "files are read without a deadline.", file=sys.stderr)
+        if asked_for_jobs:
+            print("  note: --jobs is not available on this platform; "
+                  "files are read one at a time.", file=sys.stderr)
         return engine
     # No child exists yet: the worker starts it on first use, or the caller starts it with
     # `_begin` once it is inside the block that closes the worker. Nothing is spawned in the
     # gap between this return and that block, so a signal there leaves nothing running.
+    if jobs > 1:
+        return _ScanPool(seconds, jobs)
     return scan_worker.ScanWorker(seconds)
 
 
@@ -599,6 +638,146 @@ def _begin(scanner, engine):
     """Start the child early, from inside the caller's cleanup block, so it loads while the walk begins."""
     if scanner is not engine:
         scanner.start()
+
+
+class _InlineTask:
+    """One file to be read by the scanner this thread already holds, when its result is asked for."""
+    __slots__ = ("_scanner", "_snapshot")
+
+    def __init__(self, scanner, snapshot):
+        self._scanner = scanner
+        self._snapshot = snapshot
+
+    def ready(self):
+        return False
+
+    def result(self):
+        snapshot, self._snapshot = self._snapshot, None
+        return self._scanner.scan_file(snapshot)
+
+
+class _InlineScans:
+    """One file at a time, in this thread: the scan as it has always run."""
+    limit = 1
+
+    def __init__(self, scanner):
+        self._scanner = scanner
+
+    def submit(self, snapshot):
+        return _InlineTask(self._scanner, snapshot)
+
+
+class _PoolTask:
+    """One file handed to the pool: its bytes go in, its result or the error it raised comes out."""
+    __slots__ = ("snapshot", "value", "error", "_done")
+
+    def __init__(self, snapshot):
+        self.snapshot = snapshot
+        self.value = None
+        self.error = None
+        self._done = threading.Event()
+
+    def ready(self):
+        return self._done.is_set()
+
+    def result(self):
+        self._done.wait()
+        if self.error is not None:
+            raise self.error
+        return self.value
+
+
+class _ScanPool:
+    """Reads up to `jobs` files at once, each in its own stoppable child.
+
+    The caller submits files in walk order and takes the results back in the same order,
+    so what a scan reports does not depend on which file finished first. Each child has
+    the whole per-file deadline to itself: a file that does not finish replaces that
+    child only. At most `2 * jobs` files are held at a time, and a child starts only when
+    every child already started has a file of its own, so a tree of three files starts
+    three children at most (one child is started ahead of the first file, so a tree with
+    nothing to read still starts one). Once `close` has stopped the children, no child is
+    started again.
+    """
+
+    def __init__(self, deadline_s, jobs):
+        self.deadline_s = deadline_s
+        self.jobs = jobs
+        self.limit = 2 * jobs
+        self._queue = queue.Queue()
+        self._lock = threading.Lock()
+        self._workers = []
+        self._threads = []
+        self._outstanding = 0
+        self._closed = False
+
+    def start(self):
+        """Begin loading the first child now, so the load overlaps the caller's own walk."""
+        with self._lock:
+            if not self._workers and not self._closed:
+                self._spawn()
+
+    def _spawn(self):
+        from . import scan_worker
+        worker = scan_worker.ScanWorker(self.deadline_s)
+        self._workers.append(worker)
+        worker.start()
+        thread = threading.Thread(target=self._run, args=(worker,), daemon=True)
+        self._threads.append(thread)
+        thread.start()
+
+    def _run(self, worker):
+        while True:
+            task = self._queue.get()
+            if task is None:
+                return
+            try:
+                task.value = worker.scan_file(task.snapshot)
+            except BaseException as exc:   # handed to the caller, who raises it for this file
+                task.error = exc
+            finally:
+                task.snapshot = None
+                with self._lock:
+                    self._outstanding -= 1
+                task._done.set()
+
+    def submit(self, snapshot):
+        task = _PoolTask(snapshot)
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("the scan pool is closed")
+            if self._outstanding >= len(self._threads) and len(self._threads) < self.jobs:
+                self._spawn()
+            self._outstanding += 1
+        self._queue.put(task)
+        return task
+
+    def close(self):
+        """Stop every child, including one in the middle of a file, and wait for the threads."""
+        with self._lock:
+            self._closed = True
+            workers = list(self._workers)
+            threads = list(self._threads)
+        # Files still waiting for a thread are given up: nothing will read them.
+        while True:
+            try:
+                task = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if task is not None:
+                task.error = RuntimeError("the scan pool was closed")
+                task.snapshot = None
+                with self._lock:
+                    self._outstanding -= 1
+                task._done.set()
+        for worker in workers:
+            worker.abort()
+        for _ in threads:
+            self._queue.put(None)
+        for thread in threads:
+            thread.join(timeout=10)
+        for worker in workers:
+            worker.close()
 
 
 def _printable(name):
@@ -648,6 +827,7 @@ def _scan_dir(args, engine):
     """Scan a local directory the way `--repo` scans a clone: same walker, skips, exits."""
     _check_max_files(args)
     _check_file_deadline(args)
+    _check_jobs(args)
     path = os.path.expanduser(args.directory)
     shown = _printable(args.directory)
     if not os.path.exists(path):
@@ -673,6 +853,7 @@ def _scan_repo(args, engine):
     """Clone a GitHub repo and scan all files."""
     _check_max_files(args)
     _check_file_deadline(args)
+    _check_jobs(args)
     repo_url = args.repo
 
     # Clone
@@ -738,7 +919,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind):
     # opened, inside the block that closes it: its modules are imported by now, and it
     # loads while the walk begins.
     with _SigtermLeavesCleanly():
-        scanner = _file_scanner(args, engine)
+        scanner = _file_scanner(args, engine, tree=True)
         try:
             _begin(scanner, engine)
             try:
@@ -803,51 +984,16 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
                 f"over the --max-files {max_files} limit — not inspected"))
         walked = walked[:max_files]
     total_files = len(walked)
-    for index, (filepath, _reason) in enumerate(walked, 1):
-        rel_path = os.path.relpath(filepath, tmp_dir)
-        _progress_line(index, total_files, start, rel_path)
+    # A file is handed to `scans` in walk order and its result is taken back in the same
+    # order, so the totals, the lists and the lines below do not depend on which file
+    # finished first. With one file at a time `scans` runs each scan where it is asked for.
+    scans = engine if isinstance(engine, _ScanPool) else _InlineScans(engine)
+    pending = collections.deque()
 
-        # The tree can change between the walk and the read. Read the file once, through
-        # the directory descriptors (no link at any step), and judge those bytes: they go
-        # to routing and extraction as they are, in memory. Nothing is written anywhere and
-        # the file's content is not opened a second time (the folders on the way down are
-        # opened again to list them and to read the next file), so the bytes we judged are
-        # the bytes we read, whatever the tree does next.
-        data = snapshot = None   # let go of the previous file's bytes before reading the next
-        try:
-            data = _read_member(tmp_dir, rel_path, root_fd, idents)
-        except OSError as exc:
-            reason = (_SYMLINK_SKIP_REASON if exc.errno == errno.ELOOP and not _FD_SAFE
-                      else _CHANGED_SKIP_REASON if exc.errno in _CHANGED_ERRNOS
-                      else f"could not be read ({exc.__class__.__name__}) — not inspected")
-            walker_skips.append((rel_path, reason))
-            continue
-        if policy_active:
-            sha_by_file[rel_path] = _baseline.file_sha256(data)
-        snapshot = Member(data, rel_path)
-        data = None
-
-        # Content routing, same rule as `--file` (1a-3): the walker's extension
-        # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
-        # at all — used to be read as text here and counted as inspected, which
-        # is the original bug one level up.
-        from .extractors.dispatch import identify
-        try:
-            route, label = identify(snapshot)
-        except (OSError, UnreadableFile) as exc:
-            walker_skips.append(
-                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
-            continue
-        if route in ("opaque", "media"):
-            # `--file` gives the same answer for these bytes (nothing here extracts them),
-            # so the line says what is true and, for an archive, what does get it read.
-            hint = (" Unpack it and scan the files inside." if route == "opaque" else "")
-            walker_skips.append((
-                rel_path,
-                f"{label} — not inspected. SUNGLASSES does not extract this format, "
-                f"so nothing inside it was scanned.{hint}"))
-            continue
-
+    def settle():
+        """Wait for the oldest file handed out, then count it."""
+        nonlocal files_scanned, files_with_threats, files_incomplete, total_threats
+        rel_path, task = pending.popleft()
         # Repo files go through the SAME extraction path as `--file`. Reading them
         # as raw text here meant a real compressed PDF named `.txt` was scanned as
         # its own binary bytes, found nothing, and was counted as inspected -- the
@@ -855,15 +1001,15 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
         # scanner cannot hold two opinions about one file depending on how it was
         # invoked; that divergence is audit finding C1 all over again, one level up.
         try:
-            scan_result = engine.scan_file(snapshot)
+            scan_result = task.result()
         except UnreadableFile as exc:
             # Was a silent `continue`. An unreadable file is not an absent one.
             walker_skips.append((rel_path, f"{exc} — not inspected"))
-            continue
+            return
         except OSError as exc:
             walker_skips.append(
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
-            continue
+            return
 
         files_scanned += 1
         scan_result.source = rel_path
@@ -936,6 +1082,57 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
                       else f"{RED}THREAT{RESET}" if scan_result.threat_found
                       else f"{YELLOW}INCOMPLETE{RESET}")
             print(f"  {status}  {_printable(rel_path)}")
+
+    for index, (filepath, _reason) in enumerate(walked, 1):
+        rel_path = os.path.relpath(filepath, tmp_dir)
+        _progress_line(index, total_files, start, rel_path)
+
+        # The tree can change between the walk and the read. Read the file once, through
+        # the directory descriptors (no link at any step), and judge those bytes: they go
+        # to routing and extraction as they are, in memory. Nothing is written anywhere and
+        # the file's content is not opened a second time (the folders on the way down are
+        # opened again to list them and to read the next file), so the bytes we judged are
+        # the bytes we read, whatever the tree does next.
+        data = snapshot = None   # let go of the previous file's bytes before reading the next
+        try:
+            data = _read_member(tmp_dir, rel_path, root_fd, idents)
+        except OSError as exc:
+            reason = (_SYMLINK_SKIP_REASON if exc.errno == errno.ELOOP and not _FD_SAFE
+                      else _CHANGED_SKIP_REASON if exc.errno in _CHANGED_ERRNOS
+                      else f"could not be read ({exc.__class__.__name__}) — not inspected")
+            walker_skips.append((rel_path, reason))
+            continue
+        if policy_active:
+            sha_by_file[rel_path] = _baseline.file_sha256(data)
+        snapshot = Member(data, rel_path)
+        data = None
+
+        # Content routing, same rule as `--file` (1a-3): the walker's extension
+        # list is a hint, not a verdict. A ZIP named `.bin` — or with no suffix
+        # at all — used to be read as text here and counted as inspected, which
+        # is the original bug one level up.
+        from .extractors.dispatch import identify
+        try:
+            route, label = identify(snapshot)
+        except (OSError, UnreadableFile) as exc:
+            walker_skips.append(
+                (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
+            continue
+        if route in ("opaque", "media"):
+            # `--file` gives the same answer for these bytes (nothing here extracts them),
+            # so the line says what is true and, for an archive, what does get it read.
+            hint = (" Unpack it and scan the files inside." if route == "opaque" else "")
+            walker_skips.append((
+                rel_path,
+                f"{label} — not inspected. SUNGLASSES does not extract this format, "
+                f"so nothing inside it was scanned.{hint}"))
+            continue
+
+        pending.append((rel_path, scans.submit(snapshot)))
+        while pending and (len(pending) >= scans.limit or pending[0][1].ready()):
+            settle()
+    while pending:
+        settle()
 
     elapsed_ms = (time.perf_counter() - start) * 1000
     # Skips were appended from three places (the walk, the cap, the reads): one sort, so the
@@ -1550,6 +1747,13 @@ def cmd_scan(args):
     if args.repo:
         _scan_repo(args, engine)
         return
+
+    # --jobs belongs to a tree. Every other input says so, and a bad value is a bad value there too.
+    if getattr(args, "jobs", None) is not None:
+        _check_jobs(args)
+        _usage_error(args, "--jobs applies to --dir and --repo, not to a single file or to text.",
+                     "Nothing was scanned. A file or a piece of text is read by one scanner; "
+                     "leave --jobs out.")
 
     # Explicit beats inferred: --text is the documented escape hatch from the
     # path-shape rule below, so it is checked before any filesystem guess.
@@ -3366,6 +3570,17 @@ def main():
                                   "in SECONDS is reported as not fully read (exit 3) and the scan "
                                   "moves on, never called clean. 0 = no deadline "
                                   "(default: 120). Refused with --deep on an audio or video file")
+    scan_parser.add_argument("--jobs", dest="jobs", metavar="N",
+                             help="With --dir or --repo: read up to N files at once, 1 to 64 "
+                                  "(default: 1, one file at a time). If the tree is unchanged and every "
+                                  "file is read to the end in both runs, the report holds the same "
+                                  "files, findings and exit code as --jobs 1, in the same order; a "
+                                  "file that reaches --file-deadline is reported as not read "
+                                  "(exit 3) and can differ between runs with different N. The "
+                                  "timing fields and, in SARIF, the event ids differ from run to "
+                                  "run as they always have. Progress lines announce a file when "
+                                  "it is handed out, so they can run ahead of the results. "
+                                  "Needs a file deadline above 0")
     # `--s` has always been the unique abbreviation of --stdin; --skip-lockfiles made it
     # ambiguous, so it is spelled out like `--d` below.
     scan_parser.add_argument("--stdin", "--s", dest="stdin", action="store_true", help="Read from stdin")
