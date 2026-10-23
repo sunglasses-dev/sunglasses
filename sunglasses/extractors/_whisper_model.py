@@ -5,9 +5,17 @@ folder. The scanner runs on your machine, so that download is announced on stder
 before it starts. The notice covers a model file that is missing; a cached file
 that fails Whisper's own checksum is downloaded again by Whisper without it.
 
-The announcement is made by standing in for `whisper._download` while one model
+The announcement is made by standing in for `whisper._download` while a model
 loads. That is a process-wide change, so loads through this helper run one at a
-time and the original function is put back when each load ends.
+time, and the original function is put back when the outermost helper load ends.
+Those guarantees cover loads made through this helper. Code that calls
+`whisper.load_model` directly is not coordinated with it: while a helper load is
+in progress such a call uses the same stand-in, and its notice carries the helper
+load's model name.
+
+A missing stderr, or an OSError or ValueError while the notice is written, does
+not stop the load. The notice is not written anywhere else; there is no stdout
+fallback.
 """
 
 import os
@@ -20,7 +28,10 @@ _loading = {"name": None, "original": None}
 
 
 def _say(text):
-    """Write one line to stderr; a missing or broken stderr never stops a load."""
+    """Write one line to stderr.
+
+    A missing stderr, or an OSError or ValueError while writing, never stops a load.
+    """
     stream = sys.stderr
     if stream is None:
         return
@@ -35,7 +46,7 @@ def _announcing_fetch(url, root, *args, **kwargs):
     # `root` is the cache folder Whisper chose, so the check follows whatever
     # location it uses and reads no environment variable here.
     if not os.path.isfile(os.path.join(root, os.path.basename(url))):
-        _say(f"fetching whisper model {_loading['name']} from {urlparse(url).netloc} (once)")
+        _say(f"fetching whisper model {_loading['name']} from {urlparse(url).netloc}")
     return _loading["original"](url, root, *args, **kwargs)
 
 
