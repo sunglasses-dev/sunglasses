@@ -8,7 +8,6 @@ on the module when it runs. Nothing here reaches the network.
 
 import sys
 import threading
-import time
 import types
 
 import pytest
@@ -69,6 +68,23 @@ def fake_whisper(tmp_path, monkeypatch, events):
     return mod
 
 
+class _LockSpy:
+    """Wraps the module lock and reports when the named thread reaches it."""
+
+    def __init__(self, inner, thread_name, reached):
+        self.inner = inner
+        self.thread_name = thread_name
+        self.reached = reached
+
+    def __enter__(self):
+        if threading.current_thread().name == self.thread_name:
+            self.reached.set()
+        return self.inner.__enter__()
+
+    def __exit__(self, *exc):
+        return self.inner.__exit__(*exc)
+
+
 def watch(monkeypatch, events):
     """Route stderr into `events`. Pytest swaps sys.stderr again when the test body
     starts, so this runs inside the test, not in a fixture."""
@@ -87,7 +103,7 @@ def test_a_missing_model_is_announced_before_its_download_starts(fake_whisper, e
     watch(monkeypatch, events)
     assert load_whisper_model("base") == ("model", "base")
     assert [kind for kind, _ in events if kind in ("notice", "download")][:2] == ["notice", "download"]
-    assert _notices(events) == [f"fetching whisper model base from {HOST} (once)\n"]
+    assert _notices(events) == [f"fetching whisper model base from {HOST}\n"]
     assert _downloads(events) == [URLS["base"]]
 
 
@@ -150,27 +166,36 @@ def test_overlapping_loads_leave_whisper_as_they_found_it(fake_whisper, events, 
 
     fake_whisper.load_model = slow_load
     results = {}
+    reached = threading.Event()
+    monkeypatch.setattr(_whisper_model, "_LOCK", _LockSpy(_whisper_model._LOCK, "two", reached))
 
     def run(key, name):
         results[key] = load_whisper_model(name)
 
     one = threading.Thread(target=run, args=("one", first), daemon=True)
-    two = threading.Thread(target=run, args=("two", second), daemon=True)
-    one.start()
-    assert inside.wait(5)
-    two.start()
-    time.sleep(0.2)
-    release.set()
-    one.join(5)
-    first_done.set()
-    two.join(5)
+    two = threading.Thread(target=run, args=("two", second), name="two", daemon=True)
+    try:
+        one.start()
+        assert inside.wait(5)
+        two.start()
+        assert reached.wait(5)
+        release.set()
+        one.join(5)
+        first_done.set()
+        two.join(5)
+    finally:
+        release.set()
+        first_done.set()
+        for worker in (one, two):
+            if worker.is_alive():
+                worker.join(5)
 
     assert not one.is_alive() and not two.is_alive()
     assert results == {"one": ("model", first), "two": ("model", second)}
     assert fake_whisper._download is original
     expected = sorted({first, second})
     assert sorted(_notices(events)) == sorted(
-        f"fetching whisper model {n} from {HOST} (once)\n" for n in expected)
+        f"fetching whisper model {n} from {HOST}\n" for n in expected)
 
 
 def test_a_load_inside_a_load_does_not_wait_on_itself(fake_whisper, events, monkeypatch):
@@ -194,8 +219,8 @@ def test_a_load_inside_a_load_does_not_wait_on_itself(fake_whisper, events, monk
     assert done == [("model", "base")]
     assert fake_whisper._download is original
     assert sorted(_notices(events)) == [
-        f"fetching whisper model base from {HOST} (once)\n",
-        f"fetching whisper model small from {HOST} (once)\n"]
+        f"fetching whisper model base from {HOST}\n",
+        f"fetching whisper model small from {HOST}\n"]
 
 
 def test_a_missing_stderr_loads_the_model_and_prints_nothing_on_stdout(
@@ -241,8 +266,130 @@ def test_audio_and_video_load_through_the_announcing_loader(
     monkeypatch.setattr("sunglasses.extractors.audio._check_deps", lambda: None)
     monkeypatch.setattr("sunglasses.extractors.video._check_deps", lambda: None)
     assert extractor()._get_model() == ("model", "base")
-    assert _notices(events) == [f"fetching whisper model base from {HOST} (once)\n"]
+    assert _notices(events) == [f"fetching whisper model base from {HOST}\n"]
 
     assert extractor()._get_model() == ("model", "base")
     assert len(_notices(events)) == 1
     assert _downloads(events) == [URLS["base"]]
+
+
+def test_a_failed_checksum_after_the_notice_stops_the_load_and_restores_whisper(
+        fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    original = fake_whisper._download
+
+    def bad_download(url, root, in_memory):
+        original(url, root, in_memory)
+        raise RuntimeError("model has been downloaded but the SHA256 checksum does not match")
+
+    fake_whisper._download = bad_download
+    with pytest.raises(RuntimeError, match="checksum"):
+        load_whisper_model("base")
+    assert _notices(events) == [f"fetching whisper model base from {HOST}\n"]
+    assert fake_whisper._download is bad_download
+    assert _whisper_model._loading == {"name": None, "original": None}
+
+
+def test_a_cached_file_that_is_replaced_by_whisper_is_not_announced(fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    cached = fake_whisper.cache / "base.pt"
+    cached.write_bytes(b"damaged")
+    real_download = fake_whisper._download
+
+    def redownload(url, root, in_memory):
+        # Whisper's own checksum check discards a damaged file and fetches it again.
+        cached.unlink()
+        return real_download(url, root, in_memory)
+
+    fake_whisper._download = redownload
+    assert load_whisper_model("base") == ("model", "base")
+    assert _downloads(events) == [URLS["base"]]
+    assert _notices(events) == []
+
+
+def test_a_closed_stderr_still_loads_the_model_and_writes_nothing_elsewhere(
+        fake_whisper, events, monkeypatch, capsys):
+    import io
+
+    stream = io.StringIO()
+    stream.close()
+    monkeypatch.setattr(sys, "stderr", stream)
+    assert load_whisper_model("base") == ("model", "base")
+    assert _downloads(events) == [URLS["base"]]
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("assigned,failure", [
+    (False, AttributeError("read-only for this test")),
+    (True, KeyboardInterrupt()),
+], ids=["refused", "interrupted-after-assignment"])
+def test_the_load_state_is_idle_again_when_the_hook_installation_stops(
+        fake_whisper, events, monkeypatch, assigned, failure):
+    watch(monkeypatch, events)
+    original = fake_whisper._download
+    stopped = []
+
+    class Strict(types.ModuleType):
+        def __setattr__(self, key, value):
+            if key == "_download" and not stopped:
+                stopped.append(value)
+                if assigned:
+                    super().__setattr__(key, value)
+                raise failure
+            super().__setattr__(key, value)
+
+    strict = Strict("whisper")
+    strict.__dict__.update(fake_whisper.__dict__)
+
+    def load_model(name, **kw):
+        strict._download(strict._MODELS[name], str(fake_whisper.cache), False)
+        return ("model", name)
+
+    strict.load_model = load_model
+    monkeypatch.setitem(sys.modules, "whisper", strict)
+    with pytest.raises(type(failure)):
+        load_whisper_model("base")
+    assert strict._download is original
+    assert _whisper_model._loading == {"name": None, "original": None}
+    assert load_whisper_model("base") == ("model", "base")
+    assert _notices(events) == [f"fetching whisper model base from {HOST}\n"]
+
+
+def test_the_outer_model_is_named_again_once_a_nested_load_ends(fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    # Runs on a lock of its own, in a daemon worker, so a regression in the
+    # lock fails here instead of holding up the rest of the run.
+    monkeypatch.setattr(_whisper_model, "_LOCK", type(_whisper_model._LOCK)())
+    real_load = fake_whisper.load_model
+
+    def nested(name, **kw):
+        if name == "base":
+            load_whisper_model("small")
+        return real_load(name, **kw)
+
+    fake_whisper.load_model = nested
+    done = []
+    worker = threading.Thread(target=lambda: done.append(load_whisper_model("base")), daemon=True)
+    worker.start()
+    worker.join(5)
+    assert done == [("model", "base")]
+    assert _notices(events) == [
+        f"fetching whisper model small from {HOST}\n",
+        f"fetching whisper model base from {HOST}\n"]
+    assert _whisper_model._loading == {"name": None, "original": None}
+
+
+def test_a_direct_whisper_load_during_a_helper_load_is_announced_under_the_helper_models_name(
+        fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    real_load = fake_whisper.load_model
+
+    def with_direct_call(name, **kw):
+        if name == "base":
+            real_load("small")
+        return real_load(name, **kw)
+
+    fake_whisper.load_model = with_direct_call
+    assert load_whisper_model("base") == ("model", "base")
+    assert _downloads(events) == [URLS["small"], URLS["base"]]
+    assert _notices(events) == [f"fetching whisper model base from {HOST}\n"] * 2
