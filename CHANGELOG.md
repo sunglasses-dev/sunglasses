@@ -5,6 +5,151 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.12] — 2026-10-23
+
+### Changed
+
+- `load_attack_db()` with no path now returns the built-in pattern set, the one the engine runs,
+  instead of a partial copy read from JSON files inside the package. That folder is no longer
+  shipped. For a library caller the default returns more records and more categories than before,
+  and some records carry fields the old copy did not (anchor terms, tier, mechanism and similar).
+  Every record still has a `keywords` list, empty when the rule defines none, so code that reads
+  `record["keywords"]` keeps working. The records are copies: editing one does not change the live
+  rules. An explicit directory still reads JSON files. (#457)
+
+- `sunglasses proxy --help` and `-h` print the usage on stdout and exit 0, like every other
+  subcommand; they used to print the usage-error text on stderr and exit 2. This holds for the
+  mediator form, for `approve` and for `python -m sunglasses.proxy`. Words after the separator
+  still belong to the wrapped server, a mistyped command is still a usage error, and the platform
+  refusal still comes first. (#452)
+
+- `sunglasses scan --repo` clones into a private folder made for each run and removes it when the
+  run ends, however it ends. A clone that fails, times out or cannot be started is one refusal with
+  exit 2 and one document. (#454)
+
+### Added
+
+- `sunglasses scan` takes four options so a CI job can fail on what is new. `--fail-on LEVEL`
+  (`any`, `low`, `medium`, `high`, `critical`, `none`) sets the lowest severity that exits 1;
+  `none` is report-only. `--baseline FILE` (with `--dir` or `--repo`) marks a finding as known when
+  the file lists the same rule id, the same path under the scan root and the same file sha256, and
+  `--write-baseline FILE` writes that list from the current scan. A baseline entry never covers a
+  critical finding on its own: `--accept-critical GLS-ID` (repeatable, needs `--baseline`) names the
+  rule. No finding is removed from any report; known findings are marked `KNOWN` in the human
+  report, with `"known": true` in JSON and as a suppression in SARIF. Without these options the
+  output and exit code are unchanged. Exit 3 (part of the input not read) stays 3 under every level
+  and with any baseline, and the four options are refused with `--deep`. A baseline written inside
+  the scanned folder is scanned on the next run like any other file, so keep it outside the scan
+  root. (#441)
+
+- `--file-deadline SECONDS` on `scan --file`, `--dir` and `--repo` (default 120, `0` = no
+  deadline). A file the scanner does not finish in that time counts as not fully read (exit 3), is
+  named with its reason (`partially_read[]` for `--dir` and `--repo`, `extraction_warnings` for
+  `--file`), and the scan goes on to the next file, which gets a fresh worker. A threat found in any
+  other file still exits 1, and a file that did not finish is never reported clean. Verdicts do not
+  depend on the clock; only "not fully read" can. Where processes cannot be stopped as a group
+  (Windows), and for a `--deep` audio or video scan, the files are read in-process as before: an
+  explicit `--file-deadline` prints a note on Windows and is refused with exit 2 for `--deep` audio
+  and video. (#437)
+
+- A second kind of rule, a structural validator: a small piece of code that reads structure (which
+  object a field belongs to, which word of a shell command is the program) where a regular
+  expression can only match characters. `GLS-STRUCT-001` ("Hook command fetches and runs remote
+  code", critical) judges a hook command by its words and reports a download whose bytes reach a
+  shell or interpreter. It is a judgment from the words, not proof that the command runs: a hook
+  that installs a tool from its vendor's site is the fetch-and-run it is, a hook config shown
+  inside a document is judged like the config it shows, and code that never executes can still be
+  read as a run. Among the cases not covered: other downloaders, interpreter-native fetches, array-form
+  commands, heredoc bodies and hook structures not written as JSON. If a validator fails, the scan keeps
+  every finding it already has, names the validator in a warning and reports the inspection as not
+  complete. `SunglassesEngine(validators=False)` turns the layer off. The pattern count does not
+  move. (#443)
+
+- `GLS-STRUCT-004` reports, as a notice only (`allow_redacted`, never block or quarantine), a
+  Claude Code settings file that removes the safety prompts: `permissions.defaultMode` set to
+  `bypassPermissions`, `skipDangerousModePermissionPrompt` set to `true`, a `permissions.allow`
+  entry that allows every shell command, or an `env.ANTHROPIC_BASE_URL` whose host is a public IP
+  address or a tunnel host (ngrok, trycloudflare, loca.lt). Only a single top-level JSON object is
+  read; prose around it, two documents, comments, trailing commas and truncation are clear, and a
+  settings object inside a schema or an example is not read. The file's owner can write the same
+  lines, so the finding says to look, not that the file is hostile. (#449)
+
+- Audio and video deep scans print `fetching whisper model <name> from <host>` on stderr before a
+  missing Whisper speech model is downloaded (about 145 MB for `base`). The notice is written each
+  time a model file is missing from Whisper's cache folder; an intact cached file loads with no
+  notice, and a damaged cached file that Whisper replaces is downloaded without one. A missing or
+  unwritable stderr (an `OSError` or `ValueError` while writing) does not stop the load, and the
+  notice is not written anywhere else. The guarantees cover loads made through Sunglasses; a direct
+  `whisper.load_model` call during one of its loads uses the same stand-in and is announced under
+  Sunglasses's model name. The README states the host and these cases. (#463, #465)
+
+### Fixed
+
+- The human-readable scan report prints the text it quotes from a scanned file with control
+  characters as escapes (`\xNN`, `\uNNNN`, `\UNNNNNNNN`) and a literal backslash doubled, so a
+  file cannot ring the bell, move the cursor or change colours in the terminal and two different
+  quoted texts never read the same. Printable text, non-ASCII included, is unchanged, and JSON
+  output is unchanged. (#453)
+
+- `sunglasses scan --dir` and `--repo` name a `.git` folder below the scan root under
+  `excluded_folders` in the human, JSON and SARIF reports, like `node_modules` or `build`. It was
+  left out of that list, so a scan could report a complete inspection of a tree it had only partly
+  read. The scan root's own `.git` stays unnamed. (#456)
+
+### Internal
+
+- The release workflow's stats guard reads both versions of `stats/current.json` without newline
+  translation and compares them line by line, so a stamp that also changes a line ending is
+  refused; the stamp script (`scripts/stats_last_updated.py`) now reads and writes bytes and changes
+  only the two stamped values, so a CRLF, CR or mixed-ending file keeps every ending it had. The
+  committed file has no CR bytes today. The same PR corrects the wording of two proxy comments
+  (the approve notice is printed once per server id and snapshot sha while the pair is among the
+  last 256 remembered, and again after it has left that history) and tightens the first-run doctor
+  tests; no scanner or proxy behavior changes. (#448, #460)
+
+- The `fast` CI job runs as four parts, `fast (1)` to `fast (4)`, split with the same `CI_SHARD`
+  mechanism the integrity legs use. The release certification gate now requires all four parts to
+  succeed and refuses a run that only has the old single `fast` job. (#458)
+
+- `KNOWN_VERSION_GAPS.md` has a "Documented bound" entry: a proxy session keeps several tables
+  keyed by request id for as long as it runs (an admission counter, a final mark per confirmed
+  answer, the cancelled ids, and the answer message for each request the proxy issued itself).
+  They are kept on purpose to match late cancellations and confirmations to their request, and
+  only one of them (`TOMBSTONE_LIMIT`) is bounded. No total is stated and no behavior changed.
+  (#455)
+
+- A test
+  fails the build when a rule regex stacks two unbounded wide repeats (`.*`, `.+`, a negated class,
+  `[\s\S]*`) on one match path. It is a ratchet: every rule that shows the shape is listed with a
+  dated reason, a listed rule that no longer shows it must leave the list, and no new entry may be
+  added. It reads the regex shape only: it measures nothing and does not bound a rule's work at scan
+  time. (#444)
+
+- `stats/current.json` carries the 0.6.11 upload time as `last_updated` (2026-10-21T14:43:48-07:00,
+  the time PyPI reports), so `released` and `last_updated` agree. One line changed; the pull request
+  was opened by hand from the branch the release workflow pushed. (#451)
+
+- CI: the step that installs the native media tools (Tesseract, zbar, ffmpeg) in the `fast` and
+  `integrity` jobs caps each apt command and the step itself, makes up to three attempts and, from
+  the second attempt on, points the runner's mirror list at the main Ubuntu and security archives
+  (#462). Before each retry it runs `dpkg --configure -a` (output discarded, failure ignored), so an
+  attempt stopped part-way through unpacking cannot make every later attempt refuse (#466). Job
+  timeouts are unchanged. Workflow file only.
+
+- Tests only: no test connects to a host that is not this machine. A guard around every test
+  replaces `socket.connect`, `connect_ex` and `getaddrinfo`, lets loopback, `localhost` and UNIX
+  sockets through, records anything else as `NetworkBlocked` and fails the test at teardown; tests
+  marked `network` (the two wheel-content files, which run `pip` in a child process) are exempt
+  (#446). Two image completeness controls skip, with a reason naming what is missing, when the
+  Tesseract binary or the QR library is absent, instead of failing on the scanner's correct answer
+  that the scan is incomplete; where every decoder is installed they run unchanged (#447).
+
+- Tests only: the SIGINT variants of the signal-while-taking-over test restore the default handler
+  themselves, so the test holds when the suite is started as a background job (#461); a new test
+  pins that the suite's trace-function reset runs on teardown even when a test changed nothing
+  (#459); the bound on the structural layer's cost relative to a plain scan is a ratio of 1.5 where
+  it was 1.3, with the margin unchanged (#464).
+
 ## [0.6.11] — 2026-10-21
 
 ### Changed
