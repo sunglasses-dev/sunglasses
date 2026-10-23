@@ -49,6 +49,27 @@ def outer():
     sys.settrace(None)
 '''
 
+UNCHANGED = '''
+import sys
+
+real = sys.settrace
+calls = []
+
+def test_1_changes_no_trace_function_and_watches_the_reset():
+    start = sys.gettrace()
+    calls.append(start)
+
+    def recording(hook):
+        calls.append(hook)
+        real(hook)
+    sys.settrace = recording
+
+def test_2_the_reset_still_ran_with_the_trace_function_it_found():
+    sys.settrace = real
+    assert len(calls) == 2, calls
+    assert calls[1] is calls[0], calls
+'''
+
 
 def _run_child(tmp_path, files):
     shutil.copy(TESTS / "conftest.py", tmp_path / "conftest.py")
@@ -73,5 +94,13 @@ def test_the_trace_function_in_force_before_a_test_is_the_one_after_it(tmp_path)
     body = CHILD.format(expected="g")
     outer = OUTER + body.replace("\ndef g(frame, event, arg):\n    return g\n", "\n", 1)
     done = _run_child(tmp_path, {"test_outer.py": outer})
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "2 passed" in done.stdout, done.stdout
+
+
+def test_the_trace_function_is_put_back_even_when_the_test_changed_nothing(tmp_path):
+    # The fixture calls sys.settrace on every teardown, equal or not. A fixture that skipped
+    # the call when the saved and current functions match would pass the two tests above.
+    done = _run_child(tmp_path, {"test_unchanged.py": UNCHANGED})
     assert done.returncode == 0, done.stdout + done.stderr
     assert "2 passed" in done.stdout, done.stdout
