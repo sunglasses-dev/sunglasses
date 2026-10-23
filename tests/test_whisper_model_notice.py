@@ -91,6 +91,16 @@ def watch(monkeypatch, events):
     monkeypatch.setattr(sys, "stderr", _Stream(events))
 
 
+def private_state(monkeypatch):
+    """Give one test a lock and a load record of its own.
+
+    A test that runs a nested load in a worker thread can leave that thread stuck if the lock
+    regresses. On the module's real state it would also leave `_loading` half set for every
+    test that follows, so the failure would show up in the wrong tests."""
+    monkeypatch.setattr(_whisper_model, "_LOCK", type(_whisper_model._LOCK)())
+    monkeypatch.setattr(_whisper_model, "_loading", {"name": None, "original": None})
+
+
 def _notices(events):
     return [text for kind, text in events if kind == "notice"]
 
@@ -201,8 +211,8 @@ def test_overlapping_loads_leave_whisper_as_they_found_it(fake_whisper, events, 
 def test_a_load_inside_a_load_does_not_wait_on_itself(fake_whisper, events, monkeypatch):
     watch(monkeypatch, events)
     # A load that waited on itself would hold the module's lock for good, so
-    # this test runs against a lock of its own and leaves the real one free.
-    monkeypatch.setattr(_whisper_model, "_LOCK", type(_whisper_model._LOCK)())
+    # this test runs on a lock and a load record of its own and leaves the real ones free.
+    private_state(monkeypatch)
     original = fake_whisper._download
     real_load = fake_whisper.load_model
 
@@ -357,9 +367,9 @@ def test_the_load_state_is_idle_again_when_the_hook_installation_stops(
 
 def test_the_outer_model_is_named_again_once_a_nested_load_ends(fake_whisper, events, monkeypatch):
     watch(monkeypatch, events)
-    # Runs on a lock of its own, in a daemon worker, so a regression in the
-    # lock fails here instead of holding up the rest of the run.
-    monkeypatch.setattr(_whisper_model, "_LOCK", type(_whisper_model._LOCK)())
+    # Runs on a lock and a load record of its own, in a daemon worker, so a regression in
+    # the lock fails here instead of holding up or polluting the rest of the run.
+    private_state(monkeypatch)
     real_load = fake_whisper.load_model
 
     def nested(name, **kw):
