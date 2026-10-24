@@ -968,14 +968,24 @@ def test_a_recursion_error_inside_the_reader_never_escapes_and_is_never_called_c
     saved = sys.getrecursionlimit()
     cut_seen = False
     try:
+        reader = validator()               # looked up before the limit drops: the helper needs frames too
         depth = _stack_depth()
-        for extra in list(range(4, 60)) + list(range(60, 900, 20)):
+        limits = list(range(4, 60)) + list(range(60, 900, 20))
+        for room in limits:                # the least room in which the validator can be entered at all
+            try:
+                sys.setrecursionlimit(depth + room)
+                reader.run("x", "message")
+            except RecursionError:
+                continue
+            break
+        assert room <= 16
+        for extra in [e for e in limits if e >= room]:
             try:
                 sys.setrecursionlimit(depth + extra)
             except RecursionError:
                 continue                   # the interpreter also counts calls that are not frames
             try:
-                got = validator().run(shape, "message")
+                got = reader.run(shape, "message")
             except RecursionError:
                 pytest.fail(f"RecursionError escaped the validator at {extra} frames")
             highs = [f for f in got if f["severity"] == "high"]

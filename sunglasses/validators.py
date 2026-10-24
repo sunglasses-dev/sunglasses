@@ -2232,8 +2232,8 @@ class CredentialFileUpload:
 
     reads_channel = True
 
-    def run(self, text, channel="file"):
-        scan = _Scan(channel in _NOTICE_CHANNELS)
+    @staticmethod
+    def _read_pieces(text, channel, scan):
         pieces = _upload_segments(text, channel)
         for number, (segment, fenced) in enumerate(pieces):
             if scan.done():
@@ -2250,6 +2250,13 @@ class CredentialFileUpload:
                     continue
                 scan.line = line
                 _scan_upload_text(line, 0, False, scan)
+
+    def run(self, text, channel="file"):
+        scan = _Scan(channel in _NOTICE_CHANNELS)
+        try:
+            self._read_pieces(text, channel, scan)
+        except RecursionError:
+            scan.unread = True             # a stack that ran out leaves the rest of the text unread
         findings = _Findings()
         findings.unread = scan.unread
         for evidence, low in scan.found:
