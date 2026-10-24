@@ -415,55 +415,69 @@ def test_a_later_start_failure_prints_what_the_scan_found_in_human_output(
 
 # ------------------------------- a first file whose child cannot start, with answers already in hand
 
-FIRST_CHILD = "SUNGLASSES_TEST_FIRST_CHILD"
+CHILD_ID = "SUNGLASSES_TEST_CHILD_ID"
+DECIDE_DIR = "SUNGLASSES_TEST_DECIDE_DIR"
 
 
 @pytest.fixture
 def first_child_fails_late(tmp_path, monkeypatch):
-    """With two children, the one holding the first file fails to build its engine only after the
-    other has answered for a file: the answers are in the parent before the failure is."""
+    """With two children, the one handed the first file fails to build its engine only after the
+    other has answered for a file: the answers are in the parent before the failure is.
+
+    Which child is handed which file is up to the pool's shared queue, so the failing child is not
+    named when it starts. Every child waits, before building its engine, for the parent to say
+    what file it was handed: the parent writes that just before it asks the child for its file.
+    The child handed the first file then waits for the parent to have received another child's
+    answer, and fails; any other child builds its engine as usual."""
     shim = tmp_path / "shim3"
     shim.mkdir()
+    decide = tmp_path / "decide"
+    decide.mkdir()
     answered = tmp_path / "another-child-answered"
     (shim / "sitecustomize.py").write_text(
         "import os, time\n"
         f"answered = {str(answered)!r}\n"
-        f"first = os.environ.get({FIRST_CHILD!r}) == '1'\n"
+        f"decision = os.path.join(os.environ[{DECIDE_DIR!r}], os.environ[{CHILD_ID!r}])\n"
         "import sunglasses.engine as engine\n"
-        "init, scan_file = engine.SunglassesEngine.__init__, engine.SunglassesEngine.scan_file\n"
+        "init = engine.SunglassesEngine.__init__\n"
         "def boot(self, *a, **k):\n"
-        "    if first:\n"
+        "    end = time.time() + 60\n"
+        "    while not os.path.exists(decision) and time.time() < end:\n"
+        "        time.sleep(0.02)\n"
+        "    verdict = open(decision).read() if os.path.exists(decision) else 'ok'\n"
+        "    if verdict == 'fail':\n"
         "        end = time.time() + 60\n"
         "        while not os.path.exists(answered) and time.time() < end:\n"
-        "            time.sleep(0.05)\n"
+        "            time.sleep(0.02)\n"
         "        raise RuntimeError('injected first-start failure')\n"
         "    init(self, *a, **k)\n"
-        "def read(self, target):\n"
-        "    result = scan_file(self, target)\n"
-        "    os.close(os.open(answered, os.O_CREAT | os.O_WRONLY))\n"
-        "    return result\n"
-        "engine.SunglassesEngine.__init__ = boot\n"
-        "engine.SunglassesEngine.scan_file = read\n")
+        "engine.SunglassesEngine.__init__ = boot\n")
     root = os.path.dirname(os.path.dirname(os.path.abspath(cli.__file__)))
     paths = [str(shim), root] + ([os.environ["PYTHONPATH"]] if os.environ.get("PYTHONPATH") else [])
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
-    # The pool starts its first child before the first file is handed out, so that child holds the
-    # first file. Naming it here, from the parent, keeps the failing child from depending on which
-    # child process happens to finish starting its interpreter first.
-    real_start, started = scan_worker.ScanWorker.start, []
+    monkeypatch.setenv(DECIDE_DIR, str(decide))
+    real_start, real_scan, ids = scan_worker.ScanWorker.start, scan_worker.ScanWorker.scan_file, {}
 
     def start(self):
-        first = not started
-        started.append(self)
-        if first:
-            os.environ[FIRST_CHILD] = "1"
+        # Pool children are started one at a time, so the variable is set for this child only.
+        ids[self] = str(len(ids))
+        os.environ[CHILD_ID] = ids[self]
         try:
             real_start(self)
         finally:
-            if first:
-                os.environ.pop(FIRST_CHILD, None)
+            os.environ.pop(CHILD_ID, None)
+
+    def scan_file(self, target):
+        name = str(getattr(target, "name", target))
+        first = os.path.basename(name) == "f0.txt"
+        (decide / ids[self]).write_text("fail" if first else "ok")
+        result = real_scan(self, target)
+        if not first:                       # the parent holds this child's answer now
+            os.close(os.open(answered, os.O_CREAT | os.O_WRONLY))
+        return result
 
     monkeypatch.setattr(scan_worker.ScanWorker, "start", start)
+    monkeypatch.setattr(scan_worker.ScanWorker, "scan_file", scan_file)
 
 
 def _clean_then_threat(tmp_path):
