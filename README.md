@@ -460,11 +460,25 @@ not called clean: the scan is incomplete (exit `3`), unless a threat is found el
 `1`). The flag also applies to `scan --file`, where there is one file and the reason is in the
 result's `extraction_warnings`. A `--deep` scan of an audio or video file has no process to
 stop, so it refuses an explicit deadline with exit `2`; a value that is not a number of seconds,
-0 or more, is refused with exit `2` for any file. If the scanner process cannot be started, each
-file it was meant for is reported as not read (exit `3`) and never as clean. A reply counts only
-when it is a complete scan result or one of the process's three error reports (a file that
-cannot be read, an operating-system error, a fault), each with all of its fields; any other
-reply is treated as a failed process, which is stopped, and the file is reported as not read.
+0 or more, is refused with exit `2` for any file. If the scanner cannot be started before it has
+answered for any file (the engine does not load, or the process cannot be created, exits, or never
+says it is ready), the command stops with exit `2` and one error line, `scanner could not start:
+<reason>`, and prints no report, banner or progress; with `-o json` or `-o sarif` the error is the
+usual single refusal document. The reason is `<type>: <message>` when the engine or the process
+says why, and a plain description when the process ended without saying. For a directory or a
+repository the command is refused only when no scanner has answered for any file handed out so
+far, and with `--jobs` an answer already received from another process for a file behind the
+first counts; a repository scan has said that it is cloning before it is refused. A scanner that
+cannot start once any has answered, such as the replacement for a process stopped at the deadline,
+is not a refusal: that file is listed as not inspected, the scan goes on, and the exit code
+follows the precedence above (a finding exits `1`, otherwise `3`). The scan runs in a separate process for a
+file or a tree read with a deadline on a platform that can stop one; text, standard input,
+`--file-deadline 0` and an audio or video file read without `--deep` build the engine in this
+process, and `--deep` builds its own, and all of them end the same way. A process that was ready and
+then fails on a file is different: a reply counts only when it is a complete scan result or one
+of the process's three error reports (a file that cannot be read, an operating-system error, a
+fault), each with all of its fields; any other reply is treated as a failed process, which is
+stopped, and the file is reported as not read (exit `3`) and never as clean.
 
 `--jobs N` reads up to N files at once with `--dir` and `--repo` (a whole number from 1 to 64;
 default 1, one file at a time). When the tree does not change and every file is read to the end

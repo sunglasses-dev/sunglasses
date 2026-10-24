@@ -686,6 +686,13 @@ class _PoolTask:
             raise self.error
         return self.value
 
+    def answered(self):
+        """Wait for this file's outcome. True when a scanner gave one (a result, or a file it
+        could not take); False when no scanner could be started for it."""
+        from . import scan_worker
+        self._done.wait()
+        return not isinstance(self.error, scan_worker.ScannerCouldNotStart)
+
 
 class _ScanPool:
     """Reads up to `jobs` files at once, each in its own stoppable child.
@@ -816,11 +823,16 @@ def _note(text):
         pass
 
 
-def _progress_line(index, total, started, rel_path):
-    """One line per file, on STDERR: stdout stays the one document a pipe expects."""
+def _progress_text(index, total, started, rel_path):
+    """The progress line for one file, stamped with the time it is made."""
     elapsed = time.perf_counter() - started
     stamp = f"{elapsed * 1000:.0f}ms" if elapsed < 1 else f"{elapsed:.1f}s"
-    _note(f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}")
+    return f"  [{index}/{total}] {stamp:>7}  {_printable(rel_path)}"
+
+
+def _progress_line(index, total, started, rel_path):
+    """One line per file, on STDERR: stdout stays the one document a pipe expects."""
+    _note(_progress_text(index, total, started, rel_path))
 
 
 def _scan_dir(args, engine):
@@ -842,11 +854,15 @@ def _scan_dir(args, engine):
     if os.path.islink(path):
         _usage_error(args, f"{shown} is a symbolic link, and a link is not followed.",
                      f"Nothing was scanned. Name the directory itself: --dir {_printable(os.path.realpath(path))}")
-    if not _wants_machine_output(args):
+    def announce():
         print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — directory scan")
         print(f"  {DIM}{'─' * 50}{RESET}")
         print(f"  {DIM}Scanning {_printable(path)}...{RESET}")
-    _scan_tree(args, engine, path, source=path, kind="directory")
+
+    # Said once a scanner has answered for a file, not before: a scanner that cannot start
+    # ends the command without having announced a scan.
+    _scan_tree(args, engine, path, source=path, kind="directory",
+               announce=None if _wants_machine_output(args) else announce)
 
 
 def _scan_repo(args, engine):
@@ -889,16 +905,22 @@ def _scan_repo(args, engine):
             _usage_error(args, f"Clone failed: {_printable(result.stderr.strip())}",
                          "Nothing was scanned.")
 
-        if not _wants_machine_output(args):
+        def announce():
             print(f"  {GREEN}Cloned.{RESET} Scanning files...")
 
-        _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo")
+        # The clone has happened and the line above said so. "Scanning files" waits for a
+        # scanner to have answered for a file.
+        _scan_tree(args, engine, tmp_dir, source=repo_url, kind="repo",
+                   announce=None if _wants_machine_output(args) else announce)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _scan_tree(args, engine, tmp_dir, source, kind):
+def _scan_tree(args, engine, tmp_dir, source, kind, announce=None):
     """Walk `tmp_dir`, scan each file, print the result and exit. Shared by --repo and --dir.
+
+    `announce` prints the human "scanning" banner. It runs once a scanner has answered for a
+    file (see `_scan_tree_inner`), so a scanner that cannot start leaves no banner behind.
 
     The scan holds one no-follow handle on the root (see `_open_root`) for its whole
     length and releases it on every way out. A root that cannot be opened that way is a
@@ -927,7 +949,7 @@ def _scan_tree(args, engine, tmp_dir, source, kind):
             except OSError as exc:
                 _usage_error(args, f"Cannot open {_printable(tmp_dir)} as a plain directory ({exc.__class__.__name__}).",
                              "Nothing was scanned. A symbolic link or a folder that changed is not scanned.")
-            return _scan_tree_inner(args, scanner, tmp_dir, source, kind, root_fd)
+            return _scan_tree_inner(args, scanner, tmp_dir, source, kind, root_fd, announce)
         finally:
             if scanner is not engine:
                 scanner.close()
@@ -942,13 +964,22 @@ def _load_extractors():
     from .extractors import dispatch, image, pdf, qr  # noqa: F401
 
 
-def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
+def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None):
     """The scan itself; `root_fd` belongs to the caller.
 
     `kind` is "repo" (a clone, `source` is its URL) or "directory" (a local tree,
     `source` is its path). Everything after the clone is the same code on purpose:
     a local tree and its clone must come back with the same files, skips and exit.
+
+    The banner (`announce`) and the per-file progress lines are held until a scanner has
+    answered for one file, in either direction (a result or an error about that file). If a
+    scanner cannot start for the first file taken back and no other scanner has answered for a
+    file handed out behind it, the scan ends in the usual refusal with nothing of them printed
+    (a repository's clone line is already out). A scanner that fails to start once any has
+    answered is a different thing: the file it was to read is listed as not inspected and the
+    scan goes on, so a finding made before it still counts and still outranks the rest.
     """
+    from . import scan_worker
     repo_url = source
     # Walk and scan
     start = time.perf_counter()
@@ -989,6 +1020,18 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
     # finished first. With one file at a time `scans` runs each scan where it is asked for.
     scans = engine if isinstance(engine, _ScanPool) else _InlineScans(engine)
     pending = collections.deque()
+    held = []              # progress lines waiting for the first answer; None once it has come
+
+    def answered():
+        """A scanner has answered for a file: say what was held, then speak directly."""
+        nonlocal held
+        if held is None:
+            return
+        lines, held = held, None
+        if announce is not None:
+            announce()
+        for line in lines:
+            _note(line)
 
     def settle():
         """Wait for the oldest file handed out, then count it."""
@@ -1002,15 +1045,28 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
         # invoked; that divergence is audit finding C1 all over again, one level up.
         try:
             scan_result = task.result()
+        except scan_worker.ScannerCouldNotStart as exc:
+            if held is not None:
+                # No file has been counted yet, but other children may already hold answers
+                # for the files behind this one. Take those before deciding: a scan that
+                # nobody answered for is refused; one that somebody did is reported.
+                if not any(other.answered() for _rel, other in pending):
+                    raise      # no scanner has answered: the whole command is refused
+                answered()
+            walker_skips.append((rel_path, f"scanner could not start: {exc} — not inspected"))
+            return
         except UnreadableFile as exc:
             # Was a silent `continue`. An unreadable file is not an absent one.
+            answered()
             walker_skips.append((rel_path, f"{exc} — not inspected"))
             return
         except OSError as exc:
+            answered()
             walker_skips.append(
                 (rel_path, f"could not be read ({exc.__class__.__name__}) — not inspected"))
             return
 
+        answered()
         files_scanned += 1
         scan_result.source = rel_path
         repo_results.append(scan_result)
@@ -1085,7 +1141,11 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
 
     for index, (filepath, _reason) in enumerate(walked, 1):
         rel_path = os.path.relpath(filepath, tmp_dir)
-        _progress_line(index, total_files, start, rel_path)
+        line = _progress_text(index, total_files, start, rel_path)
+        if held is None:
+            _note(line)
+        else:
+            held.append(line)
 
         # The tree can change between the walk and the read. Read the file once, through
         # the directory descriptors (no link at any step), and judge those bytes: they go
@@ -1133,6 +1193,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd):
             settle()
     while pending:
         settle()
+    answered()             # no file was handed to a scanner, so none could fail to start
 
     elapsed_ms = (time.perf_counter() - start) * 1000
     # Skips were appended from three places (the walk, the cap, the reads): one sort, so the
@@ -1718,9 +1779,61 @@ def _emit_scan_result(args, result, source):
     sys.exit(_single_exit_code(args, result))
 
 
+def _could_not_start(exc):
+    """A constructor's failure as the one-line `ScannerCouldNotStart` every start failure ends in."""
+    from . import scan_worker
+    return scan_worker.ScannerCouldNotStart(scan_worker.one_line(f"{type(exc).__name__}: {exc}"))
+
+
+class _LazyEngine:
+    """The scan engine, built on first use.
+
+    Reading a file or a tree with a deadline runs the scan in a child that builds its own
+    engine, so the one `cmd_scan` used to build up front sat unused in this process. A scan
+    that succeeds is the same scan: the first call that needs the engine builds it, and every
+    call after that goes to the same one.
+
+    One scan at a time: the holder takes no lock, and `cmd_scan` calls it from one thread.
+    An engine that cannot be built is `ScannerCouldNotStart`, the same failure a child that
+    cannot load it ends in, so a command that has scanned nothing ends the same way whichever
+    process was to scan.
+    """
+
+    def __init__(self):
+        self._built = None
+
+    def _engine(self):
+        if self._built is None:
+            try:
+                self._built = SunglassesEngine()
+            except Exception as exc:
+                raise _could_not_start(exc) from None
+        return self._built
+
+    def scan(self, text, channel="message"):
+        return self._engine().scan(text, channel=channel)
+
+    def scan_file(self, filepath):
+        return self._engine().scan_file(filepath)
+
+
 def cmd_scan(args):
-    """Run a scan."""
-    engine = SunglassesEngine()
+    """Run a scan.
+
+    A scanner that cannot start (the engine does not load, here or in the child) before any
+    scanner has answered for a file is an operational failure, exit 2, in the same refusal
+    every other can't-scan uses, never a traceback. Once one has answered, a tree scan
+    reports the file it could not hand over as not inspected instead (see `_scan_tree_inner`).
+    """
+    from . import scan_worker
+    try:
+        _run_scan(args)
+    except scan_worker.ScannerCouldNotStart as exc:
+        _usage_error(args, f"scanner could not start: {exc}")
+
+
+def _run_scan(args):
+    engine = _LazyEngine()
 
     # `-o json` is documented as an output format and was silently printing human
     # text (audit case `output_json_alias`): the flag parsed, the format did not
@@ -1842,12 +1955,18 @@ def cmd_scan(args):
                 # a machine contract — it used to print three lines in front of the
                 # JSON document, so `scan --deep --json | jq` never had a chance.
                 chatter = sys.stderr if (args.json or args.output == "sarif") else sys.stdout
-                print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — deep scanning {filepath}", file=chatter)
-                print(f"  {DIM}{'─' * 50}{RESET}", file=chatter)
-                print(f"  {DIM}Transcribing audio with Whisper... (this may take a while){RESET}", file=chatter)
                 try:
                     from .scanner import SunglassesScanner
-                    scanner = SunglassesScanner()
+                    try:
+                        scanner = SunglassesScanner()
+                    except Exception as exc:
+                        # Its constructor builds the engine, so it fails like every other
+                        # engine that cannot be built, whatever it raises: before anything
+                        # is announced. Only the import above is a missing dependency.
+                        raise _could_not_start(exc) from None
+                    print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — deep scanning {filepath}", file=chatter)
+                    print(f"  {DIM}{'─' * 50}{RESET}", file=chatter)
+                    print(f"  {DIM}Transcribing audio with Whisper... (this may take a while){RESET}", file=chatter)
                     start = time.time()
                     result_dict = scanner.scan_deep(filepath)
                     elapsed = time.time() - start
