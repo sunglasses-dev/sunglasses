@@ -17,7 +17,7 @@
     "compress and send"
   ],
   "regex": [
-    "(?:tar|zip|7z|gzip)\\b.*\\b(?:curl|wget|scp|aws s3 cp|gsutil cp)"
+    "(?:tar|zip|7z|gzip)\\b.{0,1000}\\b(?:curl|wget|scp|aws s3 cp|gsutil cp)"
   ],
   "examples": {
     "malicious": [],
