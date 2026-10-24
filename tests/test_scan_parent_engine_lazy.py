@@ -20,6 +20,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 
 import pytest
 
@@ -449,6 +450,8 @@ def first_child_fails_late(tmp_path, monkeypatch):
         "        end = time.time() + 60\n"
         "        while not os.path.exists(answered) and time.time() < end:\n"
         "            time.sleep(0.02)\n"
+        "        if not os.path.exists(answered):\n"
+        "            raise RuntimeError('no other child answered in time')\n"
         "        raise RuntimeError('injected first-start failure')\n"
         "    init(self, *a, **k)\n"
         "engine.SunglassesEngine.__init__ = boot\n")
@@ -457,6 +460,7 @@ def first_child_fails_late(tmp_path, monkeypatch):
     monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
     monkeypatch.setenv(DECIDE_DIR, str(decide))
     real_start, real_scan, ids = scan_worker.ScanWorker.start, scan_worker.ScanWorker.scan_file, {}
+    held, lock, others = [], threading.Lock(), 3     # f1, f2, f3 of _clean_then_threat
 
     def start(self):
         # Pool children are started one at a time, so the variable is set for this child only.
@@ -470,10 +474,16 @@ def first_child_fails_late(tmp_path, monkeypatch):
     def scan_file(self, target):
         name = str(getattr(target, "name", target))
         first = os.path.basename(name) == "f0.txt"
-        (decide / ids[self]).write_text("fail" if first else "ok")
+        # Publish the whole decision at once: the child never sees the file before it has its value.
+        pending = decide / (ids[self] + ".pending")
+        pending.write_text("fail" if first else "ok")
+        os.replace(pending, decide / ids[self])
         result = real_scan(self, target)
         if not first:                       # the parent holds this child's answer now
-            os.close(os.open(answered, os.O_CREAT | os.O_WRONLY))
+            with lock:
+                held.append(name)
+                if len(held) == others:     # every file but the first has been answered
+                    os.close(os.open(answered, os.O_CREAT | os.O_WRONLY))
         return result
 
     monkeypatch.setattr(scan_worker.ScanWorker, "start", start)
