@@ -102,12 +102,15 @@ documented limits; the carriers still run.
 """
 from __future__ import annotations
 
+import bisect
 import ipaddress
 import json
 import re
 import urllib.parse
+from array import array
 
-__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
+__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "EnvironmentToHttpClient", "VALIDATORS",
+           "classify_command"]
 
 # ----------------------------------------------------------------------------- JSON side
 
@@ -1537,4 +1540,599 @@ class SettingsWithoutPrompts:
         return findings
 
 
-VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts())
+# ---------------------------------------------------------------------- source-code side
+#
+# GLS-STRUCT-002 reads Python and Node source. The reader below is not a parser of either
+# language: it masks what is never code (comments, string bodies), matches brackets once, and
+# answers three questions about a call by walking tokens: which call it is, which of its
+# arguments carry data, and whether the whole process environment reaches that argument.
+
+_ENV_MAX_DEPTH = 200      # brackets nested deeper than this are not paired (calls inside are not read)
+_ENV_MAX_FINDINGS = 20
+
+_LEX_SPECIAL = re.compile(r"[#'\"`/{}]")
+_PREFIX_LETTERS = "rRbBuUfF"
+_BLANK = "\x01"
+
+
+def _body_pattern(quote, triple, hole):
+    escape = r"\\[\s\S]"
+    closer = re.escape(quote * 3 if triple else quote)
+    parts = [escape]
+    if not triple:
+        parts.append(r"\n")
+    parts.append(closer)
+    if hole == "f":
+        parts.extend([r"\{\{", r"\{"])
+    elif hole == "template":
+        parts.append(r"\$\{")
+    return re.compile("|".join(parts))
+
+
+_BODY = {}
+for _q in ("'", '"'):
+    for _t in (False, True):
+        _BODY[(_q, _t, "")] = _body_pattern(_q, _t, "")
+        _BODY[(_q, _t, "f")] = _body_pattern(_q, _t, "f")
+_BODY[("`", False, "template")] = re.compile(r"\\[\s\S]|`|\$\{")
+
+
+def _scan_body(s, p, spec):
+    """Walk a string body from ``p``. Returns (how, blank_to, resume): how is 'close', 'eol',
+    'eof' or 'hole'. A hole is a replacement field of an f-string or a ``${`` of a template."""
+    pattern = _BODY[spec]
+    while True:
+        m = pattern.search(s, p)
+        if m is None:
+            return "eof", len(s), len(s)
+        g = m.group()
+        if g[0] == "\\" or g == "{{":
+            p = m.end()
+        elif g == "\n":
+            return "eol", m.start(), m.start()
+        elif g in ("{", "${"):
+            return "hole", m.start(), m.end()
+        else:
+            return "close", m.end(), m.end()
+
+
+def _mask_source(s):
+    """Same-length copy of ``s``: comments are spaces, string bodies are ``\\x01``. The fields
+    of an f-string and the ``${}`` of a template stay code. Also returns the one-piece string
+    literals, {start: end}, so that a host can be read back from the original text."""
+    n = len(s)
+    out = []
+    literals = {}
+    holes = []            # [spec, brace depth] of strings suspended inside a replacement field
+    pos = 0
+
+    def string(start, p, spec, whole):
+        """Blank one piece of a string from ``start``; returns where code resumes."""
+        how, blank_to, resume = _scan_body(s, p, spec)
+        out.append(_BLANK * (blank_to - start))
+        if how == "hole":
+            opener = s[blank_to:resume]
+            out.append(" {" if opener == "${" else "{")
+            holes.append([spec, 0])
+        elif how == "close" and whole:
+            literals[start] = resume
+        return resume
+
+    while True:
+        m = _LEX_SPECIAL.search(s, pos)
+        if m is None:
+            out.append(s[pos:])
+            break
+        i = m.start()
+        c = s[i]
+        if c == "#" or (c == "/" and s[i + 1:i + 2] == "/"):
+            e = s.find("\n", i)
+            e = n if e < 0 else e
+            out.append(s[pos:i])
+            out.append(" " * (e - i))
+            pos = e
+        elif c == "/":
+            if s[i + 1:i + 2] == "*":
+                e = s.find("*/", i + 2)
+                e = n if e < 0 else e + 2
+                out.append(s[pos:i])
+                out.append(" " * (e - i))
+                pos = e
+            else:
+                out.append(s[pos:i + 1])
+                pos = i + 1
+        elif c == "{":
+            if holes:
+                holes[-1][1] += 1
+            out.append(s[pos:i + 1])
+            pos = i + 1
+        elif c == "}":
+            out.append(s[pos:i + 1])
+            if holes and holes[-1][1] == 0:
+                spec = holes.pop()[0]
+                pos = string(i + 1, i + 1, spec, False)
+            else:
+                if holes:
+                    holes[-1][1] -= 1
+                pos = i + 1
+        elif c == "`":
+            out.append(s[pos:i])
+            pos = string(i, i + 1, ("`", False, "template"), False)
+        else:
+            j = i
+            while j > pos and i - j < 2 and s[j - 1] in _PREFIX_LETTERS:
+                j -= 1
+            if j > 0 and (s[j - 1].isalnum() or s[j - 1] in "_$"):
+                j = i
+            prefix = s[j:i]
+            triple = s[i:i + 3] == c * 3
+            spec = (c, triple, "f" if "f" in prefix.lower() else "")
+            out.append(s[pos:j])
+            pos = string(j, i + (3 if triple else 1), spec, True)
+    return "".join(out), literals
+
+
+_ENV_TOKEN = re.compile(r"\x01+|[A-Za-z_$][\w$]*|\d[\w.]*|\S")
+
+_ROOTS = frozenset(("requests", "httpx", "aiohttp", "axios", "got", "fetch", "urllib", "urllib2",
+                    "urllib3", "urlopen"))
+_GLOBALS = frozenset(("global", "globalThis", "window", "self"))
+_CTORS = frozenset(("Session", "Client", "AsyncClient", "PoolManager", "ProxyManager",
+                    "ClientSession", "create", "extend"))
+_RECEIVERS = frozenset((
+    "requests", "httpx", "aiohttp", "axios", "got", "urllib3",
+    "requests.Session()", "requests.sessions.Session()", "httpx.Client()", "httpx.AsyncClient()",
+    "aiohttp.ClientSession()", "urllib3.PoolManager()", "urllib3.ProxyManager()",
+    "axios.create()", "got.extend()"))
+_METHODS = frozenset(("get", "post", "put", "patch", "delete", "head", "options", "request", "stream"))
+_BARE = frozenset(("fetch", "axios", "got", "urlopen", "urllib.request.urlopen", "urllib2.urlopen",
+                   "urllib.request.Request", "urllib2.Request"))
+_DATA_KEYWORDS = frozenset(("json", "data", "params", "headers", "files", "content", "body", "cookies"))
+_LOCAL_HOSTS = frozenset(("localhost", "127.0.0.1", "::1"))
+
+_ENV_PICKS = frozenset(("get", "getlist", "pop", "filter", "keys", "has", "includes"))
+_ENV_COPIES = frozenset(("items", "values", "copy"))
+_PASS_NAMES = frozenset((
+    "dict", "str", "repr", "ascii", "bytes", "bytearray", "OrderedDict", "collections.OrderedDict",
+    "copy", "copy.copy", "copy.deepcopy", "deepcopy", "Map", "URLSearchParams",
+    "Object.assign", "Object.fromEntries", "Object.entries", "Object.values"))
+_PASS_LAST = frozenset(("dumps", "stringify", "urlencode", "fromEntries", "entries", "assign",
+                        "deepcopy", "URLSearchParams"))
+_KEYS_NAMES = frozenset(("list", "sorted", "set", "tuple", "len", "frozenset", "reversed",
+                         "Object.keys", "Object.getOwnPropertyNames", "Reflect.ownKeys"))
+
+_MOCK_PATCH = re.compile(r"(?<![\w$])patch\s*\(\s*(\x01+)\s*[,)]")
+_MOCK_PATCH_OBJECT = re.compile(r"(?<![\w$])patch\s*\.\s*object\s*\(\s*([\w$.]+)\s*,\s*(\x01+)\s*[,)]")
+_MOCK_SPY = re.compile(r"(?<![\w$])(?:spyOn|stub)\s*\(\s*([\w$.]+)\s*,\s*(\x01+)\s*[,)]")
+_MOCK_ASSIGN = re.compile(
+    r"(?<![\w$.])([A-Za-z_$][\w$.]*)\s*=(?!=)\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)*"
+    r"(?:Mock|MagicMock|AsyncMock|fn|stub|spy)\b")
+_MOCK_WORDS = ("patch", "spyOn", "stub", "Mock", "fn", "spy")
+
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^\n]*)$", re.M)
+_URL_HEAD = re.compile(r"(?:https?|wss?)://([^/?#]*)", re.I)
+_PORT = re.compile(r"\d{0,5}")
+
+
+def _fenced_segments(text, channel):
+    """Split ``text`` into (start, end, fenced). A real code fence (three or more backticks or
+    tildes at the start of a line, closed by the same character) of a prose text is its own
+    segment; the ``code`` channel is never split, it is source."""
+    if channel == "code" or ("```" not in text and "~~~" not in text):
+        return [(0, len(text), False)]
+    segments = []
+    cursor = 0
+    opened = None
+    for m in _FENCE.finditer(text):
+        ticks, info = m.group(1), m.group(2)
+        if opened is None:
+            if ticks[0] == "`" and "`" in info:
+                continue
+            opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)))
+            segments.append((cursor, m.start(), False))
+        elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
+            segments.append((opened[2], m.start(), True))
+            cursor = min(m.end() + 1, len(text))
+            opened = None
+    if opened is None:
+        segments.append((cursor, len(text), False))
+    else:
+        segments.append((opened[2], len(text), True))
+    return [seg for seg in segments if seg[1] > seg[0]]
+
+
+def _is_local_url(url):
+    """True for a literal http(s)/ws(s) URL whose host, after userinfo and port, is the local machine."""
+    m = _URL_HEAD.match(url)
+    if m is None:
+        return False
+    authority = m.group(1)
+    if any(ch in authority for ch in "\\ \t\r\n\x00"):
+        return False
+    host = authority.rpartition("@")[2]
+    if host.startswith("["):
+        end = host.find("]")
+        if end < 0 or not _PORT.fullmatch(host[end + 1:].lstrip(":")) or host[end + 1:end + 2] not in ("", ":"):
+            return False
+        host = host[1:end]
+    else:
+        host, sep, port = host.partition(":")
+        if sep and not _PORT.fullmatch(port):
+            return False
+    return host.lower() in _LOCAL_HOSTS
+
+
+def _literal_text(original):
+    """The text between the quotes of a string literal as it was written."""
+    i = 0
+    while original[i] in _PREFIX_LETTERS:
+        i += 1
+    quote = original[i]
+    width = 3 if original[i:i + 3] == quote * 3 else 1
+    return original[i + width:len(original) - width]
+
+
+class _Reader:
+    """Tokens, bracket pairs and the environment references of one piece of source."""
+
+    def __init__(self, seg):
+        self.seg = seg
+        self.masked, self.literals = _mask_source(seg)
+        masked = self.masked
+        starts, ends = array("l"), array("l")
+        kinds = bytearray()                  # 0 punctuation, 1 name, 2 string, 3 number
+        match, parent = array("l"), array("l")
+        flags = bytearray()                  # per opening bracket: 1 holds `for`, 2 holds `if` after it
+        stack = []
+        too_deep = 0
+        closers = {")": "(", "]": "[", "}": "{"}
+        self.calls = []                      # token index of every name that can start a client call
+        self.envs = []                       # (first, last) token index of each environment reference
+        for mt in _ENV_TOKEN.finditer(masked):
+            a, b = mt.span()
+            c = masked[a]
+            idx = len(starts)
+            starts.append(a)
+            ends.append(b)
+            match.append(-1)
+            parent.append(stack[-1] if stack else -1)
+            flags.append(0)
+            if c == _BLANK:
+                kinds.append(2)
+            elif c.isalpha() or c in "_$":
+                kinds.append(1)
+                word = masked[a:b]
+                if word in _ROOTS:
+                    self.calls.append(idx)
+                elif word == "environ" or word == "env":
+                    owner = "os" if word == "environ" else "process"
+                    if idx >= 2 and masked[starts[idx - 1]:ends[idx - 1]] == "." \
+                            and masked[starts[idx - 2]:ends[idx - 2]] == owner:
+                        self.envs.append((idx - 2, idx))
+                elif stack and word == "for":
+                    flags[stack[-1]] |= 1
+                elif stack and word == "if" and flags[stack[-1]] & 1:
+                    flags[stack[-1]] |= 2
+            elif c.isdigit():
+                kinds.append(3)
+            else:
+                kinds.append(0)
+                if c in "([{":
+                    if len(stack) >= _ENV_MAX_DEPTH:
+                        too_deep += 1          # left unpaired; its closer is skipped below
+                    else:
+                        stack.append(idx)
+                elif c in closers and too_deep:
+                    too_deep -= 1
+                elif c in closers and stack and masked[starts[stack[-1]]] == closers[c]:
+                    opener = stack.pop()
+                    match[opener] = idx
+                    match[idx] = opener
+                    parent[idx] = parent[opener]
+        self.starts, self.ends, self.kinds = starts, ends, kinds
+        self.match, self.parent, self.flags = match, parent, flags
+        self.count = len(starts)
+        self.env_first = [e[0] for e in self.envs]
+        self.need = {}
+        self.group = {}
+
+    def word(self, i):
+        return self.masked[self.starts[i]:self.ends[i]]
+
+    def is_name(self, i):
+        return 0 <= i < self.count and self.kinds[i] == 1
+
+    def is_punct(self, i, ch):
+        return 0 <= i < self.count and self.kinds[i] == 0 and self.masked[self.starts[i]] == ch
+
+    # ---- which call
+
+    def callee(self, t):
+        """(key, index of the name before the argument list) for a client call starting at name
+        ``t``, or None. A constructor in the chain reads as ``Name()``. A dot is member access only
+        when it touches the name: a sentence's full stop before a line of code is not one."""
+        if t > 0 and self.is_punct(t - 1, ".") and self.starts[t - 1] + 1 == self.starts[t]:
+            if not (t >= 2 and self.is_name(t - 2) and self.word(t - 2) in _GLOBALS):
+                return None
+        parts = [self.word(t)]
+        j = t
+        while True:
+            if self.is_punct(j + 1, ".") and self.is_name(j + 2):
+                parts.append(self.word(j + 2))
+                j += 2
+            elif self.is_punct(j + 1, "(") and parts[-1] in _CTORS and self.match[j + 1] != -1 \
+                    and self.is_punct(self.match[j + 1] + 1, "."):
+                parts[-1] += "()"
+                j = self.match[j + 1]
+            else:
+                break
+        if not self.is_punct(j + 1, "(") or self.match[j + 1] == -1:
+            return None
+        key = ".".join(parts)
+        receiver, _, method = key.rpartition(".")
+        if key in _BARE or (receiver in _RECEIVERS and method in _METHODS):
+            return key, j
+        return None
+
+    def arguments(self, opener):
+        """[(first token, end token)] for the top-level arguments between ``opener`` and its closer."""
+        close = self.match[opener]
+        out = []
+        lo = opener + 1
+        i = lo
+        while i < close:
+            if self.kinds[i] == 0:
+                ch = self.masked[self.starts[i]]
+                if ch in "([{" and self.match[i] != -1:
+                    i = self.match[i] + 1
+                    continue
+                if ch == ",":
+                    out.append((lo, i))
+                    lo = i + 1
+            i += 1
+        out.append((lo, close))
+        return out
+
+    def dotted_before(self, o):
+        """Start index and text of the dotted name written right before the bracket at ``o``."""
+        j = o - 1
+        if not self.is_name(j):
+            return None
+        while j >= 2 and self.is_punct(j - 1, ".") and self.is_name(j - 2):
+            j -= 2
+        return j, ".".join(self.word(k) for k in range(j, o, 2))
+
+    # ---- does the whole environment reach the argument
+
+    def _level(self, a, b, keys_view):
+        """One step outward from the unit of tokens a..b: what is written after it, then the
+        bracket around it. Returns ('stop', need) when something there selects (``need`` is the
+        first token the argument must start at for that selection to count), ('root',) when no
+        bracket is left, or ('up', start, close, keys_view) for the group the unit became."""
+        while True:                            # methods and attributes written after the unit
+            nxt = b + 1
+            if self.is_punct(nxt, "["):
+                return ("stop", a)
+            if self.is_punct(nxt, ".") and self.is_name(nxt + 1):
+                name = self.word(nxt + 1)
+                if self.is_punct(nxt + 2, "(") and self.match[nxt + 2] != -1:
+                    if name in _ENV_PICKS:
+                        return ("stop", a)
+                    if name in _ENV_COPIES:
+                        keys_view = False
+                    b = self.match[nxt + 2]
+                    continue
+                return ("stop", a)             # one named variable
+            break
+        o = self.parent[a]
+        if o == -1:
+            return ("root",)
+        kind = self.word(o)
+        close = self.match[o]
+        flag = self.flags[o]
+        if close == -1 or flag == 3:           # unclosed, or a comprehension with a condition
+            return ("stop", o)
+        if flag & 1 and keys_view:             # iterating names only
+            return ("stop", o)
+        start = o
+        if kind == "(":
+            found = self.dotted_before(o)
+            if found is not None:
+                start, name = found
+                last = name.rpartition(".")[2]
+                if name == "filter":
+                    return ("stop", o)
+                if name in _KEYS_NAMES or last == "keys":
+                    if keys_view:
+                        return ("stop", o)
+                elif name in _PASS_NAMES or last in _PASS_LAST:
+                    keys_view = False
+                elif not (a == o + 1 and b == close - 1):
+                    return ("stop", o)         # unknown function with other arguments
+        elif kind == "[":
+            if o > 0 and (self.kinds[o - 1] in (1, 2, 3) or self.is_punct(o - 1, ")")
+                          or self.is_punct(o - 1, "]")):
+                return ("stop", o)             # an index into something else
+            keys_view = False
+        else:
+            keys_view = False
+        return ("up", start, close, keys_view)
+
+    def need_for(self, e):
+        """For environment reference ``e``: None when the whole environment reaches the root of
+        any argument unselected, else the token index ``need`` such that an argument starting at
+        or before ``need`` sees a selection and one starting after it does not. Climbs are shared
+        between references (memoised per bracket), so the cost is linear in the text."""
+        if e in self.need:
+            return self.need[e]
+        a, b = self.envs[e]
+        result = self._level(a, b, True)
+        path = []
+        while result[0] == "up":
+            key = (result[1], result[3])
+            if key in self.group:
+                outcome = self.group[key]
+                break
+            path.append(key)
+            result = self._level(result[1], result[2], result[3])
+        else:
+            outcome = result[1] if result[0] == "stop" else None
+        for key in path:
+            self.group[key] = outcome
+        self.need[e] = outcome
+        return outcome
+
+
+_EVIDENCE_NOTE = "environment"
+
+
+class EnvironmentToHttpClient:
+    """GLS-STRUCT-002: source code hands the whole process environment to an HTTP client."""
+
+    id = "GLS-STRUCT-002"
+    name = "Code sends the whole process environment to an HTTP client"
+    category = "exfiltration"
+    severity = "high"
+    channel = ["file", "code", "tool_output", "message", "web_content"]
+    reads_channel = True
+    description = ("Python or Node source in which the whole process environment is an argument "
+                   "that an HTTP client call sends: every variable the process holds, including "
+                   "tokens and keys, leaves the machine in one request.")
+    _EXAMPLE = ("A call in a code block of a document that hands the whole process environment "
+                "to an HTTP client. The text shows the call; this is a notice, not a verdict.")
+
+    _CLIENT_WORDS = ("requests", "httpx", "aiohttp", "urllib", "axios", "fetch", "got", "urlopen")
+
+    def pregate(self, text):
+        if "environ" not in text and not ("process" in text and "env" in text):
+            return False
+        return any(word in text for word in self._CLIENT_WORDS)
+
+    def run(self, text, channel="file"):
+        findings = []
+        for start, end, fenced in _fenced_segments(text, channel):
+            segment = text[start:end]
+            if "environ" not in segment and "env" not in segment:
+                continue
+            findings.extend(self._read(text, start, segment, fenced))
+            if len(findings) >= _ENV_MAX_FINDINGS:
+                break
+        return findings[:_ENV_MAX_FINDINGS]
+
+    def _mocks(self, reader):
+        """{name: first position} of the places a client call is replaced by a double: the
+        patch, spy, stub and assignment forms. A dotted name is kept under each of its dotted
+        endings, so ``patch("pkg.requests.post")`` replaces ``requests.post``."""
+        masked, seg = reader.masked, reader.seg
+        found = {}
+        if not any(word in masked for word in _MOCK_WORDS):
+            return found
+
+        def add(name, at):
+            for prefix in ("global.", "globalThis.", "window.", "self."):
+                if name.startswith(prefix):
+                    name = name[len(prefix):]
+            parts = name.split(".")
+            for k in range(max(len(parts) - 1, 1)):
+                ending = ".".join(parts[k:])
+                found[ending] = min(at, found.get(ending, at))
+
+        for m in _MOCK_PATCH.finditer(masked):
+            add(_literal_text(seg[m.start(1):m.end(1)]), m.start())
+        for m in _MOCK_PATCH_OBJECT.finditer(masked):
+            target = m.group(1)
+            name = _literal_text(seg[m.start(2):m.end(2)])
+            add(name if target in ("global", "globalThis", "window") else target + "." + name, m.start())
+        for m in _MOCK_SPY.finditer(masked):
+            target = m.group(1)
+            name = _literal_text(seg[m.start(2):m.end(2)])
+            add(name if target in ("global", "globalThis", "window") else target + "." + name, m.start())
+        for m in _MOCK_ASSIGN.finditer(masked):
+            add(m.group(1), m.start())
+        return found
+
+    def _read(self, text, offset, segment, fenced):
+        reader = _Reader(segment)
+        if not reader.envs or not reader.calls:
+            return []
+        mocks = self._mocks(reader)
+        findings = []
+        for t in reader.calls:
+            if len(findings) >= _ENV_MAX_FINDINGS:
+                break
+            hit = reader.callee(t)
+            if hit is None:
+                continue
+            key, last = hit
+            opener = last + 1
+            close = reader.match[opener]
+            k = bisect.bisect_right(reader.env_first, opener)
+            if k >= len(reader.env_first) or reader.env_first[k] >= close:
+                continue
+            if mocks.get(key, len(segment)) < reader.starts[t]:
+                continue
+            method = key.rpartition(".")[2]
+            receiver = key.rpartition(".")[0]
+            if method == "request" and receiver not in ("axios", "got", "axios.create()", "got.extend()"):
+                first_data, url_at = 2, 1
+            elif key == "axios" or key == "axios.request" or method == "request" and "axios" in receiver:
+                first_data, url_at = 0, -1
+            else:
+                first_data, url_at = 1, 0
+            regions = []
+            url_arg = None
+            positional = 0
+            for lo, hi in reader.arguments(opener):
+                if lo >= hi:
+                    continue
+                if reader.is_name(lo) and reader.is_punct(lo + 1, "=") and not reader.is_punct(lo + 2, "="):
+                    name = reader.word(lo)
+                    if name in ("url", "fullurl"):
+                        url_arg = (lo + 2, hi)
+                    elif name in _DATA_KEYWORDS:
+                        regions.append((lo + 2, hi, name))
+                    continue
+                if positional == url_at:
+                    url_arg = (lo, hi)
+                if positional >= first_data:
+                    regions.append((lo, hi, "argument %d" % (positional + 1)))
+                positional += 1
+            if not regions:
+                continue
+            if url_arg is not None and url_arg[1] - url_arg[0] == 1:
+                u = url_arg[0]
+                begin = reader.starts[u]
+                if reader.kinds[u] == 2 and reader.literals.get(begin) == reader.ends[u] \
+                        and _is_local_url(_literal_text(segment[begin:reader.ends[u]])):
+                    continue
+            for lo, hi, label in regions:
+                e = bisect.bisect_left(reader.env_first, lo)
+                hit_at = None
+                while e < len(reader.env_first) and reader.env_first[e] < hi:
+                    need = reader.need_for(e)
+                    if need is None or lo > need:
+                        hit_at = reader.starts[reader.envs[e][0]]
+                        break
+                    e += 1
+                if hit_at is not None:
+                    findings.append(self._finding(text, offset, segment, reader.starts[t], key, label, fenced))
+                    break
+        return findings
+
+    def _finding(self, text, offset, segment, at, key, label, fenced):
+        line = text.count("\n", 0, offset + at) + 1
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "severity": "low" if fenced else self.severity,
+            "channel": list(self.channel),
+            "description": self._EXAMPLE if fenced else self.description,
+            "matched_text": segment[at:at + 50],
+            "structural": True,
+            "evidence": {"call": key, "argument": label, "line": line,
+                         "shape": "fenced_example" if fenced else "environment_to_client"},
+        }
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentToHttpClient())
