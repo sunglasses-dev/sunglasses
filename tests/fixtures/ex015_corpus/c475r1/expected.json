@@ -1,35 +1,35 @@
 {
  "ordinary__b13.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b14.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b15.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b16.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b17.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b18.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b19.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__b20.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "relay__b01.txt": {
   "decision": "block",
