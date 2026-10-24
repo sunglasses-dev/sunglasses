@@ -3935,6 +3935,18 @@ def cmd_uninstall(args):
     elif res.byte_exact:
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
               f"{DIM}(byte-identical){RESET}\n")
+    elif res.later:
+        # The only difference from the file before the install is a wrapper a
+        # later install put there, so say that instead of "it changed". Names
+        # only, no command: the file is on the line above and a name is not a
+        # quoted shell word.
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        for later in res.later:
+            print(f"  {DIM}later sunglasses install still wrapped here: "
+                  f"{later!r}{RESET}")
+        them = "them" if len(res.later) > 1 else "it"
+        print(f"  {DIM}uninstall {them} the same way (name each one, and this "
+              f"file with --config) to restore the original{RESET}\n")
     else:
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "
