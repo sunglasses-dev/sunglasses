@@ -1788,9 +1788,8 @@ def _could_not_start(exc):
 class _LazyEngine:
     """The scan engine, built on first use.
 
-    Reading a file or a tree with a deadline through a supported scanner child runs the scan in
-    a child that builds its own engine, so the one `cmd_scan` used to build up front sat unused
-    in this process. A scan
+    Reading a file or a tree with a deadline runs the scan in a child that builds its own
+    engine, so the one `cmd_scan` used to build up front sat unused in this process. A scan
     that succeeds is the same scan: the first call that needs the engine builds it, and every
     call after that goes to the same one.
 
