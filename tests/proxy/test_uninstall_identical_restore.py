@@ -334,10 +334,11 @@ def test_four_installs_undone_first_installed_first_end_at_the_first_original(
     assert [r.earlier for r in steps] == [False, False, False, True]
 
 
-@pytest.mark.parametrize("depth", [5, 6])
+@pytest.mark.parametrize("depth", [5, 6, 7, 8])
 def test_deeper_stacks_undone_first_installed_first_end_at_the_first_original(
         tmp_path, home, artifact, depth):
-    names = ("echo", "fetch", "time", "fourth", "fifth", "sixth")[:depth]
+    names = ("echo", "fetch", "time", "fourth", "fifth", "sixth", "seventh",
+             "eighth")[:depth]
     original = (json.dumps({"mcpServers": {
         n: {"command": n + "-server", "args": ["--stdio"]} for n in names}},
         indent=2) + "\n").encode("utf-8")
