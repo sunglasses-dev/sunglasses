@@ -1626,7 +1626,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:request\.post|https?\.request|fetch|axios\.post|got\.post)\s*\(\s*["\{].*?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}[:\d]*'],
+        "regex": [r'(?:request\.post|https?\.request|fetch|axios\.post|got\.post)\s*\(\s*["\{].{0,1000}?\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}[:\d]*'],
         "description": "HTTP POST/request to a hardcoded IP address — common in RATs and data exfiltration malware."
     },
     {
@@ -1644,7 +1644,7 @@ PATTERNS = [
         "category": "supply_chain",
         "severity": "critical",
         "channel": ["file"],
-        "regex": [r'(?:(?i:\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?)curl\s+-[A-Za-z]*[oL].*(?:\|\s*(?:bash|sh|python|node))|request\.get\(.*\bwriteFileSync\b.*\bexec\b|eval\s*\(\s*Buffer\.from)'],
+        "regex": [r'(?:(?i:\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?)curl\s+-[A-Za-z]*[oL].{0,1000}(?:\|\s*(?:bash|sh|python|node))|request\.get\(.{0,300}\bwriteFileSync\b.{0,300}\bexec\b|eval\s*\(\s*Buffer\.from)'],
         "description": "Downloading remote code and executing it — classic RAT dropper behavior."
     },
     {
@@ -1816,7 +1816,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "log_memory"],
         "regex": [
-            r"config\.get\s*\(\s*['\"].*(?:key|secret|token|password)",
+            r"config\.get\s*\(\s*['\"].{0,1000}(?:key|secret|token|password)",
         ],
         "keywords": [
             "privateKey",
@@ -2893,7 +2893,7 @@ PATTERNS = [
             "compress and send",
         ],
         "regex": [
-            r"(?:tar|zip|7z|gzip)\b.*\b(?:curl|wget|scp|aws s3 cp|gsutil cp)",
+            r"(?:tar|zip|7z|gzip)\b.{0,1000}\b(?:curl|wget|scp|aws s3 cp|gsutil cp)",
         ],
         "description": "Detects archive creation followed by upload commands — a classic data exfiltration behavioral signature."
     },
@@ -3255,7 +3255,7 @@ PATTERNS = [
             # the insecure-source arm. (Jul-11: reconciles the famous-README FP
             # fix with the curl_pipe_bash regression gate.)
             r"(?i)\b(?:skills?|agents?|assistants?|claude|copilot|cursor|mcp)\b[\s\S]{0,200}?(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
-            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]*http://[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
+            r"(?i)(?:curl|wget|iwr|invoke-webrequest)\s+[^\n|]{0,1000}http://[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:bash|sh|zsh|python\d?)\b",
         ],
         "description": "Detects fake prerequisite/setup steps in skill manifests that trick users into running malicious commands."
     },
@@ -3966,7 +3966,7 @@ PATTERNS = [
         "category": 'exfiltration',
         "severity": 'medium',
         "channel": ['file'],
-        "regex": ['(?i)subprocess\\.(Popen|run|call)\\([^)]*env\\s*=\\s*os\\.environ(?!\\.copy)'],
+        "regex": ['(?i)subprocess\\.(Popen|run|call)\\([^)]{0,1000}env\\s*=\\s*os\\.environ(?!\\.copy)'],
         "description": 'Detection for GHSA-pj2r-f9mw-vrcq (CVE-2026-40159): PraisonAI passes full os.environ to MCP server subprocesses, leaking AWS/API keys to untrusted child processes. Source: https://github.com/advisories/GHSA-pj2r-f9mw-vrcq',
     },
     {
@@ -4139,7 +4139,7 @@ PATTERNS = [
         "severity": 'medium',
         "channel": ['file'],
         "regex": [
-            '(?i)(?:run|script|shell)\\s*:\\s*[^\\n]*\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]+\\}\\}',
+            '(?i)(?:run|script|shell)\\s*:\\s*[^\\n]{0,1000}\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]{1,1000}\\}\\}',
         ],
         "description": 'GitHub Actions / deployment workflow step interpolates user- or package-controlled fields directly into a shell step without quoting — RCE-via-workflow primitive.',
     },
@@ -4149,7 +4149,7 @@ PATTERNS = [
         "category": 'mcp_threat',
         "severity": 'critical',
         "channel": ['file'],
-        "regex": ['(?i)(?:allowed[_-]?commands?|whitelist|cmd_?list)\\s*[:=][^\\n]*(?:\\||;|&&|\\$\\()'],
+        "regex": ['(?i)(?:allowed[_-]?commands?|whitelist|cmd_?list)\\s*[:=][^\\n]{0,1000}(?:\\||;|&&|\\$\\()'],
         "description": 'Detection for GHSA-fgmx-xfp3-w28p (CVE-2026-5059): aws-mcp-server allowed-commands validator can be bypassed by shell metacharacters, enabling unauthenticated RCE. Source: https://github.com/advisories/GHSA-fgmx-xfp3-w28p',
     },
     {

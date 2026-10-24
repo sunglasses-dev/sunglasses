@@ -10,7 +10,7 @@
   "description": "Detection for GHSA-pj2r-f9mw-vrcq (CVE-2026-40159): PraisonAI passes full os.environ to MCP server subprocesses, leaking AWS/API keys to untrusted child processes. Source: https://github.com/advisories/GHSA-pj2r-f9mw-vrcq",
   "keywords": [],
   "regex": [
-    "(?i)subprocess\\.(Popen|run|call)\\([^)]*env\\s*=\\s*os\\.environ(?!\\.copy)"
+    "(?i)subprocess\\.(Popen|run|call)\\([^)]{0,1000}env\\s*=\\s*os\\.environ(?!\\.copy)"
   ],
   "examples": {
     "malicious": [],

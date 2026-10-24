@@ -10,7 +10,7 @@
   "description": "GitHub Actions / deployment workflow step interpolates user- or package-controlled fields directly into a shell step without quoting \u2014 RCE-via-workflow primitive.",
   "keywords": [],
   "regex": [
-    "(?i)(?:run|script|shell)\\s*:\\s*[^\\n]*\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]+\\}\\}"
+    "(?i)(?:run|script|shell)\\s*:\\s*[^\\n]{0,1000}\\$\\{\\{\\s*(?:github|inputs|env|matrix)\\.[^}]{1,1000}\\}\\}"
   ],
   "examples": {
     "malicious": [],
