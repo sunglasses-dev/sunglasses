@@ -1,0 +1,89 @@
+name: pattern-perf
+
+# The dynamic half of the regex shape lint, judged by a job the pull request cannot edit.
+#
+# Why a separate workflow: a job inside a pull_request workflow runs the pull request's OWN copy of
+# the workflow file, so the pull request could change that job's steps, its environment or drop it.
+# This file is a pull_request_target workflow: the platform runs the copy on the BASE branch. The pull
+# request contributes DATA only. Its commit objects are fetched into this clone (nothing is checked
+# out, installed or imported from them) and the gate reads its rule tables with `git show` of the
+# 40-character head sha. Waivers are read from the base as well.
+#
+# Two kinds of step, kept apart: the step that runs the gate has no token in its environment; the
+# two steps that post the commit status hold the token and run only the shell written below.
+# The status is bound to the exact head sha it judged. A push to the pull request runs this again
+# and posts a new status for the new sha; a success on an old sha never carries to a new one.
+#
+# scripts/pattern_perf_gate.py is the gate; tests/test_pattern_perf_workflow.py pins this file's
+# exact text, so changing a line here is a reviewed change to that test as well.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: pattern-perf-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pattern-perf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - name: Post the pending status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [[ "$HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "pattern-perf: unexpected head sha"; exit 1; }
+          gh api "repos/$REPO/statuses/$HEAD" -f state=pending -f context=pattern-perf \
+            -f description="judging ${HEAD:0:12}" -f target_url="$RUN_URL"
+
+      - name: Check out the base branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Fetch the head commit as data
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          [[ "$PR" =~ ^[0-9]+$ && "$HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "pattern-perf: unexpected pull request number or head sha"; exit 1; }
+          git fetch --no-tags --quiet origin "+refs/pull/${PR}/head:refs/pull-head/${PR}"
+          [ "$(git rev-parse "refs/pull-head/${PR}")" = "$HEAD" ] || { echo "pattern-perf: the pull request head moved; a newer run judges it"; exit 1; }
+
+      - name: Time the patterns this change touches
+        id: gate
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python3 -I scripts/pattern_perf_gate.py --base "$BASE" --head "$HEAD"
+
+      - name: Post the verdict
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          OUTCOME: ${{ steps.gate.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [[ "$HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "pattern-perf: unexpected head sha"; exit 1; }
+          STATE=failure
+          if [ "$OUTCOME" = "success" ]; then STATE=success; fi
+          gh api "repos/$REPO/statuses/$HEAD" -f state="$STATE" -f context=pattern-perf \
+            -f description="${HEAD:0:12} ${STATE}" -f target_url="$RUN_URL"
