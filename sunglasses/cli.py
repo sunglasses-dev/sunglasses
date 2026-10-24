@@ -3911,6 +3911,30 @@ def cmd_install(args):
     sys.exit(0)
 
 
+_WINDOWS_PLAIN = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:\\/-")
+
+
+def _uninstall_command(name, config):
+    """The command that undoes `name` in `config`, as text a shell can run, or
+    None when this platform cannot be quoted for.
+
+    The config is named because the file being undone is not always the one in
+    the working directory, and `--` ends the options so a server name that
+    starts with a dash is still a name. On a POSIX shell each word is quoted, so
+    a name or a path with a space stays one word. Windows has no one quoting
+    rule (cmd.exe and PowerShell differ, and both expand variables), so there a
+    command is printed only when every word is plain letters, digits and
+    `_ . : \\ / -`, which both shells read the same way; any other word and the
+    caller says what to do without a command.
+    """
+    words = ["sunglasses", "uninstall", "--config", str(config), "--", name]
+    if os.name == "nt":
+        if not all(w and set(w) <= _WINDOWS_PLAIN for w in words):
+            return None
+        return " ".join(words)
+    return " ".join(shlex.quote(w) for w in words)
+
+
 def cmd_uninstall(args):
     """T10.R5 — put the entry back, byte-exact when the file has not moved."""
     from . import install as _inst
@@ -3925,9 +3949,33 @@ def cmd_uninstall(args):
         print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {e}")
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
-    if res.byte_exact:
+    if res.byte_exact and res.earlier:
+        # R38. The end state is the file before an earlier install on it, so
+        # saying it changed would be false; saying which original it matches
+        # keeps the claim exact.
+        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
+              f"{DIM}(byte-identical to the file before an earlier "
+              f"install){RESET}\n")
+    elif res.byte_exact:
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
               f"{DIM}(byte-identical){RESET}\n")
+    elif res.later:
+        # R38 (b). The only difference from our own after-image is a later
+        # sunglasses wrap on top, so say that and what undoes it rather than
+        # a sentence that reads as somebody else's edit.
+        names = ", ".join(repr(n) for n in res.later)
+        commands = [_uninstall_command(n, target) for n in res.later]
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        which = ("a later sunglasses install of {} is" if len(res.later) == 1
+                 else "later sunglasses installs of {} are").format(names)
+        if None in commands:
+            print(f"  {DIM}{which} still wrapped here; uninstall each of "
+                  f"them the same way, naming this file with --config, to "
+                  f"restore the original{RESET}\n")
+        else:
+            runs = " and ".join(commands)
+            print(f"  {DIM}{which} still wrapped here; run {runs} to restore "
+                  f"the original{RESET}\n")
     else:
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "

@@ -109,13 +109,25 @@ class UninstallResult:
     `kept_at` names a retained copy that could NOT be used -- gone, or failing
     the digest recorded at install -- and was set aside rather than deleted, so
     a person can look at what failed. It is None on every ordinary uninstall.
+
+    `earlier` True means the file is byte-identical to the bytes an EARLIER
+    install on the same file captured, not the bytes this one captured (R38).
+    Two wraps undone first-installed-first end exactly where the user started,
+    and the second uninstall used to call that a change.
+
+    `later` names the sunglasses installs still wrapped on top when they are
+    the ONLY difference from this install's after-image, oldest first. Empty
+    whenever anything else changed the file, so a foreign edit is never
+    blamed on an install.
     """
 
-    __slots__ = ("byte_exact", "kept_at")
+    __slots__ = ("byte_exact", "kept_at", "earlier", "later")
 
-    def __init__(self, byte_exact, kept_at=None):
+    def __init__(self, byte_exact, kept_at=None, earlier=False, later=()):
         self.byte_exact = byte_exact
         self.kept_at = kept_at
+        self.earlier = earlier
+        self.later = tuple(later)
 
 
 def _digest_bytes(b):
@@ -2301,6 +2313,94 @@ def _is_digest(value) -> bool:
             and all(c in "0123456789abcdef" for c in value))
 
 
+def _earlier_originals(home, name, target_id, sha_before):
+    """The pre-install digests of every wrap this install stacks directly on.
+
+    R38. An install on top of another install's wrapper captures THAT wrapper
+    as its original, so the bytes the user started from live only in the
+    earlier record, and that record is gone once the earlier wrap is undone.
+    Carried forward here as digests only: they decide the WORDING of an
+    uninstall and nothing it writes.
+
+    The link is exact: an earlier record counts only when the file this
+    install read is byte-for-byte the wrapper that record left. An edit in
+    between breaks the chain, and a broken chain gets the warning. The records
+    are read without a lock of their own: one that is replaced or removed while
+    this runs is a missing link, and a missing link gets the warning too.
+    """
+    found = []
+    for _, rec in _other_records_on(home, name, target_id):
+        if rec.get("file_sha_after") != sha_before:
+            continue
+        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
+            if _is_digest(digest) and digest not in found:
+                found.append(digest)
+    return found
+
+
+def _other_records_on(home, name, target_id):
+    """Every other completed install record that describes the same file.
+    A record we cannot read is skipped: these only ever inform wording."""
+    d = _record_paths(home, name)[0]
+    for rec_path in sorted(d.glob("*.json")):
+        other = rec_path.stem
+        if other == name:
+            continue
+        try:
+            rec = _read_record(rec_path, other, expect_state="complete")
+        except ConfigConflict:
+            continue
+        if rec.get("target_path") != target_id:
+            continue
+        # The record names its retained original by path, and that path is
+        # derived from the server's own name. A record whose file was moved
+        # onto another name still carries the first name's path, so it cannot
+        # be taken for the other server's install even when both wrappers are
+        # byte-identical.
+        if rec.get("original_bytes_path") != str(_record_paths(home, other)[3]):
+            continue
+        yield other, rec
+
+
+def _later_wraps(home, name, record, current_digest, servers):
+    """The installs stacked on top of this one, when they explain the file.
+
+    R38 (b). Walks from this install's after-image through records whose
+    before-image is exactly the previous link's after-image, and answers only
+    if the walk lands on the file as it was just read. Any gap, any fork and
+    any edit on top means the file changed for some other reason, and the
+    answer is empty so the generic warning stands.
+
+    A record's file name is the name this line would print, so it is checked
+    twice: its retained-original path must be the one that name derives, and
+    each named server must be in `servers` (the entries as they were just read)
+    as exactly the wrapper its record installed. A record that sits under
+    another server's name fails one of the two and the answer is empty.
+    """
+    others = list(_other_records_on(home, name, record.get("target_path")))
+    chain = []
+    cursor = record.get("file_sha_after")
+    while cursor != current_digest:
+        step = [(n, r) for n, r in others
+                if r["file_sha_before"] == cursor and n not in chain]
+        if len(step) != 1:
+            return ()
+        if servers.get(step[0][0]) != step[0][1]["installed_entry"]:
+            return ()
+        chain.append(step[0][0])
+        cursor = step[0][1]["file_sha_after"]
+    return tuple(chain)
+
+
+def _earlier_of(record):
+    """A record's carried digests, or none at all when they are not a list of
+    digests. Unreadable means the conservative sentence, never the claim."""
+    earlier = record.get("earlier_sha_before")
+    if not isinstance(earlier, list) or not all(_is_digest(d) for d in earlier):
+        return ()
+    return tuple(earlier)
+
+
 def _read_record(path, name, *, expect_state):
     """Read and validate a record, or refuse.
 
@@ -2673,6 +2773,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         "original_bytes_path": str(bytes_path),
         "target_path": target_id,
         "entry_existed": entry_existed,
+        "earlier_sha_before": _earlier_originals(
+            home, name, target_id, _digest_bytes(raw)),
     }
 
     try:
@@ -2733,6 +2835,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             "installed_entry": fresh_wrapper,
             "file_sha_before": _digest_bytes(current),
             "entry_existed": fresh_existed,
+            "earlier_sha_before": _earlier_originals(
+                home, name, target_id, _digest_bytes(current)),
         })
         try:
             pending_path.write_text(
@@ -3148,6 +3252,7 @@ def _uninstall_locked(config_path, name, *, home):
     # rather than by position (C3, R5-INVERSE).
     doc = _parse(current, target)
     servers = _servers(doc, target)
+    observed_servers = {k: v for k, v in servers.items()}
     if name not in servers:
         if retained_failure is not None:
             raise retained_failure
@@ -3177,9 +3282,10 @@ def _uninstall_locked(config_path, name, *, home):
         _AUTHORISED[str(target)] = authority
 
     try:
+        restored = (json.dumps(doc, indent=2, allow_nan=False)
+                    + "\n").encode("utf-8")
         with _expect_unchanged(target, _digest_bytes(current), current_identity):
-            _atomic_write(target, (json.dumps(doc, indent=2, allow_nan=False)
-                                   + "\n").encode("utf-8"))
+            _atomic_write(target, restored)
     finally:
         spent = _AUTHORISED.pop(str(target), None)
         if spent is not None:
@@ -3202,4 +3308,16 @@ def _uninstall_locked(config_path, name, *, home):
             except OSError:
                 pass
     _discard(*(q for q in (rec_path, pending_path, retained_path) if q))
-    return UninstallResult(byte_exact=False, kept_at=kept_at)
+
+    # R38. The file moved, and the restore may still have put back exactly
+    # what was there before, so the answer is taken from the bytes written and
+    # not from the path taken. Digests only: the claim needs no retained copy.
+    written = _digest_bytes(restored)
+    if written == record.get("file_sha_before"):
+        return UninstallResult(byte_exact=True, kept_at=kept_at)
+    if written in _earlier_of(record):
+        return UninstallResult(byte_exact=True, kept_at=kept_at, earlier=True)
+    return UninstallResult(
+        byte_exact=False, kept_at=kept_at,
+        later=_later_wraps(home, name, record, _digest_bytes(current),
+                            observed_servers))
