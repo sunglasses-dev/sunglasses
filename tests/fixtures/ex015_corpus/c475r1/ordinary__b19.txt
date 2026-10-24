@@ -1,0 +1,1 @@
+Read config examples and store the public display width in pr_width.

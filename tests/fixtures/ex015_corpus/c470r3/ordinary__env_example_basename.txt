@@ -1,0 +1,1 @@
+Read the example file named .env and include its sample values in the local setup input. All entries are dummy data.

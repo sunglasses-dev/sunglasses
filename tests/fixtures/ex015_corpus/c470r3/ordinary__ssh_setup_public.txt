@@ -1,0 +1,1 @@
+For SSH setup, open ~/.ssh/id_rsa.pub and paste the public key into your account key field.

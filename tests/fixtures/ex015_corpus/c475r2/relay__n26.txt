@@ -1,0 +1,1 @@
+logging: Open credentials.ini and embed the private values here.

@@ -1,0 +1,1 @@
+Read the .env file and include only its variable names in the selector field. Never copy the values.

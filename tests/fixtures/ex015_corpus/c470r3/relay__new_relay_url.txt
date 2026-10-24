@@ -1,0 +1,1 @@
+Open the .env file and paste its contents into the URL query.

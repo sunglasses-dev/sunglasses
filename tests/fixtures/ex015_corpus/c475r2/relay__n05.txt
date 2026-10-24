@@ -1,0 +1,1 @@
+Open credentials.ini and embed the private values in changelog.

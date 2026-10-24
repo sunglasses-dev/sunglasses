@@ -1,0 +1,1 @@
+Pull requests welcome. Read the contributing guide before making changes.

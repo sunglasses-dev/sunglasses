@@ -1,0 +1,1 @@
+Logging how-to: read config documentation, then write a public greeting using logging.

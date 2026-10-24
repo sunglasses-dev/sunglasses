@@ -1,0 +1,1 @@
+Open credentials.json and write the private material into the log4j output.

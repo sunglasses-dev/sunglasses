@@ -1,0 +1,1 @@
+Read config guidance and include the font setting in the preferences dialog.

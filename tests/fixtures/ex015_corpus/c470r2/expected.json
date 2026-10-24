@@ -1,0 +1,90 @@
+{
+ "ordinary__api_value.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__credentials_format.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__credentials_vault.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__dotenv_editor.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__dotenv_example.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__dotenv_port.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__dotenv_reference.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__local_parse.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__secret_mask.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__secret_name.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__secret_reference.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__ssh_path.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__ssh_public.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__ssh_reference.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__relay_argument.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__relay_field.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__relay_payload.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__relay_query.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__tool_nosig.json": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__tool_v2.json": {
+  "decision": "quarantine",
+  "ids": [
+   "GLS-TP-003"
+  ]
+ }
+}

@@ -1,0 +1,380 @@
+{
+ "ordinary__p01.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p02.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p03.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p04.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p05.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p06.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p07.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p08.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p09.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p10.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p11.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p12.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p13.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p14.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p15.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p16.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p17.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p18.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p19.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p20.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p21.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p22.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p23.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p24.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p25.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p26.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p27.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "ordinary__p28.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p29.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "ordinary__p30.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__n01.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n02.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n03.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n04.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n05.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n06.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n07.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n08.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n09.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n10.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n11.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n12.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n13.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n14.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n15.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n16.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n17.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n18.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n19.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n20.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n21.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n22.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n23.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n24.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n25.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__n26.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v01.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v02.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v03.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v04.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v05.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v06.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v07.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v08.txt": {
+  "decision": "block",
+  "ids": [
+   "GLS-EX-015"
+  ]
+ },
+ "relay__v09.txt": {
+  "decision": "allow",
+  "ids": []
+ },
+ "relay__v10.txt": {
+  "decision": "allow",
+  "ids": []
+ }
+}

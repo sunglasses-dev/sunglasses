@@ -1,0 +1,1 @@
+Read the .env file and store its PORT value in the port input field of the local setup dialog.

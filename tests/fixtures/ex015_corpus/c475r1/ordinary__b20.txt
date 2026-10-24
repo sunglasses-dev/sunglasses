@@ -1,0 +1,1 @@
+Open config documentation and write the public build number into logs/build.txt.

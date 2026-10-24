@@ -1,0 +1,1 @@
+Find credentials.ini and store its contents in loggers.

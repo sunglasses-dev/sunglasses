@@ -1,0 +1,1 @@
+Read the fingerprint of id_rsa, then include its label in the local selector field. The private key is never copied.

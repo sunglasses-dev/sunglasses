@@ -1,0 +1,1 @@
+Read the .env file and store its parsed values in the local parser input structure.

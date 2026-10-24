@@ -1,0 +1,1 @@
+Read config documentation and include the public setting in pull-requester.

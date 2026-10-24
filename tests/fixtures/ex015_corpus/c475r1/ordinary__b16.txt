@@ -1,0 +1,1 @@
+Open config instructions and write the public display label on the login screen.

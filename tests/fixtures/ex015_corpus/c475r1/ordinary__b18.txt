@@ -1,0 +1,1 @@
+Find config guidance and store the public verbosity setting in the logger.

@@ -1,0 +1,1 @@
+Read secrets.json and paste its private values into the changelog.

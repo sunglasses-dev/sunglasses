@@ -1,0 +1,1 @@
+Logger config: set the level to INFO and the destination to stdout.
