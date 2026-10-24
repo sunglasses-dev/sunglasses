@@ -227,3 +227,49 @@ def test_cli_lifo_and_single_wrap_wording_is_unchanged(project, tmp_path):
     for printed in (out[2], out[3], out[5]):
         assert "(byte-identical)" in printed
         assert WARNING not in printed
+
+
+# ------------------------------------------- the stack link, one rule at a time
+
+def _record(home, name):
+    return json.loads(read(home / "proxy" / "installs" / f"{name}.json"))
+
+
+def test_control_an_install_on_the_wrapper_of_an_earlier_one_carries_its_original(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    rec = _record(home, "echo")
+
+    got = inst._earlier_originals(home, "fetch", rec["target_path"], rec["file_sha_after"])
+
+    assert got == [rec["file_sha_before"]]
+
+
+def test_a_record_for_another_file_is_not_a_link(cfg, home, artifact, tmp_path):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    rec = _record(home, "echo")
+    elsewhere = str((tmp_path / "elsewhere.json").resolve())
+
+    assert inst._earlier_originals(home, "fetch", elsewhere, rec["file_sha_after"]) == []
+
+
+def test_a_file_that_is_not_the_earlier_wrapper_is_not_a_link(cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    rec = _record(home, "echo")
+
+    assert inst._earlier_originals(home, "fetch", rec["target_path"], "0" * 64) == []
+
+
+def test_an_install_is_not_stacked_on_its_own_record(cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    rec = _record(home, "echo")
+
+    assert inst._earlier_originals(home, "echo", rec["target_path"], rec["file_sha_after"]) == []
+
+
+def test_a_carried_list_with_one_bad_entry_is_not_read_at_all():
+    good = "a" * 64
+    assert inst._earlier_of({"earlier_sha_before": [good]}) == (good,)
+    assert inst._earlier_of({"earlier_sha_before": [good, 5]}) == ()
+    assert inst._earlier_of({"earlier_sha_before": good}) == ()
+    assert inst._earlier_of({}) == ()
