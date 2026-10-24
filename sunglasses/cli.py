@@ -3911,18 +3911,27 @@ def cmd_install(args):
     sys.exit(0)
 
 
+_WINDOWS_PLAIN = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:\\/-")
+
+
 def _uninstall_command(name, config):
-    """The command that undoes `name` in `config`, as text a shell can run.
+    """The command that undoes `name` in `config`, as text a shell can run, or
+    None when this platform cannot be quoted for.
 
     The config is named because the file being undone is not always the one in
     the working directory, and `--` ends the options so a server name that
-    starts with a dash is still a name. Each word is quoted for the platform's
-    shell, so a name or a path with a space stays one word.
+    starts with a dash is still a name. On a POSIX shell each word is quoted, so
+    a name or a path with a space stays one word. Windows has no one quoting
+    rule (cmd.exe and PowerShell differ, and both expand variables), so there a
+    command is printed only when every word is plain letters, digits and
+    `_ . : \\ / -`, which both shells read the same way; any other word and the
+    caller says what to do without a command.
     """
     words = ["sunglasses", "uninstall", "--config", str(config), "--", name]
     if os.name == "nt":
-        import subprocess
-        return subprocess.list2cmdline(words)
+        if not all(w and set(w) <= _WINDOWS_PLAIN for w in words):
+            return None
+        return " ".join(words)
     return " ".join(shlex.quote(w) for w in words)
 
 
@@ -3955,12 +3964,18 @@ def cmd_uninstall(args):
         # sunglasses wrap on top, so say that and what undoes it rather than
         # a sentence that reads as somebody else's edit.
         names = ", ".join(repr(n) for n in res.later)
-        runs = " and ".join(_uninstall_command(n, target) for n in res.later)
+        commands = [_uninstall_command(n, target) for n in res.later]
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         which = ("a later sunglasses install of {} is" if len(res.later) == 1
                  else "later sunglasses installs of {} are").format(names)
-        print(f"  {DIM}{which} still wrapped here; run {runs} to restore the "
-              f"original{RESET}\n")
+        if None in commands:
+            print(f"  {DIM}{which} still wrapped here; uninstall each of "
+                  f"them the same way, naming this file with --config, to "
+                  f"restore the original{RESET}\n")
+        else:
+            runs = " and ".join(commands)
+            print(f"  {DIM}{which} still wrapped here; run {runs} to restore "
+                  f"the original{RESET}\n")
     else:
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "

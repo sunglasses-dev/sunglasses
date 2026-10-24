@@ -2350,8 +2350,16 @@ def _other_records_on(home, name, target_id):
             rec = _read_record(rec_path, other, expect_state="complete")
         except ConfigConflict:
             continue
-        if rec.get("target_path") == target_id:
-            yield other, rec
+        if rec.get("target_path") != target_id:
+            continue
+        # The record names its retained original by path, and that path is
+        # derived from the server's own name. A record whose file was moved
+        # onto another name still carries the first name's path, so it cannot
+        # be taken for the other server's install even when both wrappers are
+        # byte-identical.
+        if rec.get("original_bytes_path") != str(_record_paths(home, other)[3]):
+            continue
+        yield other, rec
 
 
 def _later_wraps(home, name, record, current_digest, servers):
@@ -2364,9 +2372,10 @@ def _later_wraps(home, name, record, current_digest, servers):
     answer is empty so the generic warning stands.
 
     A record's file name is the name this line would print, so it is checked
-    against the file: each named server must be in `servers` (the entries as
-    they were just read) as exactly the wrapper its record installed. A record
-    that sits under another server's name fails that and the answer is empty.
+    twice: its retained-original path must be the one that name derives, and
+    each named server must be in `servers` (the entries as they were just read)
+    as exactly the wrapper its record installed. A record that sits under
+    another server's name fails one of the two and the answer is empty.
     """
     others = list(_other_records_on(home, name, record.get("target_path")))
     chain = []

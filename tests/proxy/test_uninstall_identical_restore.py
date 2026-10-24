@@ -22,6 +22,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import types
 
 import pytest
 
@@ -483,3 +484,130 @@ def test_a_failed_restore_serialisation_releases_the_held_authority(
                     or inst._LOCK_FOR)
     finally:
         authority.close()
+
+
+# ------------- two servers with the same wrapper: the record's name is still evidence
+
+def _three_with_one_command(cfg):
+    entry = {"command": "same-server", "args": ["--stdio"]}
+    cfg.write_bytes((json.dumps({"mcpServers": {n: dict(entry) for n in "cab"}},
+                                indent=2) + "\n").encode("utf-8"))
+
+
+def test_control_identical_wrappers_still_name_the_actual_later_installs(
+        cfg, home, artifact):
+    _three_with_one_command(cfg)
+    for name in ("c", "a", "b"):
+        inst.install(cfg, name, artifact=artifact, home=home)
+
+    assert inst.uninstall(cfg, "c", home=home).later == ("a", "b")
+
+
+def test_a_moved_record_is_not_taken_for_the_install_of_an_identical_wrapper(
+        cfg, home, artifact):
+    """Install c, a, b with one original entry, so the three wrappers are equal;
+    put b's record under c's name. The digests still chain and the entry under
+    that name is exactly the wrapper, so only the record's own retained-original
+    path says whose install it was."""
+    _three_with_one_command(cfg)
+    for name in ("c", "a", "b"):
+        inst.install(cfg, name, artifact=artifact, home=home)
+    records = pathlib.Path(home) / "proxy" / "installs"
+    (records / "b.json").replace(records / "c.json")
+
+    assert inst.uninstall(cfg, "a", home=home).later == ()
+
+
+def test_a_moved_record_prints_the_generic_warning_and_no_command(tmp_path):
+    cfg = tmp_path / "c.json"
+    _three_with_one_command(cfg)
+    home = tmp_path / "h"
+    for name in ("c", "a", "b"):
+        assert sg("install", "--config", str(cfg), name, cwd=tmp_path,
+                  home=home).returncode == 0
+    (b_record,) = home.rglob("installs/b.json")
+    b_record.replace(b_record.with_name("c.json"))
+
+    out = sg("uninstall", "--config", str(cfg), "a", cwd=tmp_path, home=home)
+
+    assert out.returncode == 0, (out.stdout, out.stderr)
+    assert WARNING in out.stdout and "to restore the original" not in out.stdout
+
+
+# ----------------------------- a Windows undo hint is printed only for plain words
+
+class _Nt:
+    """The `os` module as seen from a Windows platform, for the one name that
+    decides the quoting rule."""
+    name = "nt"
+
+    def __getattr__(self, attr):
+        return getattr(os, attr)
+
+
+@pytest.fixture
+def on_windows(monkeypatch):
+    from sunglasses import cli
+    monkeypatch.setattr(cli, "os", _Nt())
+    return cli
+
+
+@pytest.mark.parametrize("config,name", [
+    ("C:\\Users\\me\\.claude.json", "fetch"),
+    ("/home/me/.mcp.json", "my-server_2"),
+    ("rel/.mcp.json", "-dash"),
+])
+def test_windows_prints_a_plain_command_unquoted(on_windows, config, name):
+    assert on_windows._uninstall_command(name, config) == (
+        f"sunglasses uninstall --config {config} -- {name}")
+
+
+@pytest.mark.parametrize("config,name", [
+    ("C:\\Users\\me\\.mcp.json", "a&b"),
+    ("C:\\Users\\me\\.mcp.json", "%PATH%"),
+    ("C:\\Users\\me\\.mcp.json", "$env:HOME"),
+    ("C:\\Users\\me\\.mcp.json", "it's"),
+    ("C:\\Users\\me\\.mcp.json", 'say "x"'),
+    ("C:\\Users\\me\\.mcp.json", "a b"),
+    ("C:\\Users\\me\\.mcp.json", "a;b"),
+    ("C:\\Users\\me\\.mcp.json", "a|b"),
+    ("C:\\Users\\me\\.mcp.json", "a^b"),
+    ("C:\\Users\\me\\.mcp.json", "a`b"),
+    ("C:\\Users\\me\\.mcp.json", "a(b)"),
+    ("C:\\Users\\me\\.mcp.json", ""),
+    ("C:\\Program Files\\app\\.mcp.json", "fetch"),
+    ("C:\\Users\\me\\a&b.json", "fetch"),
+])
+def test_windows_prints_no_command_for_a_word_a_shell_would_read(
+        on_windows, config, name):
+    assert on_windows._uninstall_command(name, config) is None
+
+
+def test_posix_still_quotes_every_word(monkeypatch):
+    from sunglasses import cli
+    monkeypatch.setattr(cli, "os", types.SimpleNamespace(name="posix"))
+    assert cli._uninstall_command("a b", "/x y/c.json") == (
+        "sunglasses uninstall --config '/x y/c.json' -- 'a b'")
+
+
+def test_windows_without_a_command_says_what_to_do(
+        on_windows, tmp_path, monkeypatch, capsys):
+    cfg = tmp_path / "c.json"
+    cfg.write_bytes((json.dumps({"mcpServers": {
+        "echo": {"command": "echo-server", "args": []},
+        "a&b": {"command": "later-server", "args": []}}}, indent=2)
+        + "\n").encode("utf-8"))
+    home = tmp_path / "h"
+    for name in ("echo", "a&b"):
+        assert sg("install", "--config", str(cfg), "--", name, cwd=tmp_path,
+                  home=home).returncode == 0
+    monkeypatch.setenv("SUNGLASSES_HOME", str(home))
+    monkeypatch.setenv("HOME", str(home))
+
+    with pytest.raises(SystemExit) as stop:
+        on_windows.cmd_uninstall(types.SimpleNamespace(config=str(cfg), name="echo"))
+
+    printed = capsys.readouterr().out
+    assert stop.value.code == 0
+    assert "'a&b'" in printed and "--config" in printed
+    assert "sunglasses uninstall" not in printed
