@@ -970,7 +970,10 @@ def test_a_recursion_error_inside_the_reader_never_escapes_and_is_never_called_c
     try:
         depth = _stack_depth()
         for extra in list(range(4, 60)) + list(range(60, 900, 20)):
-            sys.setrecursionlimit(depth + extra)
+            try:
+                sys.setrecursionlimit(depth + extra)
+            except RecursionError:
+                continue                   # the interpreter also counts calls that are not frames
             try:
                 got = validator().run(shape, "message")
             except RecursionError:
