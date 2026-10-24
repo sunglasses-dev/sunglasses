@@ -53,7 +53,7 @@ FAST_IGNORES = {"tests/test_v056_matrix.py", "tests/test_repair_v056.py",
 # the contract rather than to itself (ASTRA round 3, R3-1).
 CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=true  # event=$EVENT: not a pull request, the matrix always runs"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\n# Judge with the classifier from the protected branch, never with the\n# copy inside the PR under judgement (T8 review, 2026-09-10): a PR\n# that edits scripts/ci_classify.py must not be able to classify\n# itself as documentation. actions/checkout with fetch-depth: 0 makes\n# origin/main available. If main has no classifier yet, fail to FULL.\nif ! git show origin/main:scripts/ci_classify.py > "$RUNNER_TEMP/ci_classify.py" 2>/dev/null; then\n  echo "full=true  # origin/main has no scripts/ci_classify.py; defaulting to FULL"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\npython "$RUNNER_TEMP/ci_classify.py" --base "$BASE" --head "$HEAD"\n'
 # Approved shape of the coverage job (ASTRA round 3, R3-2): one plain shell
-# step, no step-level env/shell/if/with, job env = exactly the four bindings.
+# step, no step-level env/shell/if/with, job env = exactly the five bindings.
 # The integrity matrix's full-suite command, pinned as ONE exact string so
 # nothing positional can be smuggled in beside it.
 #
@@ -86,11 +86,23 @@ SHARD_INCLUDE = [{"python-version": "3.12", "shard": "3"}, {"python-version": "3
 INTEGRITY_SUITE_CMD = ("pytest -q --durations=0 "
                        "${{ needs.classify.outputs.quick == 'true' && '-m \"not full_matrix\"' || '' }}")
 
-CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
+CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY perf=$PERF"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\n[ "$PERF" = "success" ]     || { echo "COVERAGE FAIL: pattern-perf did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
+# The pattern-perf step is pinned byte for byte, like coverage's: a substring check cannot see an
+# `exit 0` ahead of the commands it looks for, a reassigned BASE or HEAD, or a swallowed failure.
+CANONICAL_PERF_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "pattern-perf: event=$EVENT is not a pull request, nothing to compare"\n  exit 0\nfi\n[ -n "$BASE" ] && [ -n "$HEAD" ] || { echo "pattern-perf: the pull request has no base or head sha"; exit 1; }\ngit cat-file -e "$BASE^{commit}" || { echo "pattern-perf: the base commit is not in the checkout"; exit 1; }\ngit cat-file -e "$HEAD^{commit}" || { echo "pattern-perf: the head commit is not in the checkout"; exit 1; }\nif git cat-file -e "$BASE:scripts/pattern_perf_gate.py"; then\n  git show "$BASE:scripts/pattern_perf_gate.py" > "$RUNNER_TEMP/pattern_perf_gate.py"\n  echo "pattern-perf: using the gate script from the base commit"\nelse\n  echo "pattern-perf: the base commit has no scripts/pattern_perf_gate.py; this pull request adds it, using its own copy"\n  cp scripts/pattern_perf_gate.py "$RUNNER_TEMP/pattern_perf_gate.py"\nfi\npython "$RUNNER_TEMP/pattern_perf_gate.py" --base "$BASE" --head "$HEAD"\n'
+PERF_JOB_KEYS = {"runs-on", "permissions", "timeout-minutes", "steps"}
+PERF_STEP_ENV = {"EVENT": "${{ github.event_name }}", "BASE": "${{ github.event.pull_request.base.sha }}",
+                 "HEAD": "${{ github.event.pull_request.head.sha }}"}
+# Variables a shell reads before it runs the first line of a step body. Set at the workflow, a job
+# or a step, they make a pinned body byte-identical and still never run it.
+SHELL_STARTUP_VARS = {"BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4", "PROMPT_COMMAND", "BASH_XTRACEFD",
+                      "LD_PRELOAD", "LD_LIBRARY_PATH", "PATH", "IFS", "SHELL", "GITHUB_ENV", "GITHUB_PATH"}
+WORKFLOW_TOP_KEYS = {"name", "concurrency", "on", True, "permissions", "jobs"}
 COVERAGE_JOB_KEYS = {"needs", "if", "runs-on", "timeout-minutes", "env", "steps"}
 COVERAGE_STEP_KEYS = {"name", "run"}
 COVERAGE_ENV = {"CLASSIFY": "${{ needs.classify.result }}", "FULL": "${{ needs.classify.outputs.full }}",
-                "FAST": "${{ needs.fast.result }}", "INTEGRITY": "${{ needs.integrity.result }}"}
+                "FAST": "${{ needs.fast.result }}", "INTEGRITY": "${{ needs.integrity.result }}",
+                "PERF": "${{ needs.pattern-perf.result }}"}
 
 
 # ----------------------------------------------------------------- classifier
@@ -187,7 +199,7 @@ def check_workflow(doc) -> list[str]:
     if "schedule" not in on:
         p.append("schedule missing")
     jobs = doc.get("jobs", {})
-    for name in ("classify", "fast", "integrity", "coverage"):
+    for name in ("classify", "fast", "integrity", "pattern-perf", "coverage"):
         if name not in jobs:
             p.append(f"job {name} missing")
     if p:
@@ -211,10 +223,27 @@ def check_workflow(doc) -> list[str]:
     versions = (integrity.get("strategy") or {}).get("matrix", {}).get("python-version")
     if versions != ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]:
         p.append(f"integrity matrix changed: {versions}")
-    if coverage.get("if") != "always()" or sorted(coverage.get("needs") or []) != ["classify", "fast", "integrity"]:
-        p.append("coverage must run always() and need classify, fast, integrity")
+    perf = jobs["pattern-perf"]
+    if "if" in perf or perf.get("continue-on-error") or perf.get("needs"):
+        p.append("job pattern-perf must run unconditionally, must not tolerate failure and must not depend on other jobs")
+    perf_steps = perf.get("steps", [])
+    if set(perf) != PERF_JOB_KEYS or perf.get("permissions") != {"contents": "read"} \
+            or perf.get("timeout-minutes") != 8:
+        p.append(f"pattern-perf job keys changed: {sorted(perf)}")
+    if len(perf_steps) != 3 or not str(perf_steps[0].get("uses", "")).startswith("actions/checkout@") \
+            or not str(perf_steps[1].get("uses", "")).startswith("actions/setup-python@"):
+        p.append("pattern-perf must be checkout, setup-python, then the timing step, and nothing else")
+    elif set(perf_steps[2]) != {"name", "env", "run"} or perf_steps[2].get("env") != PERF_STEP_ENV \
+            or perf_steps[2].get("run") != CANONICAL_PERF_RUN:
+        p.append("pattern-perf timing step is not the pinned text (script from the pinned base commit, "
+                 "fallback only when the base provably lacks it, no early exit, no swallowed failure)")
+    if not any(isinstance(st.get("with"), dict) and st["with"].get("fetch-depth") == 0
+               for st in perf.get("steps", []) if str(st.get("uses", "")).startswith("actions/checkout@")):
+        p.append("pattern-perf checkout is shallow (base and head both need to be readable)")
+    if coverage.get("if") != "always()" or sorted(coverage.get("needs") or []) != ["classify", "fast", "integrity", "pattern-perf"]:
+        p.append("coverage must run always() and need classify, fast, integrity, pattern-perf")
     cov = "\n".join(_run_lines(coverage))
-    for must in ('[ "$CLASSIFY" = "success" ]', '[ "$FAST" = "success" ]', '[ "$INTEGRITY" = "success" ]', '[ "$FULL" = "false" ]'):
+    for must in ('[ "$CLASSIFY" = "success" ]', '[ "$FAST" = "success" ]', '[ "$PERF" = "success" ]', '[ "$INTEGRITY" = "success" ]', '[ "$FULL" = "false" ]'):
         if must not in cov:
             p.append(f"coverage rule missing {must}")
     fast_runs = _run_lines(fast)
@@ -279,7 +308,7 @@ def check_workflow(doc) -> list[str]:
         if set(decide[0].keys()) - {"name", "id", "env", "run"}:
             p.append(f"classify decide step has unexpected keys {sorted(set(decide[0].keys()) - {'name', 'id', 'env', 'run'})}")
     if (coverage.get("env") or {}) != COVERAGE_ENV:
-        p.append(f"coverage job env must be exactly the four needs bindings: got {coverage.get('env')}")
+        p.append(f"coverage job env must be exactly the five needs bindings: got {coverage.get('env')}")
     if set(coverage.keys()) - COVERAGE_JOB_KEYS:
         p.append(f"coverage job has unexpected keys {sorted(set(coverage.keys()) - COVERAGE_JOB_KEYS)} (defaults/container/shell/step env are not reviewed shapes)")
     if coverage.get("runs-on") != "ubuntu-24.04":
@@ -289,10 +318,20 @@ def check_workflow(doc) -> list[str]:
         p.append("coverage must be exactly one step with only name+run (a step-level env/shell would override the job bindings)")
     elif cov_steps[0].get("run") != CANONICAL_COVERAGE_RUN:
         p.append("coverage step body differs from the approved executable template")
+    extra_top = set(doc) - WORKFLOW_TOP_KEYS
+    if extra_top:
+        p.append(f"workflow has top-level keys {sorted(map(str, extra_top))}: a top-level env reaches every step's "
+                 "shell before the pinned body runs (BASH_ENV, ENV, SHELLOPTS), and nothing else belongs there")
+    for jname, job in sorted(jobs.items()):
+        for where, env in [(f"job {jname}", job.get("env"))] + [
+                (f"job {jname} step {st.get('name') or st.get('uses')!r}", st.get("env")) for st in job.get("steps", [])]:
+            bad = sorted(set(env or {}) & SHELL_STARTUP_VARS)
+            if bad:
+                p.append(f"{where} sets {bad}: the shell reads these before the pinned body runs")
     if "defaults" in doc or any("defaults" in j for j in jobs.values()):
         p.append("workflow/job `defaults` present (could change the shell the coverage body runs under)")
     # Required execution: no step in any job may be conditional or failure-tolerant.
-    for name, job in (("classify", classify), ("fast", fast), ("integrity", integrity), ("coverage", coverage)):
+    for name, job in (("classify", classify), ("fast", fast), ("integrity", integrity), ("pattern-perf", perf), ("coverage", coverage)):
         for st in job.get("steps", []):
             for bad in ("if", "continue-on-error"):
                 if bad in st:
@@ -384,9 +423,194 @@ def test_control_timeout_removed_from_the_matrix_job():
 
 
 def test_control_timeout_removed_from_every_other_job():
-    for name in ("classify", "fast", "coverage", "certify"):
+    for name in ("classify", "fast", "pattern-perf", "coverage", "certify"):
         def m(d, n=name): d["jobs"][n].pop("timeout-minutes", None)
         assert check_workflow(_mutate(m)), f"removing {name} timeout was not caught"
+
+
+def test_control_a_workflow_env_that_sets_the_shell_startup_file_is_refused(tmp_path):
+    # BASH_ENV at the top of the workflow points at a file the pull request owns; bash sources it before
+    # the pinned perf and coverage bodies, so a body that is byte-identical never runs.
+    init = tmp_path / "init.sh"
+    init.write_text("exit 0\n")
+    body = tmp_path / "body.sh"
+    body.write_text("exit 1\n")
+    env = {**os.environ, "BASH_ENV": str(init)}
+    assert subprocess.run(["bash", "-e", str(body)], env=env).returncode == 0     # the hole is real
+    assert subprocess.run(["bash", "-e", str(body)], env={**os.environ}).returncode == 1
+    assert any("top-level" in x for x in check_workflow(_mutate(lambda d: d.update(env={"BASH_ENV": str(init)}))))
+    assert any("top-level" in x for x in check_workflow(_mutate(lambda d: d.update(env={"FOO": "1"}))))
+    assert any("top-level" in x for x in check_workflow(_mutate(lambda d: d.update(defaults={"run": {"shell": "sh"}}))))
+
+
+def test_control_a_job_or_step_env_that_sets_the_shell_startup_file_is_refused():
+    for job in ("pattern-perf", "coverage", "fast", "classify"):
+        def m(d, j=job): d["jobs"][j].setdefault("env", {})["BASH_ENV"] = ".github/init.sh"
+        assert any("BASH_ENV" in x for x in check_workflow(_mutate(m))), job
+        def m2(d, j=job): d["jobs"][j]["steps"][-1].setdefault("env", {})["BASH_ENV"] = ".github/init.sh"
+        assert any("BASH_ENV" in x for x in check_workflow(_mutate(m2))), job
+
+
+def test_the_unmodified_workflow_sets_no_shell_startup_variable_anywhere():
+    doc = _load()
+    assert not (set(doc) - WORKFLOW_TOP_KEYS)
+    for job in doc["jobs"].values():
+        assert not (set(job.get("env") or {}) & SHELL_STARTUP_VARS)
+        for st in job.get("steps", []):
+            assert not (set(st.get("env") or {}) & SHELL_STARTUP_VARS)
+
+
+def test_control_pattern_perf_dropped_from_coverage():
+    def m(d): d["jobs"]["coverage"]["needs"].remove("pattern-perf")
+    assert check_workflow(_mutate(m))
+    def m2(d): del d["jobs"]["coverage"]["env"]["PERF"]
+    assert check_workflow(_mutate(m2))
+    def m3(d):
+        s = d["jobs"]["coverage"]["steps"][0]
+        s["run"] = s["run"].replace('[ "$PERF" = "success" ]', '[ "$PERF" != "failure" ]')
+    assert check_workflow(_mutate(m3))
+
+
+def test_control_a_failed_or_skipped_pattern_perf_blocks_coverage():
+    script = _coverage_script(_load())
+    for perf in ("failure", "cancelled", "skipped", ""):
+        assert not _run_coverage(script, "success", "true", "success", "success", perf)
+        assert not _run_coverage(script, "success", "false", "success", "skipped", perf)
+    assert _run_coverage(script, "success", "false", "success", "skipped", "success")
+
+
+def test_control_pattern_perf_made_conditional_or_tolerant():
+    def m(d): d["jobs"]["pattern-perf"]["if"] = "github.event_name == 'push'"
+    assert check_workflow(_mutate(m))
+    def m2(d): d["jobs"]["pattern-perf"]["continue-on-error"] = True
+    assert check_workflow(_mutate(m2))
+    def m3(d): d["jobs"]["pattern-perf"]["steps"][-1]["continue-on-error"] = True
+    assert check_workflow(_mutate(m3))
+    def m4(d): d["jobs"]["pattern-perf"]["steps"][-1]["if"] = "false"
+    assert check_workflow(_mutate(m4))
+
+
+def test_control_pattern_perf_judged_by_the_pull_requests_own_script():
+    def m(d):
+        st = d["jobs"]["pattern-perf"]["steps"][-1]
+        st["run"] = st["run"].replace('python "$RUNNER_TEMP/pattern_perf_gate.py"', "python scripts/pattern_perf_gate.py")
+    assert check_workflow(_mutate(m))
+    def m2(d):
+        st = d["jobs"]["pattern-perf"]["steps"][0]
+        st["with"] = {}
+    assert check_workflow(_mutate(m2))
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda r: "exit 0\n" + r,                                                      # an early success
+    lambda r: r.replace('if [ "$EVENT" != "pull_request" ]', 'if true', 1),         # the event test made unconditional
+    lambda r: 'BASE="$HEAD"\n' + r,                                                 # arguments reassigned
+    lambda r: 'HEAD="$BASE"\n' + r,
+    lambda r: r.rstrip("\n") + " || true\n",                                       # a failure swallowed
+    lambda r: r.rstrip("\n") + "\nexit 0\n",
+    lambda r: "set +e\n" + r,
+    lambda r: r.replace('git cat-file -e "$BASE^{commit}" ||', 'git cat-file -e "$BASE^{commit}" || true ||', 1),
+    lambda r: r.replace('if git cat-file -e "$BASE:scripts/pattern_perf_gate.py"; then', 'if false; then', 1),
+    lambda r: r.replace('"$BASE:scripts/pattern_perf_gate.py"', '"origin/main:scripts/pattern_perf_gate.py"'),
+    lambda r: r.replace('exit 1; }', 'exit 0; }', 1),
+])
+def test_control_pattern_perf_step_text_is_pinned_exactly(mutate):
+    def m(d):
+        st = d["jobs"]["pattern-perf"]["steps"][-1]
+        mutated = mutate(st["run"])
+        assert mutated != st["run"]
+        st["run"] = mutated
+    assert check_workflow(_mutate(m))
+
+
+def test_control_pattern_perf_step_env_job_shape_and_extra_steps_are_pinned():
+    def m(d): d["jobs"]["pattern-perf"]["steps"][-1]["env"]["BASE"] = "${{ github.sha }}"
+    assert check_workflow(_mutate(m))
+    def m2(d): d["jobs"]["pattern-perf"]["steps"].insert(2, {"run": "exit 0"})
+    assert check_workflow(_mutate(m2))
+    def m3(d): d["jobs"]["pattern-perf"]["steps"][-1]["shell"] = "bash {0} || true"
+    assert check_workflow(_mutate(m3))
+    def m4(d): d["jobs"]["pattern-perf"]["timeout-minutes"] = 60
+    assert check_workflow(_mutate(m4))
+    def m5(d): d["jobs"]["pattern-perf"]["defaults"] = {"run": {"shell": "true"}}
+    assert check_workflow(_mutate(m5))
+
+
+def _perf_step_run(tmp_path, base_script, head_script, event="pull_request", base=None, head=None):
+    """Run the checked-in perf step under bash -e in a throwaway repo. The gate script is a stub that
+    says which copy ran and exits with a code the test chooses, so only the step's own logic is judged."""
+    import subprocess
+    repo, runner = tmp_path / "r", tmp_path / "runner"
+    (repo / "scripts").mkdir(parents=True)
+    runner.mkdir()
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    (bindir / "python").symlink_to(sys.executable)
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True, check=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    (repo / "README.md").write_text("x\n")
+    if base_script is not None:
+        (repo / "scripts" / "pattern_perf_gate.py").write_text(base_script)
+    git("add", "-A")
+    git("commit", "-qm", "base")
+    base_sha = git("rev-parse", "HEAD")
+    (repo / "scripts" / "pattern_perf_gate.py").write_text(head_script)
+    git("add", "-A")
+    git("commit", "-qm", "head")
+    head_sha = git("rev-parse", "HEAD")
+    env = dict(os.environ, PATH=f"{bindir}{os.pathsep}{os.environ['PATH']}", RUNNER_TEMP=str(runner), EVENT=event,
+               BASE=base_sha if base is None else base, HEAD=head_sha if head is None else head)
+    return subprocess.run(["bash", "-e", "-c", CANONICAL_PERF_RUN], cwd=repo, env=env, capture_output=True, text=True)
+
+
+def _stub(tag, code):
+    return f"import sys\nprint({tag!r})\nsys.exit({code})\n"
+
+
+def test_step_uses_the_base_commits_script_not_the_pull_requests_own(tmp_path):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 0), _stub("HEAD-COPY", 1))
+    assert r.returncode == 0 and "BASE-COPY" in r.stdout and "HEAD-COPY" not in r.stdout
+
+
+def test_step_propagates_the_base_scripts_failure(tmp_path):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 1), _stub("HEAD-COPY", 0))
+    assert r.returncode == 1 and "BASE-COPY" in r.stdout
+
+
+def test_step_uses_the_pull_requests_script_only_when_the_base_provably_lacks_it(tmp_path):
+    r = _perf_step_run(tmp_path, None, _stub("HEAD-COPY", 0))
+    assert r.returncode == 0 and "HEAD-COPY" in r.stdout and "adds it" in r.stdout
+
+
+def test_step_fails_when_the_base_commit_is_not_in_the_checkout(tmp_path):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 0), _stub("HEAD-COPY", 0), base="0" * 40)
+    assert r.returncode == 1 and "BASE-COPY" not in r.stdout and "HEAD-COPY" not in r.stdout
+
+
+def test_step_fails_when_the_head_commit_is_not_in_the_checkout(tmp_path):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 0), _stub("HEAD-COPY", 0), head="1" * 40)
+    assert r.returncode == 1 and "COPY" not in r.stdout
+
+
+@pytest.mark.parametrize("which", ["base", "head"])
+def test_step_fails_when_a_pull_request_has_no_base_or_head_sha(tmp_path, which):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 0), _stub("HEAD-COPY", 0), **{which: ""})
+    assert r.returncode == 1 and "COPY" not in r.stdout
+
+
+def test_step_does_nothing_off_a_pull_request(tmp_path):
+    r = _perf_step_run(tmp_path, _stub("BASE-COPY", 1), _stub("HEAD-COPY", 1), event="push", base="", head="")
+    assert r.returncode == 0 and "COPY" not in r.stdout
+
+
+def test_the_checked_in_pattern_perf_step_is_the_pinned_text():
+    st = _load()["jobs"]["pattern-perf"]["steps"][-1]
+    assert st["run"] == CANONICAL_PERF_RUN and st["env"] == PERF_STEP_ENV
 
 
 def test_control_concurrency_block_removed():
@@ -480,8 +704,8 @@ def _coverage_script(doc):
     return steps[0]["run"]
 
 
-def _expected(classify, full, fast, integrity):
-    if classify != "success" or fast != "success":
+def _expected(classify, full, fast, integrity, perf):
+    if classify != "success" or fast != "success" or perf != "success":
         return False
     if full == "true":
         return integrity == "success"
@@ -500,24 +724,24 @@ def _run_script_file(body, env, cwd=None, timeout=10):
         os.unlink(path)
 
 
-def _run_coverage(script, classify, full, fast, integrity):
-    env = dict(os.environ, CLASSIFY=classify, FULL=full, FAST=fast, INTEGRITY=integrity)
+def _run_coverage(script, classify, full, fast, integrity, perf):
+    env = dict(os.environ, CLASSIFY=classify, FULL=full, FAST=fast, INTEGRITY=integrity, PERF=perf)
     return _run_script_file(script, env).returncode == 0
 
 
 def coverage_truth_table_holds(doc) -> list[str]:
     # The table is only meaningful for the reviewed shape: a single plain step
-    # whose ONLY environment is the job's four bindings. Any other shape means
+    # whose ONLY environment is the job's five bindings. Any other shape means
     # the values we inject are not the values the step would see.
     shape = [x for x in check_workflow(doc) if x.startswith("coverage")]
     if shape:
         return shape
     script = _coverage_script(doc)
     bad = []
-    for classify, full, fast, integrity in itertools.product(RESULTS, ("true", "false", "", "yes", "TRUE"), RESULTS, RESULTS):
-        got = _run_coverage(script, classify, full, fast, integrity)
-        if got != _expected(classify, full, fast, integrity):
-            bad.append(f"CLASSIFY={classify} FULL={full!r} FAST={fast} INTEGRITY={integrity}: exit ok={got}, expected {_expected(classify, full, fast, integrity)}")
+    for classify, full, fast, integrity, perf in itertools.product(RESULTS, ("true", "false", "", "yes", "TRUE"), RESULTS, RESULTS, RESULTS):
+        got = _run_coverage(script, classify, full, fast, integrity, perf)
+        if got != _expected(classify, full, fast, integrity, perf):
+            bad.append(f"CLASSIFY={classify} FULL={full!r} FAST={fast} INTEGRITY={integrity} PERF={perf}: exit ok={got}, expected {_expected(classify, full, fast, integrity, perf)}")
     return bad
 
 

@@ -17,7 +17,7 @@ name: pattern-integrity
 # 2026-09-10 split (T9 Fable + T8 Opus review, ASTRA NO-GO round 1 applied):
 # the full six-Python matrix below took 2 h 50 m PER PULL REQUEST (the "Full
 # test suite" step alone: 167 min per job). A contributor fixing a README typo
-# waited three hours for a check. Now, on every pull request, four jobs run:
+# waited three hours for a check. Now, on every pull request, these jobs run:
 #
 #   classify  — unfiltered, every PR. scripts/ci_classify.py — taken from
 #               origin/main, NEVER the PR's own copy — reads the COMPLETE change
@@ -31,8 +31,11 @@ name: pattern-integrity
 #               two v0.5.6 acceptance modules. Minutes, not hours.
 #   integrity — the full matrix, unchanged, ONLY when classify says full=true
 #               (and always on push to main, tags, nightly, manual dispatch).
+#   pattern-perf — always. Times the regexes the change touches, base against
+#               head (scripts/pattern_perf_gate.py, from origin/main); a pull
+#               request with no pattern change passes in seconds.
 #   coverage  — always runs last and is the ONE check merge automation reads:
-#               it fails unless classify and fast succeeded AND, when full was
+#               it fails unless classify, fast and pattern-perf succeeded AND, when full was
 #               required, all six matrix jobs succeeded. A skipped matrix only
 #               passes when classify affirmatively said docs-only, so requiring
 #               `coverage` never deadlocks a docs PR and never lets code skip
@@ -594,10 +597,56 @@ jobs:
           CI_SHARD: ${{ matrix.shard }}/${{ matrix.python-version == '3.12' && 4 || 2 }}
         run: pytest -q --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
 
+  pattern-perf:
+    # The dynamic half of the regex shape lint. For every pattern id this pull request
+    # changes it times each changed regex on the base and on the head, in one process, and fails
+    # on superlinear growth, on a large head-over-base jump, on a run that reaches the cap, on a
+    # waiver that no longer trips and on a table it cannot read. `coverage` requires it, so a
+    # slow pattern cannot merge. The script comes from the pull request's pinned base commit,
+    # never from the pull request under judgement, for the same reason classify's does; the one
+    # exception is the pull request that adds the script: the base commit is proven present and
+    # proven to lack the file, and only then is the pull request's own copy used (printed, so the
+    # exception is visible). tests/test_ci_gate.py pins this step's text exactly.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Time the patterns this change touches (fail-closed)
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "pattern-perf: event=$EVENT is not a pull request, nothing to compare"
+            exit 0
+          fi
+          [ -n "$BASE" ] && [ -n "$HEAD" ] || { echo "pattern-perf: the pull request has no base or head sha"; exit 1; }
+          git cat-file -e "$BASE^{commit}" || { echo "pattern-perf: the base commit is not in the checkout"; exit 1; }
+          git cat-file -e "$HEAD^{commit}" || { echo "pattern-perf: the head commit is not in the checkout"; exit 1; }
+          if git cat-file -e "$BASE:scripts/pattern_perf_gate.py"; then
+            git show "$BASE:scripts/pattern_perf_gate.py" > "$RUNNER_TEMP/pattern_perf_gate.py"
+            echo "pattern-perf: using the gate script from the base commit"
+          else
+            echo "pattern-perf: the base commit has no scripts/pattern_perf_gate.py; this pull request adds it, using its own copy"
+            cp scripts/pattern_perf_gate.py "$RUNNER_TEMP/pattern_perf_gate.py"
+          fi
+          python "$RUNNER_TEMP/pattern_perf_gate.py" --base "$BASE" --head "$HEAD"
+
   coverage:
     # The single check merge automation may rely on. always() so a skipped or
     # failed upstream job still produces a verdict here instead of silence.
-    needs: [classify, fast, integrity]
+    needs: [classify, fast, integrity, pattern-perf]
     if: always()
     runs-on: ubuntu-24.04
     # No per-job permissions here, deliberately. `coverage` is THE gate and
@@ -612,12 +661,14 @@ jobs:
       FULL: ${{ needs.classify.outputs.full }}
       FAST: ${{ needs.fast.result }}
       INTEGRITY: ${{ needs.integrity.result }}
+      PERF: ${{ needs.pattern-perf.result }}
     steps:
       - name: Require the work the change needed
         run: |
-          echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"
+          echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY perf=$PERF"
           [ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }
           [ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }
+          [ "$PERF" = "success" ]     || { echo "COVERAGE FAIL: pattern-perf did not succeed"; exit 1; }
           if [ "$FULL" = "true" ]; then
             [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }
             echo "COVERAGE OK: full matrix required and green"
