@@ -1712,6 +1712,8 @@ _FILTERS = frozenset(("tr", "sed", "awk", "cut", "grep", "egrep", "fgrep", "sort
 _PRODUCERS = _READERS | _FILTERS | frozenset(("env", "printenv"))
 # Programs that run the text they are given as a command.
 _WRAPPERS = _SHELLS | frozenset(("eval",))
+# Programs that write their own arguments to standard output.
+_PRINTERS = frozenset(("echo", "printf"))
 # The first operand of these is the pattern or script, unless an option gave it; the letters
 # are the options that give it.
 _PATTERN_LETTERS = {"grep": "ef", "egrep": "ef", "fgrep": "ef", "sed": "ef",
@@ -1832,15 +1834,16 @@ def _output_of(segment, stdin):
     return stdin if not operands or "-" in operands else None
 
 
-def _flows(segments):
+def _flows(segments, emitted=None):
     """(inputs, outputs): for each segment what its standard input carries and what it writes to
     the pipe, each "file", "environment" or None. One pass forward, so a source reaches an
     uploader through any number of filters; a redirection replaces the pipe, and a producer
-    with a file of its own does not pass the pipe on."""
+    with a file of its own does not pass the pipe on. ``emitted`` maps a segment's index to what
+    its own output carries when it writes something it was handed (`echo $(cat f)`)."""
     ins = []
     outs = []
     carried = None
-    for segment in segments:
+    for index, segment in enumerate(segments):
         redirect = _stdin_redirect(segment)
         if redirect is not None:
             op, target = redirect
@@ -1852,28 +1855,76 @@ def _flows(segments):
             stdin = None
         ins.append(stdin)
         carried = _output_of(segment, stdin)
+        if emitted and index in emitted:
+            carried = emitted[index]
         outs.append(carried)
     return ins, outs
 
 
-def _substitution_reads(body, depth):
-    """What the output of a substitution body carries; bodies nest to the same depth as commands."""
+def _worth_reading(text):
+    """Could this text, left unread, hold an upload or a credential name? A body skipped at the
+    depth limit reports the run as not inspected only when it could."""
+    plain = _plain(text).lower()
+    return "curl" in plain or "wget" in plain or any(hint in plain for hint in _CREDENTIAL_HINTS)
+
+
+def _wrapped_text(head, args):
+    """The text a shell (`-c`) or `eval` is handed to run, or None."""
+    if _base(head.value) in _SHELLS:
+        run = _run_shell(args)
+        if run.mode == "inline" and run.inline is not None and run.inline.kind == "w":
+            return run.inline.value
+        return None
+    return " ".join(a.value for a in args if a.kind == "w") or None
+
+
+def _emitted(segment, depth, scan):
+    """What a segment writes to standard output from a body it was handed: a shell or `eval`
+    runs its text, and `echo` and `printf` write their arguments (for `printf`, the format, and
+    the arguments after it only when the format holds a `%`). Any other program, and any segment
+    whose output is redirected, hands nothing on."""
+    if _stdout_redirects(segment):
+        return None
+    words = segment.words
+    located = _locate(words, _WRAPPERS)
+    if located is not None:
+        text = _wrapped_text(*located)
+        return _substitution_reads(text, depth + 1, scan) if text else None
+    located = _locate(words, _PRINTERS)
+    if located is None:
+        return None
+    head, args = located
+    given = [a for a in args if a.kind == "w"]
+    if _base(head.value) == "printf" and given and "%" not in given[0].value:
+        given = given[:1]
+    for word in given:
+        for inner in word.subs:
+            found = _substitution_reads(inner, depth + 1, scan)
+            if found:
+                return found
+    return None
+
+
+def _substitution_reads(body, depth, scan):
+    """What the output of a substitution body carries; bodies nest to the same depth as commands.
+    A body the reader cannot follow reports the run as not inspected (``scan.unread``); a body
+    below the depth limit is reported by the command scan, which descends the same substitutions
+    and wrapper texts to the same depth."""
     if depth > _MAX_NESTED_COMMANDS:
         return None
     try:
         segments = _segments(_lex(body))
-        ins, outs = _flows(segments)
+        emitted = {}
+        for index, segment in enumerate(segments):
+            found = _emitted(segment, depth, scan)
+            if found:
+                emitted[index] = found
+        ins, outs = _flows(segments, emitted)
         for index, segment in enumerate(segments):
             if segment.sep_after not in ("|", "|&") and outs[index]:
                 return outs[index]
-            for word in segment.words:
-                if word.kind == "w":
-                    for inner in word.subs:
-                        found = _substitution_reads(inner, depth + 1)
-                        if found:
-                            return found
     except (_Syntax, RecursionError):
-        return None
+        scan.unread = True
     return None
 
 
@@ -1914,6 +1965,7 @@ class _Scan:
 def _upload_evidence(stdin, name, args, depth, scan):
     for kind, value in _upload_operands(name, args):
         if scan.done():
+            scan.unread = True
             return
         if kind == "file":
             if _credential_name(value):
@@ -1923,7 +1975,7 @@ def _upload_evidence(stdin, name, args, depth, scan):
             if stdin:
                 yield {"program": name, "carrier": "standard input", "source": stdin}
         elif kind == "subst":
-            source = _substitution_reads(value, depth + 1)
+            source = _substitution_reads(value, depth + 1, scan)
             if source:
                 yield {"program": name, "carrier": "read substitution", "source": source}
 
@@ -1935,6 +1987,7 @@ def _scan_tokens(toks, depth, marked, scan):
         carry = False       # a warning stands across a parenthesis and along a pipeline
         for index, segment in enumerate(segments):
             if scan.done():
+                scan.unread = True
                 return
             words = segment.words
             marked_here = marked or carry
@@ -1964,17 +2017,26 @@ def _scan_tokens(toks, depth, marked, scan):
                 if located is not None:
                     head, args = located
                     here = marked_here or _warned(words, head)
-                    name = _base(head.value)
-                    if name in _SHELLS:
-                        run = _run_shell(args)
-                        if run.mode == "inline" and run.inline is not None and run.inline.kind == "w":
-                            _scan_upload_text(run.inline.value, depth + 1, here, scan)
-                    elif name == "eval":
-                        joined = " ".join(a.value for a in args if a.kind == "w")
-                        if joined:
-                            _scan_upload_text(joined, depth + 1, here, scan)
+                    text = _wrapped_text(head, args)
+                    if text:
+                        _scan_upload_text(text, depth + 1, here, scan)
+            else:
+                # The limit: what lies below is not read, and it is said so when it could matter.
+                for word in words:
+                    if word.kind == "w" and any(_worth_reading(body) for body in word.subs):
+                        scan.unread = True
+                located = _locate(words, _WRAPPERS)
+                if located is not None:
+                    text = _wrapped_text(*located)
+                    if text and _worth_reading(text):
+                        scan.unread = True
     except RecursionError:
-        return
+        scan.unread = True
+
+
+def _names_uploader(text):
+    plain = _plain(text)
+    return "curl" in plain or "wget" in plain
 
 
 def _has_uploader(toks):
@@ -1983,16 +2045,16 @@ def _has_uploader(toks):
 
 def _scan_upload_text(line, depth, marked, scan):
     """Scan one logical line. Words read before a quote that cannot be read still count; a line
-    whose reading failed before its first curl or wget is read again from there. Text that is
-    valid but nested deeper than the reader follows sets ``scan.unread``."""
+    whose reading failed before its first curl or wget is read again from there. A line that
+    could not be read to its end (a quote that never closes, nesting deeper than the reader
+    follows, a stack that ran out) sets ``scan.unread``: the text after the failure was not
+    inspected."""
     sink = []
     try:
         toks = _lex(line, sink)
         failed = False
-    except _TooDeep:
-        scan.unread = True
-        toks, failed = sink, True
     except (_Syntax, RecursionError):
+        scan.unread = True
         toks, failed = sink, True
     _scan_tokens(toks, depth, marked, scan)
     if not failed or _has_uploader(toks):
@@ -2003,20 +2065,91 @@ def _scan_upload_text(line, depth, marked, scan):
     rest = []
     try:
         _lex(line[match.start():], rest)
-    except _TooDeep:
-        scan.unread = True
     except (_Syntax, RecursionError):
         pass
     _scan_tokens(rest, depth, marked or bool(_DOC_MARKER.search(line[:match.start()])), scan)
 
 
+_SUBSTITUTION_OPEN = re.compile(r"\$\(|`")
+# How far ahead a substitution that a line opens is searched for its close, and how much text
+# all such searches in one run may read in total.
+_MERGE_WINDOW = 8192
+_MERGE_BUDGET = 1 << 20
+
+
+def _substitution_end(text, at):
+    """Index just after the close of the substitution that opens at ``text[at:]``; None when it
+    does not close in ``text``, and -1 when it nests deeper than the reader follows (or than the
+    stack allows)."""
+    try:
+        if text[at] == "`":
+            return _closing_backtick(text, at) + 1
+        return _balanced(text, at + 1)
+    except (_TooDeep, RecursionError):
+        return -1
+    except _Syntax:
+        return None
+
+
+def _spanning_units(physical):
+    """The lines of a text with every command that opens a `$(` or backtick substitution which
+    only a later line closes joined to the lines up to the close, so the reader sees
+    `curl -d "$(` / `cat .env` / `)"` as the one command it is. Only a line that names an
+    uploader is searched, and only a window ahead of it, so the cost stays bounded; a
+    substitution that does not close in the window, or that the budget for these searches no
+    longer reaches, leaves its line alone, and the reader reports that line unread because its
+    substitution never closes."""
+    units = []
+    budget = _MERGE_BUDGET
+    count = len(physical)
+    index = 0
+    while index < count:
+        line = physical[index]
+        last = index
+        if "$(" in line or "`" in line:
+            plain = _plain(line)
+            if "curl" in plain or "wget" in plain:
+                skip_to = 0
+                for match in _SUBSTITUTION_OPEN.finditer(line):
+                    at = match.start()
+                    if at < skip_to:
+                        continue
+                    end = _substitution_end(line, at)
+                    if end == -1:
+                        break
+                    if end is not None:
+                        skip_to = end
+                        continue
+                    # Opens here and does not close here: look for the close a window ahead.
+                    if budget <= 0:
+                        break
+                    parts = [line]
+                    size = len(line)
+                    tail = index
+                    while size < _MERGE_WINDOW and tail + 1 < count:
+                        tail += 1
+                        parts.append(physical[tail])
+                        size += len(physical[tail]) + 1
+                    window = "\n".join(parts)
+                    budget -= len(window)
+                    end = _substitution_end(window, at)
+                    if end is not None and end > 0:
+                        last = index + window.count("\n", 0, end - 1)
+                    break
+        units.append("\n".join(physical[index:last + 1]) if last > index else line)
+        index = last + 1
+    return units
+
+
 def _logical_lines(text):
     """The commands of a text as the shell reads lines: a backslash before the line break joins
-    the next line with nothing between, and a line that ends in a pipe or `&&` / `||` continues
-    on the next. List-accumulated, so the cost stays linear."""
+    the next line with nothing between, a line that ends in a pipe or `&&` / `||` continues on
+    the next, and a command that opens a substitution closed on a later line takes the lines up
+    to the close. List-accumulated, so the cost stays linear."""
     lines = []
     parts = []
-    for physical in text.split("\n"):
+    units = _spanning_units(text.split("\n"))
+    for physical in units:
         stripped = physical[:-1] if physical.endswith("\r") else physical
         if (len(stripped) - len(stripped.rstrip("\\"))) % 2:
             parts.append(stripped[:-1])
@@ -2101,18 +2234,22 @@ class CredentialFileUpload:
 
     def run(self, text, channel="file"):
         scan = _Scan(channel in _NOTICE_CHANNELS)
-        for segment, fenced in _upload_segments(text, channel):
+        pieces = _upload_segments(text, channel)
+        for number, (segment, fenced) in enumerate(pieces):
+            if scan.done():
+                scan.unread = scan.unread or any(_names_uploader(p) for p, _ in pieces[number:])
+                break
             scan.fenced = fenced
-            for line in _logical_lines(segment):
+            lines = _logical_lines(segment)
+            for position, line in enumerate(lines):
                 if scan.done():
+                    scan.unread = scan.unread or any(_names_uploader(l) for l in lines[position:]) \
+                        or any(_names_uploader(p) for p, _ in pieces[number + 1:])
                     break
-                plain = _plain(line)
-                if "curl" not in plain and "wget" not in plain:
+                if not _names_uploader(line):
                     continue
                 scan.line = line
                 _scan_upload_text(line, 0, False, scan)
-            if scan.done():
-                break
         findings = _Findings()
         findings.unread = scan.unread
         for evidence, low in scan.found:
