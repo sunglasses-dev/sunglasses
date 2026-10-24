@@ -47,7 +47,7 @@ from .proxy import supervisor
 # numpy tree must trip no file at this value (see the pull request's local evidence).
 DEFAULT_FILE_DEADLINE_S = 120.0
 # Loading the engine is not the file's time. A child that has not said ready by now is
-# killed and every file reports that the scanner process did not start.
+# killed and the scan stops: a scanner that could not start is an operational failure.
 STARTUP_S = 120.0
 GRACE_MS = 2000
 # One answer holds one file's findings. Past this the child is treated as faulty.
@@ -55,9 +55,28 @@ ANSWER_LIMIT = 64 * 1024 * 1024
 
 REASON_DEADLINE = "not finished within the file deadline ({seconds} s)"
 REASON_STOPPED = "the scanner process stopped before it finished this file"
-REASON_NO_START = "the scanner process did not start"
+# The line a start failure is written on is cut here. It is a message, not a dump.
+START_LINE_LIMIT = 300
 
 _HEADER = struct.Struct(">I")
+
+
+class ScannerCouldNotStart(Exception):
+    """The scanner could not be started, as opposed to one that started and could not finish a file.
+
+    The text is one printable line ("ExcType: message" when the engine or the child says why, or
+    a description of what happened to the child). A command that has scanned nothing yet stops
+    on this and exits 2; once a scanner has answered for a file (with several processes, for a
+    file handed out behind the first), a tree scan lists the file it could not hand over as not
+    inspected instead. It is never a report about a file.
+    """
+
+
+def one_line(text):
+    """`text` as one printable line, cut short, so a start failure can be written to a terminal."""
+    text = " ".join(str(text).split())
+    text = "".join(ch if ch.isprintable() else ch.encode("unicode_escape").decode("ascii") for ch in text)
+    return text if len(text) <= START_LINE_LIMIT else text[:START_LINE_LIMIT - 3] + "..."
 
 # The OSError classes the engine's file reads can raise, by name. The package reads no class
 # off a module by a computed name, so the table is spelled out.
@@ -175,7 +194,12 @@ def main():
     try:
         from .engine import SunglassesEngine
         engine = SunglassesEngine()
-    except Exception:
+    except Exception as exc:
+        # Said in the one shape the parent reads before "ready", so the command can name it.
+        try:
+            _put(channel, {"ready": False, "error": one_line(f"{type(exc).__name__}: {exc}")})
+        except Exception:
+            pass
         return 1
     return serve(engine, sys.stdin.buffer, channel)
 
@@ -323,8 +347,11 @@ class ScanWorker:
 
     `scan_file(target)` returns what the engine returns, raises what the engine raises
     (`UnreadableFile`, `OSError`), and returns an INCOMPLETE result when the file was
-    not finished in `deadline_s` or the child failed. It never returns a verdict for a
-    file the child did not answer for.
+    not finished in `deadline_s` or the child failed after it was ready. It never returns
+    a verdict for a file the child did not answer for.
+
+    A child that never becomes ready is a different thing: the scanner could not start, no
+    file was read, and `ScannerCouldNotStart` is raised (again on every later call).
     """
 
     def __init__(self, deadline_s, *, argv=None, startup_s=None, grace_ms=GRACE_MS,
@@ -337,6 +364,7 @@ class ScanWorker:
         self._child = None
         self._ready = False
         self._broken = False
+        self._start_failure = ""
         self._aborted = False
         self._lock = threading.Lock()
         self._gate = threading.Lock()     # guards `_child` and `_aborted`; never held while waiting
@@ -347,8 +375,8 @@ class ScanWorker:
         """Begin loading the engine now, so the load overlaps the caller's own work.
 
         A child that cannot be started (no such program, no process left to give) is the
-        same answer as one that never says ready: every file reports that the scanner
-        process did not start, and nothing is called clean.
+        same answer as one that never says ready: the first file asked for raises
+        `ScannerCouldNotStart`, and nothing is called clean.
         """
         with self._gate:
             if self._child is None and not self._broken and not self._aborted:
@@ -356,9 +384,10 @@ class ScanWorker:
                     self._child = subprocess.Popen(
                         self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True)
-                except (OSError, ValueError, subprocess.SubprocessError):
+                except (OSError, ValueError, subprocess.SubprocessError) as exc:
                     self._child = None
                     self._broken = True
+                    self._start_failure = one_line(f"{type(exc).__name__}: {exc}")
 
     @property
     def pid(self):
@@ -440,25 +469,45 @@ class ScanWorker:
             raise _Gone()
         return value
 
+    def _fail_to_start(self, reason):
+        self._broken = True
+        self._start_failure = reason
+        raise ScannerCouldNotStart(reason)
+
     def _await_ready(self):
+        """True once the child has said ready, False if the worker was aborted, else raises.
+
+        Everything that stops the child before it is ready, whether it died, ran out of time
+        or said why it cannot load the engine, is `ScannerCouldNotStart`.
+        """
         if self._broken:
-            return False
+            raise ScannerCouldNotStart(self._start_failure)
         if self._child is None:
             self.start()
             if self._child is None:
-                return False
+                if self._aborted:
+                    return False
+                raise ScannerCouldNotStart(self._start_failure)
         if self._ready:
             return True
         try:
             value = self._receive(time.monotonic() + self.startup_s)
-        except (_Late, _Gone):
+        except (_Late, _Gone) as exc:
             self._stop()
             self._broken = True
-            return False
+            if self._aborted:
+                return False
+            self._fail_to_start(
+                f"the scanner process did not say ready within {self.startup_s:g} s"
+                if isinstance(exc, _Late) else "the scanner process ended before it was ready")
         if value.get("ready") is not True:
             self._stop()
             self._broken = True
-            return False
+            if self._aborted:
+                return False
+            said = value.get("error") if value.get("ready") is False else None
+            self._fail_to_start(one_line(said) if isinstance(said, str) and said.strip()
+                                else "the scanner process did not say ready")
         self._ready = True
         return True
 
@@ -468,7 +517,7 @@ class ScanWorker:
             if self._aborted:
                 return _incomplete(REASON_STOPPED)
             if not self._await_ready():
-                return _incomplete(REASON_STOPPED if self._aborted else REASON_NO_START)
+                return _incomplete(REASON_STOPPED)
             if self._aborted:
                 self._stop()
                 return _incomplete(REASON_STOPPED)

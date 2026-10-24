@@ -297,23 +297,45 @@ def test_crashed_child_is_incomplete_then_replaced(rig, worker_cls):
         assert worker.scan_file(str(ok)).is_clean
 
 
-def test_child_that_never_starts_marks_every_file_incomplete_without_hanging(rig, worker_cls):
+def test_child_that_never_starts_is_a_scanner_that_could_not_start_without_hanging(rig, worker_cls):
     worker = worker_cls.ScanWorker(30, argv=[sys.executable, "-c", "import sys; sys.exit(3)"],
                                    startup_s=5)
     with worker:
         started = time.monotonic()
         for _ in range(3):
-            result = worker.scan_file(str(_file(rig, CLEAN)))
-            assert not result.is_clean
-            assert "did not start" in "; ".join(result.extraction_warnings)
+            with pytest.raises(worker_cls.ScannerCouldNotStart) as stop:
+                worker.scan_file(str(_file(rig, CLEAN)))
+            assert "ended before it was ready" in str(stop.value)
         assert time.monotonic() - started < 20
+
+
+def test_child_that_is_never_ready_in_time_is_a_scanner_that_could_not_start(rig, worker_cls):
+    script = "import time; time.sleep(30)"
+    with worker_cls.ScanWorker(30, argv=[sys.executable, "-c", script], startup_s=1) as worker:
+        started = time.monotonic()
+        with pytest.raises(worker_cls.ScannerCouldNotStart) as stop:
+            worker.scan_file(str(_file(rig, CLEAN)))
+        assert "did not say ready within 1 s" in str(stop.value)
+        assert time.monotonic() - started < 15
+        assert worker.pid is None, "a child that never said ready must not be kept"
+
+
+def test_a_child_that_says_why_it_cannot_start_is_quoted_as_one_printable_line(rig, worker_cls):
+    reply = {"ready": False, "error": "RuntimeError: no model\x1b[31m\nsecond line " + "x" * 400}
+    script = _talker({}, raw_ready=json.dumps(reply).encode())
+    with worker_cls.ScanWorker(30, argv=[sys.executable, "-c", script], startup_s=10) as worker:
+        with pytest.raises(worker_cls.ScannerCouldNotStart) as stop:
+            worker.scan_file(str(_file(rig, CLEAN)))
+        said = str(stop.value)
+        assert said.startswith("RuntimeError: no model\\x1b[31m second line ")
+        assert "\n" not in said and "\x1b" not in said and len(said) <= worker_cls.START_LINE_LIMIT
 
 
 def test_child_that_says_something_else_is_a_fault_not_a_verdict(rig, worker_cls):
     script = "import sys; sys.stdout.buffer.write(b'hello there, not a frame'); sys.stdout.flush(); import time; time.sleep(30)"
     with worker_cls.ScanWorker(30, argv=[sys.executable, "-c", script], startup_s=5) as worker:
-        result = worker.scan_file(str(_file(rig, CLEAN)))
-        assert not result.is_clean
+        with pytest.raises(worker_cls.ScannerCouldNotStart):
+            worker.scan_file(str(_file(rig, CLEAN)))      # never a verdict, never "clean"
 
 
 def test_close_leaves_no_child(rig, worker_cls):
@@ -530,6 +552,16 @@ def test_an_error_reply_the_child_could_not_have_written_gives_an_incomplete_jso
         assert report["partially_read"], report
 
 
+def _script_argv(rig, script):
+    """The stand-in child as a file, not a `-c` argument: the payloads below are far past the length
+    one argument may have on Linux, and a spawn that fails for that reason is a different outcome."""
+    path = rig / "talker_file.py"
+    path.write_text(script)
+    argv = [sys.executable, str(path)]
+    assert max(map(len, argv)) < 4096          # nothing here can reach the per-argument limit
+    return argv
+
+
 # Bytes the decoder cannot turn into a value: not JSON at all, or JSON nested past what the
 # decoder accepts (the decoder's own limit differs between interpreters, so the nesting is far
 # past all of them).
@@ -541,21 +573,42 @@ _UNDECODABLE = {
 }
 
 
-@pytest.mark.parametrize("stage", ["ready", "answer"])
 @pytest.mark.parametrize("name", sorted(_UNDECODABLE))
-def test_a_message_the_decoder_cannot_read_is_a_failed_child_not_an_exception(rig, worker_cls, name, stage):
-    script = _talker({}, **{"raw_ready" if stage == "ready" else "raw_reply": _UNDECODABLE[name]})
-    with worker_cls.ScanWorker(30, argv=[sys.executable, "-c", script], startup_s=10) as worker:
+def test_an_answer_the_decoder_cannot_read_is_a_failed_child_not_an_exception(rig, worker_cls, name):
+    argv = _script_argv(rig, _talker({}, raw_reply=_UNDECODABLE[name]))
+    with worker_cls.ScanWorker(30, argv=argv, startup_s=10) as worker:
         result = worker.scan_file(str(_file(rig, CLEAN)))       # must not raise
         assert not result.is_clean
         assert result.extraction_complete is False
         assert worker.pid is None, "a child that answered badly must not be kept for the next file"
 
 
-@pytest.mark.parametrize("stage", ["ready", "answer"])
+@pytest.mark.parametrize("name", sorted(_UNDECODABLE))
+def test_a_ready_the_decoder_cannot_read_is_a_scanner_that_could_not_start(rig, worker_cls, name):
+    argv = _script_argv(rig, _talker({}, raw_ready=_UNDECODABLE[name]))
+    with worker_cls.ScanWorker(30, argv=argv, startup_s=10) as worker:
+        with pytest.raises(worker_cls.ScannerCouldNotStart):
+            worker.scan_file(str(_file(rig, CLEAN)))
+        assert worker.pid is None, "a child that never became ready must not be kept"
+
+
+def test_a_ready_the_decoder_cannot_read_ends_the_command_with_the_refusal_not_a_report(rig, worker_cls):
+    (rig / "talker.py").write_text(_talker({}, raw_ready=_UNDECODABLE["nested_object"]))
+    path = _file(rig, CLEAN, "target.txt")
+    proc = subprocess.run(
+        [sys.executable, str(rig / "launcher.py"), str(rig / "talker.py"), "scan", "--file", str(path),
+         "-o", "json", "--file-deadline", "30"],
+        cwd=rig / "cwd", env=_env(rig, 60), capture_output=True, text=True, timeout=120)
+    assert proc.returncode == EXIT_USAGE, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr, proc.stderr
+    refusal = json.loads(proc.stdout)
+    assert refusal["scanned"] is False and refusal["error"].startswith("scanner could not start: "), refusal
+    assert "extraction_complete" not in refusal and refusal["is_clean"] is False
+
+
 @pytest.mark.parametrize("target", ["--file", "--dir"])
-def test_a_message_the_decoder_cannot_read_gives_an_incomplete_json_report(rig, worker_cls, target, stage):
-    script = _talker({}, **{"raw_ready" if stage == "ready" else "raw_reply": _UNDECODABLE["nested_object"]})
+def test_an_answer_the_decoder_cannot_read_gives_an_incomplete_json_report(rig, worker_cls, target):
+    script = _talker({}, raw_reply=_UNDECODABLE["nested_object"])
     (rig / "talker.py").write_text(script)
     path = _file(rig, CLEAN, "target.txt") if target == "--file" else _tree(rig, {"a.txt": CLEAN})
     proc = subprocess.run(
@@ -588,17 +641,17 @@ def test_a_header_that_claims_more_than_the_limit_is_a_fault_at_once_not_a_deadl
         assert "stopped" in said and "deadline" not in said, said
 
 
-def test_a_child_that_cannot_be_started_is_incomplete_not_an_exception(rig, worker_cls):
+def test_a_child_that_cannot_be_started_is_a_scanner_that_could_not_start(rig, worker_cls):
     worker = worker_cls.ScanWorker(30, argv=[str(rig / "no-such-program")], startup_s=5)
     with worker:
-        worker.start()                              # must not raise
+        worker.start()                              # must not raise: the file asked for does
         for _ in range(2):
-            result = worker.scan_file(str(_file(rig, CLEAN)))
-            assert not result.is_clean
-            assert "did not start" in "; ".join(result.extraction_warnings)
+            with pytest.raises(worker_cls.ScannerCouldNotStart) as stop:
+                worker.scan_file(str(_file(rig, CLEAN)))
+            assert "FileNotFoundError" in str(stop.value)
 
 
-def test_command_with_no_startable_child_reports_every_file_not_read(rig):
+def test_command_with_no_startable_child_refuses_with_exit_2_and_one_line(rig):
     (rig / "nospawn.py").write_text(textwrap.dedent("""
         import sys
         from sunglasses import scan_worker
@@ -611,13 +664,14 @@ def test_command_with_no_startable_child_reports_every_file_not_read(rig):
     proc = subprocess.run([sys.executable, str(rig / "nospawn.py"), "scan", "--file", str(one)],
                           cwd=rig / "cwd", env=env, capture_output=True, text=True, timeout=120)
     said = proc.stdout + proc.stderr
-    assert proc.returncode == EXIT_INCOMPLETE, said
-    assert "did not start" in said and "Traceback" not in said, said
+    assert proc.returncode == EXIT_USAGE, said
+    assert "scanner could not start: FileNotFoundError" in proc.stderr and "Traceback" not in said, said
+    assert proc.stdout == ""
     tree = _tree(rig, {"a.txt": CLEAN, "b.txt": CLEAN})
     proc = subprocess.run([sys.executable, str(rig / "nospawn.py"), "scan", "--dir", str(tree)],
                           cwd=rig / "cwd", env=env, capture_output=True, text=True, timeout=120)
-    assert proc.returncode == EXIT_INCOMPLETE, proc.stdout + proc.stderr
-    assert "Traceback" not in proc.stdout + proc.stderr
+    assert proc.returncode == EXIT_USAGE, proc.stdout + proc.stderr
+    assert "scanner could not start" in proc.stderr and "Traceback" not in proc.stdout + proc.stderr
 
 
 def test_a_finding_the_writers_can_read_is_accepted(rig, worker_cls):
