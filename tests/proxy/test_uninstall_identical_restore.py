@@ -334,6 +334,25 @@ def test_four_installs_undone_first_installed_first_end_at_the_first_original(
     assert [r.earlier for r in steps] == [False, False, False, True]
 
 
+@pytest.mark.parametrize("depth", [5, 6])
+def test_deeper_stacks_undone_first_installed_first_end_at_the_first_original(
+        tmp_path, home, artifact, depth):
+    names = ("echo", "fetch", "time", "fourth", "fifth", "sixth")[:depth]
+    original = (json.dumps({"mcpServers": {
+        n: {"command": n + "-server", "args": ["--stdio"]} for n in names}},
+        indent=2) + "\n").encode("utf-8")
+    cfg_n = tmp_path / "deep.json"
+    cfg_n.write_bytes(original)
+    for name in names:
+        inst.install(cfg_n, name, artifact=artifact, home=home)
+
+    steps = [inst.uninstall(cfg_n, name, home=home) for name in names]
+
+    assert read(cfg_n) == original
+    assert [r.byte_exact for r in steps] == [False] * (depth - 1) + [True]
+    assert [r.earlier for r in steps] == [False] * (depth - 1) + [True]
+
+
 def test_an_unreadable_earlier_digest_list_does_not_override_the_own_original(
         cfg, home, artifact):
     inst.install(cfg, "echo", artifact=artifact, home=home)
