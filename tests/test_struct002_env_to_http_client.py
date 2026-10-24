@@ -17,8 +17,9 @@ This gate pins:
   2. CLEAR   -- a selection, a keys-only view, a local-machine literal host, a mocked call,
                 text after the call has closed, comments and strings: all clear on every
                 channel, from the same builder shapes as the positives.
-  3. NOTICE  -- the same call inside a real code fence of a prose text is a notice, never a
-                block. The `code` channel is judged as code.
+  3. NOTICE  -- the same call inside a real code fence of a `file` or `message` text is a
+                notice, never a block. In `tool_output` and `web_content` a fence changes
+                nothing; `code` is judged as source.
   4. LIMITS  -- shapes this validator does not read (a variable receiver, an alias) are
                 pinned as not found, so a change that starts reading them is deliberate.
   5. MUTANTS -- one edit to a positive (select one variable, replace the client) must turn
@@ -35,7 +36,8 @@ from sunglasses.patterns import PATTERNS
 
 RULE = "GLS-STRUCT-002"
 CHANNELS = ["code", "message", "file", "tool_output", "web_content"]
-PROSE_CHANNELS = [c for c in CHANNELS if c != "code"]
+NOTICE_CHANNELS = ["message", "file"]
+HOSTILE_CHANNELS = ["tool_output", "web_content"]
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "env_to_http_client", "samples.json")
 
 with open(FIXTURES, encoding="utf-8") as handle:
@@ -69,7 +71,7 @@ def test_selections_local_hosts_mocks_and_text_after_the_call_stay_clear(engine,
     assert not found(engine, sample["text"], channel), (sample["label"], channel)
 
 
-@pytest.mark.parametrize("channel", PROSE_CHANNELS)
+@pytest.mark.parametrize("channel", NOTICE_CHANNELS)
 @pytest.mark.parametrize("sample", of("NOTICE"), ids=lambda s: s["label"])
 def test_a_call_shown_in_a_code_fence_of_prose_is_a_notice_never_a_block(engine, sample, channel):
     result = engine.scan(sample["text"], channel=channel)
@@ -199,6 +201,25 @@ def test_a_mock_before_the_call_replaces_it_and_one_for_another_receiver_does_no
     assert not hits('with patch.object(requests, "post"):\n    requests.post(url, json=dict(os.environ))')
     assert not hits('patch("pkg.requests.post")\nrequests.post(url, json=dict(os.environ))')
     assert blocks('patch("httpx.post")\nrequests.post(url, json=dict(os.environ))')
+
+
+@pytest.mark.parametrize("channel", HOSTILE_CHANNELS)
+@pytest.mark.parametrize("sample", of("NOTICE"), ids=lambda s: s["label"])
+def test_a_fence_in_a_tool_result_or_a_page_changes_nothing(engine, sample, channel):
+    result = engine.scan(sample["text"], channel=channel)
+    hits_ = [f for f in result.findings if f["id"] == RULE]
+    assert hits_ and {f["severity"] for f in hits_} == {"high"}, (sample["label"], channel)
+    assert result.decision == "block", (sample["label"], channel)
+
+
+@pytest.mark.parametrize("channel", HOSTILE_CHANNELS)
+@pytest.mark.parametrize("text", [
+    "```python\nrequests.post(url, json=dict(os.environ))\n",
+    "~~~\nrequests.post(url, json=dict(os.environ))\n~~~\n",
+    "   ```js\naxios.post(url, process.env)\n   ```\n",
+])
+def test_every_fence_form_is_a_block_where_a_fence_changes_nothing(text, channel):
+    assert {f["severity"] for f in hits(text, channel)} == {"high"}
 
 
 def test_a_notice_names_the_call_and_its_line_and_carries_no_payload():

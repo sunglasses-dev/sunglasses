@@ -1710,6 +1710,9 @@ _MOCK_ASSIGN = re.compile(
 _MOCK_WORDS = ("patch", "spyOn", "stub", "Mock", "fn", "spy")
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^\n]*)$", re.M)
+# A fence marks documentation only where a person wrote it. A tool result and a fetched page
+# are what an attacker hands the agent, and a fence costs three characters there.
+_NOTICE_CHANNELS = ("file", "message")
 _URL_HEAD = re.compile(r"(?:https?|wss?)://([^/?#]*)", re.I)
 _PORT = re.compile(r"\d{0,5}")
 
@@ -1717,9 +1720,11 @@ _PORT = re.compile(r"\d{0,5}")
 def _fenced_segments(text, channel):
     """Split ``text`` into (start, end, fenced). A real code fence (three or more backticks or
     tildes at the start of a line, closed by the same character) of a prose text is its own
-    segment; the ``code`` channel is never split, it is source."""
+    segment, so the fence lines are never read as a string; it is ``fenced`` (a notice) only in
+    a ``file`` or ``message`` text. The ``code`` channel is never split, it is source."""
     if channel == "code" or ("```" not in text and "~~~" not in text):
         return [(0, len(text), False)]
+    softened = channel in _NOTICE_CHANNELS
     segments = []
     cursor = 0
     opened = None
@@ -1731,13 +1736,13 @@ def _fenced_segments(text, channel):
             opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)))
             segments.append((cursor, m.start(), False))
         elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
-            segments.append((opened[2], m.start(), True))
+            segments.append((opened[2], m.start(), softened))
             cursor = min(m.end() + 1, len(text))
             opened = None
     if opened is None:
         segments.append((cursor, len(text), False))
     else:
-        segments.append((opened[2], len(text), True))
+        segments.append((opened[2], len(text), softened))
     return [seg for seg in segments if seg[1] > seg[0]]
 
 
