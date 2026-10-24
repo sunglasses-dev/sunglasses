@@ -3554,9 +3554,30 @@ PATTERNS = [
             "commit secrets",
         ],
         "regex": [
-            r"(?i)(?:read|open|search|grep|find).{0,100}(?:\.env|credentials|token|secret|id_rsa|config).{0,220}(?:include|embed|paste|store|write|attach).{0,100}(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report)",
+            # one predicate, slots in order; each segment is one slot
+            r"(?i)"
+            # lead: start of an instruction (text start, after . ! ? ; : , or a line break; optional list/markup marks; please/then/and/you must...)
+            r"(?:^|[.!?;:,\n])[\s*_>#`\x22'(\[\]\d)-]{0,12}(?:(?:please|then|and|first|next|now|also|just|kindly|finally|you\s+(?:must|should|will|need\s+to|have\s+to|can|may)|(?:after|before|once|when)\s+you)\s+){0,3}"
+            # READ verb
+            r"\b(?:read|open|search|grep|find|load|inspect|view|cat|dump|retrieve|fetch|get|extract)\b"
+            # the read verb's direct object only: determiners, adjectives, a possessive, a path
+            r"(?:[\s*_`'\x22(\[]{1,3}(?:(?:the|a|an|this|that|my|our|your|all|any|each|every|its|their|these|those|full|entire|complete|whole|production|prod|live|real|actual|private|secret|local|current|project|repo(?:sitory)?|codebase|app|user|home|root|aws|ssh|config(?:uration)?|env(?:ironment)?|deployment|ci|for|in|within|across|under|contents?|values?|text|data|lines?|of)\b|\w{1,20}['’]s\b)){0,6}[\s*_`'\x22(\[]{0,3}(?:[\w~.-]{1,40}/){0,6}"
+            # STORE: ends its noun phrase (markup closers, optional 'file', then , ; : . and then to so before after once when while)
+            r"(?<![\w.])(?:\.env|credentials?|secrets?|tokens?|id_rsa)(?:\.(?!pub\b)[a-z]{1,5})?[*_`'\x22)\]]{0,3}(?:\s+file)?(?=[*_`'\x22)\]]{0,3}\s*(?:,|;|:|\.(?![A-Za-z0-9_])|$|\b(?:and|then|to|so|before|after|once|when|while)\b))"
+            # gap to the MOVE: no negation word in it
+            r"(?:(?!\b(?:not|never|nor|without|avoid|skip|instead|rather|refrain|forbid\w*|prohibit\w*|stop)\b|n['’]t\b).){0,220}"
+            # MOVE verb
+            r"\b(?:include|embed|paste|store|write|attach|put|insert|copy|append)\s+"
+            # MATERIAL: the store's own contents, ending there (the preposition after it is the next segment)
+            r"(?:(?:(?:all\s+(?:of\s+)?)?(?:its|their|the)|all|every|each)\s+(?:(?:private|secret|raw|full|entire|actual|credential|access|complete|unredacted|plain-?text|real|exact|whole|signing|original|unmasked|literal|verbatim)\s+){0,3}(?:contents?|values?|keys?|material|secrets?|credentials?|tokens?|passwords?)|them|it)\b(?:\s+(?:verbatim|directly|as[- ]is|unchanged|in\s+full|exactly))?"
+            # preposition
+            r"[ \t]+(?:in|into|to|onto|inside|within|under|via|through|on|at)\b"
+            # gap to the SINK: stays in this clause, no word that says the destination is local
+            r"(?:(?!\b(?:local(?:ly)?|offline|in-process|in-memory|memory|parser|debugger|editor|buffer|keychain|backup|encrypted|laptop|stdout|clipboard)\b|[;!?\n]|\.(?:\s|$)).){0,100}?"
+            # SINK
+            r"(?<![A-Za-z])(?:logs?|logg(?:er|ers|ing)\w*|log4j\w*|prs?|pull[ -]requests?|issues?|tickets?|commits?|artifacts?|summar(?:y|ies)|notes|reports?|changelogs?|(?:parameters?|arguments?|fields?|quer(?:y|ies)|payloads?|urls?))(?![a-z])"
         ],
-        "description": "Detects secret movement into seemingly legitimate internal outputs instead of obvious external exfiltration."
+        "description": "Detects an instruction (not a question, a description or a refusal) to read a named secret store (.env, credentials, secrets, tokens, id_rsa) and then put that store's own contents into an output the model controls (a log, pull request, issue, ticket, commit, artifact, report, summary or a call parameter), instead of obvious external exfiltration."
     },
 
     # --- GLS-PI-013: Malicious README agent targeting ---

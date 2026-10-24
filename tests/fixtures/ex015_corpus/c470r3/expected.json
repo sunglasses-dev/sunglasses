@@ -20,8 +20,8 @@
   "ex015": false
  },
  "ordinary__dotenv_readme_local.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__dotenv_readme_reference.txt": {
   "decision": "allow",
@@ -60,8 +60,8 @@
   "ex015": false
  },
  "ordinary__ssh_setup_fingerprint.txt": {
-  "decision": "block",
-  "ex015": true
+  "decision": "allow",
+  "ex015": false
  },
  "ordinary__ssh_setup_public.txt": {
   "decision": "block",
@@ -72,19 +72,19 @@
   "ex015": false
  },
  "relay__new_relay_argument.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__new_relay_contents_first.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__new_relay_named_arg.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__new_relay_url.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  }
 }
