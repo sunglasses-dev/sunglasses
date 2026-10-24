@@ -1852,14 +1852,21 @@ def _scan_upload_text(line, depth):
 
 
 _CODE_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^\n]*)$", re.M)
+# A fence, or a word of warning before the command, marks documentation only where a person
+# wrote it. A tool result and a fetched page are what an attacker hands the agent, and the
+# marker costs a few characters there.
+_NOTICE_CHANNELS = ("file", "message")
 
 
 def _upload_segments(text, channel):
     """[(segment, fenced)]: a real code fence (three or more backticks or tildes opening a line,
-    closed by the same character) of a prose text is its own segment. The `code` channel is
-    source and is never split."""
+    closed by the same character) of a prose text is its own segment, so the fence lines are never
+    read as part of a command and the words after the opening ticks (the info string) are read as
+    ordinary text; it is `fenced` (a notice) only in a `file` or `message` text. The
+    `code` channel is source and is never split."""
     if channel == "code" or ("```" not in text and "~~~" not in text):
         return [(text, False)]
+    softened = channel in _NOTICE_CHANNELS
     out = []
     cursor = 0
     opened = None
@@ -1870,11 +1877,12 @@ def _upload_segments(text, channel):
                 continue
             opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)))
             out.append((text[cursor:m.start()], False))
+            out.append((info, False))
         elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
-            out.append((text[opened[2]:m.start()], True))
+            out.append((text[opened[2]:m.start()], softened))
             cursor = min(m.end() + 1, len(text))
             opened = None
-    out.append((text[cursor:], False) if opened is None else (text[opened[2]:], True))
+    out.append((text[cursor:], False) if opened is None else (text[opened[2]:], softened))
     return out
 
 
@@ -1899,15 +1907,16 @@ class CredentialFileUpload:
 
     reads_channel = True
 
-    def run(self, text, channel=None):
+    def run(self, text, channel="file"):
         findings = []
         seen = set()
+        soft = channel in _NOTICE_CHANNELS
         for segment, fenced in _upload_segments(text, channel):
             for line in _CONTINUATION.sub(" ", segment).split("\n"):
                 if "curl" not in line and "wget" not in line:
                     continue
                 first = _UPLOAD_NAME.search(line)
-                marked = fenced or bool(first and _DOC_MARKER.search(line[:first.start()]))
+                marked = fenced or bool(soft and first and _DOC_MARKER.search(line[:first.start()]))
                 for evidence in _scan_upload_text(line, 0):
                     key = (line, marked, tuple(sorted(evidence.items())))
                     if key in seen:

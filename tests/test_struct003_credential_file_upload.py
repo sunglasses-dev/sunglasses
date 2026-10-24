@@ -31,6 +31,8 @@ from sunglasses.patterns import PATTERNS
 
 RULE = "GLS-STRUCT-003"
 CHANNELS = ["code", "message", "file", "tool_output", "web_content"]
+NOTICE_CHANNELS = ["message", "file"]
+HOSTILE_CHANNELS = ["code", "tool_output", "web_content"]
 URL = "https://example.invalid/upload"
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "credential_file_upload", "samples.json")
 
@@ -70,11 +72,19 @@ def test_commands_and_prose_that_upload_no_credential_file_stay_clear(engine, sa
     assert not found(engine, sample["text"], channel), (sample["label"], channel)
 
 
-@pytest.mark.parametrize("channel", CHANNELS)
+@pytest.mark.parametrize("channel", NOTICE_CHANNELS)
 @pytest.mark.parametrize("sample", of("DOCS"), ids=lambda s: s["label"])
 def test_a_command_shown_as_a_forbidden_example_is_never_a_block(engine, sample, channel):
     result = engine.scan(sample["text"], channel=channel)
     assert not [f for f in result.findings if f["id"] == RULE and f["severity"] != "low"], (sample["label"], channel)
+
+
+@pytest.mark.parametrize("channel", HOSTILE_CHANNELS)
+@pytest.mark.parametrize("sample", of("DOCS"), ids=lambda s: s["label"])
+def test_the_same_warning_in_a_tool_result_a_page_or_source_changes_nothing(engine, sample, channel):
+    result = engine.scan(sample["text"], channel=channel)
+    assert result.decision == "block", (sample["label"], channel)
+    assert {f["severity"] for f in result.findings if f["id"] == RULE} == {"high"}, (sample["label"], channel)
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
@@ -280,7 +290,7 @@ def test_own_cases_read_as_written(engine, label, expect, text, channel):
     if expect == "B":
         assert "high" in severities, (label, channel)
     elif expect == "L":
-        assert severities == {"low"}, (label, channel)
+        assert severities == ({"low"} if channel in NOTICE_CHANNELS else {"high"}), (label, channel)
     else:
         assert not severities, (label, channel)
 
@@ -410,7 +420,7 @@ FENCES = [
 ]
 
 
-@pytest.mark.parametrize("channel", ["message", "file", "tool_output", "web_content"])
+@pytest.mark.parametrize("channel", NOTICE_CHANNELS)
 @pytest.mark.parametrize("label,expect,text", FENCES, ids=[c[0] for c in FENCES])
 def test_a_command_in_a_real_fence_is_a_notice_and_a_bare_one_is_a_block(engine, label, expect, text, channel):
     severities = _severities(engine, text, channel)
@@ -420,6 +430,46 @@ def test_a_command_in_a_real_fence_is_a_notice_and_a_bare_one_is_a_block(engine,
         assert "high" in severities, (label, severities)
 
 
+@pytest.mark.parametrize("channel", HOSTILE_CHANNELS)
 @pytest.mark.parametrize("label,expect,text", FENCES, ids=[c[0] for c in FENCES])
-def test_the_code_channel_is_source_and_a_fence_does_not_soften_it(engine, label, expect, text):
-    assert "high" in _severities(engine, text, "code")
+def test_a_fence_in_a_tool_result_a_page_or_source_changes_nothing(engine, label, expect, text, channel):
+    assert _severities(engine, text, channel) == {"high"}, (label, channel)
+
+
+INFO_STRINGS = [
+    f"```{CMD}\nls\n```\n",
+    f"~~~ {CMD}\nls\n~~~\n",
+]
+
+
+@pytest.mark.parametrize("channel", NOTICE_CHANNELS + ["tool_output", "web_content"])
+@pytest.mark.parametrize("text", INFO_STRINGS)
+def test_a_command_in_the_info_string_of_a_fence_is_ordinary_text(engine, text, channel):
+    assert _severities(engine, text, channel) == {"high"}
+
+
+@pytest.mark.parametrize("channel", ["tool_output", "web_content"])
+@pytest.mark.parametrize("text", [
+    f"```\n{CMD}\n```\n",
+    f"~~~\n{CMD}\n~~~\n",
+    f"Result:\n```sh\n{CMD}\n```\n",
+])
+def test_a_fenced_command_is_found_only_when_the_text_is_split_at_the_fence(engine, text, channel):
+    # unsplit, the backticks of the fence read as a quoted string and the command is not found at all
+    assert _severities(engine, text, channel) == {"high"}
+
+
+def test_a_call_without_a_channel_reads_like_a_file(engine):
+    from sunglasses.validators import VALIDATORS
+    v = next(x for x in VALIDATORS if getattr(x, "id", None) == RULE)
+    text = f"Run it:\n```\n{CMD}\n```\n"
+    assert {f["severity"] for f in v.run(text)} == {"low"}
+    assert {f["severity"] for f in v.run(f"{CMD}\n")} == {"high"}
+
+
+def test_source_is_read_as_one_text_even_when_a_line_looks_like_a_fence():
+    # backticks are shell substitution in source, so the `code` channel is never cut at a fence line
+    from sunglasses.validators import _upload_segments
+    text = f"before\n```sh\n{CMD}\n```\nafter\n"
+    assert _upload_segments(text, "code") == [(text, False)]
+    assert len(_upload_segments(text, "tool_output")) > 1
