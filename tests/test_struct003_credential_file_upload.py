@@ -664,7 +664,7 @@ def test_a_warning_before_the_command_is_a_notice_in_prose_and_a_block_in_a_tool
     for text in (f"{marker.capitalize()}: {BARE}", f"{marker.capitalize()} {BARE}", f"{marker} {BARE}"):
         assert severities(text, "file") == ["low"], text
         assert severities(text, "message") == ["low"], text
-        for channel in ("code", "tool_output", "web_content"):
+        for channel in HOSTILE_CHANNELS:
             assert severities(text, channel) == ["high"], (text, channel)
 
 
