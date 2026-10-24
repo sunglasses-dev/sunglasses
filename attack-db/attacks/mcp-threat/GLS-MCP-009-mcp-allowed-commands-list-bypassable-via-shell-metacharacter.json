@@ -10,7 +10,7 @@
   "description": "Detection for GHSA-fgmx-xfp3-w28p (CVE-2026-5059): aws-mcp-server allowed-commands validator can be bypassed by shell metacharacters, enabling unauthenticated RCE. Source: https://github.com/advisories/GHSA-fgmx-xfp3-w28p",
   "keywords": [],
   "regex": [
-    "(?i)(?:allowed[_-]?commands?|whitelist|cmd_?list)\\s*[:=][^\\n]*(?:\\||;|&&|\\$\\()"
+    "(?i)(?:allowed[_-]?commands?|whitelist|cmd_?list)\\s*[:=][^\\n]{0,1000}(?:\\||;|&&|\\$\\()"
   ],
   "examples": {
     "malicious": [],

@@ -14,7 +14,7 @@
     "signingKey"
   ],
   "regex": [
-    "config\\.get\\s*\\(\\s*['\\\"].*(?:key|secret|token|password)"
+    "config\\.get\\s*\\(\\s*['\\\"].{0,1000}(?:key|secret|token|password)"
   ],
   "examples": {
     "malicious": [],
