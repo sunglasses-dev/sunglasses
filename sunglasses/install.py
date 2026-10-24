@@ -114,14 +114,20 @@ class UninstallResult:
     install on the same file captured, not the bytes this one captured (R38).
     Two wraps undone first-installed-first end exactly where the user started,
     and the second uninstall used to call that a change.
+
+    `later` names the sunglasses installs still wrapped on top when they are
+    the ONLY difference from this install's after-image, oldest first. Empty
+    whenever anything else changed the file, so a foreign edit is never
+    blamed on an install.
     """
 
-    __slots__ = ("byte_exact", "kept_at", "earlier")
+    __slots__ = ("byte_exact", "kept_at", "earlier", "later")
 
-    def __init__(self, byte_exact, kept_at=None, earlier=False):
+    def __init__(self, byte_exact, kept_at=None, earlier=False, later=()):
         self.byte_exact = byte_exact
         self.kept_at = kept_at
         self.earlier = earlier
+        self.later = tuple(later)
 
 
 def _digest_bytes(b):
@@ -2323,6 +2329,18 @@ def _earlier_originals(home, name, target_id, sha_before):
     record while it is read.
     """
     found = []
+    for _, rec in _other_records_on(home, name, target_id):
+        if rec.get("file_sha_after") != sha_before:
+            continue
+        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
+            if _is_digest(digest) and digest not in found:
+                found.append(digest)
+    return found
+
+
+def _other_records_on(home, name, target_id):
+    """Every other completed install record that describes the same file, as
+    (server name, record). A record that cannot be read is skipped."""
     d = _record_paths(home, name)[0]
     for rec_path in sorted(d.glob("*.json")):
         other = rec_path.stem
@@ -2334,12 +2352,41 @@ def _earlier_originals(home, name, target_id, sha_before):
             continue
         if rec.get("target_path") != target_id:
             continue
-        if rec.get("file_sha_after") != sha_before:
-            continue
-        for digest in (rec["file_sha_before"], *_earlier_of(rec)):
-            if _is_digest(digest) and digest not in found:
-                found.append(digest)
-    return found
+        yield other, rec
+
+
+def _later_wraps(home, name, record, current_digest, servers):
+    """The installs stacked on top of this one, when they explain the file.
+
+    Walks from this install's after-image through records whose before-image
+    is exactly the previous link's after-image, and answers only if the walk
+    lands on the file as it was just read. Any gap, any fork and any edit on
+    top means the file changed for some other reason, and the answer is empty
+    so the generic warning stands.
+
+    A record's file name is the name the output prints, so it is checked
+    twice: the record's retained-original path must be the one that name
+    derives (a record moved onto another server's name still carries the first
+    name's path, even when both wrappers are byte-identical), and each named
+    server must be in `servers`, the entries as they were just read, as exactly
+    the wrapper its record installed.
+    """
+    others = [(n, r) for n, r in _other_records_on(
+                  home, name, record.get("target_path"))
+              if r.get("original_bytes_path") == str(_record_paths(home, n)[3])]
+    chain = []
+    cursor = record.get("file_sha_after")
+    while cursor != current_digest:
+        step = [(n, r) for n, r in others
+                if r.get("file_sha_before") == cursor and n not in chain]
+        if len(step) != 1:
+            return ()
+        step_name, step_record = step[0]
+        if servers.get(step_name) != step_record.get("installed_entry"):
+            return ()
+        chain.append(step_name)
+        cursor = step_record.get("file_sha_after")
+    return tuple(chain)
 
 
 def _earlier_of(record):
@@ -3202,6 +3249,7 @@ def _uninstall_locked(config_path, name, *, home):
     # rather than by position (C3, R5-INVERSE).
     doc = _parse(current, target)
     servers = _servers(doc, target)
+    observed_servers = dict(servers)
     if name not in servers:
         if retained_failure is not None:
             raise retained_failure
@@ -3266,4 +3314,7 @@ def _uninstall_locked(config_path, name, *, home):
         return UninstallResult(byte_exact=True, kept_at=kept_at)
     if written in _earlier_of(record):
         return UninstallResult(byte_exact=True, kept_at=kept_at, earlier=True)
-    return UninstallResult(byte_exact=False, kept_at=kept_at)
+    return UninstallResult(
+        byte_exact=False, kept_at=kept_at,
+        later=_later_wraps(home, name, record, _digest_bytes(current),
+                           observed_servers))
