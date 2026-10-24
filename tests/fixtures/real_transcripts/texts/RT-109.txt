@@ -1,0 +1,7 @@
+[[safety_checker]]
+toolName = "run_shell_command"
+priority = 80
+
+[safety_checker.checker]
+type = "external"
+name = "shell-deobfuscator"

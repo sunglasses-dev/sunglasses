@@ -1,0 +1,6 @@
+<tool_code_interpreter>code_interpreter(code="import os
+
+cwd = '/Users/user/project'
+for root, dirs, files in os.walk(cwd):
+    ...
+", runtime="python")

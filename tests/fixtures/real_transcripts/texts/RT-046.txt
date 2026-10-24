@@ -1,0 +1,6 @@
+  Background
+  2 active shells · 1 active agent
+
+    Shells (2)
+  ❯ ⏺ Watch API CI runs for 8282005 and aab8911   running
+    ⏺ Recheck API CI run for aab8911              running

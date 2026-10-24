@@ -1,0 +1,31 @@
+workbench.desktop.main.js:711 [Extension Host] Error handling webview message: {
+  "msg": {
+    "messageId": "c37eb632-cb72-4e3f-b6c4-aa3f1598be89",
+    "messageType": "command/run",
+    "data": {
+      "input": "/onboard ",
+      "history": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "/onboard "
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": ""
+        }
+      ],
+      "modelTitle": "Llama CPP",
+      "slashCommandName": "onboard",
+      "contextItems": [],
+      "historyIndex": 0,
+      "selectedCode": []
+    }
+  }
+}
+
+Error: Invalid uri: .DS_Store

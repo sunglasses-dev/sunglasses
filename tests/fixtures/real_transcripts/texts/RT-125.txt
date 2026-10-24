@@ -1,0 +1,9 @@
+[
+  {"type":"function","name":"exec_command", ...},
+  ... 13 native codex tools ...,
+  {"type":"web_search"},
+  {"type":"namespace","name":"mcp__open_websearch__",
+   "tools":[
+     {"type":"function","name":"fetchWebContent","parameters":{...}},
+     {"type":"function","name":"search","parameters":{...}}]}
+]

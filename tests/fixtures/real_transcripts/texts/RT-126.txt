@@ -1,0 +1,8 @@
+  {
+    "error": {
+      "code": "EXTERNAL_API_ERROR",
+      "message": "Azure stream failed to open - Body: {\n  \"error\": {\n    \"message\": \"Missing namespace for function_call '<tool_name>'. It does not exist
+  in the default namespace. Round-trip the model's function_call item with its namespace field included.\",\n    \"type\": \"invalid_request_error\",\n
+  \"param\": \"input[7].namespace\",\n    \"code\": null\n  }\n}"
+    }
+  }

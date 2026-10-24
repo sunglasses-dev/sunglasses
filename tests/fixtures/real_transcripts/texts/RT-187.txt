@@ -1,0 +1,4 @@
+<｜｜DSML｜｜ calls>
+<｜｜DSML｜｜ invoke name="exec_command">
+<｜｜DSML｜｜ parameter name="cmd" string="true">cd /workspace/.../bifrost && git status --short && git diff --stat</｜｜DSML｜｜ parameter>
+...

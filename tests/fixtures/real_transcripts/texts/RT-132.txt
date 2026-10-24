@@ -1,0 +1,6 @@
+T+0s       function_call_output: success
+T+0s       function_call_output: success
+T+0s       function_call_output: success
+T+0s       token_count
+T+492.7s   user interrupt
+T+492.7s   turn_aborted

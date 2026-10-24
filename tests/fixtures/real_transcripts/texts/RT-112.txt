@@ -1,0 +1,7 @@
+   user    [text]
+   gemini  toolCalls=[run_shell_command]          (result: [functionResponse])
+   user    [functionResponse run_shell_command]
+   gemini  toolCalls=[read_file]                  (result: [functionResponse])
+   user    [functionResponse read_file]
+   gemini  [text]
+   

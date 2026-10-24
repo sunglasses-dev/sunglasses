@@ -1,0 +1,10 @@
+Hook event log (one line per event, from logging hooks on every event):
+{"e":"UserPromptSubmit"}
+{"e":"PreToolUse","tool":"Bash"}
+{"e":"PostToolUse","tool":"Bash"}
+<nothing more. The TUI is back at the prompt.>
+
+TUI:
+⏺ Bash(echo hello)
+  ⎿  PreToolUse:Bash hook stopped continuation: hook stopped
+  ⎿  hello

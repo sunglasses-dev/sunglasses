@@ -1,0 +1,17 @@
+auto/manual compact
+        ↓
+PreCompact
+        ↓
+hook reads transcript
+        ↓
+external compactor/JEV scores old tool calls
+        ↓
+drop stale tool calls/results
+truncate selected results
+keep important messages verbatim
+        ↓
+return replacement history
+        ↓
+Codex installs that history
+        ↓
+PostCompact

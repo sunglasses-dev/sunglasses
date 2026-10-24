@@ -1,0 +1,10 @@
+{
+  "type": "response_item",
+  "payload": {
+    "type": "function_call",
+    "id": "fc_call_gvk6lf6jpooc73szk0ezst3d",
+    "name": "apply_patch",
+    "call_id": "call_REDACTED_ID",
+    "arguments": "{\"mode\":\"patch\",\"path\":\"/home/user/src/pages/PptWorkspacePage.tsx\",\"command\":\"diff --git ...\"}"
+  }
+}

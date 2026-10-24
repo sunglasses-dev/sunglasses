@@ -1,0 +1,8 @@
+# No error is shown. Evidence from the filesystem (paths redacted):
+$ ls -l /private/tmp/claude-<uid>/<project>/<SESSION_A>/tasks/
+<agent-1>.output -> ~/.claude/projects/<project>/<SESSION_B>/subagents/agent-<agent-1>.jsonl
+<agent-2>.output -> ~/.claude/projects/<project>/<SESSION_B>/subagents/agent-<agent-2>.jsonl
+<agent-3>.output -> ~/.claude/projects/<project>/<SESSION_B>/subagents/agent-<agent-3>.jsonl
+<older-agent>.output.final.md   # only pre-/clear agents have this
+
+# Last assistant message of each post-clear transcript: stop_reason=end_turn

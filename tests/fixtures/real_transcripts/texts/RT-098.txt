@@ -1,0 +1,9 @@
+{
+  "model": "gemini-3.8-flash",
+  "status": 400,
+  "api_endpoint": "/chat/completions",
+  "transport": "http",
+  "failure_kind": "api",
+  "badRequestKind": "structured_error",
+  "errorCode": "invalid_tool_call_format"
+}

@@ -1,0 +1,18 @@
+   {
+     "receipt": {
+       "version": 1,
+       "session_id": "…",
+       "agent_id": "…",
+       "agent_type": "security-reviewer",
+       "parent_agent_id": null,
+       "model": "claude-sonnet-5-5",
+       "started_at": "2026-10-22T18:02:11Z",
+       "ended_at": "2026-10-22T18:04:40Z",
+       "turns": 14,
+       "input_sha256": "…",
+       "transcript_sha256": "…",
+       "tool_calls_sha256": "…",
+       "signature": { "alg": "ed25519", "key_id": "…", "sig": "…" }
+     }
+   }
+   

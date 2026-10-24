@@ -1,0 +1,6 @@
+T=$(mktemp -d)
+echo '{"permissions":{"deny":["Bash(touch:*)"]}}' > "$T/deny.json"
+claude -p "Use the Monitor tool with command: touch $T/MONMARKER; echo done \
+and timeout_ms 5000. Report verbatim what it returned." \
+  --settings "$T/deny.json" --max-turns 6
+ls "$T"

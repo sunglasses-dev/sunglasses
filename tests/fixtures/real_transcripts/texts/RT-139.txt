@@ -1,0 +1,9 @@
+  {
+    "timestamp": "2026-06-22T03:26:45.567Z",
+    "type": "response_item",
+    "payload": {
+      "type": "function_call_output",
+      "call_id": "call_REDACTED_ID",
+      "output": "failed to parse function arguments: EOF while parsing an object at line 1 column 1"
+    }
+  }

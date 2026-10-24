@@ -1,0 +1,14 @@
+❯ what background tasks in claude code use the haiku model?                                                                                                                                                                                                                                                                                                           
+
+⏺ claude-code-guide(Find Claude Code background tasks using Haiku)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+
+⏺ I've kicked off a lookup on this — will report back shortly with the specific list.
+
+✻ Waiting for 1 background agent to finish
+
+⏺ Agent "Find Claude Code background tasks using Haiku" failed: Agent terminated early due to an API error: API Error: 400 400: {'error': 'anthropic_messages: Invalid model name passed in model=claude-haiku-4-5-20251001. Call `/v1/models` to view available models for your key.'}
+
+⏺ The lookup agent failed — it tried to call claude-haiku-4-5-20251001 and got a 400 error ("Invalid model name... Call /v1/models to view available models for your key"). That's notable given this is your 3-haiku-eol branch — it looks like Haiku is no longer available on this GovCloud API key, which matches whatever you're working on removing.
+
+  Want me to retry the research with a different approach (e.g., web docs directly instead of a Haiku-based agent), or is that failure itself the answer you needed?

@@ -1,0 +1,21 @@
+> VSCode console
+
+
+[Extension Host] Error: 400 status code (no body)
+    at APIError.generate (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:109840:18)
+    at OpenAI.makeStatusError (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:110751:25)
+    at OpenAI.makeRequest (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:110795:29)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at OpenAIApi.chatCompletionStream (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:114858:26)
+    at OpenAI2.streamChat (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:171737:34)
+    at llmStreamChat (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:691642:17)
+    at ud.handleMessage [as value] (c:\Users\User\.vscode\extensions\continue.continue-1.1.59-win32-x64\out\extension.js:726099:29)
+
+ERR [Extension Host] Error handling webview message: {
+  "msg": {
+    "messageId": "059b90e0-eb72-4a2f-a0e1-8e910a99d534",
+    "messageType": "llm/streamChat",
+    "data": {
+      "completionOptions": {
+        "tools": [
+          {

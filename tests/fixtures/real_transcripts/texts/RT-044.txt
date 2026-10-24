@@ -1,0 +1,10 @@
+$ env -i bash --norc --noprofile -c 'set -o | grep -E "^(monitor|onecmd)\s"'
+monitor         off
+onecmd          off
+
+$ env -i bash --norc --noprofile -c 'set -o | grep "on" | awk "{print \"set -o \" \$1}"'
+set -o braceexpand
+set -o hashall
+set -o interactive-comments
+set -o monitor
+set -o onecmd

@@ -1,0 +1,50 @@
+Traceback (most recent call last):
+  File "utils.py", line 10138, in chunk_creator
+    raise Exception(
+Exception: openai raised a streaming error - finish_reason: error, no content string given. Received Chunk={'text': '', 'is_finished': True, 'finish_reason': 'error', 'logprobs': None, 'original_chunk': ChatCompletionChunk(id='gen-FtjUgYX7YEqGAOYp3netRThGXUlv', choices=[Choice(delta=ChoiceDelta(content='', function_call=None, refusal=None, role='assistant', tool_calls=None), finish_reason='error', index=0, logprobs=None, error={'message': 'Overloaded', 'code': 502, 'metadata': {'raw': {'type': 'overloaded_error', 'message': 'Overloaded'}}})], created=1727094342, model='anthropic/claude-3.5-sonnet', object='chat.completion.chunk', service_tier=None, system_fingerprint=None, usage=None), 'usage': None}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "base_coder.py", line 1117, in send_message
+    yield from self.send(messages, functions=self.functions)
+  File "base_coder.py", line 1406, in send
+    yield from self.show_send_output_stream(completion)
+  File "base_coder.py", line 1473, in show_send_output_stream
+    for chunk in completion:
+                 ^^^^^^^^^^
+  File "utils.py", line 10582, in __next__
+    raise exception_type(
+  File "utils.py", line 10500, in __next__
+    response: Optional[ModelResponse] = self.chunk_creator(chunk=chunk)
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "utils.py", line 10418, in chunk_creator
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "utils.py", line 8442, in exception_type
+    raise e  # it's already mapped
+    ^^^^^^^
+  File "utils.py", line 6852, in exception_type
+    raise APIConnectionError(
+litellm.exceptions.APIConnectionError: litellm.APIConnectionError: APIConnectionError: OpenAIException - openai raised a streaming error - finish_reason: error, no content string given. Received Chunk={'text': '', 'is_finished': True, 'finish_reason': 'error', 'logprobs': None, 'original_chunk': ChatCompletionChunk(id='gen-FtjUgYX7YEqGAOYp3netRThGXUlv', choices=[Choice(delta=ChoiceDelta(content='', function_call=None, refusal=None, role='assistant', tool_calls=None), finish_reason='error', index=0, logprobs=None, error={'message': 'Overloaded', 'code': 502, 'metadata': {'raw': {'type': 'overloaded_error', 'message': 'Overloaded'}}})], created=1727094342, model='anthropic/claude-3.5-sonnet', object='chat.completion.chunk', service_tier=None, system_fingerprint=None, usage=None), 'usage': None}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "aider", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "main.py", line 712, in main
+    coder.run()
+  File "base_coder.py", line 723, in run
+    self.run_one(user_message, preproc)
+  File "base_coder.py", line 766, in run_one
+    list(self.send_message(message))
+  File "base_coder.py", line 1119, in send_message
+    except retry_exceptions() as err:
+           ^^^^^^^^^^^^^^^^^^
+  File "sendchat.py", line 30, in retry_exceptions
+    litellm.llms.anthropic.chat.AnthropicError,
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'litellm.llms.anthropic' has no attribute 'chat'
+

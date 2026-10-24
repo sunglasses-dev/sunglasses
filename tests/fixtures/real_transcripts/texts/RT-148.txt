@@ -1,0 +1,10 @@
+const result = await tools.exec_command({
+  cmd: "Write-Output 'NESTED_OUTPUT_FORWARDED_MARKER'",
+  yield_time_ms: 10000,
+  max_output_tokens: 1000
+});
+text(JSON.stringify({
+  exit_code: result.exit_code,
+  output: result.output,
+  session_id: result.session_id ?? null
+}));

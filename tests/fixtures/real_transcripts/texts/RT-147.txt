@@ -1,0 +1,5 @@
+await tools.exec_command({
+  cmd: "Write-Output 'NESTED_OUTPUT_NOT_FORWARDED_MARKER'",
+  yield_time_ms: 10000,
+  max_output_tokens: 1000
+});

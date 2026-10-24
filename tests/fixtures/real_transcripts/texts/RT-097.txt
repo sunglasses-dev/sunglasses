@@ -1,0 +1,19 @@
+# open_canvas — arguments truncated mid-value:
+The arguments for the tool call 'open_canvas' were not valid JSON.
+Arguments: {"canvasId": "session-md-reader", "input": .
+JSON parse error: Unexpected end of JSON input
+
+# list_canvas_capabilities — trailing }{} appended:
+The arguments for the tool call 'list_canvas_capabilities' were not valid JSON.
+Arguments: {"canvasId": "session-md-reader"}{}.
+JSON parse error: Unexpected non-whitespace character after JSON at position 33
+
+# edit — trailing }{} appended:
+The arguments for the tool call 'edit' were not valid JSON.
+Arguments: {}{}.
+JSON parse error: Unexpected non-whitespace character after JSON at position 2
+
+# extensions_manage — trailing }{} appended:
+The arguments for the tool call 'extensions_manage' were not valid JSON.
+Arguments: {"operation": "inspect", "name": "session-md-reader"}{}.
+JSON parse error: Unexpected non-whitespace character after JSON at position 53

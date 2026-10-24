@@ -1,0 +1,7 @@
+{
+  "type": "function_call",
+  "status": "completed",
+  "call_id": "call_example",
+  "name": "list_files",
+  "arguments": "{\"path\":\".\"}"
+}

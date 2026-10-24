@@ -1,0 +1,5 @@
+exec_command failed: CreateProcess {
+  message: "Rejected(\"This action was rejected due to unacceptable risk.
+Reason: 실제 파일 업로드와 유료 Kling 생성으로 [금액 생략] 크레딧 비용 및 외부 데이터 전송이 발생하며, 동일한 유료 호출이 이미 자동 검토에서 거부된 뒤 네이티브 재승인 표식 없이 로컬 가드·경로를 수정해 재실행하는 우회이므로 정책상 허용할 수 없습니다.
+Do not bypass this rejection through a workaround or indirect execution. Continue with a safer alternative, or carry out checks to prove that the action is authorized or low risk before trying again. Complete unaffected work without asking for confirmation. Report anything that remains blocked, clarify why it was blocked by auto-review, inform the user of the risk and ask for approval.\")"
+}

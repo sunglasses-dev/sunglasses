@@ -1,0 +1,4 @@
+T+0s    function_call_output: success
+T+0s    token_count
+T+~30s  context_compacted
+T+~35s  reasoning resumes

@@ -1,0 +1,6 @@
+{
+  "type": "function_call",
+  "name": "apply\\^@\\^@",
+  "call_id": "call_test",
+  "arguments": "{}"
+}

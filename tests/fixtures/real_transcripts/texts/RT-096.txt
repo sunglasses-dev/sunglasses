@@ -1,0 +1,19 @@
+$ copilot plugin marketplace add ./repro
+$ copilot plugin install hook-probe@repro-local
+
+$ rm $TEMP/hook-probe.log
+$ copilot -p "reply with exactly: A" --allow-all-tools
+...
+Resume     copilot --resume=8561317a-5af2-4550-a42a-1f9b1f6058c3
+
+$ cat $TEMP/hook-probe.log
+UserPromptSubmit
+SessionStart
+Stop
+SessionEnd
+
+$ rm $TEMP/hook-probe.log
+$ copilot --resume=8561317a-5af2-4550-a42a-1f9b1f6058c3 -p "reply with exactly: B" --allow-all-tools
+...
+$ cat $TEMP/hook-probe.log
+cat: no such file — the hooks never ran

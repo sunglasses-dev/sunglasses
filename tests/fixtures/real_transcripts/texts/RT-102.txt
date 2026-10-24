@@ -1,0 +1,11 @@
+╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✓  sequentialthinking (sequential-thinking MCP Server) {"thought":"Observation: I have fetched the content of the MCP specification. After re… │
+ │                                                                                                                                                │
+ │    {                                                                                                                                           │
+ │      "thoughtNumber": 3,                                                                                                                       │
+ │      "totalThoughts": 4,                                                                                                                       │
+ │      "nextThoughtNeeded": true,                                                                                                                │
+ │      "branches": [],                                                                                                                           │
+ │      "thoughtHistoryLength": 3                                                                                                                 │
+ │    }                                                                                                                                           │
+ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

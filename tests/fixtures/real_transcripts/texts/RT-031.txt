@@ -1,0 +1,7 @@
+⏺ Task(Fetch Linear issue title) Haiku 4.5
+⏺ Task Output DELTA-2480@DELTA-2480
+  ⎿  Error: No task found with ID: DELTA-2480@DELTA-2480
+
+@DELTA-2480❯ DELTA-2480 title fetched
+⏺ The issue title for DELTA-2480 is:
+  Viewing Participants - New participants UX    <-- correct, from actual teammate

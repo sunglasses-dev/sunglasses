@@ -1,0 +1,4 @@
+   $ wsl.exe -d Ubuntu -e bash -lc 'echo hello-from-wsl > ~/probe.txt'
+   $ Get-Content \\wsl.localhost\Ubuntu\home\<user>\probe.txt
+   hello-from-wsl
+   

@@ -1,0 +1,6 @@
+python my.py --row 2 --field Labels
+Run shell command? (Y)es/(N)o [Yes]: n
+You can use /undo to undo and discard each aider commit.
+---
+my.py
+> 

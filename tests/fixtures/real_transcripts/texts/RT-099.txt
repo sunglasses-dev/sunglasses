@@ -1,0 +1,19 @@
+[
+  {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [{
+      "id": "custom_call_example",
+      "type": "custom",
+      "custom": {
+        "name": "apply_patch",
+        "input": "<synthetic patch placeholder>"
+      }
+    }]
+  },
+  {
+    "role": "tool",
+    "tool_call_id": "custom_call_example",
+    "content": "<synthetic result placeholder>"
+  }
+]

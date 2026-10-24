@@ -1,0 +1,4 @@
+2026-10-23T16:07:57.324Z
+dynamic_app_tools_request_failed
+method=tools/call
+errorMessage="The app tool call ended before producing a result"

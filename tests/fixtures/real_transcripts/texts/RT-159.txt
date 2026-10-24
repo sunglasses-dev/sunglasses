@@ -1,0 +1,6 @@
+codex exec --json \
+  --skip-git-repo-check \
+  --sandbox danger-full-access \
+  -c 'features.multi_agent=true' \
+  -c 'features.unified_exec=false' \
+  'Call spawn_agent exactly once with fork_turns none, wait for it, then reply only DONE.'

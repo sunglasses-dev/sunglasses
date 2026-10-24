@@ -1,0 +1,6 @@
+$ bash -c 'set -o | grep -E "^(monitor|onecmd)"'
+monitor        	off
+onecmd         	off
+$ bash -c 'set -o | grep "on" | awk "{print \$1}"' | grep -E '^(monitor|onecmd)$'
+monitor
+onecmd

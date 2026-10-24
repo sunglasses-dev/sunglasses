@@ -1,0 +1,4 @@
+⚙ Workers  [3 active]
+  ● explore         claude-haiku-4.5   —  "Finding auth-related files in src/"
+  ● task            claude-haiku-4.5   —  "Running test suite"
+  ● general-purpose claude-sonnet-4.5  high  —  "Refactoring login handler"

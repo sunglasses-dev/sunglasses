@@ -1,0 +1,12 @@
+❯ curl -X POST http://localhost:8000/chat/completions/ \
+        -H "Content-Type: application/json" \
+        -d '{
+      "model": "gpt-4o-11-20",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello!"
+        }
+      ]
+    }'
+{"id":"chatcmpl-B1x4WYDXaSp4HjBdPH8kRc3uZ42su","created":1739805100,"model":"gpt-4o-2024-11-20","object":"chat.completion","system_fingerprint":"fp_f3927aa00d","choices":[{"finish_reason":"stop","index":0,"message":{"content":"Hello! 😊 How can I assist you today?","role":"assistant","tool_calls":null,"function_call":null,"refusal":null}}],"usage":{"completion_tokens":10,"prompt_tokens":9,"total_tokens":19,"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0},"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0}}}¶

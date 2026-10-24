@@ -1,0 +1,21 @@
+Read only files:
+../prompts/coding/coding-principles-o1.md cm-arch-summary.md cm-exec-summary.md docs/codemods.rst.txt docs/codemods_tutorial.rst.txt docs/metadata.rst.txt docs/metadata_tutorial.ipynb.txt docs/nodes.rst.txt             
+> /tokens                                                                                                                                                                                                                  
+
+Approximate context window usage for claude-3-5-sonnet-20241022, in tokens:
+
+$ 0.0054    1,790 system messages                                       
+$ 0.0027      909 chat history                                          use /clear to clear
+$ 0.0058    1,945 repository map                                        use --map-tokens to resize
+$ 0.0058    1,935 cm-exec-summary.md (read-only)                        /drop to remove
+$ 0.0068    2,251 docs/metadata.rst.txt (read-only)                     /drop to remove
+$ 0.0023      780 ../prompts/coding/coding-principles-o1.md (read-only) /drop to remove
+$ 0.0056    1,883 docs/codemods_tutorial.rst.txt (read-only)            /drop to remove
+$ 0.0025      844 cm-arch-summary.md (read-only)                        /drop to remove
+$ 0.0075    2,491 docs/nodes.rst.txt (read-only)                        /drop to remove
+$ 0.0042    1,414 docs/metadata_tutorial.ipynb.txt (read-only)          /drop to remove
+$ 0.0058    1,921 docs/codemods.rst.txt (read-only)                     /drop to remove
+==================
+$ 0.0545   18,163 tokens total
+          181,837 tokens remaining in context window
+          200,000 tokens max context window size

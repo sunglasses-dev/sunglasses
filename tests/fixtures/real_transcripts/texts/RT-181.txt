@@ -1,0 +1,58 @@
+{
+  "prepared_date": "2026-10-08",
+  "cases": [
+    {
+      "case": "E01",
+      "classification": "promised inspection without execution",
+      "start": "2026-10-07T07:12:06.716Z",
+      "end": "2026-10-07T07:12:13.282Z",
+      "duration_seconds": 6.566,
+      "model": "gpt-6.1-sol",
+      "effort": null,
+      "mode": "default",
+      "environment": {
+        "cli_version": "0.160.1",
+        "originator": "Codex Desktop",
+        "source": "vscode"
+      },
+      "phase": "final_answer",
+      "explicit_announcement_rule_previously_injected": false,
+      "tool_call_count": 0,
+      "terminal_event": "task_complete"
+    },
+    {
+      "case": "E02",
+      "classification": "promised translation without execution",
+      "start": "2026-10-07T11:21:02.739Z",
+      "end": "2026-10-07T11:21:08.236Z",
+      "duration_seconds": 5.497,
+      "model": "gpt-6.1-sol",
+      "effort": null,
+      "mode": "default",
+      "environment": {
+        "cli_version": "0.160.1",
+        "originator": "Codex Desktop",
+        "source": "vscode"
+      },
+      "phase": "final_answer",
+      "explicit_announcement_rule_previously_injected": true,
+      "tool_call_count": 0,
+      "terminal_event": "task_complete",
+      "compactions_before_turn": [
+        {
+          "timestamp": "2026-10-07T07:37:17.445Z",
+          "announcement_rule_present": true
+        },
+        {
+          "timestamp": "2026-10-07T08:23:47.694Z",
+          "announcement_rule_present": true
+        }
+      ],
+      "next_day_follow_up": {
+        "date": "2026-10-08",
+        "admission_of_missing_translation": true,
+        "tool_call_count": 3
+      }
+    }
+  ]
+}

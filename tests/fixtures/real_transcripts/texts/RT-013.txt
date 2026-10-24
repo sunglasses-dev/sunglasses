@@ -1,0 +1,10 @@
+core/firmware_update_listener.py core/tests/test_firmware_update_listener.py                                                                                      
+> /run pytest -vv core/tests/test_firmware_update_listener.py                                                                                                               
+
+ImportError while loading conftest '/Users/user/GIT/core/tests/conftest.py'.
+core/tests/conftest.py:4: in <module>
+    from app.core.config import fc_config
+core/app/core/config.py:31: in <module>
+    with open('logging.json', 'rt') as log_cfg_file:
+E   FileNotFoundError: [Errno 2] No such file or directory: 'logging.json'
+Add command output to the chat? (Y)es/(N)o [Yes]: 

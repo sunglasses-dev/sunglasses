@@ -1,0 +1,9 @@
+SSE response=resp_REDACTED_ID tool_call=True text='{"cmd":"mkdir ~/Desktop/gkh/recovery-test"}'
+
+SSE response=resp_REDACTED_ID tool_call=True text='{"cmd":"cat > ~/Desktop/gkh/recovery-test/index.php ..."}'
+
+SSE response=resp_REDACTED_ID tool_call=True text='{"cmd":"php ~/Desktop/gkh/recovery-test/index.php"}'
+
+SSE response=resp_REDACTED_ID tool_call=True text='{"cmd":"php -l ~/Desktop/gkh/recovery-test/index.php"}'
+
+SSE response=resp_REDACTED_ID tool_call=False text='## ✅ Tamamlandı ...'

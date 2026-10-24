@@ -1,0 +1,11 @@
+> can you run `touch a.txt`?
+
+touch a.txt
+
+Tokens: 7.8k sent, 8 received. Cost: $0.0098 message, $0.03 session.
+
+touch a.txt
+Run shell command? (Y)es/(N)o/(D)on't ask again [Yes]: y
+
+Running touch a.txt
+Add command output to the chat? (Y)es/(N)o/(D)on't ask again [Yes]: y

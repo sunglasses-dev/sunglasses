@@ -1,0 +1,4 @@
+T+0s     custom_tool_call_output: apply_patch success
+T+0s     token_count
+T+216s   user interrupt
+T+216s   turn_aborted

@@ -1,0 +1,26 @@
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/site-packages/litellm/main.py", line 609, in acompletion
+    response = await init_response
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/site-packages/litellm/llms/bedrock/chat/converse_handler.py", line 108, in async_streaming
+    request_data = await litellm.AmazonConverseConfig()._async_transform_request(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/usr/lib/python3.13/site-packages/litellm/llms/bedrock/chat/converse_transformation.py", line 1096, in _async_transform_request
+    await BedrockConverseMessagesProcessor._bedrock_converse_messages_pt_async(
+    ...<4 lines>...
+    )
+  File "/usr/lib/python3.13/site-packages/litellm/litellm_core_utils/prompt_templates/factory.py", line 3866, in _bedrock_converse_messages_pt_async
+    _convert_to_bedrock_tool_call_invoke(_tool_calls)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/site-packages/litellm/litellm_core_utils/prompt_templates/factory.py", line 3205, in _convert_to_bedrock_tool_call_invoke
+    raise Exception(
+    ...<3 lines>...
+    )
+Exception: Unable to convert openai tool calls=[{'id': 'tooluse_1D3wFGn9Z4gIgGUNSbRyDO', 'type': 'function', 'function': {'name': 'multi_edit', 'arguments': '{"filepath": "gui.py"'}}] to bedrock tool calls. Received error=Expecting ',' delimiter: line 1 column 22 (char 21)
+. Received Model Group=claude-opus-4-6
+Available Model Group Fallbacks=None

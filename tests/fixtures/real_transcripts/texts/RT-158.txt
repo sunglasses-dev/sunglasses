@@ -1,0 +1,6 @@
+model turn
+  -> exec/tool result
+model turn with retained history
+  -> exec/tool result
+model turn with larger retained history
+  -> ...

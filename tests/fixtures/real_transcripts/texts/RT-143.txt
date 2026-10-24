@@ -1,0 +1,16 @@
+$ codex debug agents-md
+project_root:            C:\D\oriz\repos\frk\omniroute  (marker: .git)
+project_root_markers:    [".git"]  (source: default)
+project_doc_max_bytes:   32768
+project_doc_fallback_filenames: []
+
+Discovered files (root ? cwd):
+  1. C:\D\oriz\repos\frk\omniroute\AGENTS.md        36405 B  ?  TRUNCATED to 32768 B (remaining budget)
+  Total loaded: 32768 B / 32768 B (100%)
+
+Not discovered:
+  - C:\D\oriz\AGENTS.md                              (above project root, not walked)
+  - AGENTS.override.md                               (not present at any level)
+
+User-scope instructions:
+  - ~/.codex/AGENTS.md                              4210 B   ?  loaded (user-scope)

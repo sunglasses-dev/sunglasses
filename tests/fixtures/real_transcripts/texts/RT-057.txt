@@ -1,0 +1,8 @@
+  // Model produces a Cline-style tool call
+  {"type":"assistant","message":{"content":[{"type":"tool_use","name":"execute_command","input":{"command":"git log --oneline -10","requires_approval":"false"}}]}}
+
+  // Claude Code's executor fails — it has no such tool
+  {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"...","is_error":true,"content":"<tool_use_error>Error: No such tool available: execute_command</tool_use_error>"}],"role":"user"}}
+
+  // Session hits max_turns with nothing accomplished
+  {"type":"result","subtype":"error_max_turns","stop_reason":"tool_use","errors":["Reached maximum number of turns (1)"]}

@@ -1,0 +1,16 @@
+[{
+		"type": "function_call",
+		"name": "wait_agent",
+		"arguments": "{\"ids\":[\"019cea74-0bfe-7ac1-95a5-ea8bdd40be68\"],\"timeout_ms\":180000}",
+		"call_id": "call_REDACTED_ID"
+	}, {
+		"type": "function_call_output",
+		"call_id": "call_REDACTED_ID",
+		"output": "{\"status\":{\"019cea74-0bfe-7ac1-95a5-ea8bdd40be68\":{\"completed\":\"xxxxx\"}},\"timed_out\":false}"
+	}, {
+		"type": "message",
+		"role": "user",
+		"content": [{
+			"type": "input_text",
+			"text": "<subagent_notification>\n{\"agent_id\":\"019cea74-0bfe-7ac1-95a5-ea8bdd40be68\",\"status\":{\"completed\":\"xxxxx\"}}\n</subagent_notification>"
+		}]

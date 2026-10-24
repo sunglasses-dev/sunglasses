@@ -1,0 +1,4 @@
+env -u ANTHROPIC_API_KEY claude -p \
+  --input-format stream-json --output-format stream-json --verbose \
+  --model sonnet --permission-mode acceptEdits --permission-prompts none \
+  --allowedTools 'Bash(sleep *)'

@@ -1,0 +1,61 @@
+Traceback (most recent call last):
+  File "io.py", line 980, in _tool_message
+    self.console.print(message, **style)
+  File "console.py", line 1697, in print
+    with self:
+  File "console.py", line 870, in __exit__
+    self._exit_buffer()
+  File "console.py", line 826, in _exit_buffer
+    self._check_buffer()
+  File "console.py", line 2042, in _check_buffer
+    self._write_buffer()
+  File "console.py", line 2078, in _write_buffer
+    legacy_windows_render(buffer, LegacyWindowsTerm(self.file))
+  File "_windows_renderer.py", line 19, in legacy_windows_render
+    term.write_text(text)
+  File "_win32_console.py", line 402, in write_text
+    self.write(text)
+  File "cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2588' in position 40: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "__main__.py", line 5, in <module>
+    sys.exit(main())
+  File "main.py", line 1130, in main
+    coder.run(with_message=args.message)
+  File "base_coder.py", line 880, in run
+    self.run_one(with_message, preproc)
+  File "base_coder.py", line 934, in run_one
+    list(self.send_message(message))
+  File "base_coder.py", line 1600, in send_message
+    lint_errors = self.lint_edited(edited)
+  File "base_coder.py", line 1694, in lint_edited
+    self.io.tool_warning(res)
+  File "io.py", line 993, in tool_warning
+    self._tool_message(message, strip, self.tool_warning_color)
+  File "io.py", line 986, in _tool_message
+    self.console.print(message, **style)
+  File "console.py", line 1697, in print
+    with self:
+  File "console.py", line 870, in __exit__
+    self._exit_buffer()
+  File "console.py", line 826, in _exit_buffer
+    self._check_buffer()
+  File "console.py", line 2042, in _check_buffer
+    self._write_buffer()
+  File "console.py", line 2078, in _write_buffer
+    legacy_windows_render(buffer, LegacyWindowsTerm(self.file))
+  File "_windows_renderer.py", line 19, in legacy_windows_render
+    term.write_text(text)
+  File "_win32_console.py", line 402, in write_text
+    self.write(text)
+  File "cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2588' in position 40: character maps to <undefined>

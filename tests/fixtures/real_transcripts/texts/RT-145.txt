@@ -1,0 +1,4 @@
+   $ cd ~/.codex/plugins/cache/personal/cowart/0.1.11
+   $ node ./scripts/probe-mcp.mjs
+   OK: Cowart MCP tools and native widget resource are available.
+   

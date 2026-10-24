@@ -1,0 +1,20 @@
+> hey                                                                                                                
+
+litellm.APIConnectionError: Ollama Error - {'error': 'POST predict: Post "http://127.0.0.1:41401/completion": EOF'}
+Traceback (most recent call last):
+  File 
+"/home/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/litellm_core_utils/streaming_han
+dler.py", line 1110, in chunk_creator
+    response_obj = self.handle_ollama_chat_stream(chunk)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File 
+"/home/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/litellm_core_utils/streaming_han
+dler.py", line 623, in handle_ollama_chat_stream
+    raise e
+  File 
+"/home/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/litellm_core_utils/streaming_han
+dler.py", line 598, in handle_ollama_chat_stream
+    raise Exception(f"Ollama Error - {json_chunk}")
+Exception: Ollama Error - {'error': 'POST predict: Post "http://127.0.0.1:41401/completion": EOF'}
+
+Retrying in 0.2 seconds...

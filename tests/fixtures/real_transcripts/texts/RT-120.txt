@@ -1,0 +1,7 @@
+> You are in /home/user/workdir/some_project
+
+  Do you trust the contents of this directory? Working with untrusted contents comes with higher risk of prompt
+  injection.
+
+› 1. Yes, continue
+  2. No, quit

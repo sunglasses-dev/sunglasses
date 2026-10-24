@@ -1,0 +1,17 @@
+Readonly: CLAUDE.md
+> Can you run `touch a.txt` (run the literal command, nothing else)
+
+
+touch a.txt
+
+
+
+Tokens: 7.7k sent, 8 received. Cost: $0.0097 message, $0.0097 session.
+
+touch a.txt
+
+Readonly: CLAUDE.md
+> /run ll a.txt
+
+"a.txt": No such file or directory (os error 2)
+Added 2 lines of output to the chat.

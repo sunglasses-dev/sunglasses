@@ -1,0 +1,8 @@
+apply_patch <<'PATCH'
+*** Begin Patch
+*** Update File: relative/path/from/task/worktree
+@@
+-old
++new
+*** End Patch
+PATCH

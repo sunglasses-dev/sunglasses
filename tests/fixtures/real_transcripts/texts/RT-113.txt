@@ -1,0 +1,5 @@
+⚠️ CRITICAL SECURITY WARNING: Untrusted Command Flags Detected
+The following flags/arguments were sourced from external untrusted input (e.g., Buganizer ticket, external document):
+  • <flag/path/token>
+Executing commands with flags sourced from untrusted input can execute arbitrary code on your machine.
+Carefully verify these flags before approving.

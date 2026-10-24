@@ -1,0 +1,31 @@
+(.venv) ubuntu@lightbulb:~/PycharmProjects/EverythingHospital$ aider
+────────────────────────────────────────────────────
+Using openrouter/deepseek/deepseek-r1:free model with API key from environment.
+Aider v0.85.2
+Model: openrouter/deepseek/deepseek-r1:free with diff edit format, prompt cache, infinite output
+Git repo: .git with 26 files
+Repo-map: using 4096 tokens, auto refresh
+
+
+https://aider.chat/HISTORY.html#release-notes
+Would you like to see what's new in this version? (Y)es/(N)o [Yes]: no                                                                                                                                                     
+────────────────────────────────────────────────────
+> /run python manage.py makemigrations am_api                                                                                                                                                                              
+
+Traceback (most recent call last):
+  File "/home/user/PycharmProjects/EverythingHospital/manage.py", line 11, in main
+    from django.core.management import execute_from_command_line
+ModuleNotFoundError: No module named 'django'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/user/PycharmProjects/EverythingHospital/manage.py", line 22, in <module>
+    main()
+    ~~~~^^
+  File "/home/user/PycharmProjects/EverythingHospital/manage.py", line 13, in main
+    raise ImportError(
+    ...<3 lines>...
+    ) from exc
+ImportError: Couldn't import Django. Are you sure it's installed and available on your PYTHONPATH environment variable? Did you forget to activate a virtual environment?
+Add 0.3k tokens of command output to the chat? (Y)es/(N)o [Yes]:   

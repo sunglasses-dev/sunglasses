@@ -1,0 +1,5 @@
+assistant: [tool_use AskUserQuestion toolu_question_002]
+user:      [tool_result toolu_question_002 "[Tool result missing due to internal error]" is_error=true]
+           [text <system-reminder>[SYSTEM NOTIFICATION - NOT USER INPUT] ... <task-notification>...</task-notification></system-reminder>]
+assistant: [text "ok"]                      (the turn the CLI ran on the notice, or a synthetic "No response requested." if the process died first)
+user:      [text "Continue from where you left off."]

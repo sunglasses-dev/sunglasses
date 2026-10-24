@@ -1,0 +1,10 @@
+Read  /tmp/ccprobe/probe.txt            -> File does not exist.
+Grep  probe-ok /tmp/ccprobe/probe.txt   -> Path does not exist: /tmp/ccprobe/probe.txt.
+Glob  * in /tmp/ccprobe                 -> Directory does not exist: /tmp/ccprobe.
+Write /tmp/ccprobe-write/written.txt    -> File created successfully at: /tmp/ccprobe-write/written.txt
+$ cat /tmp/ccprobe-write/written.txt    -> cat: /tmp/ccprobe-write/written.txt: No such file or directory
+$ cat /c/tmp/ccprobe-write/written.txt  -> write-probe
+Read  /c/tmp/ccprobe-write/written.txt  -> write-probe
+# with C:\tmp\ccprobe\probe.txt planted, content "drive-root-copy":
+Read  /tmp/ccprobe/probe.txt            -> drive-root-copy
+Glob  * in /tmp/ccprobe                 -> \tmp\ccprobe\probe.txt

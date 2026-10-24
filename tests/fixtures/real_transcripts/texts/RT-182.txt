@@ -1,0 +1,6 @@
+09:01:10.383  function_call          js               call_00_sklbnyw...
+09:01:10.384  function_call          exec_command     call_01_asvwdd...
+09:01:11.838  function_call_output   call_00_sklbnyw...   (screenshot image, ~438 KB)
+09:01:11.838  message (developer)    <image_resize_notice>
+09:01:11.839  function_call_output   call_01_asvwdd...    (command output)
+09:01:16.923  task_complete          error: the 400 above

@@ -1,0 +1,12 @@
+{
+  "model": "deepseek-v4-flash-vision-exp",
+  "input": [
+    {
+      "type": "function_call_output",
+      "id": "fco_orphan",
+      "name": "automation_update",
+      "namespace": "codex_app",
+      "output": "test result"
+    }
+  ]
+}

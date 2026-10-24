@@ -1,0 +1,11 @@
+  {
+    "timestamp": "2026-06-22T03:26:45.553Z",
+    "type": "response_item",
+    "payload": {
+      "type": "function_call",
+      "id": "9444b96a15eaa8c6",
+      "name": "exec_command",
+      "arguments": "{",        <--- INVALID: just an opening brace
+      "call_id": "call_REDACTED_ID"
+    }
+  }

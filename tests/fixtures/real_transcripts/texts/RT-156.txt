@@ -1,0 +1,8 @@
+start turn
+-> tool call yields a running cell
+-> terminate/wait returns terminal output
+-> assistant emits final_answer
+-> dynamic context/developer update arrives near finalization
+-> assert exactly one terminal turn event
+-> assert task status becomes idle
+-> assert composer accepts a normal user message

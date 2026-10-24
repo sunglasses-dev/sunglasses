@@ -1,0 +1,36 @@
+2025-09-09 18:01:37.934 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:01:37.936 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryL
+2025-09-09 18:01:37.936 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:01:37.937 [d8ff4470] [debug]: Updated tool call state {"messageIndex":19,"toolCallId":"shell-1757433697
+2025-09-09 18:01:38.013 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:01:38.014 [d8ff4470] [debug]: Updated tool call state {"messageIndex":19,"toolCallId":"shell-1757433697
+2025-09-09 18:02:05.681 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:05.681 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryL
+2025-09-09 18:02:05.681 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:05.682 [d8ff4470] [debug]: Updated tool call state {"messageIndex":20,"toolCallId":"shell-1757433725
+2025-09-09 18:02:05.746 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:05.746 [d8ff4470] [debug]: Updated tool call state {"messageIndex":20,"toolCallId":"shell-1757433725
+2025-09-09 18:02:14.005 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:14.006 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryL
+2025-09-09 18:02:14.006 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:14.006 [d8ff4470] [debug]: Updated tool call state {"messageIndex":21,"toolCallId":"shell-1757433734
+2025-09-09 18:02:14.078 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:14.079 [d8ff4470] [debug]: Updated tool call state {"messageIndex":21,"toolCallId":"shell-1757433734
+2025-09-09 18:02:19.336 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:19.337 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryL
+2025-09-09 18:02:19.337 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:19.337 [d8ff4470] [debug]: Updated tool call state {"messageIndex":22,"toolCallId":"shell-1757433739
+2025-09-09 18:02:19.390 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:19.390 [d8ff4470] [debug]: Updated tool call state {"messageIndex":22,"toolCallId":"shell-1757433739336-tio1ae","updates":{"status":"done","output":[{"content":"","name":"Tool Result","description":"Tool execution result"}]}}
+2025-09-09 18:02:26.009 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:26.009 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryLength":24}
+2025-09-09 18:02:26.009 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:26.010 [d8ff4470] [debug]: Updated tool call state {"messageIndex":23,"toolCallId":"shell-1757433746009-5vg7bo","updates":{"status":"calling"}}
+2025-09-09 18:02:26.069 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:26.070 [d8ff4470] [debug]: Updated tool call state {"messageIndex":23,"toolCallId":"shell-1757433746009-5vg7bo","updates":{"status":"done","output":[{"content":"/Users/user/.continue\n","name":"Tool Result","description":"Tool execution result"}]}}
+2025-09-09 18:02:30.403 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:30.403 [d8ff4470] [debug]: Added assistant message {"contentLength":0,"toolCallCount":1,"newHistoryLength":25}
+2025-09-09 18:02:30.403 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:30.404 [d8ff4470] [debug]: Updated tool call state {"messageIndex":24,"toolCallId":"shell-1757433750403-9vvc4u","updates":{"status":"calling"}}
+2025-09-09 18:02:30.464 [d8ff4470] [debug]: ChatHistoryService state updated
+2025-09-09 18:02:30.464 [d8ff4470] [debug]: Updated tool call state {"messageIndex":24,"toolCallId":"shell-1757433750403-9vvc4u","updates":{"status":"done","output":[{"content":"auth.json\nconfig.ts\nconfig.yaml\ndev_data\nindex\ninput_history.json\nlogs\npackage.json\nsessions\ntsconfig.json\ntypes\n","name":"Tool Result","description":"Tool execution result"}]}}

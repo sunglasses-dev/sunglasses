@@ -1,0 +1,59 @@
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "阅读项目源码, 列出全部路由"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": ""
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "阅读项目源码, 列出全部路由"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "\n\n"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "阅读项目源码, 列出全部路由"
+            }
+          ]
+        },
+        {
+          "role": "assistant",
+          "content": "\n\n"
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "阅读项目源码, 列出全部路由"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
+
+Error: HTTP 404 Not Found from https://openrouter.ai/api/v1/chat/completions
+
+{"error":{"message":"No endpoints found that support tool use. To learn more about provider routing, visit: https://openrouter.ai/docs/provider-routing","code":404}}
+
+### Log output

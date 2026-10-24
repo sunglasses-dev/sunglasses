@@ -1,0 +1,27 @@
+{
+  "messages": [
+    ...
+    {
+      "tool_calls": [
+        {
+          "id": "call_REDACTED_ID",
+          "function": {
+            "arguments": "{\"command\":[\"bash\",\"-lc\",\"rg -n \\\"buildinfo\\\" || true\"],\"timeout_ms\":120000,\"workdir\":\"/home/user/coder\"}",
+            "name": "shell"
+          },
+          "type": "function"
+        }
+      ],
+      "role": "assistant"
+    },
+    {
+      "content": "Scanning the repo to find the buildinfo module and references.",
+      "role": "assistant"
+    },
+    {
+      "content": "{\"output\":\"Total output lines: 188\\n\\ncmd/coder/main.go:11:...", // 1.2KiB more
+      "tool_call_id": "call_REDACTED_ID",
+      "role": "tool"
+    }
+...
+}

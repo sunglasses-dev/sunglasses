@@ -1,0 +1,27 @@
+{
+  "model": "qwen/qwen3.6-35b-a3b",
+  "messages": [
+    { "role": "system", "content": "You are an agent in the Continue CLI. ..." },
+    { "role": "user", "content": "what is the solution name" },
+    { "role": "assistant", "content": "", "tool_calls": [ "..." ] },
+    { "role": "tool", "content": "...", "tool_call_id": "..." },
+    { "role": "assistant", "content": "The solution file is ..." },
+    { "role": "system", "content": "Switched to model: Qwen3.7 Max" },
+    { "role": "user", "content": "what's the airspeed velocity of an unladen swallow?" },
+    { "role": "assistant", "content": "African or European?" },
+    { "role": "user", "content": "I don't know" },
+    { "role": "assistant", "content": "You have been cast into the Gorge of Eternal Peril ..." },
+    { "role": "system", "content": "Switched to model: Qwen3 Coder 30b" },
+    { "role": "user", "content": "What's the airspeed velocity of an unladen swallow?" },
+    { "role": "system", "content": "Error: Connection error." },
+    { "role": "user", "content": "what is today's date" },
+    { "role": "system", "content": "Error: Connection error." },
+    { "role": "system", "content": "Switched to model: Qwen3.7 Max" },
+    { "role": "user", "content": "what is today's date" },
+    { "role": "assistant", "content": "Today is **July 25, 2026**." },
+    { "role": "system", "content": "Switched to model: Qwen3.6 35b A3b" },
+    { "role": "user", "content": "what is today's date" }
+  ],
+  "stream": true,
+  "tools": [ "..." ]
+}

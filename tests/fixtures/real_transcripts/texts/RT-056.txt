@@ -1,0 +1,10 @@
+# Every call, any command:
+Error: Exit code 126        # stdout and stderr both empty
+
+# --debug log shows only:
+[Stall] tool_dispatch_end tool=Bash outcome=error durationMs=1302
+Bash tool error (1302ms): code=tool_shell_error type=ShellError
+
+# The shell-semantics proof:
+$ zsh  -c 'exec 3<&-; exec 3<&- || exit 126; echo SURVIVED'   # no output, exits
+$ bash -c 'exec 3<&-; exec 3<&- || exit 126; echo SURVIVED'   # SURVIVED

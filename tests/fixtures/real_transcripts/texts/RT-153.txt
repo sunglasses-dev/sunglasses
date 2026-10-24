@@ -1,0 +1,8 @@
+custom_tool_call
+  name: exec
+  └── nested mcp_tool_call_end
+        server: codex_apps
+        tool: apple_music_get_track_details_batch
+        result: Ok
+        structuredContent: [body, status]
+        _meta: [appleweb/html]

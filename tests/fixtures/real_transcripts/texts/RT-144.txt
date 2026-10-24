@@ -1,0 +1,5 @@
+• Ran Write-Output 'OPENAI_API_KEY=REDACTED_TOKEN'
+  └ OPENAI_API_KEY=REDACTED_TOKEN
+
+• PostToolUse hook (blocked)
+  feedback: OPENAI_API_KEY=<<OPENAI_API_KEY_BLOCK_PROBE>>

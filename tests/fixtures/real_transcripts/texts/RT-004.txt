@@ -1,0 +1,41 @@
+Unexpected error: litellm.APIConnectionError: APIConnectionError: OpenAIException - openai raised a streaming error - finish_reason: error, no content string given. Received 
+Chunk={'text': '', 'is_finished': True, 'finish_reason': 'error', 'logprobs': None, 'original_chunk': ChatCompletionChunk(id='gen-RjjGpsqscZqk4wvSdXVPWhR7Xbws', 
+choices=[Choice(delta=ChoiceDelta(content='', function_call=None, role='assistant', tool_calls=None), finish_reason='error', index=0, logprobs=None, error={'message': 
+'Overloaded', 'code': 502, 'metadata': {'raw': {'type': 'overloaded_error', 'message': 'Overloaded'}}})], created=1723127497, model='anthropic/claude-3.5-sonnet:beta', 
+object='chat.completion.chunk', service_tier=None, system_fingerprint=None, usage=None), 'usage': None}
+Traceback (most recent call last):
+  File "litellm/utils.py", line 9611, in chunk_creator
+    raise Exception(
+Exception: openai raised a streaming error - finish_reason: error, no content string given. Received Chunk={'text': '', 'is_finished': True, 'finish_reason': 'error', 
+'logprobs': None, 'original_chunk': ChatCompletionChunk(id='gen-RjjGpsqscZqk4wvSdXVPWhR7Xbws', choices=[Choice(delta=ChoiceDelta(content='', function_call=None, 
+role='assistant', tool_calls=None), finish_reason='error', index=0, logprobs=None, error={'message': 'Overloaded', 'code': 502, 'metadata': {'raw': {'type': 
+'overloaded_error', 'message': 'Overloaded'}}})], created=1723127497, model='anthropic/claude-3.5-sonnet:beta', object='chat.completion.chunk', service_tier=None, 
+system_fingerprint=None, usage=None), 'usage': None}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "aider/coders/base_coder.py", line 865, in send_new_user_message
+    yield from self.send(messages, functions=self.functions)
+  File "aider/coders/base_coder.py", line 1126, in send
+    yield from self.show_send_output_stream(completion)
+  File "aider/coders/base_coder.py", line 1200, in show_send_output_stream
+    for chunk in completion:
+  File "litellm/utils.py", line 10025, in __next__
+    raise exception_type(
+  File "litellm/utils.py", line 9955, in __next__
+    response: Optional[ModelResponse] = self.chunk_creator(chunk=chunk)
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "litellm/utils.py", line 9879, in chunk_creator
+    raise exception_type(
+          ^^^^^^^^^^^^^^^
+  File "litellm/utils.py", line 8038, in exception_type
+    raise e  # it's already mapped
+    ^^^^^^^
+  File "litellm/utils.py", line 6476, in exception_type
+    raise APIConnectionError(
+litellm.exceptions.APIConnectionError: litellm.APIConnectionError: APIConnectionError: OpenAIException - openai raised a streaming error - finish_reason: error, no content 
+string given. Received Chunk={'text': '', 'is_finished': True, 'finish_reason': 'error', 'logprobs': None, 'original_chunk': 
+ChatCompletionChunk(id='gen-RjjGpsqscZqk4wvSdXVPWhR7Xbws', choices=[Choice(delta=ChoiceDelta(content='', function_call=None, role='assistant', tool_calls=None), 
+finish_reason='error', index=0, logprobs=None, error={'message': 'Overloaded', 'code': 502, 'metadata': {'raw': {'type': 'overloaded_error', 'message': 'Overloaded'}}})], 
+created=1723127497, model='anthropic/claude-3.5-sonnet:beta', object='chat.completion.chunk', service_tier=None, system_fingerprint=None, usage=None), 'usage': None}

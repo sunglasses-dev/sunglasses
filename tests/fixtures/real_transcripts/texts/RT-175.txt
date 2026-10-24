@@ -1,0 +1,12 @@
+{
+  "model": "qwen3.8-flash",
+  "store": false,
+  "max_output_tokens": 16,
+  "tools": [{"type": "function", "name": "dummy_tool", "description": "d",
+             "parameters": {"type": "object", "properties": {}, "required": []}}],
+  "input": [
+    {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]},
+    {"type": "function_call", "name": "dummy_tool", "arguments": "{}", "call_id": "call_probe_001"},
+    {"type": "function_call_output", "call_id": "call_probe_001", "output": "ok"}
+  ]
+}

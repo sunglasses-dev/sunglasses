@@ -1,0 +1,8 @@
+17:10:33.270  function_call          view_image    call_00_si6t6wrnjTkCBhCbg89w4748
+17:10:33.348  function_call          view_image    call_01_5kk0GRUtk7tY2lEwSKhY0823
+17:10:34.115  item_completed         ImageView     call_00_si6t6wrnjTkCBhCbg89w4748
+17:10:34.164  item_completed         ImageView     call_01_5kk0GRUtk7tY2lEwSKhY0823   <- batch now looks "done"
+17:10:34.188  function_call_output   call_00_si6t6wrnjTkCBhCbg89w4748 (image)
+17:10:34.189  message (developer)    <image_resize_notice>
+17:10:34.256  function_call_output   call_01_5kk0GRUtk7tY2lEwSKhY0823 (image)       <- 68 ms too late
+17:10:37.260  task_complete          error: No tool output found for tool call call_01_5kk0GRUtk7tY2lEwSKhY0823

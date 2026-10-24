@@ -1,0 +1,12 @@
+{
+  "message": "400 Item 'fc_0112256b6297f176006a02d459b42881a0896ad46828eade38' of type 'function_call' was provided without its required 'reasoning' item: 'rs_0112256b6297f176006a02d45510b081a0ae06a7f0a755a838'.",
+  "status": 400,
+  "modelId": "gpt-5.3-codex",
+  "providerId": "openai-native",
+  "details": {
+    "message": "Item 'fc_0112256b6297f176006a02d459b42881a0896ad46828eade38' of type 'function_call' was provided without its required 'reasoning' item: 'rs_0112256b6297f176006a02d45510b081a0ae06a7f0a755a838'.",
+    "type": "invalid_request_error",
+    "param": "input",
+    "code": null
+  }
+}

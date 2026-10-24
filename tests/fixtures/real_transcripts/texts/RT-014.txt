@@ -1,0 +1,31 @@
+ % aider --model bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Aider v0.70.0
+Main model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0 with diff edit format, infinite output
+Weak model: bedrock/anthropic.claude-3-5-haiku-20241022-v1:0
+Git repo: .git with 425 files
+Repo-map: using 1024 tokens, auto refresh
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> help                                                                                                                                                               
+
+
+litellm.APIConnectionError: Missing boto3 to call bedrock. Run 'pip install boto3'.
+Traceback (most recent call last):
+  File "/Users/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/llms/bedrock/chat/converse_handler.py", line 206, in completion
+    import boto3
+ModuleNotFoundError: No module named 'boto3'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/main.py", line 2610, in completion
+    response = bedrock_converse_chat_completion.completion(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.local/share/uv/tools/aider-chat/lib/python3.12/site-packages/litellm/llms/bedrock/chat/converse_handler.py", line 211, in completion
+    raise ImportError("Missing boto3 to call bedrock. Run 'pip install boto3'.")
+ImportError: Missing boto3 to call bedrock. Run 'pip install boto3'.
+
+You need to: pip install boto3
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>  

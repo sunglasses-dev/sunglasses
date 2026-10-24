@@ -1,0 +1,5 @@
+exec(
+  command=["find", ".", "-not", "-path", "./.git*", "-not", "-name", ".DS_Store"],
+  sandbox_permissions="allow",
+  justification="List project files for inspection"
+)

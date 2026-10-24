@@ -1,0 +1,4 @@
+You can use /undo to undo and discard each aider commit.
+---
+my.py
+> /run python my.py --row 2 --field Labels

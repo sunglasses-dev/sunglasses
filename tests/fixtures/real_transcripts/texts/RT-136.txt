@@ -1,0 +1,32 @@
+› Run exactly this command and report the output:
+
+  echo OUTPUT; sleep 0.5
+
+
+• Running the exact command now.
+
+• Ran echo OUTPUT; sleep 0.5
+  └ (no output)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• OUTPUT
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+› Run exactly this command and report the output:
+
+  sleep 0.5; echo OUTPUT
+
+
+• Running the exact command as given.
+
+• Ran sleep 0.5; echo OUTPUT
+  └ OUTPUT
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• OUTPUT
+
+────────────────────────────────────────────────────────────────────────────────────────────────────

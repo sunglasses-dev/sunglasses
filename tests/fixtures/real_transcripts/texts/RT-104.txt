@@ -1,0 +1,17 @@
+{
+  "sessionId": "beb72f7f-3ef5-43cc-80b1-43c8296e21e4",
+  "update": {
+    "sessionUpdate": "tool_call_update",
+    "toolCallId": "write_file-1758674688141",
+    "status": "failed",
+    "content": [
+      {
+        "type": "content",
+        "content": {
+          "type": "text",
+          "text": "Error checking existing file: [object Object]"
+        }
+      }
+    ]
+  }
+}

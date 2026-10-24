@@ -1,0 +1,11 @@
+{
+  "id": "error_…",
+  "role": "assistant",
+  "content": [
+    { "type": "text",
+      "text": "Upstream request failed: [invalid_request_error] The `reasoning_content` in the thinking mode must be passed back to the API. (request_id: req_REDACTED_ID)" }
+  ],
+  "ts": 1791519497729,
+  "metadata": { "displayOnly": true, "displayRole": "error" },
+  "modelInfo": { "id": "deepseek-v4.1-flash", "provider": "opencode-go" }
+}

@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-09-13T15:10:43.522Z",
+  "type": "response_item",
+  "payload": {
+    "type": "function_call_output",
+    "id": "fco_<redacted>",
+    "name": "create_thread",
+    "output": "<initial handoff prompt redacted>"
+  }
+}

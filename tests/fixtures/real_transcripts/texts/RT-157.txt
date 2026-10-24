@@ -1,0 +1,4 @@
+tool call failed for `appsrepro/view_tool`
+
+Caused by:
+    Unexpected response type
