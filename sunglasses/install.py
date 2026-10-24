@@ -2324,9 +2324,9 @@ def _earlier_originals(home, name, target_id, sha_before):
 
     The link is exact: an earlier record counts only when the file this
     install read is byte-for-byte the wrapper that record left. An edit in
-    between breaks the chain, and a broken chain gets the warning. Runs under
-    the target's transaction lock, so no other install on this file can move a
-    record while it is read.
+    between breaks the chain, and a broken chain gets the warning. The records
+    are read without a lock of their own: one that is replaced or removed while
+    this runs is a missing link, and a missing link gets the warning too.
     """
     found = []
     for _, rec in _other_records_on(home, name, target_id):
@@ -2354,7 +2354,7 @@ def _other_records_on(home, name, target_id):
             yield other, rec
 
 
-def _later_wraps(home, name, record, current_digest):
+def _later_wraps(home, name, record, current_digest, servers):
     """The installs stacked on top of this one, when they explain the file.
 
     R38 (b). Walks from this install's after-image through records whose
@@ -2362,6 +2362,11 @@ def _later_wraps(home, name, record, current_digest):
     if the walk lands on the file as it was just read. Any gap, any fork and
     any edit on top means the file changed for some other reason, and the
     answer is empty so the generic warning stands.
+
+    A record's file name is the name this line would print, so it is checked
+    against the file: each named server must be in `servers` (the entries as
+    they were just read) as exactly the wrapper its record installed. A record
+    that sits under another server's name fails that and the answer is empty.
     """
     others = list(_other_records_on(home, name, record.get("target_path")))
     chain = []
@@ -2370,6 +2375,8 @@ def _later_wraps(home, name, record, current_digest):
         step = [(n, r) for n, r in others
                 if r["file_sha_before"] == cursor and n not in chain]
         if len(step) != 1:
+            return ()
+        if servers.get(step[0][0]) != step[0][1]["installed_entry"]:
             return ()
         chain.append(step[0][0])
         cursor = step[0][1]["file_sha_after"]
@@ -3236,6 +3243,7 @@ def _uninstall_locked(config_path, name, *, home):
     # rather than by position (C3, R5-INVERSE).
     doc = _parse(current, target)
     servers = _servers(doc, target)
+    observed_servers = {k: v for k, v in servers.items()}
     if name not in servers:
         if retained_failure is not None:
             raise retained_failure
@@ -3302,4 +3310,5 @@ def _uninstall_locked(config_path, name, *, home):
         return UninstallResult(byte_exact=True, kept_at=kept_at, earlier=True)
     return UninstallResult(
         byte_exact=False, kept_at=kept_at,
-        later=_later_wraps(home, name, record, _digest_bytes(current)))
+        later=_later_wraps(home, name, record, _digest_bytes(current),
+                            observed_servers))

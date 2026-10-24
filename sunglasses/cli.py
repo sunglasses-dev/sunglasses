@@ -3911,6 +3911,21 @@ def cmd_install(args):
     sys.exit(0)
 
 
+def _uninstall_command(name, config):
+    """The command that undoes `name` in `config`, as text a shell can run.
+
+    The config is named because the file being undone is not always the one in
+    the working directory, and `--` ends the options so a server name that
+    starts with a dash is still a name. Each word is quoted for the platform's
+    shell, so a name or a path with a space stays one word.
+    """
+    words = ["sunglasses", "uninstall", "--config", str(config), "--", name]
+    if os.name == "nt":
+        import subprocess
+        return subprocess.list2cmdline(words)
+    return " ".join(shlex.quote(w) for w in words)
+
+
 def cmd_uninstall(args):
     """T10.R5 — put the entry back, byte-exact when the file has not moved."""
     from . import install as _inst
@@ -3940,7 +3955,7 @@ def cmd_uninstall(args):
         # sunglasses wrap on top, so say that and what undoes it rather than
         # a sentence that reads as somebody else's edit.
         names = ", ".join(repr(n) for n in res.later)
-        runs = " and ".join(f"sunglasses uninstall {n}" for n in res.later)
+        runs = " and ".join(_uninstall_command(n, target) for n in res.later)
         print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
         which = ("a later sunglasses install of {} is" if len(res.later) == 1
                  else "later sunglasses installs of {} are").format(names)

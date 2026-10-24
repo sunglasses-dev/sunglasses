@@ -295,7 +295,8 @@ def test_cli_fifo_first_uninstall_says_the_later_install_is_still_wrapped(
 
     assert STACKED in out[2]
     assert "'fetch'" in out[2]
-    assert "sunglasses uninstall fetch" in out[2]
+    assert "sunglasses uninstall --config " in out[2]
+    assert "-- fetch" in out[2]
     assert CHANGED not in out[2]
 
 
@@ -321,4 +322,164 @@ def test_cli_three_stacked_wraps_name_both_later_installs(project, tmp_path):
                ("install", "third"), ("uninstall", "echo"))
 
     assert "later sunglasses installs of 'fetch', 'third' are still wrapped" in out[3]
-    assert "sunglasses uninstall fetch and sunglasses uninstall third" in out[3]
+    assert "-- fetch and sunglasses uninstall --config " in out[3]
+    assert out[3].count("sunglasses uninstall --config ") == 2
+
+
+# --------------------------- the printed undo command, run (round r1 findings)
+#
+# The hint names a command to run. It is only a hint if running it does what it
+# says, so these rows run the printed text through a shell-style split and check
+# the wrapper is gone: the config that was named, from any folder, and a server
+# name that has a space or starts with a dash.
+
+import re
+import shlex
+
+
+def _printed_commands(stdout):
+    found = re.search(r"run (?P<cmds>.+?) to restore the original", stdout)
+    assert found, stdout
+    return found.group("cmds").split(" and sunglasses ")
+
+
+@pytest.mark.parametrize("later", ["fetch", "my server", "-dash"])
+def test_the_printed_undo_command_runs_against_the_named_config(
+        tmp_path, later):
+    cfg = tmp_path / "elsewhere" / "custom config.json"
+    cfg.parent.mkdir()
+    servers = {"echo": {"command": "echo-server", "args": ["--stdio"]},
+               later: {"command": "later-server", "args": []}}
+    cfg.write_bytes((json.dumps({"mcpServers": servers}, indent=2)
+                     + "\n").encode("utf-8"))
+    home = tmp_path / "h"
+    cwd = tmp_path / "somewhere-else"
+    cwd.mkdir()
+    for name in ("echo", later):
+        r = sg("install", "--config", str(cfg), "--", name, cwd=cwd, home=home)
+        assert r.returncode == 0, (name, r.stdout, r.stderr)
+
+    first = sg("uninstall", "--config", str(cfg), "--", "echo",
+               cwd=cwd, home=home)
+    assert first.returncode == 0, (first.stdout, first.stderr)
+    (printed,) = _printed_commands(first.stdout)
+    argv = shlex.split(printed)
+    assert argv[0] == "sunglasses"
+
+    ran = sg(*argv[1:], cwd=cwd, home=home)
+
+    assert ran.returncode == 0, (printed, ran.stdout, ran.stderr)
+    assert json.loads(read(cfg))["mcpServers"] == servers
+
+
+def test_every_printed_undo_command_names_the_config_it_was_given(tmp_path):
+    cfg = tmp_path / "x" / "c.json"
+    cfg.parent.mkdir()
+    cfg.write_bytes((json.dumps({"mcpServers": {
+        **json.loads(CANON)["mcpServers"],
+        "third": {"command": "third-server", "args": []}}}, indent=2)
+        + "\n").encode("utf-8"))
+    home = tmp_path / "h"
+    for name in ("echo", "fetch", "third"):
+        r = sg("install", "--config", str(cfg), name, cwd=tmp_path, home=home)
+        assert r.returncode == 0, (r.stdout, r.stderr)
+    out = sg("uninstall", "--config", str(cfg), "echo", cwd=tmp_path, home=home)
+
+    commands = _printed_commands(out.stdout)
+
+    assert len(commands) == 2
+    assert all(str(cfg) in shlex.split(c) for c in commands)
+
+
+# ------------------------ a record's file name is not evidence of what is wrapped
+
+def test_control_a_misplaced_record_does_not_name_a_server_that_is_not_wrapped(
+        cfg, home, artifact):
+    """Install `echo`, then `fetch`; move fetch's record to the name of a third
+    server that is in the file but never wrapped. The digests still chain, and
+    the line used to name that third server, which is direct, and omit `fetch`."""
+    cfg.write_bytes((json.dumps({"mcpServers": {
+        **json.loads(CANON)["mcpServers"],
+        "third": {"command": "third-server", "args": []}}}, indent=2)
+        + "\n").encode("utf-8"))
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    records = pathlib.Path(home) / "proxy" / "installs"
+    (records / "fetch.json").rename(records / "third.json")
+
+    assert inst.uninstall(cfg, "echo", home=home).later == ()
+
+
+def test_control_the_named_server_must_still_be_the_wrapper_the_record_installed(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    rec = pathlib.Path(home) / "proxy" / "installs" / "fetch.json"
+    body = json.loads(rec.read_text(encoding="utf-8"))
+    body["installed_entry"] = {"command": "something-else", "args": []}
+    rec.write_text(json.dumps(body, indent=2), encoding="utf-8")
+
+    assert inst.uninstall(cfg, "echo", home=home).later == ()
+
+
+# ------------------------------------------------ the earlier-original qualifier
+
+def test_only_the_final_fifo_uninstall_reports_an_earlier_original(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    first = inst.uninstall(cfg, "echo", home=home)
+    last = inst.uninstall(cfg, "fetch", home=home)
+
+    assert (first.byte_exact, first.earlier) == (False, False)
+    assert (last.byte_exact, last.earlier) == (True, True)
+
+
+def test_lifo_uninstalls_report_their_own_original_not_an_earlier_one(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    inst.install(cfg, "fetch", artifact=artifact, home=home)
+    top = inst.uninstall(cfg, "fetch", home=home)
+    bottom = inst.uninstall(cfg, "echo", home=home)
+
+    assert (top.byte_exact, top.earlier) == (True, False)
+    assert (bottom.byte_exact, bottom.earlier) == (True, False)
+
+
+# ------------------------- a failure while serialising the restore closes the fd
+
+def test_a_failed_restore_serialisation_releases_the_held_authority(
+        cfg, home, artifact, monkeypatch):
+    """The entry-only restore after an unusable retained copy holds one open
+    descriptor as its authority. Serialising the restored document can fail
+    before the compare-and-swap is entered, and the descriptor must still be
+    closed and no scoped write state left behind."""
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    cfg.write_text(json.dumps(json.loads(cfg.read_text()), indent=4))
+    before = read(cfg)
+    retained = pathlib.Path(home) / "proxy" / "installs" / "echo.original"
+    authority = retained.open("rb")
+
+    def unavailable(*args, **kw):
+        raise inst._RetainedUnusable(inst.ConfigConflict("injected"))
+
+    monkeypatch.setattr(inst, "_retained_of", unavailable)
+    monkeypatch.setattr(inst, "_failed_copy_is_present", lambda *a, **k: True)
+    monkeypatch.setattr(inst, "_authorise_from_one_fd", lambda *a, **k: authority)
+    real_dumps = inst.json.dumps
+
+    def fail(doc, *args, **kw):
+        if isinstance(doc, dict) and "mcpServers" in doc:
+            raise ValueError("injected serialization failure")
+        return real_dumps(doc, *args, **kw)
+
+    monkeypatch.setattr(inst.json, "dumps", fail)
+    try:
+        with pytest.raises(ValueError, match="injected serialization"):
+            inst.uninstall(cfg, "echo", home=home)
+        assert read(cfg) == before
+        assert authority.closed
+        assert not (inst._AUTHORISED or inst._EXPECTED or inst._HELD
+                    or inst._LOCK_FOR)
+    finally:
+        authority.close()
