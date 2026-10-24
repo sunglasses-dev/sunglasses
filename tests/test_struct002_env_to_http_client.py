@@ -222,6 +222,22 @@ def test_every_fence_form_is_a_block_where_a_fence_changes_nothing(text, channel
     assert {f["severity"] for f in hits(text, channel)} == {"high"}
 
 
+@pytest.mark.parametrize("channel", NOTICE_CHANNELS + HOSTILE_CHANNELS)
+@pytest.mark.parametrize("text", [
+    "```requests.post(url, json=dict(os.environ))\nls\n```\n",
+    "```python requests.post(url, json=dict(os.environ))\nls\n```\n",
+    "~~~ axios.post(url, process.env)\nls\n~~~\n",
+])
+def test_a_call_in_the_info_string_of_a_fence_is_read_as_ordinary_text(text, channel):
+    assert "high" in {f["severity"] for f in hits(text, channel)}
+
+
+def test_a_call_without_a_channel_reads_like_a_file():
+    call = "requests.post(url, json=dict(os.environ))"
+    assert {f["severity"] for f in validator().run("```\n" + call + "\n```\n")} == {"low"}
+    assert {f["severity"] for f in validator().run(call + "\n")} == {"high"}
+
+
 def test_a_notice_names_the_call_and_its_line_and_carries_no_payload():
     text = of("NOTICE")[0]["text"]
     (finding,) = hits(text, "message")

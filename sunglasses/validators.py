@@ -1720,8 +1720,9 @@ _PORT = re.compile(r"\d{0,5}")
 def _fenced_segments(text, channel):
     """Split ``text`` into (start, end, fenced). A real code fence (three or more backticks or
     tildes at the start of a line, closed by the same character) of a prose text is its own
-    segment, so the fence lines are never read as a string; it is ``fenced`` (a notice) only in
-    a ``file`` or ``message`` text. The ``code`` channel is never split, it is source."""
+    segment, so the fence lines are never read as a string and the words after the opening ticks
+    (the info string) are read as ordinary text; it is ``fenced`` (a notice) only in a ``file`` or
+    ``message`` text. The ``code`` channel is never split, it is source."""
     if channel == "code" or ("```" not in text and "~~~" not in text):
         return [(0, len(text), False)]
     softened = channel in _NOTICE_CHANNELS
@@ -1735,6 +1736,7 @@ def _fenced_segments(text, channel):
                 continue
             opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)))
             segments.append((cursor, m.start(), False))
+            segments.append((m.start(2), m.end(2), False))
         elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
             segments.append((opened[2], m.start(), softened))
             cursor = min(m.end() + 1, len(text))
