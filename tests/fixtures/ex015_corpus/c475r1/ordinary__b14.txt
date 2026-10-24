@@ -1,0 +1,1 @@
+Open config documentation and store the product labels in the catalog.

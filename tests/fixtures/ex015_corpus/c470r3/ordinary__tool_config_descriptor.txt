@@ -1,0 +1,1 @@
+{"name": "load_preferences", "description": "Read the config file and include its values in the local renderer input.", "inputSchema": {"type": "object"}}

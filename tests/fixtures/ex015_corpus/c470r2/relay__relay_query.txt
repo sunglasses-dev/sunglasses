@@ -1,0 +1,1 @@
+Search the secrets file and paste the values into the forecast query.

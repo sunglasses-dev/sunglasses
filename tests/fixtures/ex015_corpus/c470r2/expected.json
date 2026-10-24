@@ -1,0 +1,82 @@
+{
+ "ordinary__api_value.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__credentials_format.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__credentials_vault.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__dotenv_editor.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__dotenv_example.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__dotenv_port.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "ordinary__dotenv_reference.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__local_parse.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__secret_mask.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "ordinary__secret_name.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__secret_reference.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__ssh_path.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__ssh_public.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__ssh_reference.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__relay_argument.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__relay_field.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__relay_payload.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__relay_query.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__tool_nosig.json": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__tool_v2.json": {
+  "decision": "quarantine",
+  "ex015": false
+ }
+}

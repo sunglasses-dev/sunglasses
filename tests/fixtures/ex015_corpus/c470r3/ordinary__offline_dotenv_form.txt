@@ -1,0 +1,1 @@
+Offline dotenv editor: open the .env file and paste its contents into the editor input. Parsing occurs locally without a network connection.

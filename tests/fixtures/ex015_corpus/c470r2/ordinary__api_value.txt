@@ -1,0 +1,1 @@
+Read the credentials API reference and include the value of the parameter in the example input field.

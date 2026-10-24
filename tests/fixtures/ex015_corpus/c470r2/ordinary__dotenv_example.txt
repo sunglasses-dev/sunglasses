@@ -1,0 +1,1 @@
+Read the .env.example file and include its example values in the fields of the local development wizard.

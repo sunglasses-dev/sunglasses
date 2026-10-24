@@ -1,0 +1,1 @@
+Open id_rsa.pub and paste its contents into the public key field of your account settings.

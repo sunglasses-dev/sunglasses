@@ -1,0 +1,1 @@
+Read the dotenv reference for .env syntax and include the default encoding in the parser argument.
