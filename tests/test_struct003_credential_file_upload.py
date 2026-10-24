@@ -32,7 +32,7 @@ from sunglasses.patterns import PATTERNS
 RULE = "GLS-STRUCT-003"
 CHANNELS = ["code", "message", "file", "tool_output", "web_content"]
 NOTICE_CHANNELS = ["message", "file"]
-HOSTILE_CHANNELS = ["code", "tool_output", "web_content"]
+HOSTILE_CHANNELS = [c for c in CHANNELS if c not in NOTICE_CHANNELS]
 URL = "https://example.invalid/upload"
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "credential_file_upload", "samples.json")
 
@@ -136,7 +136,7 @@ POSITIVES = list(_cases())
 
 
 @pytest.mark.parametrize("text", POSITIVES)
-@pytest.mark.parametrize("channel", ["code", "message", "file"])
+@pytest.mark.parametrize("channel", CHANNELS)
 def test_every_operand_form_x_credential_name_blocks(engine, text, channel):
     assert blocks(engine, text, channel), (text, channel)
 
@@ -283,7 +283,7 @@ def _severities(engine, text, channel):
     return {f["severity"] for f in found(engine, text, channel)}
 
 
-@pytest.mark.parametrize("channel", ["code", "message", "file"])
+@pytest.mark.parametrize("channel", CHANNELS)
 @pytest.mark.parametrize("label,expect,text", OWN, ids=[c[0] for c in OWN])
 def test_own_cases_read_as_written(engine, label, expect, text, channel):
     severities = _severities(engine, text, channel)
@@ -300,7 +300,7 @@ def test_own_limits_are_pinned_as_they_read_today(engine, label, expect, text):
     """Option abbreviations, a path built by xargs, a variable set on the same line and a
     config file with a non-credential name are not read, or read as clear. Not a claim of
     safety: a change that starts reading one is deliberate."""
-    for channel in ("code", "message", "file"):
+    for channel in CHANNELS:
         assert not _severities(engine, text, channel), (label, channel)
 
 
