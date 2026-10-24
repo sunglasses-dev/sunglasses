@@ -473,11 +473,37 @@ def test_a_double_that_is_not_active_at_the_call_does_not_clear_it(label, text):
     ("with_object", 'with patch.object(requests, "post"):\n    ' + SEND),
     ("decorator", '@patch("requests.post")\ndef test(m):\n    ' + SEND),
     ("started", 'patch("requests.post").start()\n' + SEND),
+    ("bound_then_started", 'p = patch("requests.post")\np.start()\n' + SEND),
     ("assignment", "requests.post = Mock()\n" + SEND),
     ("spy", 'jest.spyOn(axios, "post")\naxios.post(u, process.env)'),
 ], ids=lambda v: v if isinstance(v, str) and "_" in v and " " not in v else "t")
 def test_a_double_that_is_active_at_the_call_clears_it(label, text):
     assert not hits(text), label
+
+
+@pytest.mark.parametrize("text", [
+    'p = patch("requests.post")\n' + SEND,
+    'q = patch("requests.post")\nother.start()\n' + SEND,
+])
+def test_a_double_that_is_bound_and_never_started_replaces_nothing(text):
+    assert blocks(text), text
+
+
+@pytest.mark.parametrize("text", [
+    "fetch(destination, {...process.env})",
+    "got(destination, {...process.env})",
+    "axios({...process.env})",
+])
+def test_a_spread_of_the_environment_into_an_options_object_is_the_environment(text):
+    assert blocks(text), text
+
+
+def test_a_run_of_notices_neither_hides_a_later_call_nor_costs_a_walk_per_notice():
+    fenced = "```\n" + SEND + "\n```\n"
+    text = fenced * 3000 + SEND + "\n"
+    found = [f for f in validator().run(text, "message") if f["severity"] == "high"]
+    assert len(found) == 1
+    assert len(validator().run(fenced * 3000, "message")) == 20
 
 
 @pytest.mark.parametrize("label,text", [
