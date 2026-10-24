@@ -34,6 +34,13 @@ CANON = (json.dumps({"mcpServers": {
     "fetch": {"command": "fetch-server", "args": ["--stdio"]},
 }}, indent=2) + "\n").encode("utf-8")
 
+CANON3 = (json.dumps({"mcpServers": {
+    "echo": {"command": "echo-server", "args": ["--stdio"]},
+    "fetch": {"command": "fetch-server", "args": ["--stdio"]},
+    "time": {"command": "time-server", "args": ["--stdio"]},
+}}, indent=2) + "\n").encode("utf-8")
+
+EARLIER = "(byte-identical to the file before an earlier install)"
 WARNING = "not byte-identical"
 CHANGED = "changed after the install"
 
@@ -81,6 +88,21 @@ def test_fifo_second_uninstall_reports_identical_when_the_end_state_is_the_origi
     assert read(cfg) == CANON            # the premise, measured, not assumed
     assert first.byte_exact is False     # fetch is still wrapped at that point
     assert last.byte_exact is True
+    assert last.earlier is True          # the match is with an earlier original
+
+
+def test_three_installs_undone_first_installed_first_end_at_the_first_original(
+        tmp_path, home, artifact):
+    cfg3 = tmp_path / "three.json"
+    cfg3.write_bytes(CANON3)
+    for name in ("echo", "fetch", "time"):
+        inst.install(cfg3, name, artifact=artifact, home=home)
+
+    steps = [inst.uninstall(cfg3, name, home=home) for name in ("echo", "fetch", "time")]
+
+    assert read(cfg3) == CANON3
+    assert [r.byte_exact for r in steps] == [False, False, True]
+    assert steps[2].earlier is True
 
 
 def test_fifo_first_uninstall_still_warns_while_the_other_wrapper_is_in_the_file(
@@ -203,7 +225,22 @@ def test_cli_fifo_never_prints_changed_when_the_end_state_is_the_original(
     assert read(project / ".mcp.json") == CANON
     assert WARNING not in out[3]
     assert CHANGED not in out[3]
-    assert "byte-identical" in out[3]
+    assert EARLIER in out[3]
+
+
+def test_cli_three_installs_undone_first_installed_first_name_the_earlier_original(
+        tmp_path):
+    work = tmp_path / "work3"
+    work.mkdir()
+    (work / ".mcp.json").write_bytes(CANON3)
+    out = _run(work, tmp_path / "h", ("install", "echo"), ("install", "fetch"),
+               ("install", "time"), ("uninstall", "echo"), ("uninstall", "fetch"),
+               ("uninstall", "time"))
+
+    assert read(work / ".mcp.json") == CANON3
+    assert EARLIER not in out[3] and EARLIER not in out[4]
+    assert EARLIER in out[5]
+    assert WARNING not in out[5]
 
 
 def test_cli_control_a_foreign_edit_still_prints_the_warning(project, tmp_path):
