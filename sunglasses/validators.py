@@ -107,7 +107,7 @@ import json
 import re
 import urllib.parse
 
-__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
+__all__ = ["CredentialFileUpload", "HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
 
 # ----------------------------------------------------------------------------- JSON side
 
@@ -1537,4 +1537,397 @@ class SettingsWithoutPrompts:
         return findings
 
 
-VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts())
+# ------------------------------------------------------------------------- upload side
+
+# A credential file is named by its own file name, never by a directory above it. The words
+# below are whole tokens of that name (split at `.`, `_` and `-`), so `secretsauce` is not one.
+_CREDENTIAL_TOKENS = frozenset(("credential", "credentials", "secret", "secrets", "apikey", "apikeys"))
+_CREDENTIAL_PAIRS = frozenset((("api", "key"), ("api", "keys"), ("private", "key"), ("private", "keys")))
+_PRIVATE_KEYS = frozenset(("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk"))
+_CREDENTIAL_FILES = frozenset((".netrc", "_netrc", ".pgpass", ".npmrc", ".pypirc", ".dockercfg", ".htpasswd"))
+_KEY_EXTENSIONS = frozenset(("key", "p12", "pfx", "ppk", "jks", "keystore"))
+_PEM_WORDS = frozenset(("private", "priv", "privkey", "key", "secret"))
+# A name that says it is a document or a stand-in. `test`, `local`, `prod`, `live` and
+# `backup` are not here: `.env.test` can hold working credentials.
+_PUBLIC_TOKENS = frozenset((
+    "example", "examples", "sample", "samples", "template", "templates", "fixture", "fixtures",
+    "schema", "schemas", "reference", "manual", "doc", "docs", "documentation", "mock", "mocks",
+    "public", "report", "reports", "audit", "audits", "release", "releases", "final", "spec", "specs",
+    "guide", "guides", "manuals", "references", "dist"))
+# A public word followed by one of these still names a working file: `.env.example.local`.
+_LIVE_TOKENS = frozenset(("test", "local", "prod", "production", "live", "backup", "dev", "staging"))
+_DOCUMENT_EXTENSIONS = frozenset(("md", "markdown", "rst", "adoc", "html", "htm"))
+_DATA_EXTENSIONS = frozenset(("txt", "csv", "tsv", "json", "yaml", "yml"))
+_READERS = frozenset(("cat", "tac", "head", "tail", "base64", "gzip", "bzip2", "xz", "zstd", "xxd", "od",
+                      "strings", "openssl"))
+_DOC_MARKER = re.compile(
+    r"\b(?:never|do not|don't|dont|must not|forbidden|avoid|unsafe|insecure|wrong|dangerous|example)\b", re.I)
+_UPLOAD_NAME = re.compile(r"curl|wget")
+_CONTINUATION = re.compile(r"\\\r?\n")
+_FORM_FILE = re.compile(r"[^=]*=([@<])([^;]*)")
+_URLENCODE_FILE = re.compile(r"[^=@]*@(.*)\Z", re.S)
+_PROSE_END = (":", ".", ",", ";", "!")
+_MAX_UPLOAD_FINDINGS = 50
+_MAX_PIPE_BACK = 8
+_CREDENTIAL_HINTS = ("env", "cred", "secret", "key", "id_", "netrc", "pgpass", "npmrc", "pypirc",
+                     "dockercfg", "htpasswd", "pem", "p12", "pfx", "ppk", "jks")
+
+
+def _says_public(tokens):
+    """A public word in the name, with no live word after it."""
+    for index, token in enumerate(tokens):
+        if token in _PUBLIC_TOKENS:
+            return not any(later in _LIVE_TOKENS for later in tokens[index + 1:])
+    return False
+
+
+def _credential_name(path):
+    """Is the file's own name that of a credential file, and not of a document about one?"""
+    base = path.rstrip("/").rsplit("/", 1)[-1].lower()
+    if not base or base in (".", ".."):
+        return False
+    tokens = [t for t in re.split(r"[._\-\s]+", base) if t]
+    if not tokens:
+        return False
+    stem, dot, ext = base.rpartition(".")
+    ext = ext if dot and stem else ""
+    environment = base == ".env" or base.startswith(".env.") or (ext == "env" and stem)
+    if environment:
+        return not _says_public(tokens)
+    if base in _PRIVATE_KEYS or base in _CREDENTIAL_FILES:
+        return True
+    if ext in _KEY_EXTENSIONS:
+        return True
+    if ext == "pem":
+        return any(t in _PEM_WORDS for t in tokens) or base.startswith("id_")
+    named = any(t in _CREDENTIAL_TOKENS for t in tokens) \
+        or any(pair in _CREDENTIAL_PAIRS for pair in zip(tokens, tokens[1:]))
+    if not named:
+        return False
+    if ext in _DOCUMENT_EXTENSIONS:
+        return False
+    if ext in _DATA_EXTENSIONS and _says_public(tokens):
+        return False
+    return True
+
+
+def _upload_operands(program, args):
+    """[(kind, value)] for the words of a curl / wget command that carry the payload.
+
+    kind is "file" (a file named by the word), "stdin" (`@-` or `-` read from standard input)
+    or "subst" (the body of a substitution inside a data word). `--data-raw` takes its text
+    literally, so an `@` there names nothing; a substitution in it is still expanded first."""
+    curl = program == "curl"
+    out = []
+    long_value = _CURL_LONG_VALUE if curl else _WGET_LONG_VALUE
+    short_value = _CURL_SHORT_VALUE if curl else _WGET_SHORT_VALUE
+    data_long = ("--data", "--data-ascii", "--data-binary", "--data-raw", "--json", "--data-urlencode")
+    file_long = ("--upload-file",) if curl else ("--post-file", "--body-file")
+
+    def operand(name, value, word):
+        if name in file_long or name == "-T":
+            out.append(("stdin", None) if value == "-" and curl else ("file", value))
+        elif name in ("--form", "-F"):
+            match = _FORM_FILE.match(value)
+            if match:
+                out.append(("stdin", None) if match.group(2) == "-" else ("file", match.group(2)))
+        elif name == "--data-urlencode":
+            match = _URLENCODE_FILE.match(value)
+            if match:
+                out.append(("stdin", None) if match.group(1) == "-" else ("file", match.group(1)))
+        elif name != "--data-raw" and name in data_long + ("-d",) and value.startswith("@"):
+            out.append(("stdin", None) if value == "@-" else ("file", value[1:]))
+        if name in data_long or name in ("-d", "-F", "--form"):
+            for body in word.subs:
+                out.append(("subst", body))
+
+    i = 0
+    n = len(args)
+    while i < n:
+        arg = args[i]
+        i += 1
+        if arg.kind != "w":
+            continue
+        value = arg.value
+        if value == "--":
+            break
+        if value.startswith("--") and len(value) > 2:
+            name, eq, rest = value.partition("=")
+            if name in data_long + ("--form",) + file_long and (curl or name in file_long):
+                if eq:
+                    operand(name, rest, arg)
+                elif i < n and args[i].kind == "w":
+                    operand(name, args[i].value, args[i])
+                    i += 1
+            elif name in long_value and not eq:
+                i += 1
+            continue
+        if curl and len(value) > 1 and value[0] == "-":
+            j = 1
+            while j < len(value):
+                ch = value[j]
+                if ch in short_value:
+                    rest = value[j + 1:]
+                    if ch in "dFT":
+                        if rest:
+                            operand("-" + ch, rest, arg)
+                        elif i < n and args[i].kind == "w":
+                            operand("-" + ch, args[i].value, args[i])
+                            i += 1
+                    elif not rest:
+                        i += 1
+                    break
+                j += 1
+    return out
+
+
+def _reads_of(segment):
+    """What one segment reads: "file" for a credential file, "environment" for the whole
+    environment, else None. Its own redirection from a file counts as a read of that file."""
+    redirect = _stdin_redirect(segment)
+    if redirect is not None and redirect[0] == "<" and redirect[1] is not None \
+            and redirect[1].kind == "w" and _credential_name(redirect[1].value):
+        return "file"
+    if _dumps_environment(segment.words):
+        return "environment"
+    located = _locate(segment.words, _PRODUCERS)
+    if located is None:
+        return None
+    head, args = located
+    name = _base(head.value)
+    operands = [a.value for a in args if a.kind == "w" and not a.value.startswith("-")
+                and not a.value.isdigit()]
+    if name in ("env", "printenv") and not operands:
+        return "environment"
+    if (name in _READERS or name in _FILTERS) and any(_credential_name(o) for o in operands):
+        return "file"
+    return None
+
+
+def _substitution_reads(body):
+    try:
+        segments = _segments(_lex(body))
+    except (_Syntax, RecursionError):
+        return None
+    for segment in segments:
+        found = _reads_of(segment)
+        if found:
+            return found
+    return None
+
+
+def _stdin_reads(segments, index):
+    """What the segment's standard input carries: a redirection replaces the pipe; otherwise
+    walk back through the pipe, past readers that were given no file of their own."""
+    segment = segments[index]
+    redirect = _stdin_redirect(segment)
+    if redirect is not None:
+        op, target = redirect
+        if op == "<" and target is not None and target.kind == "w" and _credential_name(target.value):
+            return "file"
+        return None
+    steps = 0
+    while index > 0 and segments[index].sep_before in ("|", "|&") and steps < _MAX_PIPE_BACK:
+        index -= 1
+        steps += 1
+        producer = segments[index]
+        if _dumps_environment(producer.words):
+            return "environment"
+        located = _locate(producer.words, _PRODUCERS)
+        if located is None:
+            return None
+        head, args = located
+        name = _base(head.value)
+        operands = [a.value for a in args if a.kind == "w" and not a.value.startswith("-")
+                    and not a.value.isdigit()]
+        if name in ("env", "printenv") and not operands:
+            return "environment"
+        if name not in _READERS and name not in _FILTERS:
+            return None
+        own = _stdin_redirect(producer)
+        if own is not None and own[0] == "<" and own[1] is not None and own[1].kind == "w":
+            return "file" if _credential_name(own[1].value) else None
+        if any(_credential_name(o) for o in operands):
+            return "file"
+        if name in _READERS and operands:
+            return None
+    return None
+
+
+def _upload_evidence(segments, index, name, args, depth):
+    found = []
+    for kind, value in _upload_operands(name, args):
+        if kind == "file":
+            if _credential_name(value):
+                found.append({"program": name, "carrier": "file operand", "source": "file",
+                              "file": value.rstrip("/").rsplit("/", 1)[-1][:60]})
+        elif kind == "stdin":
+            source = _stdin_reads(segments, index)
+            if source:
+                found.append({"program": name, "carrier": "standard input", "source": source})
+        elif kind == "subst":
+            source = _substitution_reads(value)
+            if source:
+                found.append({"program": name, "carrier": "read substitution", "source": source})
+    return found
+
+
+def _dumps_environment(words):
+    """`env` or `printenv` alone (options allowed): the whole environment goes to the output.
+    `env` is also a wrapper word, so a command that holds no program is looked at here."""
+    if not words or words[0].kind != "w" or _base(words[0].value) not in ("env", "printenv"):
+        return False
+    return all(w.kind == "w" and w.value.startswith("-") for w in words[1:])
+
+
+_UPLOADERS = ("curl", "wget")
+# Programs that pass what they read on standard input along, changed: a credential file
+# piped through one of them still reaches the next stage. Which of their words is a file and
+# which is a pattern is not read; a file of their own named by a redirection is.
+_FILTERS = frozenset(("tr", "sed", "awk", "cut", "grep", "egrep", "fgrep", "sort", "uniq", "tee", "rev",
+                      "fold", "nl", "column", "expand", "unexpand"))
+_PRODUCERS = _READERS | _FILTERS | frozenset(("env", "printenv"))
+
+
+def _locate(words, names):
+    """(program word, argument words) of the first command among ``names`` that a segment
+    starts: its own program, or one that follows prose or a prompt on the same line
+    (`Run this: curl ...`, `$ curl ...`)."""
+    located = _program(words)
+    if located is not None and _base(located[0].value) in names:
+        return located
+    for k in range(1, len(words)):
+        prev, word = words[k - 1], words[k]
+        if prev.kind != "w" or word.kind != "w":
+            continue
+        if not (prev.value.endswith(_PROSE_END) or prev.value == "$"):
+            continue
+        if _base(word.value) in names:
+            inner = _program(words[k:])
+            if inner is not None and _base(inner[0].value) in names:
+                return inner
+    return None
+
+
+def _scan_upload_segments(segments, depth):
+    found = []
+    for index, segment in enumerate(segments):
+        started = _locate(segment.words, _UPLOADERS)
+        if started is not None:
+            found.extend(_upload_evidence(segments, index, _base(started[0].value), started[1], depth))
+        for word in segment.words:
+            if word.kind == "w" and word.subs and depth < _MAX_NESTED_COMMANDS:
+                for body in word.subs:
+                    found.extend(_scan_upload_text(body, depth + 1))
+        located = _program(segment.words)
+        if located is not None and depth < _MAX_NESTED_COMMANDS:
+            head, args = located
+            name = _base(head.value)
+            if name in _SHELLS:
+                run = _run_shell(args)
+                if run.mode == "inline" and run.inline is not None and run.inline.kind == "w":
+                    found.extend(_scan_upload_text(run.inline.value, depth + 1))
+            elif name == "eval" and args and args[0].kind == "w":
+                found.extend(_scan_upload_text(args[0].value, depth + 1))
+        if len(found) >= _MAX_UPLOAD_FINDINGS:
+            break
+    return found
+
+
+def _scan_upload_text(line, depth):
+    try:
+        segments = _segments(_lex(line))
+    except (_Syntax, RecursionError):
+        match = _UPLOAD_NAME.search(line)
+        if match is None:
+            return []
+        try:
+            segments = _segments(_lex(line[match.start():]))
+        except (_Syntax, RecursionError):
+            return []
+    try:
+        return _scan_upload_segments(segments, depth)
+    except RecursionError:
+        return []
+
+
+_CODE_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^\n]*)$", re.M)
+
+
+def _upload_segments(text, channel):
+    """[(segment, fenced)]: a real code fence (three or more backticks or tildes opening a line,
+    closed by the same character) of a prose text is its own segment. The `code` channel is
+    source and is never split."""
+    if channel == "code" or ("```" not in text and "~~~" not in text):
+        return [(text, False)]
+    out = []
+    cursor = 0
+    opened = None
+    for m in _CODE_FENCE.finditer(text):
+        ticks, info = m.group(1), m.group(2)
+        if opened is None:
+            if ticks[0] == "`" and "`" in info:
+                continue
+            opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)))
+            out.append((text[cursor:m.start()], False))
+        elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
+            out.append((text[opened[2]:m.start()], True))
+            cursor = min(m.end() + 1, len(text))
+            opened = None
+    out.append((text[cursor:], False) if opened is None else (text[opened[2]:], True))
+    return out
+
+
+class CredentialFileUpload:
+    """GLS-STRUCT-003: a curl or wget command sends a credential file or the whole environment."""
+
+    id = "GLS-STRUCT-003"
+    name = "Command uploads a credential file"
+    category = "exfiltration"
+    severity = "high"
+    channel = ["message", "file", "code", "tool_output", "web_content"]
+    description = ("A curl or wget command in this text reads as one that sends a credential file, "
+                   "or the whole environment, to a remote address: the payload word names the file "
+                   "or reads standard input that carries it. A command shown as a forbidden example "
+                   "is a notice, not a verdict.")
+
+    def pregate(self, text):
+        if "curl" not in text and "wget" not in text:
+            return False
+        lowered = text.lower()
+        return any(hint in lowered for hint in _CREDENTIAL_HINTS)
+
+    reads_channel = True
+
+    def run(self, text, channel=None):
+        findings = []
+        seen = set()
+        for segment, fenced in _upload_segments(text, channel):
+            for line in _CONTINUATION.sub(" ", segment).split("\n"):
+                if "curl" not in line and "wget" not in line:
+                    continue
+                first = _UPLOAD_NAME.search(line)
+                marked = fenced or bool(first and _DOC_MARKER.search(line[:first.start()]))
+                for evidence in _scan_upload_text(line, 0):
+                    key = (line, marked, tuple(sorted(evidence.items())))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    label = evidence["program"] + " " + evidence["carrier"]
+                    findings.append({
+                        "id": self.id,
+                        "name": self.name,
+                        "category": self.category,
+                        "severity": "low" if marked else self.severity,
+                        "channel": list(self.channel),
+                        "description": self.description,
+                        "matched_text": label[:50],
+                        "structural": True,
+                        "evidence": evidence,
+                    })
+                if len(findings) >= _MAX_UPLOAD_FINDINGS:
+                    return findings
+        return findings
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), CredentialFileUpload())
