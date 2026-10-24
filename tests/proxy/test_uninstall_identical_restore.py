@@ -5,7 +5,6 @@ Two wraps on one file, uninstalled first-installed-first (FIFO), put the file
 back byte for byte, and each uninstall still printed "file not byte-identical:
 it changed after the install". The second of those is a false statement to the
 user: the file in front of them is exactly what they had before either install.
-Measured on main dd3dedd by T8 (t9-fable:3646).
 
 The first FIFO uninstall keeps its warning, and a row below pins that: at that
 moment the second install's wrapper is still in the file, so the file really is
@@ -223,6 +222,7 @@ def test_cli_fifo_never_prints_changed_when_the_end_state_is_the_original(
                ("uninstall", "echo"), ("uninstall", "fetch"))
 
     assert read(project / ".mcp.json") == CANON
+    assert "Restored 'fetch'" in out[3]
     assert WARNING not in out[3]
     assert CHANGED not in out[3]
     assert EARLIER in out[3]
@@ -239,6 +239,7 @@ def test_cli_three_installs_undone_first_installed_first_name_the_earlier_origin
 
     assert read(work / ".mcp.json") == CANON3
     assert EARLIER not in out[3] and EARLIER not in out[4]
+    assert "Restored 'time'" in out[5]
     assert EARLIER in out[5]
     assert WARNING not in out[5]
 
@@ -252,6 +253,7 @@ def test_cli_control_a_foreign_edit_still_prints_the_warning(project, tmp_path):
     assert read(project / ".mcp.json") != CANON
     assert WARNING in out[1]
     assert CHANGED in out[1]
+    assert all(EARLIER not in printed for printed in out)
 
 
 def test_cli_lifo_and_single_wrap_wording_is_unchanged(project, tmp_path):
@@ -310,3 +312,39 @@ def test_a_carried_list_with_one_bad_entry_is_not_read_at_all():
     assert inst._earlier_of({"earlier_sha_before": [good, 5]}) == ()
     assert inst._earlier_of({"earlier_sha_before": good}) == ()
     assert inst._earlier_of({}) == ()
+
+
+# ------------------------------------------------ deeper stacks and bad records
+
+def test_four_installs_undone_first_installed_first_end_at_the_first_original(
+        tmp_path, home, artifact):
+    names = ("echo", "fetch", "time", "fourth")
+    original = (json.dumps({"mcpServers": {
+        n: {"command": n + "-server", "args": ["--stdio"]} for n in names}},
+        indent=2) + "\n").encode("utf-8")
+    cfg4 = tmp_path / "four.json"
+    cfg4.write_bytes(original)
+    for name in names:
+        inst.install(cfg4, name, artifact=artifact, home=home)
+
+    steps = [inst.uninstall(cfg4, name, home=home) for name in names]
+
+    assert read(cfg4) == original
+    assert [r.byte_exact for r in steps] == [False, False, False, True]
+    assert [r.earlier for r in steps] == [False, False, False, True]
+
+
+def test_an_unreadable_earlier_digest_list_does_not_override_the_own_original(
+        cfg, home, artifact):
+    inst.install(cfg, "echo", artifact=artifact, home=home)
+    rec = pathlib.Path(home) / "proxy" / "installs" / "echo.json"
+    body = json.loads(rec.read_text(encoding="utf-8"))
+    body["earlier_sha_before"] = "not a list"
+    rec.write_text(json.dumps(body, indent=2), encoding="utf-8")
+    cfg.write_bytes(json.dumps(json.loads(read(cfg)), indent=4).encode("utf-8"))
+
+    res = inst.uninstall(cfg, "echo", home=home)
+
+    assert read(cfg) == CANON
+    assert res.byte_exact is True
+    assert res.earlier is False
