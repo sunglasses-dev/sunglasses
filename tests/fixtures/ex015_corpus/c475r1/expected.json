@@ -1,122 +1,82 @@
 {
  "ordinary__b13.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b14.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b15.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b16.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b17.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b18.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b19.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__b20.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b01.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b02.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b03.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b04.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b05.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b06.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b07.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b08.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b09.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b10.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b11.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "relay__b12.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  }
 }

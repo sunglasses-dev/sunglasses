@@ -1,96 +1,90 @@
 {
  "ordinary__ci_secret_docs.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__ci_secret_names.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__credential_helper_docs.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__credential_helper_reference.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__dotenv_keys_only.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__dotenv_readme_local.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__dotenv_readme_reference.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__env_example_basename.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__env_example_walkthrough.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__offline_dotenv_form.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__password_field_form.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__secret_reference_heading.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__secrets_manager_name.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__secrets_manager_reference.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__ssh_filename_only.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__ssh_setup_fingerprint.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__ssh_setup_public.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-SC-002"
-  ]
+  "ex015": false
  },
  "ordinary__tool_config_descriptor.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__new_relay_argument.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__new_relay_contents_first.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__new_relay_named_arg.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__new_relay_url.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  }
 }

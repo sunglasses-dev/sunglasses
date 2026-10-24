@@ -2,8 +2,10 @@
 gets today.
 
 `tests/fixtures/ex015_corpus/<packet>/<kind>__<case>` is the text; `<packet>/expected.json` holds
-the decision and the rule ids the engine returns for it on the `file` channel. `<kind>` is the label
-the case carried when it was written (`relay` or `ordinary`), kept in the id; it is not asserted.
+the decision the engine returns for it on the `file` channel and whether GLS-EX-015 is among the
+findings. Other rules are not pinned, so a new pattern that fires on one of these texts does not move
+an answer here. `<kind>` is the label the case carried when it was written (`relay` or `ordinary`),
+kept in the id; it is not asserted.
 
 A change to the EX-015 rule moves some of these answers. Run the file before pushing, read which
 cases moved, and when each move is intended regenerate the expected files:
@@ -34,7 +36,7 @@ def _text(packet, case):
 
 def _answer(engine, text):
     result = engine.scan(text, channel="file")
-    return {"decision": result.decision, "ids": sorted({f["id"] for f in result.findings})}
+    return {"decision": result.decision, "ex015": any(f["id"] == "GLS-EX-015" for f in result.findings)}
 
 
 def _expected(packet):

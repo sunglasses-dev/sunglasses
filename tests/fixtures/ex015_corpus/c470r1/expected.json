@@ -1,30 +1,26 @@
 {
  "ordinary__old_sink_substring.txt": {
   "decision": "block",
-  "ids": [
-   "GLS-EX-015"
-  ]
+  "ex015": true
  },
  "ordinary__ordinary_docs.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__ordinary_input.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "ordinary__plain_query.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__tool_nosig_description.txt": {
   "decision": "allow",
-  "ids": []
+  "ex015": false
  },
  "relay__tool_v2_description.txt": {
   "decision": "quarantine",
-  "ids": [
-   "GLS-TP-003"
-  ]
+  "ex015": false
  }
 }
