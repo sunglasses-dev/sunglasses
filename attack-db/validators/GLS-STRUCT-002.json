@@ -1,0 +1,18 @@
+{
+  "id": "GLS-STRUCT-002",
+  "name": "Code sends the whole process environment to an HTTP client",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "exfiltration",
+  "severity": "high",
+  "channel": [
+    "file",
+    "code",
+    "tool_output",
+    "message",
+    "web_content"
+  ],
+  "description": "Python or Node source in which the whole process environment is an argument that an HTTP client call sends: every variable the process holds, including tokens and keys, leaves the machine in one request.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-002"
+}
