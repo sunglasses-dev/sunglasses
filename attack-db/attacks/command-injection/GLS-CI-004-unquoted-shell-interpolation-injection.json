@@ -30,7 +30,7 @@
     "os\\.system\\s*\\(\\s*f['\\\"]",
     "subprocess\\.(?:call|run|Popen)\\s*\\(\\s*f['\\\"]",
     "os\\.popen\\s*\\(\\s*f['\\\"]",
-    "subprocess\\.(?:call|run|Popen)\\s*\\(.*shell\\s*=\\s*True"
+    "subprocess\\.(?:call|run|Popen)\\s*\\(.{0,1000}shell\\s*=\\s*True"
   ],
   "examples": {
     "malicious": [],

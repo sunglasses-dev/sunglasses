@@ -26,8 +26,8 @@
   ],
   "regex": [
     "(?:\\.\\./){2,}",
-    "(?:load_prompt|load_template|read_file|open)\\s*\\(.*(?:\\.\\./|\\.\\.\\\\)",
-    "os\\.path\\.join\\s*\\(.*(?:user_input|request\\.|params\\[|args\\[)"
+    "(?:load_prompt|load_template|read_file|open)\\s*\\(.{0,1000}(?:\\.\\./|\\.\\.\\\\)",
+    "os\\.path\\.join\\s*\\(.{0,1000}(?:user_input|request\\.|params\\[|args\\[)"
   ],
   "examples": {
     "malicious": [],
