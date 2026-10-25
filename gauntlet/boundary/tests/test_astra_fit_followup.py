@@ -39,7 +39,7 @@ def test_paired_g2_04_exact_transport_calibration():
         reply=[json.loads(x) for x in p.stdout.splitlines()]
         events=[json.loads(x) for x in (directory/'proxy.receipts.jsonl').read_bytes().splitlines()] if route=='proxy_strict' else []
         upstreamfile=directory/'upstream.ingress.jsonl'
-        results[route]={'exit':p.returncode,'request_sha256':digest(raw),
+        results[route]={'exit':p.returncode,'request_sha256':digest(raw),'request_id':request['id'],
                          'content_bytes':len(request['params']['arguments']['content'].encode()),
                          'destination':receipt,'responses':reply,
                          'upstream_bytes':upstreamfile.stat().st_size if upstreamfile.exists() else 0,
@@ -49,9 +49,38 @@ def test_paired_g2_04_exact_transport_calibration():
     assert results['control']['destination']['deliveries'][0]['body_len']==21
     assert results['proxy_strict']['destination']['nothing_arrived']
     assert results['proxy_strict']['upstream_bytes']==0
-    err=results['proxy_strict']['responses'][0]['error']['data']
-    assert err['reason_code']==proxy.PROHIBITED_SECRET,'CALIBRATION_CANONICAL_REASON'
-    assert err['inspection_complete'] is True,'CALIBRATION_COMPLETE_FINDING'
+    proxied=results['proxy_strict']
+    # The client gets one reply, to its request, and it is the withholding
+    # error: no result is delivered with it or after it.
+    assert len(proxied['responses'])==1,'CALIBRATION_ONE_REPLY'
+    answer=proxied['responses'][0]
+    assert answer.get('id')==proxied['request_id'] and 'result' not in answer,'CALIBRATION_REPLY_IS_ERROR'
+    assert answer['error']['code']==proxy.GATE2_WITHHELD_CODE,'CALIBRATION_WITHHELD_CODE'
+    assert answer['error']['message']==proxy.GATE2_WITHHELD,'CALIBRATION_WITHHELD_MESSAGE'
+    err=answer['error']['data']
+    terminal=proxied['terminal']
+    assert len(terminal)==1 and isinstance(terminal[0]['terminated'],bool),'CALIBRATION_TERMINAL_RECEIPT'
+    settled=terminal[0]
+    assert settled['request_id']==proxied['request_id'] and settled['forwarded'] is False,'CALIBRATION_TERMINAL_REQUEST'
+    # The receipt and the reply state the same reason and completeness.
+    assert settled['reason']==err['reason_code'],'CALIBRATION_RECEIPT_REASON'
+    assert settled['inspection_complete']==err['inspection_complete'],'CALIBRATION_RECEIPT_COMPLETE'
+    # The deadline clock starts when the proxy begins the scan of the request,
+    # after its content has been extracted, and covers starting the worker and
+    # waiting for it. A worker still running when the wait ends is terminated:
+    # the receipt says SCAN_DEADLINE, an incomplete inspection and no finding.
+    # A worker that exited inside the wait and returned a complete result
+    # settles the finding it made. Either way the reply is the withholding
+    # error and nothing reached the destination.
+    if settled['terminated']:
+        assert err['reason_code']==proxy.SCAN_DEADLINE,'CALIBRATION_DEADLINE_REASON'
+        assert err['inspection_complete'] is False,'CALIBRATION_DEADLINE_INCOMPLETE'
+        assert settled['finding'] is False and not settled.get('detector'),'CALIBRATION_DEADLINE_FINDING'
+    else:
+        assert err['reason_code']==proxy.PROHIBITED_SECRET,'CALIBRATION_CANONICAL_REASON'
+        assert err['inspection_complete'] is True,'CALIBRATION_COMPLETE_FINDING'
+        assert settled['finding'] is True and settled['detector']['blocked'] is True,'CALIBRATION_FOUND_BLOCKED'
+        assert any(str(r).startswith('GLS-SD-') for r in settled['detector']['rule_ids']),'CALIBRATION_FOUND_SECRET_RULE'
 
 def test_r2_batch_fault_selection_matches_variants():
     data=[]
