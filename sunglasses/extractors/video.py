@@ -172,7 +172,7 @@ class VideoExtractor:
                         pass
 
         except Exception as exc:
-            # v0.5.6 round 4: this `pass` made "no subtitle tracks" and "we could
+            # A bare `pass` here would make "no subtitle tracks" and "we could
             # not read the subtitle tracks" the same answer. Subtitles are a
             # first-class injection surface; losing them silently is a false clean.
             self.warnings.append(
@@ -279,7 +279,7 @@ def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dic
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # Invariant B (round 3). A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -289,7 +289,7 @@ def scan_video(video_path: str, engine=None, whisper_model: str = "base") -> dic
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
     # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # round 3. Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:

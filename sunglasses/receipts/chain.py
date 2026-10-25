@@ -127,7 +127,7 @@ class Chain:
         return self._open_segment(previous=tail)
 
     def _segments(self):
-        return _fs.listing(self._dir, SEGMENT_GLOB)   # R56: raises, never "no tail"
+        return _fs.listing(self._dir, SEGMENT_GLOB)   # raises, never "no tail"
 
     def _read_tail(self) -> _Tail | None:
         segments = self._segments()
@@ -207,7 +207,7 @@ class Chain:
         opened = dataclasses.replace(empty, seq=0, head=wire.record_hash(line),
                                      size=len(line), unsigned=1)
         pieces, _ = self._plan(opened, [], GENESIS)
-        # R62 B: the marker first. No segment is begun that its marker could not
+        # The marker first. No segment is begun that its marker could not
         # name, and a marker this call made for a segment that was not begun
         # is taken back, so the next call tries again from where this one began.
         made = self._marker is not None and self._mark(genesis)

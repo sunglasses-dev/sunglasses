@@ -343,7 +343,7 @@ def is_placeholder(token: str, rule: "SecretRule | None" = None) -> bool:
     claimed = False
     for segment in body:
         # Words compare in lowercase; SHAPE is measured on the segment exactly
-        # as it arrived. Mixing those two is R1b.
+        # as it arrived; mixing those two is a bug.
         low = segment.lower()
         if low in words or _is_filler(segment):
             claimed = True
@@ -1814,7 +1814,7 @@ class _HookReceipts:
     def __init__(self, home):
         self.home = home
         # R21: a deleted key is not `receipts off`. A hook chain that the off
-        # record has not ended still means the user opted in. R56: a key or
+        # record has not ended still means the user opted in. A key or
         # chain directory that cannot be listed raises here, never reads as
         # "not opted in", and run_hook's guard asks, naming the cause. With
         # neither directory there, nothing of the receipts package loads.
@@ -1832,7 +1832,7 @@ class _HookReceipts:
             signer = optin.signer(self.home)
             from .receipts import chain
             # One writer for both records: its in-memory note of the opening
-            # it wrote is what lets the close seal it (R15d).
+            # it wrote is what lets the close seal it.
             self._chain = chain.Chain(self.home / "receipts" / "hook",
                                       signer, producer="hook",
                                       marker=optin.hook_marker(self.home))
@@ -2428,18 +2428,18 @@ def _receipts_unwritable(decision, error, receipts, exc):
             check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
     from .receipts import _fs
     if isinstance(exc, _fs.Unlistable):
-        # R56: which directory, and that it could not be listed, not "empty".
+        # which directory, and that it could not be listed, not "empty".
         check = (f"A receipts directory {exc}, and a signed log never turns "
                  f"unsigned on a guess. Fix its permissions (chmod 700).")
         if getattr(exc, "blocked_by", None) is not None:
-            # R62: the thing in the way is what to fix, not the path under it.
+            # the thing in the way is what to fix, not the path under it.
             from .receipts._shown import shown_path
             check = (f"A receipts directory {exc}, and a signed log never "
                      f"turns unsigned on a guess. Fix it: make "
                      f"{shown_path(exc.blocked_by)[0]} a directory, chmod 700.")
     from .receipts import chain as _chain
     if isinstance(exc, _chain.MarkerUnwritable):
-        # R62 B: which marker, why, and that the next call tries again.
+        # Which marker, why, and that the next call tries again.
         check = (f"The hook log's marker {exc}, and no signed log is begun "
                  f"without it. Fix ~/.sunglasses/keys (chmod 700) or free disk "
                  f"space; the next call tries again.")

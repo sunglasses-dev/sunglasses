@@ -366,7 +366,7 @@ class LogReport:
     first_failure_segment: str | None = None
     failure_detail: str | None = None
     fingerprint: str | None = None
-    authority_transitions: int = 0       # R120: APPROVAL_INVALIDATED, verified
+    authority_transitions: int = 0       # APPROVAL_INVALIDATED, verified
 
 
 def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
@@ -376,7 +376,7 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
     checkpoint. `expected_endpoint` may carry `chain_id` to say which segment
     it was retained from."""
     import pathlib
-    paths = _fs.listing(pathlib.Path(directory), SEGMENT_GLOB)   # R57: raises
+    paths = _fs.listing(pathlib.Path(directory), SEGMENT_GLOB)   # raises
     walks = [(p.name, _verify(p.read_bytes(), public_key, expected_fingerprint, None))
              for p in paths]
     fingerprint = wire.key_fingerprint(public_key)

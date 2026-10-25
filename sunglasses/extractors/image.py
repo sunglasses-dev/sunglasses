@@ -608,7 +608,7 @@ class ImageExtractor:
             try:
                 # Snapshot AT this position. The iterator hands back the shared
                 # object, so anything that defers the actual read until after the
-                # next `seek` would read the wrong frame -- which is J1 exactly.
+                # next `seek` would read the wrong frame -- which is wrong.
                 target = frame.convert("RGB")
             except Exception as exc:
                 self.failures.append(
@@ -1397,7 +1397,7 @@ def scan_image(image_path: str, engine=None) -> dict:
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # Invariant B (round 3). A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -1407,7 +1407,7 @@ def scan_image(image_path: str, engine=None) -> dict:
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
     # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # round 3. Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:

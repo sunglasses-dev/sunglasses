@@ -71,7 +71,7 @@ class Breach:
         # prose is what receipts exclude by name. R6 has two limits under one
         # reason, so without this a receipt cannot say which one fired.
         self.bound = bound
-        # R-CLOSE-KIND. WHICH fault, for the sites that close on a breach.
+        # WHICH fault, for the sites that close on a breach.
         # Produced HERE, where the reason is produced, exactly as `framing.py`
         # and `handshake.py` produce theirs: a caller that takes the reason
         # from this object can take the kind from the same object, and a kind

@@ -154,14 +154,21 @@ class Route:
                         else inspection.trusted_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
-        # R-168-R6/F2. THE CLIENTS THIS ROUTE STILL OWES A FRAME, by id.
+        # F2. THE CLIENTS THE SESSION STILL OWES A FRAME: its `_unanswered`
+        # set, keyed by attempt token and taken one at a time by
+        # `_pay_bounded_refusals`.
         #
-        # RETIREMENT IS NOT ANSWERING, and that distinction is the finding. On
-        # the release paths the pump has already retired the record when
-        # authorisation fails, so the session has nothing owed to retain and
-        # the client -- who has received no bytes at all -- is owed an answer
-        # nobody is holding. An id leaves this set when a frame is actually
-        # WRITTEN for it, which is the only event that means answered.
+        # RETIREMENT IS NOT ANSWERING. On the release paths the pump has
+        # already retired the record when authorisation fails, so the session
+        # has nothing owed to retain and the client -- who has received no
+        # bytes at all -- is owed an answer nobody is holding. A writer takes
+        # the token before it writes, gives it back if the write fails, and
+        # confirms it final only after the bytes have moved; only that
+        # confirmation means answered.
+        #
+        # `_paying` stops re-entry while the bounded-refusal loop is active;
+        # that loop writes straight to the sink and gives an obligation back
+        # if its write fails.
         self._paying = False
         # contract row 2.6's re-list runs through this. None means no control channel is
         # wired, and a tools/list is then refused rather than forwarded: the
@@ -269,13 +276,13 @@ class Route:
         the half without it is the half that carries what a compromised server
         said.
         """
-        # R-168-R8/F3. TAKEN BEFORE THE AUTHORISATION, not cleared after the
+        # F3. TAKEN BEFORE THE AUTHORISATION, not cleared after the
         # write. The window between committing to a release and clearing the
         # id let a concurrent receipt failure pay a client whose frame was
         # already on its way, so the original AND a bounded refusal both
-        # reached it (XS15, XS16). Committing first and giving the obligation
+        # reached it. Committing first and giving the obligation
         # back if the authorisation fails leaves exactly one of the two.
-        # R-168-R9/(a). THE READER SAYS WHICH OBLIGATION THIS FRAME DISCHARGES.
+        # THE READER SAYS WHICH OBLIGATION THIS FRAME DISCHARGES.
         # Working it out from the id cannot be done any more, and that is the
         # point: an id can have two unanswered tokens at once -- a finished
         # generation whose frame never reached the sink, and a live one.
@@ -310,19 +317,18 @@ class Route:
             self._pay_bounded_refusals()
             return
         except Exception:
-            # R-168-R9. THE SINK ITSELF FAILED, and the obligation is not
+            # THE SINK ITSELF FAILED, and the obligation is not
             # discharged by an attempt to discharge it. Giving it back is the
             # same rule as the receipt path: taking is reversible until the
             # bytes have actually moved. Without this the take was permanent
-            # and a client whose write raised was owed an answer nobody held
-            # (XU03).
+            # and a client whose write raised was owed an answer nobody held.
             if owed is not None:
                 self.session.owe_again(owed)
             raise
         # IDEMPOTENT, AND THE NAME IS LOAD-BEARING. The id was taken above,
         # before the authorisation; this confirms it once the bytes have
         # actually moved, and a test control locates this exact statement
-        # by AST to pause a thread here (XS15). Deleting it turned that control
+        # by AST to pause a thread here. Deleting it turned that control
         # into a StopIteration -- an instrument broken by a change it had no
         # reason to notice, the `_handoff` signature lesson one more time.
         self._answered_for(raw, owed)
@@ -336,7 +342,7 @@ class Route:
         is the difference between a rule and a habit: a second release path
         added later inherits the check instead of forgetting it.
         """
-        # R-168-R4a. READ FROM THE SESSION, which is the one place authority
+        # READ FROM THE SESSION, which is the one place authority
         # lives and the one place it is written under a lock. A route-local
         # copy read here and written there is two sources for one fact, which
         # is how this lane spent three rounds.
@@ -408,16 +414,16 @@ class Route:
         """
         if request_id is NO_ID:
             return None
-        # R-168-R6/F1. THE ADAPTER, and the name is why it is still here. This
+        # F1. THE ADAPTER, and the name is why it is still here. This
         # attribute is wrapped by test controls and its calls are COUNTED
-        # (XE02_rederive_writer asserts exactly two), so the decision it
+        # (a test asserts exactly two), so the decision it
         # returns had to become reachable from somewhere that is not a call to
         # it -- the retirement re-derives after a writer lands during the
         # fallible frame build, which is a third derivation that may not be a
         # third gate call. The policy moved to the session, where every input
         # it reads already lives; this is not a copy of it.
         #
-        # XB04 lives there now with the rest: a recorded S3 fault is terminal
+        # That rule lives there now with the rest: a recorded S3 fault is terminal
         # and no authority overrides it, so a cancellation arriving after a
         # scan fault cannot replace SCAN_EXCEPTION on the wire while the core
         # keeps it in the receipt.
@@ -447,8 +453,8 @@ class Route:
         has just lost its log may claim.
         """
         # PURE, AND IT KEEPS ITS NAME. Test controls wrap this
-        # attribute to drive a writer during preparation (XE02_frame_cancel,
-        # XE02_rederive_writer), so it stays the thing called once per build --
+        # attribute to drive a writer during preparation (the cancel and
+        # re-derive tests), so it stays the thing called once per build --
         # but building is all it does. A superseded decision leaves no
         # trace in the receipt stream, because it is not a settlement: the item
         # settles once, `_release_record` writes that once, and a reader
@@ -599,7 +605,7 @@ class Route:
             return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
         if settlement.reason == REASON_CLEAN:
-            # contract row 2.5, CB06. The ENTIRE original, its own id and its own code.
+            # contract row 2.5. The ENTIRE original, its own id and its own code.
             # An error is a real answer and rewriting it into ours loses what
             # the server said.
             return None
@@ -787,7 +793,7 @@ class Route:
     def _client_request(self, raw, message, method):
         request_id = message["id"]
 
-        # R-179-R4. THE ATTEMPT CARRIES ITS OWN ANSWER. `refusal` is a local
+        # THE ATTEMPT CARRIES ITS OWN ANSWER. `refusal` is a local
         # in this call, so nothing else can read it and no later attempt on the
         # same id can overwrite it -- which is what three rounds of a table
         # keyed by the id kept producing.
@@ -808,7 +814,7 @@ class Route:
                 self._withhold_refusal(request_id, refusal[0] if refusal
                                        else None)
             return
-        # R-179-R5. THE ATTEMPT THIS CALL OWNS, as a LOCAL and never on the
+        # THE ATTEMPT THIS CALL OWNS, as a LOCAL and never on the
         # instance. Parking it on `self` looks equivalent and is the same bug
         # one level up: a second `client_frame` for the same id overwrites it,
         # and an older call resuming mid-write then settles the NEWER attempt's
@@ -868,7 +874,7 @@ class Route:
 
         approved_under = None
         if method == "tools/call":
-            # R111.3. Read BEFORE the approval is asked, so anything that moves
+            # Read BEFORE the approval is asked, so anything that moves
             # the approval after this point is seen at the handoff.
             approved_under = self._approval_stamp()
             blocked = self._approval_reason(message)
@@ -900,11 +906,9 @@ class Route:
         over = bounds.check_content(
             selector.content_bytes(selector.bound_surface(method, message)))
         if over:
-            # MERGE, #168 r9 onto #179. r9 wrote this refusal before the attempt
-            # existed, so it was the one `_withhold` in this method that did not
-            # thread it -- R-179-R4 reverted on r9's own new path, with nothing
-            # to notice it because `attempt` defaults to None. Found by
-            # attempt_threading_audit.py, not by the suite.
+            # This refusal (#168, #179) must pass this call's admitted
+            # attempt, so it settles the correct generation; omitting it would
+            # use the default None.
             self._withhold(request_id, over.reason, over.rule,
                            budget=over.budget, attempt=attempt)
             return
@@ -1126,13 +1130,13 @@ class Route:
             # cancel, and recording it would grow the tables below by one entry
             # for every id a peer cares to invent.
             return
-        # R-168-R4a. Accepted in the session, under ITS lock, so a reader
+        # Accepted in the session, under ITS lock, so a reader
         # parked at the handoff sees the epoch move and re-derives. The writer
         # never waits on that reader.
         deferred = self.session.accept_cancellation(target, origin=CLIENT)
         self._record("CANCEL_ACCEPTED", id_type=type(target).__name__)
         if deferred:
-            # R111.2. The call is being written upstream right now. Answering
+            # The call is being written upstream right now. Answering
             # here would tell the client "cancelled" before the bytes leave;
             # `_release` finishes this cancel once the write has returned.
             return
@@ -1140,7 +1144,7 @@ class Route:
 
     def _finish_cancel(self, target):
         if self.session.is_settling(target, origin=CLIENT):
-            # R-168-R3. The item has left `_pending` and its answer is in the
+            # The item has left `_pending` and its answer is in the
             # reader's hands, NOT the client's. Settling it here would be the
             # second answer contract row 6.1 forbids, and returning early -- which is what
             # the `expects` test below used to do -- treated it as already
@@ -1251,7 +1255,7 @@ class Route:
         if request_id is NO_ID:
             self._forward(raw, request_id, attempt)
             return
-        # R111.3. A call approved against descriptors or an approval record
+        # A call approved against descriptors or an approval record
         # that moved before this point is withheld with its one answer. The
         # record half is read here; the descriptor half is decided with the
         # claim, under the authority lock `accept_invalidation` takes.
@@ -1269,10 +1273,10 @@ class Route:
             self._withhold(request_id, REASON_DESCRIPTOR_CHANGED, RULE_APPROVAL,
                            attempt=attempt)
             return
-        # R111.2. The gate's answer was a claim. A cancel accepted while it is
+        # The gate's answer was a claim. A cancel accepted while it is
         # held was recorded and not answered; it is answered here, after the
         # write, so its answer never precedes the call it cancels.
-        # R111.2b. After the write ATTEMPT, returned or raised: a write that
+        # After the write ATTEMPT, returned or raised: a write that
         # raised has still ended, and the cancel the client sent is owed its
         # one answer either way (R66). The exception leaves as before.
         try:
@@ -1334,22 +1338,24 @@ class Route:
                        else (rule_ids or ())),
             catalog=self.catalog,
             **self._approval_hint(reason))
-        # R-168-R9/(b). TAKE, do not assume. If this obligation is already
+        # TAKE, do not assume. If this obligation is already
         # someone else's -- the payer has it, or a close drained it -- there is
         # nothing here to answer and writing anyway is the second frame.
         # `_to_client` keeps the one argument a test control stubs it with,
         # so the ownership call sits beside it rather than inside it.
-        # MERGE, #168 r9 onto #179. THE ORDER OF THE TWO REPAIRS, and getting it
-        # wrong is silent. r9's ownership take (below) returned before anything
-        # was recorded, which swallowed #179's typed refusal whole: a `_withhold`
-        # for an item nobody owns wrote NO receipt at all instead of exactly one
-        # SETTLEMENT_REFUSED, and #179's own row R5_NOATTEMPT_REFUSAL caught it.
-        # Both repairs are right; composed in the wrong order one eats the other.
+        # THE ORDER OF THE TWO REPAIRS (#168's ownership take, #179's typed
+        # refusal), and getting it wrong is silent. The ownership take (below)
+        # returns before anything is recorded, which would swallow #179's typed
+        # refusal whole: a `_withhold` for an item nobody owns would write NO
+        # receipt at all instead of exactly one SETTLEMENT_REFUSED, which
+        # #179's own row catches. Both repairs are right; composed in the wrong
+        # order one eats the other.
         #
-        # So the no-owner case is decided FIRST, because r9's gate is about a
-        # COMPETING WRITER for an obligation this attempt owns, and on this path
-        # there is no attempt to own one. The client still gets the frame #179
-        # writes here, and the receipt still says the settlement was refused.
+        # So the no-owner case is decided FIRST, because the ownership gate is
+        # about a COMPETING WRITER for an obligation this attempt owns, and on
+        # this path there is no attempt to own one. The client still gets the
+        # frame #179 writes here, and the receipt still says the settlement
+        # was refused.
         if attempt is None or attempt.request_id != request_id:
             self._to_client(body)  # to-client-exempt: nobody owns this item, so there is no obligation to take, and this branch returns before the take below
             # NO ATTEMPT, NO SETTLEMENT -- the typed refusal, verbatim from
@@ -1357,12 +1363,12 @@ class Route:
             self._record("SETTLEMENT_REFUSED", reason_code=reason, rule=rule,
                          reason="no_attempt", forwarded=False)
             return
-        # R-179-R5/(3). CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A
+        # CLAIM THE ITEM BEFORE THE ANSWER IS WRITTEN. A
         # withheld request is never forwarded, so a response carrying its id
         # is unsolicited -- but only if the item has stopped being pending by
         # the time that response arrives.
         self.session.claim_for_local_answer(attempt.token)
-        # R-179-R7/(d) + R-168-R12/(a). THE SINGLE ACQUIRE, over both sets,
+        # R-168-R12. THE SINGLE ACQUIRE, over both sets,
         # before a byte moves. It keeps the name `take_delivery` because
         # test controls hook that attribute to drive the reuse race; the
         # plumbing gives way, not the control.
@@ -1370,7 +1376,7 @@ class Route:
             return
         # Already acquired above, in the claim branch, as one operation.
         owed = attempt.token
-        # R-CLOSE-KIND-R3/(1). The cause is committed BEFORE the bytes, so a
+        # The cause is committed BEFORE the bytes, so a
         # close that wins the race while `_to_client` is paused inside the sink
         # settles this item with the cause the client was actually told. The
         # settlement itself still happens after the write, because #179's bound
@@ -1382,7 +1388,7 @@ class Route:
         # correlation table releases the id. Leaving it pending makes the next
         # legitimate use of that id look like a duplicate and closes the
         # session on the client for our own bookkeeping.
-        # R-179-R5/(2). By the OWNED token. `settle_from` recomputed the
+        # By the OWNED token. `settle_from` recomputed the
         # current generation, so an older withheld attempt resuming after a
         # newer one was admitted on the same id popped the newer entry and
         # settled ITS generation: the new request lost its debt. A stale token
@@ -1417,7 +1423,7 @@ class Route:
         anything down."""
         if request_id is NO_ID:
             return
-        # R-168-R9/(b). A DELIVERY PATH, so it takes like the others. Writing
+        # A DELIVERY PATH, so it takes like the others. Writing
         # without taking left the obligation on the books, and the payer -- run
         # by the very receipt failure this frame is reporting -- answered the
         # same request a second time (RS09). Every path that puts an answer on
@@ -1615,7 +1621,7 @@ class Route:
             return
         self._paying = True
         try:
-            # R-168-R9/(b). TAKEN ONE AT A TIME, UNDER THE OWNER, and never
+            # TAKEN ONE AT A TIME, UNDER THE OWNER, and never
             # from a snapshot. The old loop read the whole list and marked each
             # entry afterwards, so a real cancellation could answer an id while
             # this payer was paused holding a stale copy -- and the payer then
@@ -1644,7 +1650,7 @@ class Route:
                     if not confirmed:
                         # The sink failed. The obligation was taken and not
                         # discharged, so it goes back on the books rather than
-                        # vanishing with the attempt to pay it (XU05).
+                        # vanishing with the attempt to pay it.
                         self.session.owe_again(owed)
         finally:
             self._paying = False

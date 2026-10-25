@@ -1138,7 +1138,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             # zero findings behind it — but it must not leave the scan looking
             # complete either.
             files_incomplete += 1
-            # v0.5.6 round 5: this used to be a COUNT and nothing else, so the
+            # As a COUNT and nothing else, the
             # report said "Files not fully read: 1" and never which file or why —
             # while the walker's own skips were listed by name right beside it.
             # A count is not a name: a reader cannot act on "one of these is
@@ -1424,11 +1424,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
     if files_incomplete or unread_skips or folder_gaps:
-        # The banner introduces the list. Round 5: it was printed in the verdict
-        # block BELOW, so a reader met the named skips first and the header last,
-        # and a header that promises a list of what went unread has to arrive
-        # before the list. Caught by the round-5 `banner_without_named_scope`
-        # assertion on this surface.
+        # The banner introduces the list, so it is printed before it: a header
+        # that promises a list of what went unread has to arrive before the list,
+        # not after the named skips.
         _print_coverage_banner("part of this repo was not read" if kind == "repo"
                                else "part of this directory was not read")
     if files_incomplete:
@@ -2597,7 +2595,7 @@ def _receipts_off(home):
     from .receipts import optin
     try:
         done = optin.turn_off(home)
-    except (OSError, ValueError, optin.KeyUnusable) as exc:   # R57: a key dir that cannot be listed
+    except (OSError, ValueError, optin.KeyUnusable) as exc:   # a key dir that cannot be listed
         print(f"\n  {RED}Signing was NOT turned off:{RESET} "
               f"{_display(f'{type(exc).__name__}: {exc}', limit=200)}\n")
         return 1
@@ -2621,7 +2619,7 @@ def _verify_key(home):
     cause; the logs are still verified with the public key."""
     from .receipts import optin
     try:
-        # R56: a key or chain directory that cannot be listed is not "signing
+        # a key or chain directory that cannot be listed is not "signing
         # off"; whether the key can sign cannot be known, so it is said.
         if not optin.opted_in(home):
             return 0
@@ -2721,7 +2719,7 @@ def _verify_received(args):
     import pathlib
     from .receipts import _fs
     log = pathlib.Path(args.log)
-    if not _fs.listing(log, "segment-*.chain"):          # R57: raises, never "not a log"
+    if not _fs.listing(log, "segment-*.chain"):          # raises, never "not a log"
         print(f"\n  {RED}--log {_display(str(log), limit=200)}{RESET}: not a "
               f"directory of signed segments (segment-*.chain). Nothing "
               f"verified.\n")
@@ -2764,7 +2762,7 @@ def _receipt_public_key(home, keys):
     Raw 32 bytes, or None. Never trusted on its own: see --fingerprint."""
     from .receipts import _fs
     public_dir = home / keys.KEY_DIR / keys.PUBLIC_DIR
-    candidates = _fs.listing(public_dir, "*.pub")      # R57: raises, never "no key"
+    candidates = _fs.listing(public_dir, "*.pub")      # raises, never "no key"
     private = keys.private_path(home)
     if private is not None:
         prefix = private.stem.split("-", 1)[-1]
@@ -2920,7 +2918,7 @@ def cmd_receipts(args):
                   f"Run `sunglasses init` to install the firewall.{RESET}\n")
             return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
 
-        # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+        # L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
         # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
         # and can find an interpreter with no sunglasses installed. But it means a
         # recreated venv or an upgraded python leaves a hook that cannot start, and that
@@ -2995,7 +2993,7 @@ def cmd_receipts(args):
             if marker is not None:
                 code = codes.combine_exits(code, _verify_marker(marker, hook, sunglasses_home()))
             elif hook in chain_logs:
-                # R62 (c): segments and no marker. Nothing names the chain this
+                # Segments and no marker. Nothing names the chain this
                 # log opened with, so a wipe cannot be told: a limit, never a fail.
                 print(f"\n  {YELLOW}LOG_UNMARKED{RESET} {DIM}-- the hook log has "
                       f"segments and no {optin.HOOK_MARKER[-1]} names its first chain, "
@@ -4279,7 +4277,7 @@ def cmd_uninstall(args):
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
     if res.byte_exact and res.earlier:
-        # R38. The end state is the file before an earlier install on it, so
+        # The end state is the file before an earlier install on it, so
         # saying it changed would be false; saying which original it matches
         # keeps the claim exact.
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
@@ -4439,7 +4437,7 @@ def cmd_doctor(args, _run=None):
                      for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
-        # The whole point of R-DOCTOR-R3c, in the one place an operator reads.
+        # Said in the one place an operator reads.
         print(f"  {YELLOW}Self-test NOT RUN{RESET} "
               f"{DIM}— this build has no live self-test, so nothing below is"
               f" proof that a wrapped route mediates traffic.{RESET}")

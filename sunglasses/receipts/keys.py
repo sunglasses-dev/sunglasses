@@ -70,7 +70,7 @@ def _raw_public(private: ed25519.Ed25519PrivateKey) -> bytes:
 
 
 def private_path(home) -> pathlib.Path | None:
-    # R56: a key directory that cannot be listed raises, never "no key".
+    # a key directory that cannot be listed raises, never "no key".
     found = _fs.listing(_key_dir(home), "receipt-*.ed25519")
     return found[0] if found else None
 

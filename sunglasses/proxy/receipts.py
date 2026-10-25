@@ -36,7 +36,7 @@ EVENTS = frozenset({
     # Required by the contract: without it in the allowlist, the
     # one event that says the stderr cap was applied could not be written.
     "STDERR_BOUNDED",
-    # R-179-R6/R5_NOATTEMPT_REFUSAL. A typed refusal is only typed if the log
+    # A typed refusal is only typed if the log
     # will take it: `Log.event` raises ValueError on a kind that is not here,
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
@@ -92,7 +92,7 @@ PERMITTED_FIELDS = frozenset({
     "inspection_complete", "decision", "rule_ids", "inspected_bytes",
     "observed_bytes", "elapsed_ms", "worker_pid", "leaf_provenance", "bytes",
     "reason_code", "rule", "budget", "settled", "supervised", "count",
-    # R-CLOSE-KIND, and this line is the difference between the change working
+    # This line is the difference between the change working
     # and only LOOKING like it works. The kind reaches `session.events` as soon
     # as a Cause carries it, but this list is what the DURABLE receipt keeps:
     # a field missing here is dropped on the way to disk, silently, and every
@@ -105,7 +105,7 @@ PERMITTED_FIELDS = frozenset({
     # NO `authority_epoch`. This set is FROZEN with the wire
     # #172 shipped inside v0.6.0: every 0.6.0 verifier holds a copy and reads a
     # key outside it as UNKNOWN_FIELD, a failure (R44), and a post-tag change is
-    # an epoch, never an edit (R22). The transition record carries its reason in
+    # an epoch, never an edit. The transition record carries its reason in
     # `reason_code`, and the chain's signed `seq` orders two of them.
 })
 
@@ -656,7 +656,7 @@ def _chain_for(directory, home):
     home = pathlib.Path(home)
     from ..receipts import optin
     try:
-        # R21: only `receipts off` opts out. R56: a key or chain directory
+        # R21: only `receipts off` opts out. A key or chain directory
         # that cannot be listed is a receipt failure, never "not opted in".
         if not optin.opted_in(home):
             return None
