@@ -173,7 +173,7 @@ NO_TAIL, TAIL, COMPLETE = "NO_VISIBLE_TAIL", "UNVERIFIED_TAIL", "LIFECYCLE_COMPL
 # (the integrity result already says what went wrong, if anything did).
 EMPTY = "EMPTY_CHAIN"
 NOT_EXPORTED = {
-    "12": "rotation is specified, not built and not claimed (T9 ruling 40). "
+    "12": "rotation is specified, not built and not claimed. "
           "The verifier prints ROTATION_UNSUPPORTED for a segment signed by "
           "another key; the SUCCESSOR_ASSERTED row is a strict xfail in "
           "tests/test_verify_log.py until rotation is built.",

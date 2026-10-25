@@ -303,8 +303,8 @@ def test_a_first_segment_under_another_key_is_still_a_context_mismatch(tmp_path)
 
 
 @pytest.mark.xfail(strict=True, reason=(
-    "Spec vector 12. Rotation is specified, not built and not claimed (T9 "
-    "ruling 40): the verifier prints ROTATION_UNSUPPORTED. This row is the "
+    "Spec vector 12. Rotation is specified, not built and not claimed: the "
+    "verifier prints ROTATION_UNSUPPORTED. This row is the "
     "target, and it turns strict-xpass the day rotation is built."))
 def test_12_rotation_with_the_old_key_absent_is_successor_asserted(tmp_path):
     log = _write(tmp_path / "hook", *_rotated())

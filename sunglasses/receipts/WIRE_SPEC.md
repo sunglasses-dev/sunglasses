@@ -1,10 +1,9 @@
 # Signed receipts, wire specification `sg-receipt-chain/1`
 
-Frozen bytes for the receipt chain. Written against ASTRA's design verdict of
-2026-09-14, which is a **DESIGN GO WITH EDITS** and certifies no implementation
+Frozen bytes for the receipt chain. This document certifies no implementation
 and approves no release.
 
-ASTRA's ordering rule is why this document exists before any writer:
+The ordering rule is why this document exists before any writer:
 
 > Publish exact byte vectors for hashes, signatures and fingerprint derivation
 > before implementing both writer and verifier.
@@ -65,8 +64,7 @@ before checking it is checking your own rewrite.
   it, and the writer refuses such a line before anything is written
 - unknown types are **refused, never converted**. A value needing a conversion
   was never the value the producer meant to commit
-- **text a peer chose is replaced before the wire, never refused (T9 ruling
-  43).** The refusals above stay the wire's own rule. A producer writing a
+- **text a peer chose is replaced before the wire, never refused.** The refusals above stay the wire's own rule. A producer writing a
   string it did not choose (the proxy writes a server's name, the methods it
   advertises, a reason it gave) replaces first, so a refusal is never a
   switch a peer can flip. Each control character (U+0000 to U+001F and
@@ -75,8 +73,7 @@ before checking it is checking your own rewrite.
   lone surrogate becomes U+FFFD. The same input always gives the same
   output, and the record says how many were replaced in `sanitized`, keyed
   by field (proxy/receipts.py:103-126)
-- **a peer's object is one string, never an object in the row (T9 ruling
-  44).** Replacing inside an object's keys could make two keys one: `"a\u0000"`
+- **a peer's object is one string, never an object in the row.** Replacing inside an object's keys could make two keys one: `"a\u0000"`
   (a real NUL) escapes to exactly the six characters of the key
   `"a\\u0000"`. So a value that is an object, or a list holding one at any
   depth, is written as ONE string, its canonical JSON: keys sorted, every
@@ -97,7 +94,7 @@ change makes old history look forged.
 | record chain hash | `sunglasses-receipt-chain/1\x00record\x00` |
 | checkpoint signature | `sunglasses-receipt-chain/1\x00checkpoint\x00` |
 | key fingerprint | `sunglasses-receipt-key/1\x00ed25519\x00` |
-| hook log marker signature (T9 ruling 60) | `sunglasses-receipt-chain/1\x00marker\x00` |
+| hook log marker signature | `sunglasses-receipt-chain/1\x00marker\x00` |
 
 Separate domains mean the same bytes can never be presented as the other kind.
 
@@ -111,7 +108,7 @@ Separate domains mean the same bytes can never be presented as the other kind.
   followed by one LF. Without omitting it the signature would cover itself.
 - **marker signature** = Ed25519 over the marker domain prefix plus the hook
   log marker's canonical record with **only its `signature` member omitted**,
-  followed by one LF (T9 ruling 60).
+  followed by one LF.
 - **predecessor** covers checkpoint signatures too. The completed signed
   checkpoint becomes the next predecessor.
 - **covered head** is the previous record's hash.
@@ -201,22 +198,22 @@ not copied into production to satisfy a slogan.
 The offline claim is withheld until the standalone bundle is demonstrated
 offline.
 
-## Exit codes (T9 rulings 46 and 48)
+## Exit codes
 
 Every reason code is exactly one of three classes, and a verifier's exit code
 comes from the class, never from a list kept somewhere else.
 
-LIMIT = verifier could not conclude because the CALLER did not supply something (fingerprint, endpoint, key, session, log) or the feature is specified-not-built (R40), log bytes consistent with clean. FAIL = the log's bytes contradict or lack what they must carry. Every limit exits non-zero.
+LIMIT = verifier could not conclude because the CALLER did not supply something (fingerprint, endpoint, key, session, log) or the feature is specified-not-built, log bytes consistent with clean. FAIL = the log's bytes contradict or lack what they must carry. Every limit exits non-zero.
 
 - **ok**: the result holds. `KEY_TRUSTED`, `CHAIN_OK`, `NO_VISIBLE_TAIL`,
   `ENDPOINT_CONFIRMED` and `LIFECYCLE_COMPLETE`.
 - **limit**: `KEY_UNTRUSTED`, `HISTORY_EXTENT_UNKNOWN`, `PAIRING_UNKEYED`,
   `EMPTY_CHAIN`, `NO_SESSION`, `ROTATION_UNSUPPORTED`, `NO_LOG` and
-  `LOG_UNCHAINED` (T9 ruling 60). A limit is neither a pass nor a failure, and
+  `LOG_UNCHAINED`. A limit is neither a pass nor a failure, and
   it is never a pass.
-- **fail**: every other code, including `UNKNOWN_FIELD` (T9 ruling 44),
-  `KEY_UNUSABLE`, `LEGACY_UNSIGNED`, `PATH_UNREADABLE` (T9 ruling 57),
-  `LOG_MISSING` (T9 ruling 60) and the rotation codes a verifier does not emit
+- **fail**: every other code, including `UNKNOWN_FIELD`,
+  `KEY_UNUSABLE`, `LEGACY_UNSIGNED`, `PATH_UNREADABLE`,
+  `LOG_MISSING` and the rotation codes a verifier does not emit
   yet.
 
 The exit, over every result of every log verified:
@@ -234,20 +231,20 @@ over 3. A result that is not a known code exits 1, and a new code with no
 class fails the enumeration test in CI before it can ship.
 
 `--verify` with nothing on disk to verify prints `NO_LOG` and exits 3 (1 under
-`--strict`), with the hint to run `sunglasses init` (T9 ruling 53). Without
+`--strict`), with the hint to run `sunglasses init`. Without
 `--verify` the same empty listing exits 0, because a listing is not a verdict.
 
 A path the verifier must list that is there and cannot be listed (a directory
 it may not read, or a file or symlink where a directory should be) prints
 `PATH_UNREADABLE` with the path and the OS cause and exits 1, with or without
-`--strict` (T9 ruling 57). It is never `NO_LOG`: something is on disk, so
+`--strict`. It is never `NO_LOG`: something is on disk, so
 "nothing to verify" would be false. Only a path with no directory entry at all
 is absent.
 
 Which entries are logs: under the home's `receipts/` the hook's log is `hook`,
 and under the proxy's default `receipts/` a run's log is its run id, 32
 lowercase hex (`[0-9a-f]{32}`, the whole name), the rule the writer names it
-with (T9 ruling 58). A run written by a proxy started with `--state-root PATH`
+with. A run written by a proxy started with `--state-root PATH`
 is not read by `--verify` unless it is named with `--log PATH`.
 An entry with a known name that the verifier cannot
 list (a file, a dangling symlink, a symlink to a file, a directory it may not
@@ -258,7 +255,7 @@ segments is passed over without a warning, as before. A `--log PATH` the
 verifier cannot list is `PATH_UNREADABLE`; no name rule applies to it. Any
 other entry that is not a directory is not a log and is passed over.
 
-A log with no chain (T9 ruling 60). A proxy run in a home with no key writes
+A log with no chain. A proxy run in a home with no key writes
 its rows to `<run id>.jsonl` under the proxy's `receipts/`, and a hook that
 predates signing writes day files under the home's `receipts/`. `--verify`
 names each one `LOG_UNCHAINED`, a limit, so exit 3 and 1 under `--strict`,
@@ -267,14 +264,14 @@ nothing says they should have been signed. The claim decides the exit, so a
 log the caller supplies with `--log` that carries no chain is a failure. Plain
 `receipts` names a run's `.jsonl` too, and stays exit 0.
 
-The hook log's marker (T9 ruling 60). At the hook chain's first genesis the
+The hook log's marker. At the hook chain's first genesis the
 writer creates `keys/log-hook.genesis` with `O_EXCL`. It holds one canonical
 line with exactly the members `chain_id`, `event` (`log_genesis`), `key_id`,
 `log` (`hook`), `signature`, `t_wall_ns` and `wire`, naming that chain and the
 time its genesis carries, signed under the marker domain. `receipts init`
 never writes it. A marker already there is never replaced and never deleted,
 and it is never an error for the writer. The marker is the genesis's
-precondition (T9 ruling 62): it is created before the segment, and when it
+precondition: it is created before the segment, and when it
 cannot be created for any reason but already being there, no segment is
 begun, the hook asks naming the marker, and the next call tries again. A
 marker the writer created for a segment it then could not begin is taken
@@ -335,7 +332,7 @@ line is a genesis and its second a checkpoint with purpose `genesis`
 | `seq` | `0` | chain.py:202 |
 | `prev_hash` | `null`, the only null predecessor in a segment | chain.py:203 |
 | `event` | `genesis` | chain.py:203 |
-| `producer` | the writer's producer name; the callers pass `hook` or `proxy`, and a writer refuses a directory whose genesis names another (R15) | chain.py:204, :91-96 |
+| `producer` | the writer's producer name; the callers pass `hook` or `proxy`, and a writer refuses a directory whose genesis names another | chain.py:204, :91-96 |
 | `t_wall_ns` | integer, the writer's wall clock, not trusted time | chain.py:204 |
 | `body` | `{}` for a log's first segment, else the predecessor object below | chain.py:189-205 |
 
@@ -396,21 +393,20 @@ product.
 - hook: `in_flight` opens and `decision` closes, paired by `body.eval_id`;
   `receipts_off` is known and pairs with nothing (verify.py:44-49).
 - proxy: the session, `HEADER` then `SESSION_TORN_DOWN` or `TEARDOWN`; items
-  are not paired (see A proxy chain's lifecycle, R24) (verify.py:56-64).
+  are not paired (see A proxy chain's lifecycle) (verify.py:56-64).
 - anything else is `UNKNOWN_EVENT` under lifecycle and never an integrity
   failure.
 - nothing verified at all (no genesis, the wrong key, no checkpoint) is
-  `EMPTY_CHAIN` (T9 ruling 41): printed by name, never `LIFECYCLE_COMPLETE`
+  `EMPTY_CHAIN`: printed by name, never `LIFECYCLE_COMPLETE`
   and never a lifecycle failure, since the integrity result already says why
   nothing verified. A genesis and its checkpoint alone are verified, so a
   chain that started and recorded nothing stays `LIFECYCLE_COMPLETE`
   (vectors 2c, 5c and 8b against 6, 6b and the hook's 6c).
-- a proxy genesis with no `HEADER` is `NO_SESSION` (T9 ruling 43): the proxy
+- a proxy genesis with no `HEADER` is `NO_SESSION`: the proxy
   opens a session with `HEADER`, so none was opened. Not `LIFECYCLE_ORPHAN`,
   since nothing opened, and not `LIFECYCLE_COMPLETE`; neither a pass nor a
   failure (vector 6d).
-- a key outside the closed schema for its record kind is `UNKNOWN_FIELD`
-  (T9 ruling 44), a failure and never a limit: a signed row's keys are the
+- a key outside the closed schema for its record kind is `UNKNOWN_FIELD`, a failure and never a limit: a signed row's keys are the
   writer's, so an extra one says something no honest writer can say. The
   kinds are the checkpoint, the envelope of every other record, the genesis
   body, and the body of a proxy or a hook record, each held in verify.py
@@ -478,13 +474,13 @@ is not a chain and this spec does not cover it.
 - `leaf_provenance` keeps index, depth, byte count and the value's digest; the
   JSON pointer is hashed to `pointer_sha256`, never carried (proxy/receipts.py:
   438-453). No caller writes it at this head.
-- **A row fits its line by construction (T9 ruling 41).** A long value is cut
+- **A row fits its line by construction.** A long value is cut
   and the cut is counted, never refused, because the values come from matches
   on what a peer sent and a refusal would stop the audit for the rest of the
   session (proxy/receipts.py:84-188, 387-436):
   - `rule_ids` keeps the first 256 in the order the engine gave, and the
     kept ids, each encoded with its quotes, total at most 6 KiB; whichever
-    cuts first (T9 ruling 43). `rule_ids_omitted` counts every id left out,
+    cuts first. `rule_ids_omitted` counts every id left out,
     for either reason, in one number. Real catalog ids are at most 21
     characters, so 256 of them are kept whole.
   - `leaf_provenance` keeps the first 8 entries; the rest are counted in
@@ -502,10 +498,10 @@ is not a chain and this spec does not cover it.
   (proxy/receipts.py:363-385). The 16 KiB line check stays as the invariant,
   and a test feeds every permitted field at its worst to show nothing reaches
   it. If it ever fires, the bounds above are wrong: like any other failure to
-  append, it stops the session as a receipt failure (R4), the refusal is kept
+  append, it stops the session as a receipt failure, the refusal is kept
   so every later row is refused too, and the message names the cause.
 
-## Chains and writers: one chain per log (T9 ruling 15)
+## Chains and writers: one chain per log
 
 Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
 
@@ -518,7 +514,7 @@ Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
   `close` checkpoint over them, signed before the process exits. A call that
   finds the tail sealed continues the segment; one that finds an unsigned tail
   (a call that died) opens a new segment whose genesis names it.
-- **Sealed means verified (ruling 15b).** A tail counts as sealed only when its
+- **Sealed means verified.** A tail counts as sealed only when its
   last checkpoint is this segment's, names this writer's key, and its signature
   verifies under that key. A forged, garbled or foreign seal is just bytes: it
   is counted as unsigned, the segment is closed untouched, and the new genesis
@@ -530,7 +526,7 @@ Amended 2026-09-24, before any receipt byte exists, so no epoch is needed.
   hook call to a proxy item across chains is a **lifecycle** result only. A
   partner missing from another chain never changes either chain's integrity.
 
-## A proxy chain's lifecycle is the session (T9 ruling 24)
+## A proxy chain's lifecycle is the session
 
 Stated 2026-09-24 for this round, in its own commit, so the limit is on the
 record before a verifier prints it.
@@ -546,7 +542,7 @@ record before a verifier prints it.
   **`PAIRING_UNKEYED`**, which is neither a pass nor a failure (a limit:
   exit 3, and 1 under `--strict`), and never `LIFECYCLE_COMPLETE`, because that code says every opening
   has its terminal and nobody checked.
-- **A revoke is a record** (T9 ruling 120). `APPROVAL_INVALIDATED` is written
+- **A revoke is a record.** `APPROVAL_INVALIDATED` is written
   when the proxy revokes authority, with its cause in `reason_code` and no new
   field; it is not paired, and a verifier that predates it reads it as
   `UNKNOWN_EVENT` under lifecycle, never an integrity failure.
@@ -559,7 +555,7 @@ record before a verifier prints it.
   `ADMITTED` without `SETTLED` → lifecycle failure; `FORWARD_SUPPRESSED` +
   `SETTLED REQUEST_CANCELLED` → lifecycle ok", stays the requirement. It is
   **not judged until R24-A lands**: its own change after this round, where
-  each obligation carries one key (`record_key` + direction, T9 ruling 25,
+  each obligation carries one key (`record_key` + direction,
   never the raw JSON-RPC id) and the verifier pairs by it.
 
 ## What is built here, and what is not
@@ -587,7 +583,7 @@ key, and `sunglasses receipts --verify` checks both.
 - An upper bound on the checkpoint interval. The writer refuses an interval
   that is not a positive integer (`chain.py:67`) and accepts any larger one.
 - Concurrency between hook and proxy beyond their separate chains, and the
-  durable release gate. ASTRA's acceptance groups remain requirements until a
+  durable release gate. The acceptance groups remain requirements until a
   review says otherwise.
 
 ## Not in the released artifact

@@ -161,7 +161,7 @@ def test_exits_across_logs_combine_failure_over_limit(exits, combined):
 
 def test_the_spec_states_the_exits_and_the_strict_rule():
     spec = (TREE / "sunglasses" / "receipts" / "WIRE_SPEC.md").read_text()
-    section = spec.split("## Exit codes (T9 rulings 46 and 48)", 1)[1].split(
+    section = spec.split("\n## Exit codes\n", 1)[1].split(
         "\n## ", 1)[0]
     for row in ("| 0 | every result is ok |",
                 "| 1 | at least one result is a failure |",
@@ -171,7 +171,7 @@ def test_the_spec_states_the_exits_and_the_strict_rule():
     assert "`--strict` counts a limit as a failure" in section
     assert ("LIMIT = verifier could not conclude because the CALLER did not "
             "supply something (fingerprint, endpoint, key, session, log) or the "
-            "feature is specified-not-built (R40), log bytes consistent with "
+            "feature is specified-not-built, log bytes consistent with "
             "clean. FAIL = the log's bytes contradict or lack what they must "
             "carry. Every limit exits non-zero.") in section
     for code in LIMITS:

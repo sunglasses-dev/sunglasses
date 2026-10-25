@@ -27,7 +27,7 @@ CODES = {
     "EXPECTED_KEY_MISMATCH": "the key does not match the pinned fingerprint",
     "KEY_UNUSABLE": ("signing is on and the key cannot sign, so nothing new is "
                      "signed; the cause and the command that clears it are "
-                     "printed with it (T9 ruling R21)"),
+                     "printed with it."),
 
     # chain integrity
     "CHAIN_OK": "hashes and signatures hold across the verified prefix",
@@ -62,27 +62,29 @@ CODES = {
     "SUCCESSOR_ENDORSED": "the old key signed this successor binding",
     "LEGACY_UNSIGNED": "predates signing; integrity status unknown, not clean",
     "ROTATION_UNSUPPORTED":
-        "a later segment is signed by another key: a key transition. Rotation "
-        "is specified (WIRE_SPEC, key loss and rotation) and not built, so "
-        "that segment and everything after it is not judged (T9 ruling R40). "
-        "Not a pass.",
+        "a later segment's genesis names another key: a claimed key transition. "
+        "Rotation is specified (WIRE_SPEC, key loss and rotation) and not built, "
+        "so continuity across that claimed transition is not verified. "
+        "The result is not a pass.",
 
     # lifecycle
     "EMPTY_CHAIN":
-        "no record was verified, so there is no lifecycle to judge (T9 ruling "
-        "R41). Not a pass and not a failure; the integrity result says why "
+        "no record was verified, so there is no lifecycle to judge. "
+        "This is neither a pass nor a failure; the integrity result says why "
         "nothing verified.",
     "NO_SESSION":
         "a proxy segment with its genesis and no HEADER: no session was "
-        "opened, so there is none to judge (T9 ruling R43). Not an orphan, "
-        "since nothing opened, and not complete. Not a pass and not a failure.",
+        "opened, so there is none to judge. It is not an orphan, "
+        "since nothing opened, and it is not complete. It is neither a pass "
+        "nor a failure.",
     "LIFECYCLE_COMPLETE": "every opening has its terminal",
     "LIFECYCLE_ORPHAN": "an opening with no terminal, or a terminal with no opening",
     "LIFECYCLE_DUPLICATE": "more than one settlement for one invocation",
     "PAIRING_UNKEYED":
         "the session opened and ended; the items inside it carry no key to "
-        "pair them by, so whether each one settled is not judged (T9 ruling "
-        "R24, WIRE_SPEC section 4). Not a pass and not a failure.",
+        "pair them by, so whether each one settled is not judged ("
+        "WIRE_SPEC, a proxy chain's lifecycle is the session). This is "
+        "neither a pass nor a failure.",
     "UNKNOWN_EVENT":
         "an event outside this verifier's vocabulary; its meaning is not "
         "judged, and chain integrity is unaffected",
@@ -90,32 +92,32 @@ CODES = {
     "PATH_UNREADABLE":
         "something is on disk where a log or its key is read, and it cannot "
         "be listed: a directory it may not read, or a file or symlink where a "
-        "directory should be (T9 ruling 57). Never NO_LOG, since nothing to "
-        "verify would be false, and never a pass; the path and the OS cause "
-        "are printed with it.",
+        "directory should be. The result is never NO_LOG, since saying there "
+        "is nothing to verify would be false, and never a pass; the path and "
+        "the OS cause are printed with it.",
     "NO_LOG":
-        "nothing on disk to verify, so there is no verdict (T9 ruling 53). "
-        "Not a pass and not a failure; `sunglasses init` installs the "
-        "firewall that writes the log.",
+        "nothing on disk to verify, so there is no verdict. "
+        "This is neither a pass nor a failure; `sunglasses init` installs "
+        "the firewall that writes the log.",
     "LOG_MISSING":
         "the home's signed marker names a hook chain and no hook segment "
-        "opens with it: the log it must carry is gone (T9 ruling 60). A "
+        "opens with it: the log it must carry is gone. The result is a "
         "failure in both modes; a home with no marker stays NO_LOG.",
     "LOG_UNCHAINED":
         "a log found on the home walk carries no chain, and nothing says it "
-        "should have: a legacy day file, or a proxy run written with no key "
-        "(T9 ruling 60). Named, never passed over. Not a pass and not a "
-        "failure; a log supplied with --log and no chain is LEGACY_UNSIGNED.",
+        "should have: a legacy day file, or a proxy run written with no key. "
+        "The log is named and never passed over. This is neither a pass nor "
+        "a failure; a log supplied with --log and no chain is LEGACY_UNSIGNED.",
     "LOG_UNMARKED":
         "the hook log has segments and the home has no marker naming the chain "
         "it opened with: a log begun before the marker existed, or one whose "
-        "marker is gone (T9 ruling 62). A wipe of it cannot be told from a log "
-        "never begun. Not a pass and not a failure; the log is marked when it "
-        "next opens a segment.",
+        "marker is gone. A wipe of it cannot be told from a log "
+        "never begun. This is neither a pass nor a failure; the log is marked "
+        "when it next opens a segment.",
 
     "UNKNOWN_FIELD":
         "a signed record carries a key outside the closed schema for its "
-        "record kind (T9 ruling R44). A signed row's keys are the writer's, "
+        "record kind. A signed row's keys are the writer's, "
         "fixed by the schema, so an extra one is a failure, never a limit; "
         "chain integrity is unaffected.",
 }
