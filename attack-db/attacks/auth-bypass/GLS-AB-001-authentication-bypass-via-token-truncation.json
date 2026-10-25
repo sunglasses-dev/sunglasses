@@ -26,8 +26,8 @@
   ],
   "regex": [
     "(?:token|api_key|auth_key|secret)\\s*\\[\\s*:\\s*\\d{1,2}\\s*\\]",
-    "(?:hash|md5|sha)\\s*\\(.*(?:token|key)\\s*\\)\\s*\\[\\s*:\\s*\\d+\\s*\\]",
-    "cache_key\\s*=.*(?:token|key)\\s*\\[\\s*:\\s*\\d+\\s*\\]"
+    "(?:hash|md5|sha)\\s*\\(.{0,1000}(?:token|key)\\s*\\)\\s*\\[\\s*:\\s*\\d+\\s*\\]",
+    "cache_key\\s*=.{0,1000}(?:token|key)\\s*\\[\\s*:\\s*\\d+\\s*\\]"
   ],
   "examples": {
     "malicious": [],

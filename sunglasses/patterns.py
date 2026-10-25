@@ -2041,7 +2041,7 @@ PATTERNS = [
             r"os\.system\s*\(\s*f['\"]",
             r"subprocess\.(?:call|run|Popen)\s*\(\s*f['\"]",
             r"os\.popen\s*\(\s*f['\"]",
-            r"subprocess\.(?:call|run|Popen)\s*\(.*shell\s*=\s*True",
+            r"subprocess\.(?:call|run|Popen)\s*\(.{0,1000}shell\s*=\s*True",
         ],
         "description": "User-controlled strings interpolated directly into shell commands without shlex.quote or proper escaping. Based on BentoML CVE-2026-35043 where package names were injected into shell commands via f-strings."
     },
@@ -2097,8 +2097,8 @@ PATTERNS = [
         ],
         "regex": [
             r"(?:\.\./){2,}",
-            r"(?:load_prompt|load_template|read_file|open)\s*\(.*(?:\.\./|\.\.\\)",
-            r"os\.path\.join\s*\(.*(?:user_input|request\.|params\[|args\[)",
+            r"(?:load_prompt|load_template|read_file|open)\s*\(.{0,1000}(?:\.\./|\.\.\\)",
+            r"os\.path\.join\s*\(.{0,1000}(?:user_input|request\.|params\[|args\[)",
         ],
         "description": "Path traversal sequences in prompt template loading or file access, allowing reading arbitrary files outside intended directories. Based on LangChain CVE-2026-34070."
     },
@@ -2159,8 +2159,8 @@ PATTERNS = [
         ],
         "regex": [
             r"(?:token|api_key|auth_key|secret)\s*\[\s*:\s*\d{1,2}\s*\]",
-            r"(?:hash|md5|sha)\s*\(.*(?:token|key)\s*\)\s*\[\s*:\s*\d+\s*\]",
-            r"cache_key\s*=.*(?:token|key)\s*\[\s*:\s*\d+\s*\]",
+            r"(?:hash|md5|sha)\s*\(.{0,1000}(?:token|key)\s*\)\s*\[\s*:\s*\d+\s*\]",
+            r"cache_key\s*=.{0,1000}(?:token|key)\s*\[\s*:\s*\d+\s*\]",
         ],
         "description": "Authentication tokens truncated or partially compared, allowing collision attacks where different users can share cache entries or bypass auth. Based on LiteLLM CVE-2026-35030."
     },
@@ -3295,7 +3295,7 @@ PATTERNS = [
             "reverse shell",
         ],
         "regex": [
-            r"(?i)os\.system\(|subprocess\.(?:Popen|run|call)\([^)]*shell\s*=\s*True|bash\s+-i|/dev/tcp/|nc\s+-e|reverse shell",
+            r"(?i)os\.system\(|subprocess\.(?:Popen|run|call)\([^)]{0,1000}shell\s*=\s*True|bash\s+-i|/dev/tcp/|nc\s+-e|reverse shell",
         ],
         "description": "Detects reverse-shell logic embedded in agent skills — a critical code execution threat."
     },
