@@ -4561,7 +4561,7 @@ PATTERNS = [
             "unverified mcp server",
         ],
         "regex": [
-            r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)|execute\s+this\s+command|printenv\b|curl\s+https?://[^\s]*(?:\$|env|secret|token|key|cred|\.aws|\.ssh)|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
+            r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)(?! command\? \(y\)es/\(n\)o\b)|execute\s+this\s+command|printenv\b|curl\s+https?://[^\s]*(?:\$|env|secret|token|key|cred|\.aws|\.ssh)|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
         ],
         "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems — grounded in GitHub Security Advisories.",
     },
