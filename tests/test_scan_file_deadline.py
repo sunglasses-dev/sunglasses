@@ -43,7 +43,8 @@ CLEAN = "Quarterly notes. Nothing in here asks anyone to do anything.\n"
 SLOW = "SLOWMARK " + CLEAN
 
 # A child that behaves like the real one, except that a file carrying the marker takes
-# SLOW_SECONDS to finish and every start is written to WORKER_LOG.
+# SLOW_SECONDS to finish and every start is written to WORKER_LOG. When READING_LOG is set, a
+# child also writes its pid there as it starts to read such a file.
 STAND_IN = textwrap.dedent("""
     import os, sys, time
     from sunglasses import engine, scan_worker
@@ -52,6 +53,9 @@ STAND_IN = textwrap.dedent("""
     real = engine.SunglassesEngine.scan
     def scan(self, text, channel="message"):
         if "SLOWMARK" in text:
+            if os.environ.get("READING_LOG"):
+                with open(os.environ["READING_LOG"], "a") as log:
+                    log.write(str(os.getpid()) + "\\n")
             time.sleep(float(os.environ["SLOW_SECONDS"]))
         return real(self, text, channel)
     engine.SunglassesEngine.scan = scan

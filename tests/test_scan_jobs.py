@@ -166,19 +166,39 @@ def test_a_small_tree_starts_no_more_children_than_files(rig):
 
 # ── 4. signals ─────────────────────────────────────────────────────────────
 
+def _pids_in(path):
+    return set(path.read_text().split()) if path.exists() else set()
+
+
+def _wait_until(condition, seconds):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if condition():
+            return True
+        time.sleep(0.05)
+    return condition()
+
+
+def _default_signals():
+    # A test run started in the background of a non-interactive shell has SIGINT ignored, and a
+    # process started from it keeps that: Python then installs no KeyboardInterrupt handler and the
+    # command would not stop. The command under test gets the signal disposition of a terminal.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+
 @pytest.mark.parametrize("signum", [signal.SIGINT, signal.SIGTERM], ids=["sigint", "sigterm"])
 def test_a_signal_stops_every_child_even_in_the_middle_of_a_file(rig, signum):
     root = _tree(rig, {f"s_{i}.txt": SLOW for i in range(8)})
+    reading = rig / "reading.log"
     proc = subprocess.Popen(
         [sys.executable, str(rig / "launcher.py"), str(rig / "stand_in.py"), "scan", "--dir", str(root),
          "--file-deadline", "100", "--jobs", "4"],
-        cwd=rig / "cwd", env=_env(rig, 120), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cwd=rig / "cwd", env={**_env(rig, 120), "READING_LOG": str(reading)},
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, preexec_fn=_default_signals)
     try:
-        deadline = time.monotonic() + 90
-        while len(_starts(rig)) < 4 and time.monotonic() < deadline:
-            time.sleep(0.1)
+        # Each of the four children has written its pid as it began to read its file.
+        assert _wait_until(lambda: len(_pids_in(reading)) == 4, 90), (_starts(rig), _pids_in(reading))
         assert len(_starts(rig)) == 4, _starts(rig)
-        time.sleep(1.5)                  # let each request reach its child
         began = time.monotonic()
         proc.send_signal(signum)
         proc.communicate(timeout=60)
@@ -187,10 +207,14 @@ def test_a_signal_stops_every_child_even_in_the_middle_of_a_file(rig, signum):
         if proc.poll() is None:
             proc.kill()
             proc.communicate()
-    time.sleep(0.5)
     for pid in _starts(rig):
-        with pytest.raises(ProcessLookupError):
-            os.kill(int(pid), 0)
+        def gone(pid=pid):
+            try:
+                os.kill(int(pid), 0)
+            except ProcessLookupError:
+                return True
+            return False
+        assert _wait_until(gone, 10), f"child {pid} is still running after the command ended"
 
 
 # ── 5. how many files are held and read at once ────────────────────────────
