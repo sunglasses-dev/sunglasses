@@ -114,10 +114,9 @@ def _tell(sink, attempt):
 
 ORIGIN_CLIENT = "client"
 ORIGIN_UPSTREAM = "upstream"
-# T6.R6. The proxy's own control traffic. T2.R6 turns one client tools/list
-# into up to sixty four proxy requests under T8.R13, and the client's single id
-# can answer exactly one of them, so the proxy owns ids of its own or it cannot
-# page a tool list at all.
+# The proxy's own control traffic. One client tools/list becomes up to sixty
+# four proxy requests, and the client's single id can answer exactly one of
+# them, so the proxy owns ids of its own or it cannot page a tool list at all.
 ORIGIN_PROXY = "proxy"
 
 # The prefix is OURS. An id shaped like this arriving from the CLIENT is
@@ -126,7 +125,7 @@ ORIGIN_PROXY = "proxy"
 # client holding a control id could settle the proxy's own pending request.
 CONTROL_PREFIX = "sg-"
 
-# T6.R6. Bounded, because a tombstone table that grows with the session is a
+# contract row 6.6. Bounded, because a tombstone table that grows with the session is a
 # memory bound a peer controls.
 # R-168-R6/F1. How many times an answer may be re-derived because an
 # authority landed while it was being prepared. The precedence allows two
@@ -375,7 +374,7 @@ class Session:
         # in whichever namespace nobody was watching.
         self._control_answers: dict = {}
         self._tombstones: list = []       # keys, oldest first
-        # T6.R1. Who is still owed one answer, retained across the close that
+        # contract row 6.1. Who is still owed one answer, retained across the close that
         # discovered the fault so the reader can deliver it on the way out.
         self._owed_refusals: list = []
         # identity -> the budget its recorded cause names, or None. Read by
@@ -402,14 +401,12 @@ class Session:
         # R-168-R4a. AUTHORITY STATE, BEHIND ITS OWN SHORT LOCK.
         #
         # A cancellation or a descriptor invalidation is an authority that must
-        # still win while a reader is parked at the handoff. Round 3 put the
-        # reader's CHECK inside the settlement lock and left the WRITERS
-        # outside it, so the check just moved the window. Putting the writers
-        # under the settlement lock instead was measured and is worse: the
-        # reviewer's instrument pauses the reader INSIDE that lock and requires
-        # a writer to complete during the pause, so a writer that needs the
-        # same lock times out -- four of six rows failed with "action
-        # incomplete" rather than with a wrong answer.
+        # still win while a reader is parked at the handoff. Making the
+        # reader's CHECK happen inside the settlement lock while the WRITERS
+        # stay outside it only moves the window. Putting the writers under the
+        # settlement lock instead does not work with the test instrument, which
+        # pauses the reader INSIDE that lock and requires a writer to complete
+        # during the pause, so a writer that needs the same lock times out.
         #
         # So the writers never wait on a reader. They record and bump an EPOCH
         # here, atomically; the reader decides from recorded state, builds its
@@ -454,19 +451,17 @@ class Session:
         # authority epoch moves on cancellations too. A request carries the
         # value it was admitted under and the gate compares that.
         self._descriptor_revision = 0
-        # R-168-R5. The epoch, and the epoch A DECISION WAS DERIVED FROM.
+        # The epoch, and the epoch A DECISION WAS DERIVED FROM.
         #
-        # Round 4 claimed the decision and the discharge were atomic because
-        # they are adjacent lines. They are not: the reader releases this lock
-        # when the decision returns and takes the settlement owner only, which
-        # the writers do not need. ASTRA's XD01 measured the window six ways --
-        # a cancellation completing there still lost.
+        # The decision and the discharge are not atomic merely because they are
+        # adjacent lines: the reader releases this lock when the decision returns and
+        # takes the settlement owner only, which the writers do not need. A
+        # cancellation completing in that window still loses.
         #
         # ADJACENT LINES ARE NOT ATOMICITY. What closes the window is a stamp:
         # every authority READ records the epoch it saw, and the discharge
         # refuses to spend a decision derived from an older one. The stamp is
-        # taken at the READ and not before the call, which is the difference
-        # between this and the epoch round 3 proposed: a writer that lands
+        # taken at the READ and not before the call: a writer that lands
         # BEFORE the decision reads is already visible to it and needs no
         # re-derivation, so the re-derivation fires exactly when the decision
         # is actually stale.
@@ -477,7 +472,7 @@ class Session:
         # R-168-R6/F2. CLIENT IDS ADMITTED AND NOT YET ANSWERED ON THE WIRE.
         #
         # Kept HERE and not on the route because admission is the session's
-        # event however the caller reached it -- the reviewer's controls admit
+        # event however the caller reached it -- test controls admit
         # straight through this method -- and kept apart from every other table
         # because it has to OUTLIVE retirement. The release paths retire the
         # record and THEN fail to authorise, and at that moment `_pending`,
@@ -549,12 +544,11 @@ class Session:
         # committed item with the cause its wire frame carries.
         #
         # BY TOKEN, because a claim outlives the correlation it describes: this
-        # is a spanning table and `warroom/r168-followups/key_shape_audit.py`
-        # governs it as one.
+        # is a spanning table and the key-shape audit treats it as one.
         self._committed_cause: dict = {}
-        # T8.R6's second half, written by whoever owns the write queue.
+        # The in-flight bound's second half, written by whoever owns the write queue.
         self.queued_bytes = 0
-        # AR11, T8.R5. When each item was admitted, so the upstream-response
+        # When each item was admitted, so the upstream-response
         # deadline has something to measure. A bound with no clock behind it is
         # a number in a table.
         self._admitted_at: dict = {}
@@ -589,7 +583,7 @@ class Session:
         """T6.R6. A duplicate typed id from the client closes the session."""
         if self._closed:
             return False
-        # T2.R16. An extension or unknown method from the client is refused AT
+        # contract row 2.16. An extension or unknown method from the client is refused AT
         # ADMISSION, so upstream never sees it. Refusing it later, after it has
         # been forwarded, is a different and much weaker promise.
         if origin == ORIGIN_CLIENT and _is_control_id(request_id):
@@ -650,7 +644,7 @@ class Session:
                             "upstream reused an id that was already pending",
                             kind="ID_REUSED_WHILE_PENDING")
             return False
-        # T6.R6 stores an id with its GENERATION. A cancelled id is tombstoned
+        # contract row 6.6 stores an id with its GENERATION. A cancelled id is tombstoned
         # for the session, but a COMPLETED one may legitimately be used again,
         # and without a generation the core refuses the second request because
         # it has already settled that identity. The generation is what makes
@@ -687,20 +681,19 @@ class Session:
             _tell(on_refusal, Attempt(identity, reserved[-1],
                                       Cause("UNINSPECTED_METHOD", "S1")))
             return False
-        # T801, T8.R6, ROUND 2. The bound is evaluated and the slot reserved
-        # inside ONE critical section, and it runs HERE -- after every protocol
-        # test above -- because the two are different kinds of answer.
+        # The bound is evaluated and the slot reserved inside ONE critical section, and
+        # it runs HERE -- after every protocol test above -- because the two are
+        # different kinds of answer.
         #
-        # R-179-R2/DP01: malformed before resource. At capacity, a duplicate id
-        # used to be refused OVERLOADED, so a client that broke the protocol was
-        # told the server was busy and the session stayed open on a correlation
-        # table both ends now disagree about. Protocol validation decides first;
-        # only a well-formed request can be too many.
+        # Malformed before resource. At capacity, a duplicate id refused OVERLOADED
+        # would tell a client that broke the protocol that the server was busy, and the
+        # session would stay open on a correlation table both ends disagree about.
+        # Protocol validation decides first; only a well-formed request can be too many.
         #
-        # R-179-R2/AR06: the check and the insert are ONE step. Round 1 read the
-        # occupancy outside the lock, so two admissions both read seven and both
-        # inserted: nine pending against a cap of eight, reachable with ordinary
-        # concurrent traffic and no fault injection at all.
+        # The check and the insert are ONE step. Reading the occupancy outside the lock
+        # lets two admissions both read seven and both insert: nine pending against a
+        # cap of eight, reachable with ordinary concurrent traffic and no fault
+        # injection at all.
         with self._settlement:
             if identity in self._settling or identity in self._pending:
                 return False
@@ -842,13 +835,12 @@ class Session:
         (v5.2) with this reason; it is a narrowing of the row, and ASTRA's AR04
         as written measures the literal reading it replaces.
         """
-        # R-179-R6/R5_LOCAL_CAP adds the third table. An attempt claimed for a
-        # LOCAL answer has left `_pending` before its frame is written, and
-        # between the claim and the settlement it was counted by nothing: eight
-        # of them parked at their writers left the count at zero and a ninth
-        # request was admitted with nine debts owed. T8.R6 names in-flight held
-        # messages, and a held message being answered is the most in-flight it
-        # ever gets.
+        # A third table counts local answers. An attempt claimed for a LOCAL answer has
+        # left `_pending` before its frame is written, and between the claim and the
+        # settlement it would be counted by nothing: eight of them parked at their
+        # writers would leave the count at zero and a ninth request would be admitted
+        # with nine debts owed. The in-flight bound covers held messages, and a held
+        # message being answered is the most in-flight it ever gets.
         return (sum(1 for i in self._pending if i[0] == origin)
                 + sum(1 for i in self._settling if i[0] == origin)
                 + sum(1 for t in self._claimed if t[0] == origin))
@@ -1209,8 +1201,8 @@ class Session:
         owner = ORIGIN_CLIENT if origin == ORIGIN_UPSTREAM else ORIGIN_UPSTREAM
         identity = key(owner, request_id)
         if identity not in self._pending:
-            # T6.R6. Unsolicited or already answered. Either way nobody is
-            # waiting for it, and T7.R1 makes that a protocol fault.
+            # contract row 6.6. Unsolicited or already answered. Either way nobody is
+            # waiting for it, and contract row 7.1 makes that a protocol fault.
             self._close("MALFORMED_UPSTREAM" if origin == ORIGIN_UPSTREAM
                         else "MALFORMED_CLIENT",
                         "a response arrived for an id that is not pending",
@@ -1224,8 +1216,8 @@ class Session:
                         kind="RESPONSE_SHAPE_MISMATCH")
             return None
 
-        # T802, T8.R2. The content bound existed in the table and nothing
-        # applied it, so a 262,145 byte result was forwarded to the model
+        # The content bound is applied here as well as to frames, or a 262,145 byte
+        # result would be forwarded to the model
         # intact. An over-budget FRAME already closes the session here; content
         # is the same row's other half and is treated the same way, so the
         # bound cannot be walked around by putting the bytes one level further
@@ -1271,7 +1263,7 @@ class Session:
             #
             # If the close won, it has already recorded this item's debt and
             # the reader pays it on the way out. Delivering here as well would
-            # be the second answer T6.R1 forbids.
+            # be the second answer contract row 6.1 forbids.
             if self._closed or identity not in self._pending:
                 return None
             self._pending.pop(identity)
@@ -1289,7 +1281,7 @@ class Session:
         if verdict is not None:
             return _Replaced(replacement, cause)
 
-        # T2.R5, and CB06. A fully inspected, authorised upstream ERROR keeps
+        # contract row 2.5, and CB06. A fully inspected, authorised upstream ERROR keeps
         # disposition CLEAN and is forwarded AS IT IS, with its own code, message
         # and data. Rebuilding it as a result would answer an error with a
         # success, and replacing it with our own error would tell the client we
@@ -1298,11 +1290,11 @@ class Session:
             self._retire_record(identity)
         if frame is not None and "error" in frame:
             return frame
-        # T6.R1: C's TYPED id, returned as it was issued.
+        # contract row 6.1: C's TYPED id, returned as it was issued.
         return {"jsonrpc": "2.0", "id": request_id, "result": (frame or {}).get(
             "result", {})}
 
-    # T2. The member a result MUST carry, per the method that asked for it.
+    # The member a result MUST carry, per the method that asked for it.
     _REQUIRED_RESULT_MEMBER = {
         "tools/call": "content",
         "tools/list": "tools",
@@ -1336,7 +1328,7 @@ class Session:
         four were accepted.
         """
         if "error" in frame:
-            # T2.R5. An error is a legitimate answer and has no result member.
+            # contract row 2.5. An error is a legitimate answer and has no result member.
             return True
         method = self._pending.get(identity)
         result = frame.get("result")
@@ -1347,7 +1339,7 @@ class Session:
             # identity is built on.
             info = result.get("serverInfo") if isinstance(result, dict) else None
             # serverInfo has to NAME the server and its version. An empty
-            # object satisfies "is a dict" and identifies nothing, and T1.R1
+            # object satisfies "is a dict" and identifies nothing, and contract row 1.1
             # builds the session identity out of exactly this.
             return (isinstance(result, dict)
                     and isinstance(result.get("protocolVersion"), str)
@@ -1409,22 +1401,18 @@ class Session:
                 return False
             self._pending.pop(identity)
             self._admitted_at.pop(identity, None)
-            # R-179-R6/R5_LOCAL_CAP. STILL COUNTED, AND THIS LINE IS THE FIX.
-            # Round 5 dropped the item out of `_pending` and into nothing that
-            # `_outstanding_locked` reads, so eight attempts refused by the
-            # ordinary approval path and parked at their writers counted ZERO
-            # against a bound of eight, and a ninth request was admitted with
-            # nine debts owed. That is a regression of the bound itself --
-            # round 4 refused that ninth in the same window -- and T8.R6 names
-            # in-flight held messages and obligations mid-handoff explicitly.
+            # STILL COUNTED, AND THIS LINE IS WHAT COUNTS IT. The item stays visible to
+            # `_outstanding_locked`: dropping it out of `_pending` and into nothing that the
+            # count reads would let eight attempts refused by the ordinary approval path and
+            # parked at their writers count ZERO against a bound of eight, and a ninth
+            # request would be admitted with nine debts owed. The in-flight bound names held
+            # messages and obligations mid-handoff explicitly.
             #
-            # ITS OWN TABLE, and `_settling` was measured first. Putting the
-            # item there counts it, and it also makes admission treat the id as
-            # "still being answered" and CLOSE the session on reuse -- which
-            # turned the reachable R4_WITHHOLD_OWNER row red, because the
-            # newer attempt it admits on that id stopped being admissible at
-            # all. That is a redesign of reviewed behaviour smuggled in under a
-            # bound fix, so it was backed out.
+            # ITS OWN TABLE, not `_settling`. Putting the item in `_settling` counts it, and
+            # it also makes admission treat the id as "still being answered" and CLOSE the
+            # session on reuse, so the newer attempt admitted on that id would stop being
+            # admissible at all. That is a redesign of the admission behaviour smuggled in
+            # under a bound fix.
             #
             # `_claimed` is counted by `_outstanding_locked` and drained by
             # `_close`, and it is read by nothing else: admission still decides
@@ -1648,10 +1636,10 @@ class Session:
             return
         self._tombstones.append(identity)
         if len(self._tombstones) > TOMBSTONE_LIMIT:
-            # T6.R6 caps this; overflow closes the session rather than silently
+            # contract row 6.6 caps this; overflow closes the session rather than silently
             # forgetting, because a forgotten tombstone lets a cancelled id be
             # reused and that is the thing the table exists to prevent.
-            # T6.R7. OVERLOADED is a resource breach, so S3 and not S5: the
+            # contract row 6.7. OVERLOADED is a resource breach, so S3 and not S5: the
             # peer has not violated the protocol, we have run out of room to
             # keep promises in. And the close must not RAISE on the way out,
             # because `cancel` is a normal operation and a session that has just
@@ -1706,15 +1694,13 @@ class Session:
         # nothing left to read and is about to wait.
         if self._wake_reader_for_exit():
             return
-        # No reader that can be told (a stream without a descriptor): the old
-        # behaviour, unchanged.
-        # T7.R1, then T8.R12. The fault is recorded first so the cause is the
-        # exit rather than whatever the kill produces, and the group is then
-        # stopped, which closes the descendant's copy of the write end and is
-        # what actually releases the reader.
-        # _close supervises now, so the group is stopped as part of the
-        # teardown rather than beside it. Doing it twice was how the close
-        # could be claimed before anything had actually been stopped.
+        # No reader that can be told (a stream without a descriptor): judge the exit
+        # here. The fault is recorded first so the cause is the exit rather than
+        # whatever the kill produces, and the group is then stopped, which closes the
+        # descendant's copy of the write end and is what actually releases the reader.
+        # `_close` supervises, so the group is stopped as part of the teardown rather
+        # than beside it; stopping it separately as well would let the close be claimed
+        # before anything had actually been stopped.
         self._judge_upstream_exit()
 
     def _judge_upstream_exit(self):
@@ -1833,7 +1819,7 @@ class Session:
                 yield from self._drain_refusals()
                 return
             if parsed_ok_but_unterminated(raw):
-                # C15 and T1.R2. The transport is newline delimited, so a
+                # C15 and contract row 1.2. The transport is newline delimited, so a
                 # trailing fragment at EOF is not a short frame, it is the
                 # beginning of one that never arrived. Forwarding it hands the
                 # client a truncated message as a complete answer, and the one
@@ -1845,7 +1831,7 @@ class Session:
                 return
             parsed = framing.parse_frame(raw, origin=ORIGIN_UPSTREAM)
             if not parsed:
-                # The BUDGET travels with the cause. T8's rows name which bound
+                # The BUDGET travels with the cause. The answer names which bound
                 # broke, and an answer that says OVER_BUDGET without saying
                 # which one cannot be graded against a fixture.
                 self._close(parsed.reason, parsed.detail, rule=parsed.rule,
@@ -1854,7 +1840,7 @@ class Session:
                 return
             message = parsed.message
 
-            # T2.R15. A frame carrying BOTH a method and an id is an upstream
+            # contract row 2.15. A frame carrying BOTH a method and an id is an upstream
             # REQUEST, not a response, however much its id resembles one of
             # ours. G2-15 shares the client's id on purpose. Treating it as the
             # response settled the client's item on a frame the client never
@@ -1863,7 +1849,7 @@ class Session:
             if "method" in message and "id" in message:
                 self._core._emit("UPSTREAM_REQUEST_REFUSED", message["id"],
                                  reason="UNINSPECTED_METHOD")
-                # T6.R3 and T2.R15. ONE response, to UPSTREAM, in upstream's
+                # contract row 6.3 and contract row 2.15. ONE response, to UPSTREAM, in upstream's
                 # own id namespace. Dropping it silently was half the row: the
                 # client is correctly never told, but the server is left
                 # waiting for an answer to a request it is entitled to have
@@ -1874,10 +1860,8 @@ class Session:
                 continue
 
             if "id" not in message:
-                # T1.R3's last sentence. A notification outside the frozen set
-                # is NOT forwarded. The helper existed and this loop did not
-                # call it, which is the whole shape of ASTRA's round 4 finding:
-                # a component that is correct and never invoked protects
+                # A notification outside the frozen set is NOT forwarded. The helper has to be
+                # called from this loop: a component that is correct and never invoked protects
                 # nothing.
                 method = message.get("method")
                 if not handshake.notification_supported(method):
@@ -1914,7 +1898,7 @@ class Session:
                     continue
                 verdict = inspect(raw, message) if inspect is not None else None
                 if verdict is not None:
-                    # T2.R12. Dropped with a receipt and never a response,
+                    # contract row 2.12. Dropped with a receipt and never a response,
                     # because a notification has no id to answer in. The
                     # verdict is (replacement, reason, rule) and the reason is
                     # the part that says WHY: dropped without it, the row on
@@ -1925,7 +1909,7 @@ class Session:
                     self._core._emit("NOTIFICATION_DROPPED", None,
                                      supported=True, **fields)
                     continue
-                # T7.R2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
+                # contract row 7.2, RC28. ONCE THE CLOSE HAS WON, NOTHING CROSSES, AND A
                 # NOTIFICATION IS NOT AN EXCEPTION. It carries no id, so the
                 # record gate that gives responses their boundary does not
                 # cover it, and this line delivered regardless: a close could
@@ -1940,13 +1924,13 @@ class Session:
                 yield self._handoff_notification(raw)
                 continue
 
-            # T2.R6. OUR OWN control traffic, handed to the collector and never
+            # contract row 2.6. OUR OWN control traffic, handed to the collector and never
             # yielded toward the client, who asked once and is not part of this
             # conversation. Checked before the client correlation because the
             # two namespaces share one table and only the key tells them apart,
             # and BEFORE the inspection because a page of our own tool list is
             # not a message held on the client's behalf: the collector scans
-            # every page itself under T5.R3(c).
+            # every page itself under contract row 5.3(c).
             #
             # The hand-off is an assignment into a dict the collector reads. It
             # CANNOT BLOCK, which is the point: the collector runs on the
@@ -1978,7 +1962,7 @@ class Session:
                 # RC05. The CORE owns the item too, so an answered control
                 # request has to settle there as well. Leaving it owed means a
                 # session that finished its work still reports an outstanding
-                # correlation, and T9.R5 reads an ADMITTED with no SETTLED as
+                # correlation, and a log with an ADMITTED and no SETTLED reads as
                 # INCOMPLETE_SESSION. RC13's discipline applies here too: the
                 # call happens outside the lock, and the record left behind
                 # keeps the window closed.
@@ -2009,7 +1993,7 @@ class Session:
                     return
                 continue
 
-            # T6.R5. A response for an id that was cancelled is DISCARDED and
+            # contract row 6.5. A response for an id that was cancelled is DISCARDED and
             # the session stays serviceable. It is not an unsolicited response:
             # we did issue that request, we simply stopped waiting. Closing S5
             # here would let any peer end a session by answering a cancellation
@@ -2085,12 +2069,12 @@ class Session:
             # an identity while `_settling` holds it.
             self._retire_record(identity, record_key)
 
-        # T7.R1. EOF is not a clean ending while the client is still owed.
+        # contract row 7.1. EOF is not a clean ending while the client is still owed.
         if self._pending and not self._closed:
             self._close("MALFORMED_UPSTREAM",
                         "upstream exited with calls still pending",
                         kind="UPSTREAM_EXIT_WITH_PENDING")
-        # T4.R7 and T6.R1. The client is WAITING, whoever closed the session
+        # contract row 4.7 and contract row 6.1. The client is WAITING, whoever closed the session
         # and whenever. Recording the fault and saying nothing leaves it
         # waiting for ever on a session that has already decided it is over, so
         # every retained debt is paid here, including the ones a watcher thread
@@ -2223,10 +2207,9 @@ class Session:
         request_id = identity[2]
         # The budget is LOOKED UP rather than passed in. It belongs to the
         # cause recorded for this item, and threading it through the signature
-        # broke every reviewer subclass that wraps this method with the three
-        # arguments the row names -- seventeen of ASTRA's v6 controls at once,
-        # on a TypeError, before a single assertion ran. The shape of a refusal
-        # is this method's business; who is waiting for it is the table's.
+        # would break every subclass that wraps this method with its three arguments,
+        # with a TypeError before a single assertion could run. The shape of a
+        # refusal is this method's business; who is waiting for it is the table's.
         budget = self._budget_for.get(identity)
         body = envelope.withheld(
             request_id=request_id, reason_code=reason, rule=rule,
@@ -2298,7 +2281,7 @@ class Session:
             # The close is WRITTEN under this lock, so whether we still owe the
             # frame is READ under it. Deciding to deliver outside the lock lets
             # the reader commit to a frame at the instant the close is
-            # recording the debt for that same item, and T6.R1's one answer
+            # recording the debt for that same item, and contract row 6.1's one answer
             # becomes two.
             #
             # Also a survivor of the mutation round, and for the same reason as
@@ -2493,7 +2476,7 @@ class Session:
                     # A close completed while the frame was being prepared. It
                     # found the record still owed, recorded the debt, and pays
                     # it on the way out; handing this frame over as well would
-                    # be T6.R1's one answer becoming two.
+                    # be contract row 6.1's one answer becoming two.
                     return b""
                 withheld = again
                 if withheld is None:
@@ -2917,17 +2900,13 @@ class Session:
                     # the release path does (XU05). Marking it final here made
                     # the take permanent and lost the answer.
                     #
-                    # R-168-R13/(1), ASTRA OW01 + OW02. THROUGH THE SAME SINGLE
-                    # ACQUIRE as the other two takers. Round 12 removed the
-                    # obligation here by hand and never entered `_delivering`,
-                    # so the payer held the obligation while still looking
-                    # unowned to anything asking about delivery -- and round 12
-                    # had also removed the second-obligation check that used to
-                    # stop the local writer. Pause the writer at its acquire,
-                    # let the payer take, release it at any of the payer's
-                    # three boundaries: TWO responses for one admitted request,
-                    # 3 of 3 crossings, where b707bf2 passed 3 of 3. A taker of
-                    # either half owns both, and that has to include this one.
+                    # THROUGH THE SAME SINGLE ACQUIRE as the other two takers. Removing the
+                    # obligation here by hand without entering `_delivering` would leave the payer
+                    # holding the obligation while still looking unowned to anything asking about
+                    # delivery, and without the second-obligation check the local writer would not
+                    # be stopped. Pause the writer at its acquire, let the payer take, release it at
+                    # any of the payer's three boundaries: TWO responses for one admitted request.
+                    # A taker of either half owns both, and that has to include this one.
                     if self._take_delivery(token):
                         return token
                     # Somebody already owns delivery for this id; it is not

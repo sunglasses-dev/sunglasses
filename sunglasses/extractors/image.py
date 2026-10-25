@@ -113,11 +113,8 @@ class ImageExtractor:
         # 2. Metadata — hidden text in photo properties, IN EVERY FRAME.
         #    A multi-page TIFF carries a separate IFD per page, and a GIF can
         #    carry a comment block per frame, so reading page 0's metadata and
-        #    stopping is the frame bug (G1) again on the metadata side: a
-        #    two-page TIFF whose ImageDescription lives only on page 2 returned
-        #    exit 0, complete, clean. Found by T9 reasoning from the source; the
-        #    fixture turned out to be buildable after all, so it is asserted
-        #    rather than filed as an unknown.
+        #    stopping skips every later page: a two-page TIFF whose ImageDescription
+        #    lives only on page 2 would otherwise come back exit 0, complete, clean.
         for field, text in self._metadata_all_frames(image_path):
             if text.strip():
                 results.append((f"exif:{field}", text))
@@ -145,16 +142,15 @@ class ImageExtractor:
         # OCR every frame, same contract as `extract()`.
         results.extend(self._ocr_frames_of(img, source=filename))
 
-        # v0.5.6 round 7 (ASTRA I2). Round 6 put a `seek(0)` here and then read
-        # metadata ONCE. That fixed the first page by breaking the last: 0 -> 7
-        # findings for page-0-only metadata, and 7 -> 0 for page-1-only, with an
-        # empty `failures` list both times. A seek to frame 0 is not evidence that
-        # every metadata frame was read -- it just moves which page gets lost.
+        # A single `seek(0)` followed by one metadata read is not evidence that every
+        # metadata frame was read -- it just moves which page gets lost: the first
+        # page's metadata is found and the last page's is missed, with an empty
+        # `failures` list.
         #
-        # The path and bytes APIs now run the SAME bounded walk, which is the only
-        # version of "they agree" that survives a fixture on the other page.
+        # The path and bytes APIs run the SAME bounded walk, which is the only version
+        # of "they agree" that survives a fixture on the other page.
         # `_metadata_frames_of` handles its own seeking, so the parked position the
-        # OCR walk left behind no longer decides what metadata is seen.
+        # OCR walk leaves behind does not decide what metadata is seen.
         try:
             # Not when the walk above stopped on a refused frame: rewinding is a
             # seek, and the metadata walk below seeks to frame 0 on its own.
@@ -174,10 +170,10 @@ class ImageExtractor:
     # frame 0 and stays there unless you seek, so OCR read the first frame and the
     # scan reported a complete inspection of the whole file.
     #
-    # v0.5.6 round 5 (ASTRA G1): `two-frame.gif` and `two-page.tiff` came back
+    # A `two-frame.gif` or `two-page.tiff` read from frame 0 alone comes back
     # exit 0, complete, clean -- while exporting frame 2 on its own and handing it
-    # to the identical scanner produced five findings. Nothing was broken; the
-    # attack simply lived in a component nothing looked at, and the document said
+    # to the identical scanner produces findings. Nothing is broken; the attack
+    # simply lives in a component nothing looked at, and the document would say
     # everything had been looked at.
     #
     # The cap exists because a GIF can carry thousands of frames and OCR is
@@ -491,12 +487,11 @@ class ImageExtractor:
             self.failures.append(over)
             return []
 
-        # Round 7 (ASTRA I1, same mechanism as QR): `n_frames` is a property that
-        # PARSES, so a damaged later descriptor makes it RAISE -- and the `getattr`
-        # default never fires, because it only covers a missing attribute, not a
-        # getter that throws. Unguarded, that exception escaped to `dispatch`, which
-        # reported "Image extraction failed" and lost OCR and metadata for the whole
-        # file including the frames that read perfectly.
+        # `n_frames` is a property that PARSES, so a damaged later descriptor makes
+        # it RAISE -- and the `getattr` default never fires, because it only covers a
+        # missing attribute, not a getter that throws. Unguarded, that exception
+        # escapes to `dispatch`, which reports "Image extraction failed" and loses OCR
+        # and metadata for the whole file including the frames that read perfectly.
         try:
             total = getattr(img, "n_frames", 1) or 1
             total_known = True
@@ -537,7 +532,7 @@ class ImageExtractor:
                 results.append(("ocr", text))
             return results
 
-        # Round 8 (ASTRA J1). `ImageSequence.Iterator` yields THE SAME mutable
+        # `ImageSequence.Iterator` yields THE SAME mutable
         # image object, re-seeked -- it does not yield independent frames. So
         # `list(...)` does not collect the sequence: it collects N references to
         # one object, and by the time the list is built every one of them is
@@ -629,7 +624,7 @@ class ImageExtractor:
                 # them. Retrying would launch it up to 64 times and stack 64
                 # copies of one sentence in the warnings a human has to read, so
                 # the loss is reported once, for the whole file, and names the
-                # scope. (T9's review catch.)
+                # scope.
                 remaining = min(total, self.MAX_OCR_FRAMES) - index
                 self.failures.append(
                     f"{remaining} of {total} frames not read by OCR ({exc})")
@@ -828,17 +823,16 @@ class ImageExtractor:
         return self._exif_from_pil(img)
 
     # EXIF text tags whose value can legitimately arrive as BYTES, and how the
-    # spec says to read them. v0.5.6 round 5 (ASTRA G2): the extractor named
-    # XPComment as a supported field and then admitted `str` values only, so a
-    # byte-valued XPComment -- which is the ONLY way Windows writes it -- was
-    # dropped, and `exif-xpcomment.jpg` came back exit 0, complete, clean while
-    # the same bytes decoded by hand and handed to the same engine produced five
-    # findings. Naming a field as supported and then not reading it is the
-    # release's own defect in miniature.
+    # spec says to read them. XPComment is a supported field and its value is
+    # BYTES -- which is the ONLY way Windows writes it -- so a `str`-only filter
+    # would drop it, and `exif-xpcomment.jpg` would come back exit 0, complete,
+    # clean while the same bytes decoded by hand and handed to the same engine
+    # produce findings. Naming a field as supported and then not reading it is a
+    # defect in miniature.
     #
     # Scope is deliberately narrow: ONLY these text-typed tags. MakerNote, ICC
     # profiles and other binary blocks are not text and must NOT be reported as
-    # failed text -- ASTRA asked for that explicitly, and a scanner that calls
+    # failed text, and a scanner that calls
     # every binary EXIF block "undecodable text" is one nobody reads the warnings
     # of.
     _EXIF_TEXT_FIELDS = {
@@ -867,7 +861,7 @@ class ImageExtractor:
         so the count is a fact about the INPUT. A legitimate U+FFFD in the source
         is preserved and NOT counted, which is the whole point (ASTRA I5a).
         """
-        # Round 8 (ASTRA J2). A BOM selects byte order ONCE, for the whole field,
+        # A BOM selects byte order ONCE, for the whole field,
         # and it sits only at offset 0. The loop below restarts decoding at the
         # byte after each error span -- past the BOM -- so with the generic
         # "utf-16" codec every recovery read fell back to Python's default LITTLE
@@ -938,14 +932,11 @@ class ImageExtractor:
                 return raw.decode(encoding).rstrip("\x00"), None
             except UnicodeDecodeError:
                 pass
-            # v0.5.6 round 7 (ASTRA I5a). Round 6 decoded with `errors="replace"`
-            # and counted U+FFFD in the RESULT. Renaming that count from "bytes" to
-            # "units" did not fix it: a LEGITIMATE U+FFFD in the source inflates the
-            # number, so a field holding one valid replacement character plus one
-            # incomplete trailing unit was reported as TWO undecodable units. One of
-            # them was valid input. That is the G5 invariant again -- a number about
-            # the decoder's output published as a fact about the input -- and I
-            # walked into it in the very function whose comment describes it.
+            # Do not decode with `errors="replace"` and count U+FFFD in the RESULT: a
+            # LEGITIMATE U+FFFD in the source inflates the number, so a field holding one
+            # valid replacement character plus one incomplete trailing unit would be
+            # reported as TWO undecodable units, and one of them is valid input. That
+            # would publish a number about the decoder's output as a fact about the input.
             #
             # Count the decoder's OWN error spans instead, exactly as `decode_lossy`
             # does for the byte-oriented encodings, and keep every valid character.
@@ -1022,22 +1013,22 @@ class ImageExtractor:
 
     # PIL puts BINARY blocks in `img.info` beside the text chunks: the raw EXIF
     # segment, ICC profiles, Photoshop resources, palettes. Those are not text and
-    # must not be reported as undecodable text -- ASTRA asked for that boundary
-    # explicitly, and it matters: on `exif-xpcomment.jpg` the raw `exif` blob has
-    # a few bytes that are not UTF-8, which made the file read as INCOMPLETE for a
-    # reason that was not true. The XPComment inside it is read properly by the
-    # EXIF path above; the container it arrived in is not a text field.
+    # must not be reported as undecodable text, and it matters: on
+    # `exif-xpcomment.jpg` the raw `exif` blob has a few bytes that are not UTF-8,
+    # which would make the file read as INCOMPLETE for a reason that is not true.
+    # The XPComment inside it is read properly by the EXIF path above; the
+    # container it arrived in is not a text field.
     # Every entry here must be a container that is BINARY BY FORMAT. The test is
     # not "PIL gave me bytes" -- almost everything in `info` is bytes -- it is
     # "there is no text encoding defined for this block".
     #
-    # `xmp` was in this list for about twenty minutes and that was a real bug I
-    # introduced while fixing G2: XMP is an XML TEXT packet that merely arrives as
+    # `xmp` is NOT in this list: XMP is an XML TEXT packet that merely arrives as
     # bytes, and a `dc:description` inside it is exactly the kind of place an
-    # instruction hides. It made `xmp-description.jpg` -- 8 findings when the
-    # packet is scanned -- come back exit 0, complete, clean. Excluding a text
-    # format as "binary" is the same false-coverage move as never reading it, so
-    # the bar for adding a key here is a format with no text encoding at all.
+    # instruction hides. Listing it would make `xmp-description.jpg` -- which has
+    # findings when the packet is scanned -- come back exit 0, complete, clean.
+    # Excluding a text format as "binary" is the same false-coverage move as never
+    # reading it, so the bar for adding a key here is a format with no text
+    # encoding at all.
     _BINARY_INFO_KEYS = {
         "exif",              # raw EXIF segment; its text fields are read above
         "icc_profile", "photoshop", "adobe", "adobe_transform", "mpinfo",
@@ -1142,7 +1133,7 @@ class ImageExtractor:
 
         tags = {}
         parser_errors = []
-        # v0.5.6 round 6 (ASTRA H2). Pillow does NOT raise on a damaged EXIF block:
+        # Pillow does NOT raise on a damaged EXIF block:
         # it emits `UserWarning: Corrupt EXIF data` and hands back an empty tag set.
         # Catching exceptions therefore proved nothing about the parsers that warn,
         # and a count of caught exception patterns cannot stand in for handling them.
@@ -1179,8 +1170,8 @@ class ImageExtractor:
                     tags = {}
                     parser_errors.append(f"{exc.__class__.__name__}: {exc}")
 
-            # Only warnings ABOUT metadata parsing count. ASTRA was explicit that an
-            # unrelated resource warning (Pillow's "unclosed file", say) must not be
+            # Only warnings ABOUT metadata parsing count. An unrelated resource warning
+            # (Pillow's "unclosed file", say) must not be
             # rebranded as corrupt metadata -- a scanner that cries corruption at
             # every stray warning is one nobody reads the warnings of.
             metadata_warnings = [
@@ -1201,14 +1192,13 @@ class ImageExtractor:
         except Exception:
             raw_exif = b""
 
-        # v0.5.6 round 7 (ASTRA I3). Round 6 treated "container present + zero tags"
-        # as failure, and that was too broad: **zero tags is also the correct result
-        # of a successful parse of an EMPTY block.** Pillow writes exactly that --
-        # `empty-exif.jpg` is a valid 20-byte zero-entry EXIF that decodes cleanly,
-        # emits no warning and loads its raster -- and round 6 turned it from
-        # 0/complete into 3/incomplete, claiming text fields went uninspected when
-        # there were none to inspect. A false loss claim is the mirror image of a
-        # false clean, and it costs the warnings their meaning.
+        # "Container present + zero tags" is not by itself a failure: **zero tags is
+        # also the correct result of a successful parse of an EMPTY block.** Pillow
+        # writes exactly that -- `empty-exif.jpg` is a valid 20-byte zero-entry EXIF
+        # that decodes cleanly, emits no warning and loads its raster -- and treating it
+        # as a failure would claim text fields went uninspected when there were none to
+        # inspect. A false loss claim is the mirror image of a false clean, and it
+        # costs the warnings their meaning.
         #
         # Three states, not two: ABSENT (no container -> clean), SUCCESSFULLY EMPTY
         # (container, zero tags, parser silent -> clean), and FAILED (container,
@@ -1281,11 +1271,9 @@ class ImageExtractor:
                         continue
                     if isinstance(value, (bytes, bytearray)):
                         text, failure = self._decode_exif_text(tag_name, bytes(value))
-                        # `elif` here until v0.5.6 round 6. That single keyword WAS
-                        # ASTRA H3: a partial decode reported the loss and then threw
-                        # the readable half away, so the finding vanished and only the
-                        # warning survived. Both branches now run -- name the loss AND
-                        # scan what we read.
+                        # Both branches run, not an `elif`: a partial decode that reported the loss
+                        # and then threw the readable half away would make the finding vanish while only
+                        # the warning survived. Name the loss AND scan what we read.
                         if failure:
                             self.failures.append(failure)
                         if text and len(text) > 5:

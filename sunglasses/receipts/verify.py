@@ -52,7 +52,7 @@ CONTROL_EVENTS = {"receipts_off"}
 # The proxy's vocabulary, frozen here because this verifier stands alone and
 # imports nothing from the product; a test holds it equal to
 # `sunglasses.proxy.receipts.EVENTS`. A proxy run's lifecycle is its SESSION:
-# HEADER, then one of the terminals. Its items are not paired (T9 ruling 24):
+# HEADER, then one of the terminals. Its items are not paired:
 # most carry no id_token to pair by, so the verifier names that limit instead.
 PROXY_EVENTS = frozenset({
     "HEADER", "FRAME_IN", "FRAME_OUT", "ADMITTED", "SCAN_STARTED",
@@ -64,7 +64,7 @@ PROXY_EVENTS = frozenset({
 })
 PROXY_TERMINALS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
 
-# T9 ruling 44. A signed record's keys are the writer's, fixed by its schema,
+# A signed record's keys are the writer's, fixed by its schema,
 # so the key set is CLOSED per record kind and a key outside it is
 # UNKNOWN_FIELD, a failure: a quiet overwrite or a "first key wins" would let
 # the row say something its writer never built. A schema maps each key to
@@ -349,7 +349,7 @@ def _proxy_lifecycle(prefix):
     return "PAIRING_UNKEYED"
 
 
-# -- one log: a directory of segments (T9 ruling 15) -----------------------------
+# -- one log: a directory of segments ---------------------------------------
 
 # The writer's name for a segment file. Repeated here, not imported, because
 # this module must stand alone in the offline bundle.
@@ -437,7 +437,7 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
     # Judged over the verified prefixes in order: an item may open before a
     # size rotation and settle after it.
     results["lifecycle"] = _lifecycle([r for _, w in walks for r in w.prefix])
-    # T9 ruling 120. How many times authority was revoked, counted over the
+    # How many times authority was revoked, counted over the
     # VERIFIED prefixes only, so a revoke in an unsigned tail is not counted as
     # evidence. A count, not a result: it changes no code and no exit.
     report.authority_transitions = sum(
@@ -473,7 +473,7 @@ def render_log(report: LogReport, name: str = "log") -> str:
                    f"APPROVAL_INVALIDATED record(s) in the verified prefix")
     # A segment is checked alone, with no endpoint, so on its own its extent
     # is unknown. Under a log whose endpoint is confirmed that line reads as a
-    # contradiction, so it says what happened instead (T9 ruling 53). Display
+    # contradiction, so it says what happened instead. Display
     # only: the segment's result and the exit are unchanged.
     alone = report.results["expected_endpoint"] == "ENDPOINT_CONFIRMED"
     for segment_name, segment in report.segments:

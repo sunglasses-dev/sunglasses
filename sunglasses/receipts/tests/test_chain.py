@@ -249,7 +249,7 @@ print(" ".join(sorted({"dir" if d else "file" for d in synced})))
 def test_a_checkpoint_is_fsynced_with_its_directory(home):
     # The spy runs in a child process: the package's environment guard
     # (tests/test_repair_v056.py) refuses any handle on the os module in
-    # package code, a monkeypatch of it included (T9 ruling 50).
+    # package code, a monkeypatch of it included.
     import subprocess
     proc = subprocess.run([sys.executable, "-c", _FSYNC_SPY, str(HERE.parent), str(home)],
                           capture_output=True, text=True, timeout=60)

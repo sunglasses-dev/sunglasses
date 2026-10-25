@@ -179,15 +179,11 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
         else:
             # Invariant 2: silence is not a pass.
             #
-            # v0.5.6 round 5 (ASTRA G5). There used to be a `sources_found`
-            # fallback here: a mapping with a non-zero source count and NO
-            # coverage axis was read as complete. That is the invariant this
-            # module documents, contradicted three lines below where it is
-            # stated -- and it is round 4's own lesson (`aggregate`'s docstring:
-            # a non-empty source list proves content was PRODUCED, never that
-            # every requested component was INSPECTED) left un-applied to the
-            # normalizer itself. Removed. Every producer in this package sets an
-            # explicit axis; a caller that does not gets "not inspected".
+            # A non-zero source count with NO coverage axis is NOT read as complete: a
+            # non-empty source list proves content was PRODUCED, never that every
+            # requested component was INSPECTED (see `aggregate`'s docstring). Every
+            # producer in this package sets an explicit axis; a caller that does not gets
+            # "not inspected".
             extraction_complete = False
     extraction_complete = bool(extraction_complete)
 
@@ -238,10 +234,9 @@ def normalize(obj: Any, *, source: Optional[str] = None, extra: Optional[dict] =
         core = _normalize_scanresult(obj, source)
         passthrough = {}
     else:
-        # Round-4 hardening (ASTRA's API observation). `getattr(obj, ..., default)`
-        # meant `normalize(None)` and `normalize(object())` came back complete and
-        # CLEAN: every axis defaulted to the optimistic value because nothing
-        # contradicted it. Silence is not a pass -- and an input this function does
+        # `getattr(obj, ..., default)` would let `normalize(None)` and
+        # `normalize(object())` come back complete and CLEAN: every axis would default
+        # to the optimistic value because nothing contradicted it. Silence is not a pass -- and an input this function does
         # not understand is not silence, it is a caller bug. Refuse it loudly rather
         # than answer a question about a scan that never happened.
         raise TypeError(
@@ -314,11 +309,11 @@ def aggregate(children, *, source: Optional[str] = None,
     scanned_bytes = 0
 
     for label, text, result in children:
-        # v0.5.6 round 5 (ASTRA G5): this summed the EXTRACTED length, so a source
-        # longer than the engine's cap was published as though all of it had been
-        # inspected -- a number about what we handed the engine, printed as a
-        # statement about what the engine read. The child knows the real figure
-        # because the cap is applied before it counts.
+        # Sum what the engine READ: a source longer than the engine's cap would
+        # otherwise be published as though all of it had been inspected -- a number
+        # about what we handed the engine, printed as a statement about what the
+        # engine read. The child knows the real figure because the cap is applied
+        # before it counts.
         scanned_bytes += int(getattr(result, "bytes_scanned", None) or len(text or ""))
         child = normalize(result, source=label)
         preview = text if len(text) <= 100 else text[:100] + "..."

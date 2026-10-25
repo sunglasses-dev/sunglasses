@@ -33,7 +33,7 @@ EXTRA = "sunglasses[receipts]"
 OFF = "sunglasses receipts off"
 OFF_EVENT = "receipts_off"
 HOOK_LOG = ("receipts", "hook")
-# The hook log's genesis marker, beside the key (T9 ruling 60).
+# The hook log's genesis marker, beside the key.
 HOOK_MARKER = (KEY_DIR, "log-hook.genesis")
 SEGMENT_GLOB = "segment-*.chain"
 _TAIL_BYTES = 1 << 16
@@ -132,15 +132,15 @@ def opted_in(home) -> bool:
 
 
 def _chain_open(directory) -> bool:
-    # T9 ruling 56: Path.glob read a chain nobody could list as no chain, so
-    # a deleted key under an unlistable chain went quietly unsigned.
+    # Path.glob would read a chain nobody could list as no chain, so
+    # a deleted key under an unlistable chain would go quietly unsigned.
     segments = _fs.listing(directory, SEGMENT_GLOB)
     if not segments:
         return False
     # A tail that cannot be read is not an off record: it stays opted in, and
     # the key failure that follows says so, rather than going quietly unsigned.
-    # T9 ruling 34: the comment said so and the read let the OSError out, which
-    # took the hook down with exit 1 -- the one exit the host lets through.
+    # The read does not let the OSError out, which would take the hook down with
+    # exit 1 -- the one exit the host lets through.
     try:
         return _last_event(segments[-1]) != OFF_EVENT
     except OSError:

@@ -49,7 +49,7 @@ WIRE_VERSION = "sg-receipt-chain/1"
 RECORD_DOMAIN = b"sunglasses-receipt-chain/1\x00record\x00"
 CHECKPOINT_DOMAIN = b"sunglasses-receipt-chain/1\x00checkpoint\x00"
 FINGERPRINT_DOMAIN = b"sunglasses-receipt-key/1\x00ed25519\x00"
-# The hook log's genesis marker, beside the key (T9 ruling 60). Its own domain,
+# The hook log's genesis marker, beside the key. Its own domain,
 # so a marker's signature is never a checkpoint's and never the other way.
 MARKER_DOMAIN = b"sunglasses-receipt-chain/1\x00marker\x00"
 

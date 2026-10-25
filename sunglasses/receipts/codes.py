@@ -120,8 +120,8 @@ CODES = {
         "chain integrity is unaffected.",
 }
 
-# Exactly what a verifier prints about what a valid signature means. ASTRA's
-# replacement sentence, with the boundaries filled in from the actual log. It is
+# Exactly what a verifier prints about what a valid signature means, with the
+# boundaries filled in from the actual log. It is
 # a constant so it cannot drift into something friendlier over time.
 MEANING_TEMPLATE = (
     "The checkpoint signature is valid under key {fingerprint}. The supplied "
@@ -145,7 +145,7 @@ LIMITATIONS = {
 
 
 # Every code is exactly one of three classes, and the exit code comes from the
-# class (T9 rulings R46, R48). OK is a result that holds. LIMIT is a verifier
+# class. OK is a result that holds. LIMIT is a verifier
 # that could not conclude because the caller did not supply something
 # (fingerprint, endpoint, key, session, log) or the feature is specified and not
 # built (R40), with log bytes consistent with clean. FAIL is a log whose bytes
@@ -183,7 +183,7 @@ def _tag(**groups) -> dict:
 
 
 # Built from the three sets only, never from CODES with a default: a code added
-# to CODES and to no set has no class, and untagged() names it (T11 on R46).
+# to CODES and to no set has no class, and untagged() names it.
 CLASS = _tag(ok=_OK_CODES, limit=_LIMIT_CODES, fail=_FAIL_CODES)
 
 

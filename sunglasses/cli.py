@@ -2731,15 +2731,15 @@ def cmd_receipts(args):
         from .proxy import receipts as proxy_receipts
         # A proxy run in a home with no key writes its rows to `<run id>.jsonl`
         # with no chain. By the rule its writer names runs with, it is a log,
-        # and both commands name it (T9 ruling 60, Q3).
+        # and both commands name it.
         runs = [p for p in _fs.listing(state_root() / "receipts", "*.jsonl")
                 if proxy_receipts.is_run_log_name(p.stem)]
         chain_logs = []
         marker = None
         if getattr(args, "verify", False):
             # The proxy writes one chain per run under its own state root, and the
-            # hook's chain is under the home; both are signed with the home's key
-            # (T9 ruling 24b). A run moved with `--state-root` is not found here.
+            # hook's chain is under the home; both are signed with the home's key.
+            # A run moved with `--state-root` is not found here.
             from .receipts import optin
             marker = _hook_marker(sunglasses_home())
             hook = optin.hook_log(sunglasses_home())
@@ -2757,7 +2757,7 @@ def cmd_receipts(args):
                       f"Run `sunglasses init` to install the firewall.{RESET}\n")
                 return 0
             # --verify asked for a verdict and there is nothing to reach one on:
-            # a limit, never a pass (T9 ruling 53).
+            # a limit, never a pass.
             from .receipts import codes
             print(f"\n  {YELLOW}NO_LOG{RESET} {DIM}-- no receipts in {directory}. "
                   f"Run `sunglasses init` to install the firewall.{RESET}\n")
@@ -2815,13 +2815,13 @@ def cmd_receipts(args):
 
         if getattr(args, "verify", False):
             from .receipts import codes
-            # One combiner for the key, the legacy log and the chains (T9 ruling
-            # 50): a verdict joins the ones before it and never replaces them.
+            # One combiner for the key, the legacy log and the chains: a verdict joins
+            # the ones before it and never replaces them.
             code = _verify_key(sunglasses_home())
             strict = getattr(args, "strict", False)
             if files:
                 # A legacy log found on the walk carries no chain, and nothing says
-                # it should have: LOG_UNCHAINED, a limit (T9 rulings 11 Q1, 60).
+                # it should have: LOG_UNCHAINED, a limit.
                 # Its lifecycle verdict is the one it always had, joined to it.
                 print(f"\n  {DIM}legacy log ({len(files)} file(s)){RESET} "
                       f"{YELLOW}LOG_UNCHAINED{RESET} {DIM}-- predates signing; "
@@ -3846,7 +3846,7 @@ def main():
     report_parser.set_defaults(func=cmd_report)
 
     # config
-    # install / uninstall (T10.R4/R5)
+    # install / uninstall
     install_parser = subparsers.add_parser(
         "install",
         help="Rewrite an MCP server entry to launch through the Sunglasses proxy")
@@ -4148,8 +4148,8 @@ def cmd_doctor(args, _run=None):
     sources = None
     if args.config is not None:
         import pathlib as _pl
-        # `is not None`, never truthiness. ASTRA F1 (round 1, 2026-09-21): `if
-        # args.config:` reads an EMPTY STRING as an omitted option, so
+        # `is not None`, never truthiness: `if args.config:` reads an EMPTY STRING
+        # as an omitted option, so
         # `doctor --config ""` returned byte-identical output to the bare
         # command -- two entries discovered from `~/.claude.json`, the file the
         # operator had just said not to read. The everyday shape is

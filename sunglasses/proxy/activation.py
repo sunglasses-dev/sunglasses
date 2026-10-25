@@ -78,7 +78,7 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
     found = collector(list_pages, scan=scan)
 
     if not found.complete:
-        # T8.R13. There is no sha to compare, by construction, so the store is
+        # There is no sha to compare, by construction, so the store is
         # never asked. Capturing a truncation would put a document in front of
         # a human that the server never finished sending.
         # THE COLLECTOR REFUSES FIRST, AND IT KNOWS WHY. A poisoned tool
@@ -91,12 +91,12 @@ def activate(store, *, list_pages, scan, server_identity, collect=None):
                        detail=found.detail, snapshot=found,
                        rule_ids=_deciding_rule_ids(found.page_scans))
 
-    # T5.R2. Captured whatever the verdict, so the operator has the thing they
+    # Captured whatever the verdict, so the operator has the thing they
     # would be approving.
-    # T9 ruling 64 (c). A capture that cannot be written is the PROXY's state
-    # failing, and it used to raise out of the reader: the session ended as the
-    # server's MALFORMED_UPSTREAM, or, with a server that outlives EOF, not at
-    # all. It is named here and the route closes on it.
+    # A capture that cannot be written is the PROXY's state failing, and it must not
+    # raise out of the reader: the session would end as the server's
+    # MALFORMED_UPSTREAM, or, with a server that outlives EOF, not at all. It is
+    # named here and the route closes on it.
     try:
         store.capture(found.sha256, found.capture())
     except OSError as failure:

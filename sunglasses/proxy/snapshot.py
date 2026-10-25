@@ -34,7 +34,7 @@ import time
 
 from . import policy
 
-# T8.R13, as separate numbers because they bound separate things.
+# The snapshot bounds, as separate numbers because they bound separate things.
 MAX_PAGES = 64
 MAX_TOOLS = 512
 MAX_BYTES = 4 * 1024 * 1024
@@ -118,7 +118,7 @@ def collect(request, *, scan, now=None, max_pages=MAX_PAGES,
         result = scan(page)
         scans.append(result)
         if not _page_is_clean(result):
-            # T5.R3(c) is an AND over every page. A finding on page forty is a
+            # contract row 5.3(c) is an AND over every page. A finding on page forty is a
             # finding in the document being approved, and the pages before it
             # are not separately approvable.
             reason, rule = _scan_provenance(result)

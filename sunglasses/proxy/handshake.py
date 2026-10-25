@@ -13,7 +13,7 @@ would be passing through blind while the client believes otherwise.
 """
 from __future__ import annotations
 
-# T1.R2. Frozen for 0.6.0. Membership, never prefix or ordering: a version is
+# contract row 1.2. Frozen for 0.6.0. Membership, never prefix or ordering: a version is
 # supported because it is IN this set, not because it resembles one that is.
 #
 # 0.6.9 added 2025-11-25. It is the version current Claude Code offers and the
@@ -28,17 +28,17 @@ SUPPORTED_VERSIONS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
 # what a client that also speaks the earlier era is told to look for.
 DISCOVER_PROBE_METHOD = "server/discover"
 
-# T1.R3, verbatim from the row.
+# contract row 1.3, verbatim from the row.
 SUPPORTED_CAPABILITIES = frozenset({
     "tools", "resources", "prompts", "logging", "ping",
 })
 SUPPORTED_NOTIFICATIONS = frozenset({
     "notifications/cancelled",
     "notifications/initialized",
-    # T2.R12 names `message` as an upstream notification to INSPECT, and T1.R3
+    # contract row 2.12 names `message` as an upstream notification to INSPECT, and contract row 1.3
     # advertises the `logging` capability whose only wire traffic this is.
     # Omitting it advertised a capability that could never carry a message and
-    # made T2.R12's row unreachable: a rule scoped to it would have read as
+    # made contract row 2.12's row unreachable: a rule scoped to it would have read as
     # covered and never fired, which is the check that skips itself.
     "notifications/message",
     "notifications/progress",
@@ -48,7 +48,7 @@ SUPPORTED_NOTIFICATIONS = frozenset({
 
 UNSUPPORTED_PROTOCOL = "UNSUPPORTED_PROTOCOL"
 
-# T2.R16. The methods a CLIENT may send. Anything else is an extension or an
+# contract row 2.16. The methods a CLIENT may send. Anything else is an extension or an
 # unknown, and the row answers it to the client without upstream ever seeing it.
 # Declared here, once, so the selector table and the reader cannot drift into
 # two vocabularies that disagree about what a known method is.
@@ -105,7 +105,7 @@ def negotiate(params):
     return Negotiation(True, version=version)
 
 
-# T1.R3 names `resources(read)`. The parenthesis is a restriction and not a
+# contract row 1.3 names `resources(read)`. The parenthesis is a restriction and not a
 # gloss: a server may advertise `resources` with `subscribe` and `listChanged`,
 # and those are separate capabilities the client will use if it is told they
 # exist. The frozen subset is the read side only.

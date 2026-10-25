@@ -171,7 +171,7 @@ def stop_group(pid, *, grace_ms=2000, poll_ms=25, handle=None):
     try:
         _signal_group(pgid, signal.SIGTERM)
     except PermissionError:
-        # T7.R2 needs to know whether the processes are stopped. They are not,
+        # contract row 7.2 needs to know whether the processes are stopped. They are not,
         # and returning False rather than raising lets the caller record a
         # teardown that did not complete instead of crashing inside one.
         return False

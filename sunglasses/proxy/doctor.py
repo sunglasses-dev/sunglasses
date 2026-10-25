@@ -45,12 +45,12 @@ from pathlib import Path
 
 from .. import install as _install
 
-# ── classification states (T10.R2) ─────────────────────────────────────────
+# ── classification states ────────────────────────────────────────────────
 WRAPPED = "WRAPPED"
 DIRECT = "DIRECT"
 UNVERIFIED = "UNVERIFIED"
 
-# ── aggregate labels and exit codes (T10.R3) ───────────────────────────────
+# ── aggregate labels and exit codes ──────────────────────────────────────
 ROUTE_VERIFIED = "ROUTE_VERIFIED"
 ROUTE_UNVERIFIED = "ROUTE_UNVERIFIED"
 
@@ -59,7 +59,7 @@ EXIT_FAILED = 1
 EXIT_DOUBT = 3
 EXIT_OPERATIONAL = 2   # R-DOCTOR-R3a: we could not open it. Not doubt, not clean.
 
-# ── the self-test (T10.R1) ─────────────────────────────────────────────────
+# ── the self-test ───────────────────────────────────────────────────────
 SELF_TEST_CHECKS = ("initialized", "s1_forward_byte_equal", "s2_block_schema",
                     "deadline", "disconnect")
 REQUIRED_CONTROLS = ("constant_allow", "constant_deny")
@@ -94,7 +94,7 @@ ROUTE_RESULTS = ("PASS", "FAIL", NOT_RUN)
 # The only details this report will ever print. An allowlist rather than a
 # string, because `detail` is the field a future caller reaches for when it has
 # an exception to explain, and the doctor's report is read in a terminal by the
-# operator T10.R3 forbids showing upstream stderr to.
+# operator who must never be shown upstream stderr.
 DETAILS = ("", SELF_TEST_UNAVAILABLE)
 
 # The module a wrapped command has to be invoking for the entry to be ours.
@@ -166,7 +166,7 @@ class Report:
     receipts_key_cause: str = ""
 
 
-# ── T10.R1 · an instrument that cannot fail proves nothing ─────────────────
+# ── an instrument that cannot fail proves nothing ───────────────────────
 
 @dataclass
 class SelfTestVerdict:
@@ -198,23 +198,22 @@ def judge_self_test(checks, controls) -> SelfTestVerdict:
     valid = self_test_valid(controls)
     failed = [name for name in SELF_TEST_CHECKS if checks.get(name) != "PASS"]
 
-    # R-DOCTOR-R3c (T9, 2026-09-21). Nothing reported at all -- no checks AND
-    # no controls -- is an instrument that never ran, and it is a different
-    # fact from an instrument that ran and disagreed with us. Until this branch
-    # existed, `default_self_test`'s `(False, {})` fell through to SCHEMA with
-    # all five names in `failed_checks`, so every build without a live
-    # self-test told its operator that five checks had failed when not one of
-    # them had been performed. A name in `failed_checks` is an assertion that
-    # the check RAN and did not pass.
+    # Nothing reported at all -- no checks AND no controls -- is an instrument that
+    # never ran, and it is a different fact from an instrument that ran and
+    # disagreed with us. `default_self_test`'s `(False, {})` must not fall through
+    # to SCHEMA with all five names in `failed_checks`: a build without a live
+    # self-test would tell its operator that five checks had failed when not one of
+    # them had been performed. A name in `failed_checks` is an assertion that the
+    # check RAN and did not pass.
     #
     # The boundary is the controls, not the checks. A control is rigged to
     # trip, so a run that produced controls is a run that happened, and a check
     # missing from it is a real miss that stays SCHEMA. Absence is only ever
     # the whole instrument.
     #
-    # `ok` is untouched, so `process_exit_code` still returns 1 here:
-    # R-DOCTOR-R3a stands, a doctor that cannot demonstrate mediation must
-    # never imply it. The exit code was never the lie; the words were.
+    # `ok` is untouched, so `process_exit_code` returns 1 here:
+    # a doctor that cannot demonstrate mediation must
+    # never imply it. The exit code is honest; the words must be too.
     if not checks and not controls:
         return SelfTestVerdict(ok=False,
                                failed_checks=[],
@@ -270,7 +269,7 @@ def _route_result(passed) -> str:
     return "PASS" if passed else "FAIL"
 
 
-# ── T10.R2 · classification, path AND hash ─────────────────────────────────
+# ── classification, path AND hash ───────────────────────────────────────
 
 # ONE classifier, install's (R-DOCTOR-OWNER). Re-exported rather than
 # redefined. The original lived here with a different signature, unreachable
@@ -370,7 +369,7 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
     return entries, unreadable
 
 
-# ── T10.R3 · the aggregate, and what doubt does to it ──────────────────────
+# ── the aggregate, and what doubt does to it ────────────────────────────
 
 def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
     entries = list(entries)
@@ -559,10 +558,10 @@ def render(report) -> dict:
     }
 
 
-# ── T10.R4 to R6 ───────────────────────────────────────────────────────────
+# ── install and uninstall ───────────────────────────────────────────────
 #
-# Not here. R-DOCTOR-OWNER (2026-09-15): `sunglasses/install.py` is the one
-# implementation of install, uninstall and classify, because it is the one that
-# has been through 48 independent property controls. The doctor imports it and
-# never redefines it, so R2's classifier and R4's already-wrapped check are the
-# same function by construction rather than by two authors agreeing.
+# Not here. `sunglasses/install.py` is the one implementation of install,
+# uninstall and classify, so there is one implementation to test and to trust.
+# The doctor imports it and never redefines it,
+# so the classifier and the already-wrapped check are the same function by
+# construction rather than by two authors agreeing.

@@ -23,12 +23,12 @@ import time
 import json
 import math
 
-# T8.R1, T1.R2. Frozen for 0.6.0.
+# Frozen for 0.6.0.
 MAX_FRAME_BYTES = 4_194_304
 MAX_DEPTH = 64
 MAX_NODES = 100_000
 
-# T7.R1 / T4.R4. The rule is WHY the session reacts as it does; the reason is
+# contract row 7.1 / contract row 4.4. The rule is WHY the session reacts as it does; the reason is
 # what the client is told. They are separate fields because one cause maps to
 # one of each and a reader has to be able to see both.
 S3 = "S3"
@@ -38,7 +38,7 @@ MALFORMED_UPSTREAM = "MALFORMED_UPSTREAM"
 MALFORMED_CLIENT = "MALFORMED_CLIENT"
 OVER_BUDGET = "OVER_BUDGET"
 
-# T4.R4(2): the budget that was breached, named. A receipt saying OVER_BUDGET
+# contract row 4.4(2): the budget that was breached, named. A receipt saying OVER_BUDGET
 # without saying WHICH bound is not gradeable against the fixtures.
 BUDGET_FRAME = "frame"
 BUDGET_DEPTH = "depth"
@@ -218,7 +218,7 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
     # The caller's list, when it wants to know; a private one otherwise, so the
     # generator never has to test for None in the loop.
     unterminated = [] if unterminated is None else unterminated
-    # AR10, T8.R3. `partial[0]` is when an incomplete frame first appeared in
+    # `partial[0]` is when an incomplete frame first appeared in
     # the buffer, or None when there is none. The frame-assembly deadline is
     # measured from here because only this loop knows it, and it is published
     # rather than checked here because the check has to happen while this loop
@@ -246,7 +246,7 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
         while b"\n" in buffer:
             line, buffer = buffer.split(b"\n", 1)
             # THE TERMINATOR STAYS ON. A frame is its bytes including the LF:
-            # T8.R1 bounds the "raw wire frame incl. LF", and a reader that
+            # the limit bounds the "raw wire frame incl. LF", and a reader that
             # strips it measures one byte short, so a frame exactly one over the
             # inclusive cap passes. Keeping it also means what the reader
             # forwards is byte-for-byte what arrived, rather than a
@@ -342,13 +342,13 @@ def parse_frame(raw, *, origin="upstream"):
 
     if isinstance(raw, str):
         raw = raw.encode("utf-8", "surrogatepass")
-    # T8.R1 bounds the frame INCLUDING its terminator, so the size is measured
+    # The limit bounds the frame INCLUDING its terminator, so the size is measured
     # before the terminator is removed for parsing. Measuring the stripped line
     # lets a frame exactly one byte over the inclusive cap through.
     size = len(raw)
     body = raw[:-1] if raw.endswith(b"\n") else raw
 
-    # T8.R1 BEFORE the parse. A frame over the wire limit is refused without
+    # The limit applies BEFORE the parse. A frame over the wire limit is refused without
     # being parsed, because parsing it is the cost the bound exists to refuse.
     if size > MAX_FRAME_BYTES:
         return Frame(ok=False, rule=S3, reason=OVER_BUDGET, budget=BUDGET_FRAME,

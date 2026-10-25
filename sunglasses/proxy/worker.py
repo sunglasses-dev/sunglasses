@@ -22,7 +22,7 @@ that is not S1, S2 or S7 is S3. "Not obviously bad" is not a verdict.
 """
 from __future__ import annotations
 
-# T4.R1's enums. Frozen for 0.6.0.
+# contract row 4.1's enums. Frozen for 0.6.0.
 STATUS_COMPLETE = "complete"
 STATUS_INCOMPLETE = "incomplete"
 STATUS_EXCEPTION = "exception"
@@ -138,7 +138,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
     # T402. `status: complete` and `inspection_complete: false` is a scan
     # saying it finished and did not finish. The pair was checked in one
     # direction only, so a result carrying a finding could claim completion
-    # while admitting it had not read everything, and T4.R4 would then settle
+    # while admitting it had not read everything, and contract row 4.4 would then settle
     # it as a complete inspection.
     if (result.get("status") == STATUS_COMPLETE
             and result.get("inspection_complete") is not True):
@@ -154,7 +154,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
         value = result.get(counter)
         # T403 applies to the BYTE counters. 19.5 bytes were not inspected by
         # anything, and a fractional count cannot be compared to the byte
-        # totals T4.R2 checks it against. `elapsed_ms` is a DURATION and half a
+        # totals contract row 4.2 checks it against. `elapsed_ms` is a DURATION and half a
         # millisecond is an ordinary measurement, so it stays a finite number:
         # applying the byte rule to it was me over-reading the row.
         if counter in _BYTE_COUNTERS:
@@ -188,7 +188,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
         # T405. When the catalog says which LANE an id belongs to, the
         # finding's own `source` has to agree. `GLS-SD-001` is an engine id, so
         # a helper claiming it is a deterministic lane asserting an engine
-        # detection, and T4.R4(7) would read that as the engine having found a
+        # detection, and contract row 4.4(7) would read that as the engine having found a
         # secret. One check, one thing: the id names its lane, the worker does
         # not get to reassign it.
         if isinstance(catalog, dict) and finding["rule_id"] in catalog:
@@ -198,7 +198,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
                     f"{catalog[finding['rule_id']]!r} lane and the finding "
                     f"claims {finding.get('source')!r}")
         if not isinstance(finding["rule_id"], str) or finding["rule_id"] not in catalog:
-            # T4.R6. A worker cannot confer authority on itself by naming a rule.
+            # contract row 4.6. A worker cannot confer authority on itself by naming a rule.
             raise Invalid(
                 f"rule id {finding['rule_id']!r} is not in the trusted catalog")
 

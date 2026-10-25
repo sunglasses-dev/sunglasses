@@ -74,7 +74,7 @@ MARKER = "x-sunglasses"
 # only the shape of argv, which is why the assertion below moved with it.
 LAUNCH = ("-m", "sunglasses.proxy")
 
-# The five fields T10.R4 names. A record may carry more, never fewer.
+# The five fields a record carries. A record may carry more, never fewer.
 RECORD_FIELDS = ("original_entry", "installed_entry", "file_sha_before",
                  "file_sha_after", "original_bytes_path")
 
@@ -412,9 +412,9 @@ LOCKING = "flock" if fcntl is not None else None
 # never a wrong delete.
 
 # Bound once, as an ATTRIBUTE and not a computed lookup: the package forbids
-# `getattr(os, ...)` (a reader in disguise, ASTRA E33/E34) and the repo guard
-# `test_package_reads_no_undeclared_environment_variables` caught the first cut
-# of this line. The flag is POSIX-only, so its absence is an ImportError-shaped
+# `getattr(os, ...)` (a reader in disguise) and the repo guard
+# `test_package_reads_no_undeclared_environment_variables` refuses the computed
+# form. The flag is POSIX-only, so its absence is an ImportError-shaped
 # fact and is handled the same way `fcntl` is.
 try:
     _O_NOFOLLOW = os.O_NOFOLLOW
@@ -425,9 +425,9 @@ except AttributeError:                             # pragma: no cover - posix he
 _HELD: dict = {}
 
 # target path -> the lock file that serialises transactions on it. Dynamically
-# scoped for the SAME reason as `_EXPECTED`: the reviewer's race barrier
+# scoped for the SAME reason as `_EXPECTED`: the race-barrier test
 # replaces `_atomic_write` with a two-positional stub, so anything that reaches
-# the rename as an argument turns his instrument into a TypeError instead of a
+# the rename as an argument turns that test into a TypeError instead of a
 # refusal. It travels beside the expectation and arrives at the same instant.
 _LOCK_FOR: dict = {}
 
@@ -819,11 +819,10 @@ def _read_note(path):
     held = intent.get("held")
     sha = intent.get("sha256")
     owner = intent.get("owner")
-    # R13-IDENTITY (ASTRA round 12, `R12_INVALID_SECOND_NOTE_MUST_NOT_ANSWER`).
     # A note is identified by WHAT it names, WHAT that should hash to, and WHO
-    # wrote it. Round 12 compared the filename alone, so a valid-shaped note
-    # carrying the same held name and a wrong digest answered for bytes it had
-    # never seen, and the good note was deleted on the strength of it.
+    # wrote it. Comparing the filename alone would let a valid-shaped note carrying
+    # the same held name and a wrong digest answer for bytes it has never seen,
+    # and the good note would be deleted on the strength of it.
     if not isinstance(held, str) or not held or not _is_digest(sha):
         return None
     if not isinstance(owner, str) or not owner:
@@ -1112,8 +1111,8 @@ def _release_owner_file(private, fh):
     # R18-A-CLEANUP-THAT-RAISES-DESTROYS-THE-ERROR-IT-WAS-CLEANING-UP. This runs
     # in a `finally`, so ANY exception escaping it replaces whatever was already
     # propagating -- the caller's real failure disappears and the traceback
-    # blames the cleanup. `except OSError` was too narrow and the reviewer's
-    # `test_C4_precommit_fault_atomic_no_success[write]` and `[flush]` proved it:
+    # blames the cleanup. `except OSError` was too narrow, as
+    # `test_C4_precommit_fault_atomic_no_success[write]` and `[flush]` proved:
     # their fault injection hands back an object with no `.close()`, the
     # AttributeError escaped, and the child died with the atomicity assertion
     # never reached. A real `open` always returns a closeable file, so this was
@@ -1169,14 +1168,11 @@ def _filesystem_type(path):
             libc = ctypes.CDLL(None, use_errno=True)
             # NAMED, NOT COMPUTED. The package guard
             # `test_package_reads_no_undeclared_environment_variables` refuses
-            # `getattr(obj, <variable>)` anywhere in the wheel -- a computed
-            # lookup is a reader in disguise (ASTRA E33/E34) -- and the first
-            # cut of this loop tried three symbol names that way. It was green
-            # in tests/proxy and RED in the receipt, which is what the receipt
-            # is for. `statfs64` is the 64-bit-inode entry point on every macOS
-            # this package supports and `statfs` is its alias there; the old
-            # `statfs$INODE64` shim belongs to the 32-bit era and cannot be
-            # written as an attribute anyway.
+            # `getattr(obj, <variable>)` anywhere in the wheel -- a computed lookup is a
+            # reader in disguise -- so each symbol name is spelled out as an attribute.
+            # `statfs64` is the 64-bit-inode entry point on every macOS this package
+            # supports and `statfs` is its alias there; the old `statfs$INODE64` shim
+            # belongs to the 32-bit era and cannot be written as an attribute anyway.
             try:
                 fn = libc.statfs64
             except AttributeError:
@@ -1537,7 +1533,7 @@ def _collect_discharged_notes(d, held_name):
     # hashed `R12_AUDIT_NEW_SHAPES[qualified_site_relocation]` locates the real
     # `_discard` site by asserting that `                q.unlink()` appears in
     # install.py EXACTLY once before it relocates it. A second one anywhere in
-    # the file at that indentation turns the reviewer's row red in its SETUP,
+    # the file at that indentation turns the audit test's row red in its SETUP,
     # which reads like the audit escape coming back and is nothing of the kind.
     for spent in sorted(d.glob("*.taking*")):
         note = _read_note(spent)
@@ -1681,28 +1677,26 @@ def _forget_held(taking, private, owner):
             pass
         return
 
-    # R11-PUTBACK-CONTESTS-THE-NAME (ASTRA round 10,
-    # `R10_FORGET_PUTBACK_NEW_OWNER`). The rename above is exclusive on the
-    # INODE and says nothing about the destination NAME: a new owner can claim
+    # PUT-BACK CONTESTS THE NAME. The rename above is exclusive on the INODE and
+    # says nothing about the destination NAME: a new owner can claim
     # `<name>.taking` while we hold the old note privately, and a plain rename
     # back would overwrite it. So the put-back competes for the name the same
     # way the claim does, and loses gracefully: if a new owner is there, ITS
     # note stands and the one we are holding is stale -- whatever it referred
     # to has already been dealt with by whoever moved it on.
-    # R12-A-NAME-CONTEST-IS-NOT-PROOF (ASTRA round 11,
-    # `R11_REAL_TWO_FORGETS_ONE_DELAYED_CLAIM`). Round 11 treated EEXIST as
-    # proof that the note being held was stale. It is not: a delayed claimant
-    # can win the freed name having moved NO bytes, and the note discarded on
-    # that EEXIST was the only thing naming the held inverse. A note is
-    # discarded only when what it points at has been DEALT WITH -- the held
-    # bytes are back at the canonical name, or another VALID note names the
-    # same held file -- and never merely because somebody else holds a name.
-    # BEFORE the link-back, not after. The alias this call is about to leave
-    # behind if it is killed is created by the rename above, and ASTRA's driver
-    # ends the process the instant `os.link` returns -- anything written after
-    # that line never runs in the world the control measures. Collecting here
-    # means the aliases of every owner that has already died are gone before
-    # this one can be added to them.
+    #
+    # A NAME CONTEST IS NOT PROOF. EEXIST does not show that the note being held is
+    # stale: a delayed claimant can win the freed name having moved NO bytes, and
+    # a note discarded on that EEXIST would be the only thing naming the held
+    # inverse. A note is discarded only when what it points at has been DEALT WITH
+    # -- the held bytes are back at the canonical name, or another VALID note names
+    # the same held file -- and never merely because somebody else holds a name.
+    #
+    # Collect BEFORE the link-back, not after. The alias this call is about to
+    # leave behind if it is killed is created by the rename above, and a driver
+    # that ends the process the instant `os.link` returns never runs anything
+    # written after that line. Collecting here means the aliases of every owner
+    # that has already died are gone before this one can be added to them.
     _collect_stale_aliases(taking.parent, private, intent)
     try:
         os.link(str(private), str(taking))
@@ -1719,15 +1713,13 @@ def _forget_held(taking, private, owner):
             except OSError:
                 pass
             return
-        # R13-NEVER-DELETE-WHAT-YOU-DID-NOT-AUTHOR (ASTRA round 12,
-        # `R12_TWO_NOTES_MUTUAL_DISCARD`). Round 12 discarded here when the
-        # bytes looked answered for by ANOTHER note -- and two cleanups each
-        # holding a copy of the same note each saw the other as the answer and
-        # both deleted, so the held bytes ended up named by nothing. "Somebody
-        # else has this covered" is not a fact when the somebody else is doing
-        # the same thing at the same time. A note we did not author is never
-        # ours to remove; it stays under a name `_reclaim_taken` scans, and the
-        # sweep is where leftovers go.
+        # NEVER DELETE WHAT YOU DID NOT AUTHOR. Discarding here when the bytes look
+        # answered for by ANOTHER note fails when two cleanups each holding a copy of
+        # the same note see the other as the answer and both delete: the held bytes
+        # end up named by nothing. "Somebody else has this covered" is not a fact
+        # when the somebody else is doing the same thing at the same time. A note we
+        # did not author is never ours to remove; it stays under a name
+        # `_reclaim_taken` scans, and the sweep is where leftovers go.
         return
     except OSError:
         return
@@ -2034,13 +2026,12 @@ def _adopt_standby(home, name, target):
         # say it is for THIS server's retained original before it is promoted.
         if claim.get("original_bytes_path") != str(bytes_path):
             continue
-        # R11-ADOPT-THE-CURRENT-ONE (ASTRA round 10,
-        # `R10_TWO_PAIRS_SELECT_CURRENT_WRAPPER`). More than one standby can be
-        # on disk -- a transaction that ended and another that ran after it --
-        # and round 10 took the first it found by name order, which is the
-        # oldest. A standby is the inverse of a PARTICULAR published wrapper, so
-        # the one to adopt is the one whose record describes the file that is
-        # actually there. Sorted order is not a decision.
+        # ADOPT THE CURRENT ONE. More than one standby can be on disk -- a
+        # transaction that ended and another that ran after it -- and name order does
+        # not establish which one is current. A standby is the inverse of a PARTICULAR
+        # published wrapper, so the one to adopt is the one whose record describes the
+        # file that is actually there. The digest comparison below is the selection
+        # rule; sorted order is not a decision.
         try:
             _validate_record(claim, name, expect_state="complete")
         except ConfigConflict:
@@ -2059,12 +2050,10 @@ def _adopt_standby(home, name, target):
         except OSError:
             continue
         if not usable and not exhausted:
-            # R12-PREFER-A-PAIR-THAT-VALIDATES (ASTRA round 11,
-            # `R11_TWO_MATCHING_PAIRS[first_bytes_wrong]`). Two pairs can
-            # describe the live file, and round 11 took the first and fell
-            # straight to entry-only while a byte-exact inverse sat beside it.
-            # Entry-only is what is left when nothing validates, not what
-            # happens to be first.
+            # PREFER A PAIR THAT VALIDATES. Two pairs can describe the live file; taking
+            # the first and falling straight to entry-only while a byte-exact inverse sits
+            # beside it is wrong. Entry-only is what is left when nothing validates, not
+            # what happens to be first.
             continue
         if not usable:
             # The bytes are not an inverse and promoting them would write
@@ -2224,12 +2213,11 @@ def _discard(*paths):
             except OSError:
                 pass
             continue
-        # R7-OWNER-CHECK-UNLINK (ASTRA round 6, `R6_OWNER_CHECK_UNLINK_GAP`).
-        # Round 6 asked whether a record claimed these bytes and then unlinked
-        # the path, and he paused it between the two: a second install completed
-        # in that gap, published its own retained original at this very name,
-        # and the unlink removed THAT. Checking closer to the unlink does not
-        # help, because a check and an unlink are two operations on a NAME.
+        # OWNER CHECK, THEN UNLINK, IS A GAP. Asking whether a record claims these
+        # bytes and then unlinking the path leaves a window between the two: a second
+        # install can complete in that gap, publish its own retained original at this
+        # very name, and the unlink removes THAT. Checking closer to the unlink does
+        # not help, because a check and an unlink are two operations on a NAME.
         #
         # So take the bytes before asking about them. The rename is atomic, and
         # afterwards we hold an inode rather than a name, which is the only
@@ -2238,7 +2226,7 @@ def _discard(*paths):
         # record, the copy we are holding is the superseded one and ours to drop.
         held = _unique_name(lambda k: q.with_name(
             q.name + f".discarding-{os.getpid()}-{k:x}"))
-        # R8-TAKE-JOURNALLED (ASTRA round 7, `R7_TAKE_CRASH_RECOVERABLE`). The
+        # THE TAKE IS JOURNALLED. The
         # take is atomic, but a process that ends between the take and the
         # question leaves the bytes under a name no recovery path looks for,
         # and the record that claims them pointing at a file that is gone. So
@@ -2434,9 +2422,9 @@ def _validate_record(record, name, *, expect_state):
                 f"{want.__name__}")
     if "file_sha_after" not in record:
         raise ConfigConflict(f"the record for {name!r} is missing file_sha_after")
-    # R5-AFTER-NULL / R5-AFTER-LIST / R5-EXISTED-LIST (ASTRA round 4). Presence
-    # was checked and TYPE was not, so a record carrying `null` or `[]` for the
-    # after-digest was accepted and restoration proceeded through the inverse.
+    # The after-digest's TYPE is checked, not only its presence: a record carrying
+    # `null` or `[]` for it is refused, not accepted with restoration proceeding
+    # through the inverse.
     # A COMPLETE record has always been through the replace, so its after-digest
     # is a digest; a PENDING one has not, so `null` there is a state and not a
     # defect, which is why only the complete case is strict.
@@ -2779,13 +2767,11 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         identities = {"retained": _identity(bytes_path)}
     except ConfigIOError:
         raise
-    # R9-INVERSE-FIRST (ASTRA round 8,
-    # `R8_REBUILD_WRITE_FAILURE_KEEPS_USABLE_INVERSE`). Round 8 rebuilt the
-    # inverse out of bytes held in memory once it noticed it had been
-    # cancelled, and a rebuild that needs to WRITE can fail: his rows failed
-    # the retained write and the record write in turn, and both left a wrapper
-    # with nothing behind it. A recovery plan that only exists in memory is not
-    # on disk, and the whole PR is about what is on disk.
+    # INVERSE FIRST. Rebuilding the inverse out of bytes held in memory once a
+    # cancellation is noticed needs a WRITE, and a write can fail: the retained
+    # write and the record write can both fail and leave a wrapper with nothing
+    # behind it. A recovery plan that only exists in memory is not on disk, and
+    # what matters here is what is on disk.
     #
     # So a second copy of the inverse goes down BEFORE the wrapper is
     # published, under a name a competing cleanup does not know to remove --
@@ -2878,14 +2864,13 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         _discard(spare_bytes, spare_record)
         raise
 
-    # R7-CANCELLED-IN-FLIGHT (ASTRA round 6, `R6_INSTALL_RACES_UNINSTALL`). A
-    # concurrent uninstall ran while we were inside the replace. It found our
-    # PENDING journal, could not tell an interrupted transaction from a live
-    # one, correctly concluded the target was still the original, and discarded
-    # our journal and our retained bytes. Every step of that is defensible from
-    # where it stood. What is not defensible is what we did next: we published
-    # the wrapper and wrote a completed record pointing at retained bytes that
-    # no longer exist, so the install looked successful and had no inverse.
+    # CANCELLED IN FLIGHT. A concurrent uninstall can run while we are inside the
+    # replace. It finds our PENDING journal, cannot tell an interrupted transaction
+    # from a live one, correctly concludes the target is still the original, and
+    # discards our journal and our retained bytes. Every step of that is defensible
+    # from where it stands. What is not defensible is publishing the wrapper and
+    # writing a completed record pointing at retained bytes that no longer exist:
+    # the install would look successful and have no inverse.
     #
     # The transaction that cannot see the other one is the one that must check.
     # An install owns its own material from the moment it writes it, and at the
@@ -2908,30 +2893,23 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             # directory after a cancellation it had handled perfectly well.
             _discard(rec_path, spare_bytes, spare_record)
         else:
-            # R8-INVERSE-LAST (ASTRA round 7, `R7_CANCEL_ROLLBACK_REFUSAL`).
-            # The rollback can fail for two honest reasons: the write itself
-            # errors, or its compare-and-swap correctly refuses because a
-            # different install landed while we were being cancelled. Round 7
-            # raised a typed refusal here and asked for the file to be
-            # reconciled by hand, which leaves a wrapper on disk with nothing
-            # that can undo it -- the one state every round of this PR has been
-            # about. The bytes we overwrote are still in hand, so the inverse is
-            # rebuilt rather than mourned: retained bytes back, a completed
-            # record describing what we published, and THEN the refusal. An
-            # uninstall after this works, and it restores entry-only if the
-            # competing install changed the file, which leaves that install
-            # alone.
-            # Two renames of files that are already on disk, not two writes.
-            # Round 8 rebuilt by writing, and a write can fail: that is exactly
-            # what his rows failed, one at the retained copy and one at the
-            # record, and both left a wrapper with nothing behind it.
-            # R10-PROMOTION-DISCARDS-NOTHING (ASTRA round 9,
-            # `R9_PROMOTION_IO_FAILURE`). Round 9 ran the cleanup whatever
-            # happened, so a promotion that failed at either rename took the
-            # remaining material with it: the standby pair was the last copy of
-            # the inverse and the handler deleted it. Nothing is discarded until
-            # the canonical inverse has been READ BACK from disk; if it is not
-            # there, every file stays where it is and the refusal says so.
+            # INVERSE LAST. The rollback can fail for two honest reasons: the write itself
+            # errors, or its compare-and-swap correctly refuses because a different
+            # install landed while we were being cancelled. Raising a typed refusal here
+            # and asking for the file to be reconciled by hand would leave a wrapper on
+            # disk with nothing that can undo it. The bytes we overwrote are still in
+            # hand, so the inverse is rebuilt rather than mourned: retained bytes back, a
+            # completed record describing what we published, and THEN the refusal. An
+            # uninstall after this works, and it restores entry-only if the competing
+            # install changed the file, which leaves that install alone.
+            # Two renames of files that are already on disk, not two writes: a write can
+            # fail, at the retained copy or at the record, and either failure would leave a
+            # wrapper with nothing behind it.
+            # PROMOTION DISCARDS NOTHING. Running the cleanup whatever happened would let a
+            # promotion that failed at either rename take the remaining material with it:
+            # the standby pair is the last copy of the inverse. Nothing is discarded until
+            # the canonical inverse has been READ BACK from disk; if it is not there, every
+            # file stays where it is and the refusal says so.
             rebuilt = True
             try:
                 # The standby bytes are checked before they are promoted, the
@@ -3193,9 +3171,8 @@ def _uninstall_locked(config_path, name, *, home):
     # R5-RETAINED: the retained bytes are validated before they are trusted,
     # and F1: so is the path they are read from and deleted at.
     #
-    # R10-ENTRY-ONLY-WITHOUT-BYTES (ASTRA round 9,
-    # `R9_STANDBY_DISAGREEMENT[retained_disagrees]`). When the retained copy
-    # does not survive validation, round 9 refused and the wrapper stayed on
+    # ENTRY-ONLY WITHOUT BYTES. When the retained copy
+    # does not survive validation, refusing would leave the wrapper on
     # disk with no way out. But the bytes are only needed for the BYTE-EXACT
     # restore; putting the entry back needs the record, which is intact and
     # says what was there. Refusing both because one is unusable is how a
@@ -3206,10 +3183,9 @@ def _uninstall_locked(config_path, name, *, home):
     try:
         retained_path, retained = _retained_of(record, name, home=home)
     except _RetainedUnusable as e:
-        # NARROW ON PURPOSE (R-177-R10a, corrected). Falling back for every
-        # unusable retained copy changes R5-reviewed behaviour that five of the
-        # reviewer's own rows pin, and they said so the moment it was tried.
-        # The fallback belongs only to a record that was promoted from a
+        # NARROW ON PURPOSE (R-177-R10a). Falling back for every
+        # unusable retained copy would change behaviour that existing test rows
+        # pin. The fallback belongs only to a record that was promoted from a
         # standby whose bytes had already failed: there the bytes were never
         # this record's to begin with, and refusing would leave a wrapper that
         # nothing can undo.
@@ -3263,9 +3239,8 @@ def _uninstall_locked(config_path, name, *, home):
     else:
         del servers[name]
     if retained_failure is not None:
-        # R13-ONE-AUTHORITY-FD (ASTRA round 12, `R12_AUTHORITY_REPLACEMENT`).
-        # Round 12 re-opened the set-aside copy immediately before the write,
-        # which is closer but still two opens: the evidence could be replaced
+        # ONE AUTHORITY DESCRIPTOR. Re-opening the set-aside copy immediately before
+        # the write still leaves two opens: the evidence could be replaced
         # between the second open and the write, and between the predicate and
         # the write at `_atomic_write`'s own entry. An authorisation that can be
         # re-taken is an authorisation with a lifetime, and this one's lifetime

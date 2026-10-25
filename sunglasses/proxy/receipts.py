@@ -24,7 +24,7 @@ import threading
 import time
 import uuid
 
-# T9.R2's allowlist. An event outside it cannot be written, for the same reason
+# The allowlist. An event outside it cannot be written, for the same reason
 # the client envelope is built by naming fields: a log that accepts any kind is
 # a log whose schema is whatever the last caller felt like.
 EVENTS = frozenset({
@@ -33,7 +33,7 @@ EVENTS = frozenset({
     "RELEASE_AUTHORIZED", "WRITE_ATTEMPT", "WRITE_COMPLETE", "WRITE_STALLED",
     "SETTLED", "UPSTREAM_CLOSED", "SESSION_TORN_DOWN", "WATCHDOG",
     "RECEIPT_IO_ERROR", "NOTIFICATION_DROPPED", "TEARDOWN",
-    # T902, T9.R2. Required by the row and missing from the allowlist, so the
+    # Required by the contract: without it in the allowlist, the
     # one event that says the stderr cap was applied could not be written.
     "STDERR_BOUNDED",
     # R-179-R6/R5_NOATTEMPT_REFUSAL. A typed refusal is only typed if the log
@@ -41,20 +41,19 @@ EVENTS = frozenset({
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
     "SETTLEMENT_REFUSED",
-    # APPROVAL_INVALIDATED. The third time this list has cost a change, and the
-    # two comments above are the first two. The durable record is written by
-    # `Route._invalidated` through `_record` (the session's `_emit` is memory
-    # only and checks nothing), so a kind missing here is a ValueError on the
-    # revoke path. A new KIND and no new field (T9 ruling 120): a 0.6.0 verifier
-    # reads it as UNKNOWN_EVENT under lifecycle, never an integrity failure.
+    # APPROVAL_INVALIDATED. The durable record is written by `Route._invalidated`
+    # through `_record` (the session's `_emit` is memory only and checks nothing),
+    # so a kind missing here is a ValueError on the revoke path. A separate KIND and no
+    # added field: a 0.6.0 verifier reads it as UNKNOWN_EVENT under lifecycle, never
+    # an integrity failure.
     "APPROVAL_INVALIDATED",
     # 0.6.9. The `server/discover` probe is declined with Method not found and
     # is not a refusal: nothing was withheld, because nothing was asked for.
-    # A new KIND and no new field (T9 ruling 120).
+    # A separate KIND and no added field.
     "PROBE_DECLINED",
 })
 
-# T9.R5. The events that END a session. A log that stops without one of these
+# The events that END a session. A log that stops without one of these
 # is not a clean short session; it is a session whose ending is unknown, and a
 # verifier that returns ok for it certifies the absence of evidence.
 TERMINAL_EVENTS = frozenset({"SESSION_TORN_DOWN", "TEARDOWN"})
@@ -66,7 +65,7 @@ _ID_TOKEN = re.compile(r"\A[0-9a-f]{16}\Z")
 _RULE_ID = re.compile(r"\AGLS-[A-Z0-9-]{1,60}\Z")
 # A run's id is its log's name under the state root's receipts/: 32 lowercase
 # hex, from new_run_id(). The writer names the log by this rule and the
-# verifier reads by it (T9 ruling 58): an entry with this name is a run's log,
+# verifier reads by it: an entry with this name is a run's log,
 # so one that cannot be listed is PATH_UNREADABLE, never "not there".
 _RUN_ID = re.compile(r"\A[0-9a-f]{32}\Z")
 
@@ -79,7 +78,7 @@ def new_run_id():
 def is_run_log_name(name):
     return _RUN_ID.match(name) is not None
 
-# T9.R3's never-list, as field names rather than as a hope. Anything not in the
+# The never-list, as field names rather than as a hope. Anything not in the
 # permitted set for an event is dropped, and these are named so a reader can see
 # what was being guarded against.
 FORBIDDEN_FIELDS = frozenset({
@@ -103,7 +102,7 @@ PERMITTED_FIELDS = frozenset({
     "advertised", "supported", "offered", "reason", "terminal",
     "session_id", "server_identity", "config_sha", "budget_version",
     "catalog_version", "contract_version",
-    # NO `authority_epoch` (T9 ruling 120). This set is FROZEN with the wire
+    # NO `authority_epoch`. This set is FROZEN with the wire
     # #172 shipped inside v0.6.0: every 0.6.0 verifier holds a copy and reads a
     # key outside it as UNKNOWN_FIELD, a failure (R44), and a post-tag change is
     # an epoch, never an edit (R22). The transition record carries its reason in
@@ -112,7 +111,7 @@ PERMITTED_FIELDS = frozenset({
 
 
 
-# T9 ruling 41. Every variable-length field has its own bound, so a row fits
+# Every variable-length field has its own bound, so a row fits
 # the wire's 16 KiB line BY CONSTRUCTION. rule_ids come from matches on
 # attacker input, and when an oversized row was refused the failure was kept
 # and every later row refused with it: enough matches switched the audit off
@@ -131,9 +130,9 @@ def _encoded_size(value):
                .encode("utf-8", "surrogatepass"))
 
 
-# T9 ruling 43 part 2. The wire refuses a control character or a lone
+# The wire refuses a control character or a lone
 # surrogate, and a peer chooses the strings the proxy writes, so a refusal
-# here was an off switch the peer held. A receipt is never refused for what
+# here would be an off switch the peer holds. A receipt is never refused for what
 # the peer sent: a control character becomes its JSON escape as text, six
 # characters, so a newline can never split a record; a lone surrogate becomes
 # U+FFFD. Deterministic, counted per field in `sanitized`.
@@ -156,7 +155,7 @@ def _sanitized(value):
     return value, 0
 
 
-# T9 ruling 44. A signed row's keys are OURS, fixed by the schema. Escaping a
+# A signed row's keys are OURS, fixed by the schema. Escaping a
 # control character in an object's KEYS can make two keys one (`"a\x00"`
 # escapes to exactly the key `"a\\u0000"`), and the row then keeps one of
 # them with nothing saying the other existed. So a peer object is never
@@ -252,8 +251,8 @@ def _check_value(name, value):
         return
     # detector_status is checked BEFORE the null shortcut below, because it is
     # OURS: a supplied None would claim a cause and name nobody, and the route
-    # OMITS the field when there is no cause. Same hole, same day, as origin on
-    # feat/admitted-carries-origin (ASTRA r1, 2026-09-22).
+    # OMITS the field when there is no cause. Origin has the same hole and the same
+    # rule.
     if name == "origin":
         # ORIGIN IS OURS, and that is exactly why it is checked here. The five
         # fields below are checked because they arrived from the WIRE; this one
@@ -270,12 +269,11 @@ def _check_value(name, value):
         return
     # ORIGIN IS CHECKED BEFORE THIS LINE ON PURPOSE. `None` here means "the
     # caller did not have one", which is right for the wire-supplied fields
-    # below. For origin it was a hole: the check lived AFTER this return, so an
-    # explicit `origin=None` skipped it and was written as a null author -- a
+    # below. For origin it would be a hole: a check placed AFTER this return lets an
+    # explicit `origin=None` skip it and be written as a null author -- a
     # record claiming nobody sent the request. An OMITTED origin never reaches
     # this function (`_clean` iterates only the fields passed), so optional
     # stays optional; a SUPPLIED None is a value, and it is not one of three.
-    # (ASTRA r1 on 8d21e5d, 2026-09-22.)
     if value is None:
         return
     if name == "reason_code":
@@ -298,12 +296,11 @@ def _check_value(name, value):
                 raise ValueError(f"rule id {rule_id!r} is not an engine rule id")
 
     elif name == "id_token":
-        # R-T903-1 (T9, 2026-09-14 10:24). The MINTED grammar, not merely a
-        # string. `session._item_token` produces sixteen lowercase hex
-        # characters, and requiring that is what refuses a peer-supplied id
-        # passed under this field name -- which is the actual risk it carries,
-        # because a raw JSON-RPC id is peer text and a receipt is read as a
-        # record of what happened. A structural check would keep out ASTRA's
+        # The MINTED grammar, not merely a string. `session._item_token` produces
+        # sixteen lowercase hex characters, and this check rejects values outside that
+        # grammar. It validates shape, not provenance: callers must supply the
+        # internally minted token, because a raw JSON-RPC id is peer text and a receipt
+        # is read as a record of what happened. A structural check would keep out a
         # `{'raw': ...}` and let a chosen string through.
         if not isinstance(value, str) or not _ID_TOKEN.match(value):
             raise ValueError(
@@ -357,7 +354,7 @@ class Verification:
         self.ok = ok
         self.reason = reason
         self.detail = detail
-        # T9.R5's last clause, carried on the result rather than left to a
+        # The lifecycle rule's last clause, carried on the result rather than left to a
         # reader's assumption. This is the field most likely to be over-read.
         self.proves = ("schema", "order", "completion")
         self.signed = False
@@ -375,7 +372,7 @@ class Log:
         self._failure = None
         self.on_fsync = None
         self._handle = None
-        # #172, T9 rulings 11 and 24b. Once the user has run `receipts init` the
+        # Once the user has run `receipts init` the
         # signed chain IS the log: one chain per run, in the directory beside
         # where its jsonl would have been. The key lives in the sunglasses home
         # and nowhere else; `--state-root` moves the log, never the key. With no
@@ -527,7 +524,7 @@ class Log:
                 str(pointer).encode("utf-8", "surrogatepass")).hexdigest()
         return out
 
-    # ── T9.R2: durable before irreversible ──────────────────────────────────
+    # ── durable before irreversible ─────────────────────────────────────────
     def authorise_release(self, id_token, *, write):
         """Record and fsync the authorisation, THEN let the bytes go.
 
@@ -556,7 +553,7 @@ class Log:
             self._failure = failed
             raise ReceiptIOError(f"the receipt could not be made durable: {failed}")
 
-    # ── T9.R4 ───────────────────────────────────────────────────────────────
+    # ── test seam ──────────────────────────────────────────────────────────
     def fail_writes(self, error):
         """Test seam: make every later append fail the way a full disk does."""
         self._failure = error
@@ -660,7 +657,7 @@ def _chain_for(directory, home):
     return chain.Chain(directory, signer, producer="proxy")
 
 
-# ── T9.R5 ──────────────────────────────────────────────────────────────────
+# ── verify ─────────────────────────────────────────────────────────────
 def verify(path):
     """Schema, order and completion. Nothing about delivery."""
     lines = [line for line in pathlib.Path(path).read_text().splitlines() if line]

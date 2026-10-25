@@ -65,7 +65,7 @@ class Breach:
         self.detail = detail
         self.inspection_complete = inspection_complete
         # WHICH of a row's limits broke, from a fixed vocabulary, for callers
-        # that put this in evidence. `budget` cannot carry it: T4.R7 v5.1 says
+        # that put this in evidence. `budget` cannot carry it: contract row 4.7 v5.1 says
         # budget is populated ONLY for OVER_BUDGET, and OVERLOADED is not a
         # budget breach. `detail` cannot carry it either -- it is prose, and
         # prose is what receipts exclude by name. R6 has two limits under one
@@ -217,5 +217,5 @@ def exit_status(*, fatal, upstream_code, pending):
     if fatal:
         return 1
     if pending:
-        return 1                      # T7.R1, exit with pending calls is S5
+        return 1                      # contract row 7.1, exit with pending calls is S5
     return upstream_code
