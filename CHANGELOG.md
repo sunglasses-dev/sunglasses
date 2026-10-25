@@ -5,6 +5,104 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.13] — 2026-10-25
+
+### Added
+
+- `sunglasses scan --dir` and `--repo` take `--jobs N`, a whole number from 1 to 64 (default 1: one
+  file at a time, no pool, no extra process). With N above 1 the bytes of up to N files are scanned
+  by N scanner children at once while each file is still read, routed and judged as it is with `--jobs 1`, and the
+  results come back in walk order. When the tree does not change and every file is read to the end
+  in both runs, the report holds the same files, findings, lists and exit code as `--jobs 1`, in
+  the same order; a file that reaches `--file-deadline` is reported as not read (exit 3), and
+  whether a file does can differ between runs with different N. At most 2N files are held at a
+  time. `--jobs` with a single file, text or stdin, or a value outside 1 to 64, is refused with
+  exit 2 before anything is scanned; with `--file-deadline 0`, or where a process group cannot be
+  stopped, files are read one at a time and a note says so. SIGTERM and SIGINT stop every child.
+  (#467, #472)
+
+### Changed
+
+- A scanner that cannot start, before any scanner has answered for a file, is one failure on every
+  path: `sunglasses scan` exits 2, prints one line `scanner could not start: <reason>` and no
+  report, banner, progress or traceback; with `-o json` or `-o sarif` the output is the single
+  refusal document the other can't-scan cases use. This covers an engine that fails to build (in
+  the scan child or in the process itself, text and stdin included), a child that cannot be created,
+  exits or never says it is ready, and the deep scanner's constructor. A directory or repository
+  scan is refused only when no scanner has answered for any file handed out so far. A scanner that
+  cannot start after one has answered is not a refusal: that file is listed as not inspected with
+  the reason, the scan goes on, and the exit code follows the existing precedence. A scan that
+  succeeds keeps its decisions, findings and exit codes. (#478)
+
+- `sunglasses uninstall NAME` prints `Restored 'NAME' in <file> (byte-identical to the file before
+  an earlier install)` when two or more installs stack on one file, are undone first-installed-first
+  and the restored file is byte for byte the file as it was before an earlier install. A real
+  foreign edit keeps the "file changed after the install" warning. The bytes written to the MCP
+  config do not change; install records gain the pre-install digests of the installs they stack on,
+  and uninstall uses them only to choose the sentence it prints. (#481)
+
+- When the first of two stacked installs is undone first, `sunglasses uninstall` names each later
+  install that is still wrapped in the file (`later sunglasses install still wrapped here: 'NAME'`,
+  one line per install, oldest first, each name printed with its `repr`) and says to uninstall each
+  the same way. The names are printed only when the later installs are the whole difference between
+  the file as read and this install's after-image; a foreign edit, a gap or fork in the records or
+  a record for another file keeps the existing sentence. (#486)
+
+- `GLS-AIFP-002` finds an override of the agent's instructions that says `any` or `all` and names
+  `user or system` or `user or developer` instructions ("overrides any user or system
+  instruction"). A negated override ("never overrides ...") stays clear. (#475)
+
+- `GLS-GHSA-PI-202` does not fire on the confirmation prompt a coding agent prints to the person
+  at the keyboard, for example `Run shell command? (Y)es/(N)o [Yes]: n`. After `run shell`, `run bash`
+  or `run aws cli` the rule skips only this fixed text: a space, `command`, a question mark, a space,
+  then the paired choice `(Y)es/(N)o` ending at a word boundary. Every other `run shell`, `run bash`
+  or `run aws cli` text still fires, including a mismatched choice, a longer word (`(N)ow`), a choice
+  on the next line, extra spacing and a plain "Yes". (#491)
+
+- Twelve rules allow a fixed distance between their two parts instead of an unbounded gap: the
+  second and third regexes of `GLS-AB-001`, the fourth of `GLS-CI-004`, the second and third of
+  `GLS-PT-001`, the `subprocess` alternative of `GLS-CI-005`; `GLS-CI-007` (the gap before the
+  expression and the inner field), the second regex of `GLS-SC-014`, `GLS-EX-009`, `GLS-TD-004`,
+  `GLS-SC-001`, `GLS-MCP-009`, `GLS-EX-019`, and each alternative of `GLS-SC-003`. A hit whose two
+  parts sit further apart than the bound is not reported by these regexes; a hit inside the bound
+  is reported with the same match (span, text and groups). The gaps written with `.` or `[^\n]`
+  stop at LF (and the LF of a CRLF) but take a bare CR, which counts toward the bound; the gaps
+  written with a negated class that takes line breaks count them. (#484, #485)
+
+### Internal
+
+- `SunglassesEngine()` reads where a caret-led co-occurrence predicate splits and, for a rule that
+  asks for anchored mode, whether its regex has a lookaround and the longest match it can make, from
+  a generated table (`sunglasses/_derivation_table.py`, written by `scripts/gen_derivation_table.py`;
+  `--check` exits 1 when the module is stale) instead of deriving them at every start. A source
+  outside the shipped rules, a source the table does not hold and a module that cannot be imported
+  use the live derivation. No detection changes. The table holds no digest of the functions it was
+  derived from: a change that alters a generated answer fails `tests/test_derivation_table.py`
+  until the module is regenerated, and an edit that leaves every answer the same is not detected.
+  (#488)
+
+- A new workflow, `pattern-perf`, runs for every pull request as a `pull_request_target` job from
+  the copy on the base branch, so the pull request cannot edit the job that judges it. It times the
+  regexes the pull request changes, base against head, with `scripts/pattern_perf_gate.py`, treats
+  the head as data (no checkout, install or import of it) and publishes one commit status named
+  `pattern-perf`. The verdict reads the waiver file of the base only; a pull request that changes a
+  rule and the waiver file together fails. Requiring the status in branch protection is a repository
+  setting. (#489)
+
+- `pytest.ini` sets `faulthandler_timeout = 300`: a test that runs longer than five minutes prints
+  every thread's Python stack to stderr; the test is not stopped and nothing else is reported
+  differently. (#479)
+
+- Probe texts for `GLS-EX-015` are kept as fixtures under
+  `tests/fixtures/ex015_corpus/`, each pinned to the decision the engine gave on the base commit;
+  `python3 tests/test_ex015_probe_corpus.py --regen` rewrites the expected files after an intended
+  change. (#480)
+
+- The two nested-load tests in `tests/test_whisper_model_notice.py` each get a private lock and a
+  private load record, so one of them failing cannot break the tests after it. (#471)
+
+- `stats/current.json`: `last_updated` for 0.6.12 is the PyPI upload time of the wheel. (#469)
+
 ## [0.6.12] — 2026-10-23
 
 ### Changed
