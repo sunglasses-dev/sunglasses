@@ -1,4 +1,4 @@
-"""T4.R3, the engine's vocabulary onto the wire's.
+"""The engine's vocabulary onto the wire's.
 
 Written against `tests/test_proxy_inspection.py`, committed first from the rows.
 
@@ -8,11 +8,12 @@ It is a CONSTRUCTOR, never a copy. The engine names the bytes it matched in
 `matched_text` and keeps the whole message in `raw_input` and
 `normalized_input`, which is the most useful thing in the result for a human
 and the most dangerous thing to forward, because every road out of a worker
-result ends at the client through T4.R7 or at the receipt log through T9.R2.
+result ends at the client through contract row 4.7 or at the receipt log through
+contract row 9.2.
 Each finding is rebuilt from three named fields, so a field nobody named cannot
 travel and a field the engine adds next release cannot either.
 
-And T3.R1 decides what the engine is given: every coverage leaf joined by
+And contract row 3.1 decides what the engine is given: every coverage leaf joined by
 newlines. Not the raw frame. Handing it the frame scans our own envelope,
 charges protocol scalars against a content budget that excludes them, and only
 misses nothing by accident. Object KEYS are coverage leaves, which is the part
@@ -22,9 +23,9 @@ Fail closed is the direction throughout. A scan that raised did not look, so it
 is `exception` and never `allow`, because allow is the engine's word for having
 looked.
 
-WHAT THIS IS NOT, IN THE DEFAULT MODE: the T4 worker PROCESS. By default
-(`--worker inprocess`) the engine runs in this process, so T8.R4's kill on
-deadline and T8.R7's worker stdout bound do not apply to it and a scan that
+WHAT THIS IS NOT, IN THE DEFAULT MODE: the worker PROCESS. By default
+(`--worker inprocess`) the engine runs in this process, so contract row 8.4's kill on
+deadline and contract row 8.7's worker stdout bound do not apply to it and a scan that
 hangs stalls the session rather than being killed at 2,000 ms. The session
 holds the message throughout, so nothing is released by the stall, but the
 bound is not enforced on that path and saying otherwise would be the kind of
@@ -56,7 +57,7 @@ _engine = None
 
 def default_engine():
     """One engine per process. Loading the pattern set per message would put a
-    cold start inside T8.R4's inspection clock on every frame."""
+    cold start inside contract row 8.4's inspection clock on every frame."""
     global _engine
     if _engine is None:
         from ..engine import SunglassesEngine
@@ -72,7 +73,7 @@ HELPER_PIN_IDS = ("GLS-FW-PIN-TOFU", "GLS-FW-PIN-MISMATCH", "GLS-FW-PIN-DRIFT")
 
 
 def engine_catalog():
-    """T4.R6's pinned engine ids: the pattern set AND the mechanism lane.
+    """Contract row 4.6's pinned engine ids: the pattern set AND the mechanism lane.
 
     Both, and the second half is the part that was missing. The mechanism rules
     are eleven ids the engine can return like any other, and 1,546 + 11 is
@@ -92,19 +93,19 @@ def engine_catalog():
 
 
 def helper_catalog():
-    """T4.R6's enrolled deterministic helper lane, enumerated from firewall.py."""
+    """Contract row 4.6's enrolled deterministic helper lane, enumerated from firewall.py."""
     from .. import firewall
     return frozenset({str(rule.id) for rule in firewall.SECRET_RULES}
                      | set(HELPER_PIN_IDS))
 
 
 def trusted_catalog():
-    """T4.R6 in full: engine ids union helper lane ids."""
+    """Contract row 4.6 in full: engine ids union helper lane ids."""
     return engine_catalog() | helper_catalog()
 
 
 def scanner_input(params):
-    """T3.R1. Every coverage leaf, in document order, joined by newlines.
+    """Every coverage leaf, in document order, joined by newlines.
 
     The join is ours and is not counted against the content budget, which is
     why `content_bytes` is measured separately rather than as the length of
@@ -114,7 +115,7 @@ def scanner_input(params):
 
 
 def scan(params, *, channel, binding, content_bytes, engine=None):
-    """One held message to one T4.R1 worker result."""
+    """One held message to one contract row 4.1 worker result."""
     engine = engine if engine is not None else default_engine()
     text = scanner_input(params)
     inspected = len(text.encode("utf-8", "surrogatepass"))

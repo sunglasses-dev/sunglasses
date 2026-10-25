@@ -1,6 +1,6 @@
 """A real MCP stdio server, bundled so the self test has something to spawn.
 
-T10.R1 spawns the installed artifact against this and T12.R1 requires real
+Contract row 10.1 spawns the installed artifact against this and contract row 12.1 requires real
 pipes and real upstreams. Nothing here is clever on purpose: a self test whose
 server is a mock proves the mock agrees with us, and an echo whose output a
 test cannot predict exactly gives S1's byte equality check nothing to compare.

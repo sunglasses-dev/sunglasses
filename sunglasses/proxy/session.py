@@ -1,6 +1,6 @@
 """Settling every held request exactly once, with the cause that came first.
 
-T7.R2 is a teardown procedure, and the part of it that is easy to get wrong is
+Contract row 7.2 is a teardown procedure, and the part of it that is easy to get wrong is
 not killing processes. It is this sentence: "settle each KNOWN pending client
 request ONCE with the FIRST recorded cause and rule". Three separate claims hide
 in it and each one has a way of failing quietly.
@@ -15,7 +15,7 @@ in it and each one has a way of failing quietly.
   answered.
 
   THE FIRST CAUSE. A fault does not become a different fault because a later one
-  arrives. T4.R4 Rule A is explicit that a recorded fault is terminal and is
+  arrives. Contract row 4.4 Rule A is explicit that a recorded fault is terminal and is
   never superseded by a later cancellation, and Rule B carves out the one
   exception in the other direction, a NORMAL completion that has not yet
   settled.
@@ -204,9 +204,9 @@ class Cause:
         than one that is wrong: the receipt no longer says anything about the
         rule, and code that reads it raises rather than disagreeing.
 
-        Found by review as V05, on values returned by `record()` and `settle()`.
-        The lesson is that "immutable" is a property of every mutating verb, and
-        I had only thought of one of them.
+        This applies to values returned by `record()` and `settle()`.
+        "Immutable" is a property of every mutating verb, so deletion is
+        guarded as well as assignment.
         """
         if getattr(self, "_frozen", False):
             raise AttributeError(
@@ -315,19 +315,19 @@ class Session:
 
         `method` is the method the request was issued with, kept so a later
         response can be checked against the request it claims to answer. The
-        record used to be a bare timestamp, which is why T2 and T13 of ASTRA's
-        round 2 could not be satisfied: nothing here knew what a pending id was
+        record used to be a bare timestamp, which is why round 2 could not be satisfied:
+        nothing here knew what a pending id was
         waiting for. Nothing reads it yet; the pump does.
 
         Three refusals, and two of them were missing. The old version replaced
         an existing entry and returned success, so a second call with a live id
         silently retired the first request; and it accepted an id that had
         already been settled, so a cancelled id could be reused and answered
-        twice. ASTRA's G2-20 derivatives execute both.
+        twice. Derived probes execute both.
 
         A DUPLICATE PENDING ID TEARS THE SESSION DOWN. It is not a busy signal:
         the peer and we disagree about which request an id names, so every
-        correlation after it is a guess. That is a protocol fault, T7.R1, and
+        correlation after it is a guess. That is a protocol fault, contract row 7.1, and
         the session cannot continue through it.
         """
         with self._lock:
@@ -387,7 +387,7 @@ class Session:
             return [cause.frozen() for cause in self._causes.get(request_id, [])]
 
     def terminal_cause(self, request_id):
-        """T4.R4 Rule A: the FIRST recorded fault, not the most recent one.
+        """Contract row 4.4 Rule A: the FIRST recorded fault, not the most recent one.
 
         `min` by recorded order rather than by precedence, because precedence
         decides between causes known at the SAME settlement instant and this
@@ -411,7 +411,7 @@ class Session:
 
     @staticmethod
     def precedence_winner(causes):
-        """T4.R4's numbered order, for causes known at ONE settlement instant."""
+        """Contract row 4.4's numbered order, for causes known at ONE settlement."""
         if not causes:
             return None
         return min(causes, key=lambda c: (_PRECEDENCE.get(c.reason, 99), c.at))
@@ -420,12 +420,12 @@ class Session:
     def settle(self, request_id, cause, *, origin=ORIGIN_API):
         """Answer an item once, with the cause that is actually terminal.
 
-        Four refusals and one substitution, three of which were missing.
+        Four refusals and one substitution.
 
-        UNKNOWN IDS. The old version checked only whether an id was already
-        settled, so any id at all could be settled, including one the client
-        never issued. G2-20's unsolicited response and G2-15's reverse request,
-        which deliberately reuses a pending client id, both land here. Settling
+        UNKNOWN IDS. Checking only whether an id was already settled would let
+        any id at all be settled, including one the client never issued. An
+        unsolicited response and a reverse request that deliberately reuses a
+        pending client id both land here. Settling
         an id we do not owe an answer for either invents a response or retires
         somebody else's request, so an unknown id is refused and REPORTED rather
         than raising, since it is a fact about the peer and not a bug in us.
@@ -436,7 +436,7 @@ class Session:
         settled has a bug in its own ordering and a silent overwrite puts two
         answers for one id on the wire.
 
-        AND THE CAUSE MAY NOT BE THE ONE OFFERED. T4.R4 Rule A: if a FAULT was
+        AND THE CAUSE MAY NOT BE THE ONE OFFERED. Contract row 4.4 Rule A: if a FAULT was
         recorded for this item first, that fault is terminal and the caller's
         cause does not replace it. A recorded deadline followed by a clean
         settlement used to become clean.
@@ -478,7 +478,7 @@ class Session:
     def settle_or_report(self, request_id, cause, *, origin=ORIGIN_API):
         """Settle it, or say it was ALREADY settled. One lock, one answer.
 
-        R-179-R6/R5_WITHHOLD_CLOSE. Callers asked `settled_as` and then called
+        Callers asked `settled_as` and then called
         `settle`, which is check-then-act across two acquisitions of this lock:
         a legitimate teardown landing between them settles the token, and the
         `settle` that follows raises `Settled` out of `Route.client_frame` --
@@ -512,7 +512,7 @@ class Session:
 
     # ── teardown ────────────────────────────────────────────────────────────
     def teardown(self, cause, *, stop_processes=None):
-        """T7.R2. Stop admitting, settle everything owed, once, first cause wins.
+        """Stop admitting, settle everything owed, once, first cause wins.
 
         Returns the causes each owed item was settled with, so the caller can
         write one client error per item. Idempotent: a second teardown settles
@@ -620,10 +620,10 @@ class Session:
             return self._admitting
 
     def exit_code(self):
-        """T7.R2 ends nonzero. A session that tore down did not succeed, and a
+        """Contract row 7.2 ends nonzero. A session that tore down did not succeed, and a
         zero exit is read by everything upstream of us as "it worked".
 
-        T803. A CLEAN session whose upstream exited non-zero is not a success
+        A CLEAN session whose upstream exited non-zero is not a success
         either. The server failed and said so; swallowing its code and
         reporting 0 tells whatever runs the proxy that the run was fine, which
         is the proxy inventing a verdict about something it only carried.

@@ -1,11 +1,11 @@
-"""T10's doctor, and the difference between doubt and a finding.
+"""The doctor, and the difference between doubt and a finding.
 
 Written against `tests/test_proxy_doctor.py` and
 `tests/test_proxy_doctor_reader.py`, both committed first from the rows.
 
 This module answers one question, "is my traffic actually going through the
 proxy", and the hard part is not the checking, it is what it is allowed to say
-when it does not know. T10.R3 makes that asymmetric on purpose. ROUTE_VERIFIED
+when it does not know. Contract row 10.3 makes that asymmetric on purpose. ROUTE_VERIFIED
 requires every known source readable, every entry WRAPPED, and every wrapped
 route PASSED. Everything else is ROUTE_UNVERIFIED, an unreadable file and an
 empty config included, because a config we could not parse is not a config with
@@ -16,17 +16,15 @@ this tool can say.
 
 Three codes, and they are three different statements. 0 says verified. 3 says
 doubt, some part of the picture is unknown. 1 says a thing we ran failed in
-front of us, which is not doubt, and R3 gives it precedence over both.
+front of us, which is not doubt, and contract row 10.3 gives it precedence over both.
 
-WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: R1's live
-self-test spawns `sys.executable -m sunglasses.proxy` against a bundled echo
-server. Both artifacts EXIST on main since #168 -- this paragraph said they did
-not until 2026-09-21, which was true of the branch it was written on and stopped
-being true underneath it; an assertion of absence expires when the tree gains
-the thing. What is still absent is the spawn itself, which is 0.6.1's own row.
-`default_self_test` and `default_launcher` therefore still report failure, now
-with failure_class SELF_TEST_UNAVAILABLE and the five checks rendered NOT_RUN
-(R-DOCTOR-R3c), and `run()` exits 1, which is the safe direction: a doctor that
+WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: contract row
+10.1's live self-test spawns `sys.executable -m sunglasses.proxy` against a
+bundled echo server. Both artifacts exist in the package. What is still absent
+is the spawn itself.
+`default_self_test` and `default_launcher` therefore still report failure, with
+failure_class SELF_TEST_UNAVAILABLE and the five checks rendered NOT_RUN, and
+`run()` exits 1, which is the safe direction: a doctor that
 cannot demonstrate mediation must never imply it. They are the seam the real
 spawn lands in, and they are injectable so the decision logic above them is
 exercised today.
@@ -129,7 +127,7 @@ class Entry:
 
 @dataclass
 class Outcome:
-    """R3's three lines, kept as three fields. Collapsing them loses which of
+    """Contract row 10.3's three lines, kept as three fields. Collapsing them loses which of
     the three a reader is looking at, and an operator needs the inventory most
     precisely when the aggregate is a failure."""
     aggregate: str
@@ -179,7 +177,7 @@ class SelfTestVerdict:
 
 
 def deadline_line(measured_ms) -> str:
-    """The measured figure beside the bound. R-DOCTOR-R3b: an operator who sees
+    """The measured figure beside the bound. An operator who sees
     `3100 ms measured against a 2250 ms bound` learns something true and
     actionable; one who sees "the machine may have been busy" learns to ignore
     the doctor."""
@@ -187,7 +185,7 @@ def deadline_line(measured_ms) -> str:
 
 
 def judge_self_test(checks, controls) -> SelfTestVerdict:
-    """The whole R1 decision, in one place.
+    """The whole contract row 10.1 decision, in one place.
 
     Controls first: if the instrument agreed with something that always says the
     same thing, nothing the checks report means anything, so the run is void
@@ -244,19 +242,19 @@ def self_test_valid(controls) -> bool:
 
 
 def default_self_test():
-    """The seam R1's live self-test lands in. See the module docstring: the
-    artifact it has to spawn does not exist on this branch, so this reports
+    """The seam contract row 10.1's live self-test lands in. See the module
+    docstring: the spawn it has to perform is not built, so this reports
     failure rather than an empty pass."""
     return False, {}
 
 
 def default_launcher(entry):
-    """The seam R2's per-route launch lands in. Same reason, same direction.
+    """The seam contract row 10.2's per-route launch lands in. Same reason, same direction.
 
-    `None`, not `False`. CU-M8 (2026-09-30): this returned `False`, which every
-    reader takes to mean "launched and failed", so a build with no launcher
-    reported every wrapped route as FAIL in `--json` while the text said nothing
-    was marked failed. Nothing was launched, and the verdict says so.
+    `None`, not `False`: `False` is what every reader takes to mean "launched
+    and failed", so a build with no launcher would report every wrapped route as
+    FAIL in `--json` while the text said nothing was marked failed. Nothing was
+    launched, and the verdict says so.
     """
     return None, {}
 
@@ -398,9 +396,9 @@ def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
 
 def receipts_key_status(home=None):
     """(OFF | ON | KEY_UNUSABLE, cause). Signing on with a key that cannot
-    sign stops every wrapped route's proxy before it starts (R24b a), so the
+    sign stops every wrapped route's proxy before it starts, so the
     doctor names it rather than leaving the user a route that will not start
-    and no reason (R21 b). No key imports none of the signing code."""
+    and no reason. No key imports none of the signing code."""
     import pathlib
     if home is None:
         from ..firewall import sunglasses_home
@@ -419,8 +417,9 @@ def receipts_key_status(home=None):
 
 
 def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False) -> int:
-    """R3's precedence, `1 > 2 > 3 > 0` (R-DOCTOR-R3a, and AGENTS.md's own
-    order).
+    """Contract row 10.3's precedence as this function applies it: a failure
+    we know about is 1, an operational error is 2, doubt about a route is 3, and
+    a clean run is 0.
 
     A failed self-test is 1 regardless of how clean the inventory reads, because
     an instrument that failed has no standing to report on anything else, and a
@@ -514,7 +513,7 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
 def _safe_checks(checks) -> dict:
     """Named checks with allowlisted verdicts, nothing else.
 
-    R3's last sentence is that the doctor never prints upstream stderr, and the
+    Contract row 10.3's last sentence is that the doctor never prints upstream stderr, and the
     way that promise gets broken is a dict passed through whole. Both the key
     and the value are allowlisted, because a check name we recognise carrying an
     exception string is the same leak by a shorter route.

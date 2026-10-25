@@ -1,7 +1,7 @@
 """
 File → text routing for scanning.
 
-Audit finding C1: `SunglassesEngine.scan_file()` was a raw `open().read()`, so the
+`SunglassesEngine.scan_file()` was a raw `open().read()`, so the
 CLI's `scan --file` read PDFs and images as bytes and reported "no threats detected"
 on files whose payload lived in a compressed content stream. The extractors in this
 package existed and worked; nothing routed to them. (The MCP `scan_file` tool was
@@ -59,7 +59,7 @@ class UnreadableFile(OSError):
 class NonRegularFile(UnreadableFile):
     """The path exists but is not a regular file: FIFO, socket, device, directory.
 
-    v0.5.6 round 4 (ASTRA F3). ``_probe_readable`` used to prove readability by
+    v0.5.6 round 4. ``_probe_readable`` used to prove readability by
     OPENING the path. Opening a read-only FIFO with no writer BLOCKS in the kernel,
     so an MCP ``scan_file`` on a named pipe never returned a result at all -- the
     server simply stopped answering, which is worse than a wrong answer because a
@@ -135,10 +135,9 @@ def decode_lossy(raw: bytes):
 
     Returns ``(text, undecodable_bytes, first_bad_offset)``.
 
-    v0.5.6 round 5 (ASTRA G5). The previous version decoded with
+    v0.5.6 round 5. The previous version decoded with
     ``errors="replace"``, counted the U+FFFD characters and then stripped every
-    U+FFFD from the result. Three things were wrong with that, and ASTRA found
-    all three:
+    U+FFFD from the result. Three things were wrong with that:
 
       * a two-byte unfinished sequence produces ONE replacement character, so it
         was reported as one unread byte when two went unread;
@@ -176,8 +175,7 @@ def decode_lossy(raw: bytes):
 def read_text_source(path: str):
     """Return (text, warnings). Bytes we could not decode are named, not hidden.
 
-    v0.5.6 round 4, found while probing the expanded matrix -- same class as F1/F4,
-    one surface over. Every text read in this package was `open(..., errors="ignore")`,
+    Every text read in this package was `open(..., errors="ignore")`,
     which DROPS undecodable bytes and reports nothing. A 256-byte file of 0xff/0x00
     pairs scanned as 128 bytes and came back `inspection_complete: true, is_clean:
     true`: half the file was discarded and the document claimed a full inspection.
@@ -261,7 +259,7 @@ def _extract_image(path: str):
 def _extract_pdf(path: str):
     """Page text + document metadata + annotations.
 
-    v0.5.6 round 4 (ASTRA F4): the extractor's ``failures`` list was never read
+    v0.5.6 round 4: the extractor's ``failures`` list was never read
     here. A valid PDF whose annotation array held one malformed element made
     ``_extract_annotations`` abandon the loop, the following instruction-bearing
     annotation was never extracted, and this returned ``complete=True`` -- CLI
@@ -377,7 +375,7 @@ def _probe_readable(path: str) -> None:
     Guarding the branches that read is not enough when a branch that does not read
     can be selected by filename alone. Checking first covers every branch at once.
 
-    ORDER MATTERS (round 4, ASTRA F3). The file TYPE is checked on stat metadata
+    ORDER MATTERS (round 4). The file TYPE is checked on stat metadata
     first, because the readability check opens the path and opening a FIFO with no
     writer blocks forever. A probe that hangs is not a probe.
     """
@@ -405,7 +403,7 @@ def _matches(head: bytes, magic: bytes, offset: int) -> bool:
 def _is_webp(head: bytes) -> bool:
     """RIFF + 'WEBP' at offset 8. A WebP is an IMAGE wearing a RIFF container.
 
-    v0.5.6 round 5 (T9). `_MAGIC_MEDIA` matches bare `RIFF` and labels it
+    v0.5.6 round 5. `_MAGIC_MEDIA` matches bare `RIFF` and labels it
     "RIFF container (WAV/AVI)", so every `.webp` was routed to the deep-scan
     branch and reported exit 3 with "not transcribed — Nothing in <file> was
     inspected". Not a false clean, but a false REASON: the file was never sent to

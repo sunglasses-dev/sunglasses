@@ -1,6 +1,7 @@
 """What version we speak, and what we are willing to say the server can do.
 
-T1.R2 fixes the version set and T1.R3 fixes the capability intersection. Written
+Contract row 1.2 fixes the version set and contract row 1.3 fixes the capability
+intersection. Written
 against `tests/test_proxy_handshake.py`, which was committed first from the rows.
 
 The capability rule is an INTERSECTION and that word is doing work. It is bounded
@@ -88,7 +89,7 @@ class Negotiation:
 
 
 def negotiate(params):
-    """T1.R2. Exactly one of the frozen versions, or refuse and close.
+    """Exactly one of the frozen versions, or refuse and close.
 
     Membership in the tuple, not a prefix and not a comparison. `2025-06-18-beta`
     starts with a supported version and is not it; `2025-06` is a truncation of
@@ -115,13 +116,13 @@ _CAPABILITY_SUBSET = {
 
 
 def advertise(upstream_capabilities):
-    """T1.R3. Upstream's capabilities INTERSECTED with what we support.
+    """Upstream's capabilities INTERSECTED with what we support.
 
     The intersection is applied at TWO levels, and the second is the one I
     missed. Filtering the names alone advertises `resources` with whatever
     members upstream attached, so a client told that `subscribe` and
     `listChanged` exist will use them and the proxy has promised to mediate
-    traffic it has no rule for. The row says `resources(read)`; the parenthesis
+    traffic it has no rule for. Contract row 1.3 says `resources(read)`; the parenthesis
     is the restriction.
 
     Values are otherwise upstream's own, carried through rather than invented,
@@ -143,7 +144,7 @@ def advertise(upstream_capabilities):
 
 
 def notification_supported(method):
-    """T1.R3's last sentence: anything unlisted is rejected on arrival.
+    """Contract row 1.3's last sentence: anything unlisted is rejected on arrival.
 
     Membership again. `notifications/cancelled/extra` is accepted by a prefix
     match and is not the method the row names.

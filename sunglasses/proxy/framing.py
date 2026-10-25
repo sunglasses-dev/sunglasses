@@ -1,13 +1,14 @@
 """Reading one frame off the wire, and saying exactly what is wrong with it.
 
-T1.R2 fixes the parser and T7.R1 fixes which faults tear a session down, and the
+Contract row 1.2 fixes the parser and contract row 7.1 fixes which faults tear a session
+down, and the
 two only make sense together: the same malformed line can be a PROTOCOL fault
 that ends the session or a RESOURCE breach that refuses one message, and the
 contract separates them deliberately.
 
-  T7.R1  protocol faults are S5: unparseable, invalid UTF-8, duplicate key,
+  Contract row 7.1  protocol faults are S5: unparseable, invalid UTF-8, duplicate key,
          not JSON-RPC 2.0, both result and error, invalid id type.
-  T4.R4(2)  structural and resource breaches are NOT S5. Depth, nodes and frame
+  Contract row 4.4(2)  structural and resource breaches are NOT S5. Depth, nodes and frame
          size are S3 OVER_BUDGET with the budget named, and the session may
          continue.
 
@@ -52,7 +53,7 @@ class NotJsonNumber(ValueError):
     not JSON, no MCP peer is entitled to send them, and they poison every
     numeric comparison downstream: a budget check against NaN is false whichever
     way it is written, so a counter of NaN passes "at most" and "at least" at
-    once. Found by ASTRA's independent checks, not by mine.
+    once.
     """
 
 
@@ -84,7 +85,7 @@ def _finite_float(literal):
 
 
 def _no_duplicate_keys(pairs):
-    """T1.R2's `object_pairs_hook`.
+    """Contract row 1.2's `object_pairs_hook`.
 
     `json.loads` keeps the LAST value for a repeated key and says nothing. That
     is a disagreement about what the message says, between us and whatever wrote
@@ -183,7 +184,7 @@ def _shape(value):
 
 
 def valid_id(value):
-    """T1.R2: ids are string, number or null, and the JSON type is retained.
+    """Ids are string, number or null, and the JSON type is retained.
 
     `isinstance(True, int)` is True in Python, so a bool reaches a naive number
     check as a number. `true` is not a valid JSON-RPC id and a proxy that
@@ -201,7 +202,7 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
                   partial=None):
     """Frames, read with a ceiling, instead of `readline` with none.
 
-    T1.R2's bounded reader, which ASTRA's review noted was absent.
+    Contract row 1.2's bounded reader, which was absent.
     `iter(source.readline, b"")` reads until it finds a newline however far away
     that is, and checking the wire limit against the line it returns applies the
     bound AFTER the unbounded thing has already happened. An upstream that never
@@ -211,7 +212,7 @@ def bounded_lines(source, limit=MAX_FRAME_BYTES, unterminated=None,
     An over-long frame is yielded as a bounded PREFIX so the caller refuses it
     through the ordinary path rather than through an exception, and the rest of
     that frame is drained and discarded. Draining too little resumes inside the
-    frame just refused, which is the resynchronisation T7.R2 forbids; draining
+    frame just refused, which is the resynchronisation contract row 7.2 forbids; draining
     too much swallows the next message.
     """
     buffer = b""
@@ -283,7 +284,7 @@ def _envelope_fault(message):
     A `result` with no `id` is a response to nobody. A `method` that is not a
     string is not a method name. An `error` that is not an object has no code.
 
-    The parser accepted all four before ASTRA's checks found them, because it
+    The parser accepted all four, because it
     validated the FIELDS a frame had and never asked whether the combination was
     a frame at all.
     """
@@ -336,7 +337,7 @@ def parse_frame(raw, *, origin="upstream"):
     """One line of wire bytes to a Frame, with the cause named.
 
     `origin` decides only which side is blamed, MALFORMED_UPSTREAM or
-    MALFORMED_CLIENT (T7.R1, T7.R3). It never changes what counts as a fault.
+    MALFORMED_CLIENT (contract rows 7.1 and 7.3). It never changes what counts as a fault.
     """
     malformed = MALFORMED_UPSTREAM if origin == "upstream" else MALFORMED_CLIENT
 

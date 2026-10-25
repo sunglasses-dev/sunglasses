@@ -1,10 +1,10 @@
-"""T5.R3, running the collector into the store.
+"""Running the collector into the store.
 
 Written against `tests/test_proxy_activation.py`, committed first.
 
 Short, and almost all of it is one ordering decision.
 
-T5.R3(d) requires the approval-record revision and the invalidation epoch to
+Contract row 5.3(d) requires the approval-record revision and the invalidation epoch to
 equal what the caller read AT THE START of the attempt. Reading them again at
 the end makes the check vacuous: it compares the world to itself and passes
 every time, including the run where a human revoked the approval while sixty

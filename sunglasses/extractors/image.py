@@ -660,16 +660,16 @@ class ImageExtractor:
     def _metadata_frames_of(self, img, source: str = "image") -> List[Tuple[str, str]]:
         """EXIF and embedded text from every frame of an ALREADY-OPEN image.
 
-        v0.5.6 round 7 (ASTRA I2). Split out of `_metadata_all_frames` so the
+        v0.5.6 round 7. Split out of `_metadata_all_frames` so the
         in-memory API can run the SAME bounded walk instead of its own single read.
         Round 6 gave `extract_from_bytes` a `seek(0)` and one `_exif_from_pil()`
-        call, which fixed the first page by BREAKING the last: on ASTRA's controls
-        the bytes API went 0 -> 7 findings for page-0-only metadata and 7 -> 0 for
+        call, which fixed the first page by BREAKING the last: on the controls the bytes
+        API went 0 -> 7 findings for page-0-only metadata and 7 -> 0 for
         page-1-only, with an empty `failures` list either way. Trading one page's
         findings for another's is not a repair, and a silent trade is the same
         false-completeness defect wearing different clothes.
 
-        The frame-count query is also hardened here for the I1 reason: `n_frames`
+        The frame-count query is also hardened here: `n_frames`
         is a property that PARSES, so a damaged later descriptor makes it raise, and
         `getattr(..., 1)` does not catch a getter that throws. Frames we can read
         are read; what we cannot reach is named.
@@ -770,7 +770,7 @@ class ImageExtractor:
         `_ocr_all_frames()`, which walks the sequence. It is kept because it is the
         single-image primitive the frame walker is built on, but it reads frame 0
         and nothing else, so wiring it back into an extraction path would silently
-        reintroduce the H1/G1 class. Use `_ocr_all_frames()`; if you need one frame,
+        reintroduce the one-frame-only defect. Use `_ocr_all_frames()`; if you need one frame,
         say so at the call site.
 
         Raises OCRUnavailable if OCR could not run. It must NEVER return the error
@@ -859,7 +859,7 @@ class ImageExtractor:
         `dispatch.decode_lossy`'s method generalised to a named codec: each
         `UnicodeDecodeError` reports the exact ``[start, end)`` it could not read,
         so the count is a fact about the INPUT. A legitimate U+FFFD in the source
-        is preserved and NOT counted, which is the whole point (ASTRA I5a).
+        is preserved and NOT counted, which is the whole point.
         """
         # A BOM selects byte order ONCE, for the whole field,
         # and it sits only at offset 0. The loop below restarts decoding at the
@@ -913,16 +913,18 @@ class ImageExtractor:
         the damage. Both may be set: that is a PARTIAL read -- readable text plus
         a named loss -- and it is the whole point of this helper.
 
-        v0.5.6 round 6 (ASTRA H3). Two measurement rules, both learned the hard way:
+        v0.5.6 round 6. Two measurement rules, both learned the hard way:
 
           * for a byte-oriented encoding the loss is measured on the INPUT, via
             `decode_lossy`, which sums the exact `[start, end)` spans the decoder
-            could not read. That is the G5 rule -- never publish a number about
+            could not read. The rule is never to publish a number about
             the decoder's output as if it were a fact about the input.
-          * for UTF-16 there is no such span, so we say what we actually measured:
-            REPLACED UNITS, not bytes. A legitimate U+FFFD in the source inflates
-            that count, so calling it "bytes not inspected" would be a claim we
-            cannot support. The wording is the honest one.
+          * for UTF-16 the loss is measured on the INPUT too, through
+            `_decode_spans`, which sums the exact byte spans the decoder could
+            not read. Every valid character is decoded, a legitimate U+FFFD
+            included, and only the unreadable input bytes are counted as not
+            inspected; trailing NUL characters are trimmed from the text
+            before it is returned.
         """
         if not raw:
             return "", None
@@ -971,8 +973,8 @@ class ImageExtractor:
         that signature changed in v0.5.6 round 6 and the caller changed with it.
 
         It used to be "exactly one of them is None": one undecodable byte rejected
-        the WHOLE field and returned text=None. ASTRA H3 showed what that costs. A
-        proper nested UserComment with an ASCII header yields six findings, exit 1.
+        the WHOLE field and returned text=None. That costs: a proper nested UserComment
+        with an ASCII header yields six findings, exit 1.
         Add ONE bad byte at either end and this candidate returned zero findings and
         exit 3 -- while the PREVIOUS wheel still found all six. The incomplete flag
         was honest and the finding was still gone, and an honest flag does not
@@ -1040,12 +1042,12 @@ class ImageExtractor:
     def _decode_embedded_text(self, key: str, value: bytes):
         """Decode an embedded text chunk (PNG tEXt/iTXt/zTXt, GIF comment).
 
-        Returns (text, failure). Unlike the EXIF path this KEEPS what decoded: a
+        Returns (text, failure). Like the EXIF path this KEEPS what decoded: a
         GIF comment with three bad bytes and a paragraph of readable instructions
         must still yield the instructions AND report the loss. `errors="ignore"`
         used to do the first half and silently skip the second, which is how
         `partial-comment.gif` produced six findings beside `inspection_complete:
-        true` (ASTRA G2).
+        true`.
         """
         try:
             return value.decode("utf-8"), None
@@ -1063,7 +1065,7 @@ class ImageExtractor:
 
         Returns ``(state, detail)`` with state in {"empty", "populated", "unreadable"}.
 
-        v0.5.6 round 7 (ASTRA I3). Round 6 asked Pillow's warnings whether the
+        v0.5.6 round 7. Round 6 asked Pillow's warnings whether the
         parse had failed, and that turned out to be unreliable in both directions:
         the "Corrupt EXIF data" warning escapes a `catch_warnings(record=True)`
         block entirely on the `_getexif()` path (measured -- it prints to stderr
@@ -1078,7 +1080,7 @@ class ImageExtractor:
         header/offset that does not resolve, is a real failure.
 
         This reads four fixed fields; it is deliberately NOT a parser and decodes no
-        tag. ASTRA's bound for this round was to distinguish the states without
+        tag. The bound for this round was to distinguish the states without
         starting a parser project, and reading the one field that states the entry
         count is the smallest thing that can.
         """
@@ -1115,7 +1117,7 @@ class ImageExtractor:
     def _exif_tags(self, img, header_only: bool = False) -> dict:
         """Every EXIF tag PIL can give us, for every format that carries EXIF.
 
-        v0.5.6 round 5, second pass (T9). This used to be
+        v0.5.6 round 5, second pass. This used to be
         `img._getexif() if hasattr(img, "_getexif") else None`. `_getexif` is a
         JPEG-era private method: **TIFF does not have it**, so `hasattr` came back
         False and EXIF was skipped ENTIRELY for a format this extractor routes and
@@ -1307,8 +1309,8 @@ class ImageExtractor:
         Basic hidden text detection.
 
         FRAME 0 GEOMETRY ONLY, and that is a decision rather than the frame bug
-        again (round 5, reviewed by T9; wording corrected in round 6 to ASTRA's
-        precision). The claim "not a content source" was too absolute: the string
+        again (round 5; wording corrected in round 6). The claim "not a content source"
+        was too absolute: the string
         this returns DOES include OCR text excerpts, and that string is scanned. So
         state it exactly -- what is limited to frame 0 is the GEOMETRY heuristic
         (tiny glyphs, edge placement), not the reading of later frames. A later
@@ -1381,7 +1383,7 @@ def scan_image(image_path: str, engine=None) -> dict:
 
     Returns the canonical result document (see ``sunglasses.result``).
 
-    v0.5.6 round 4 (ASTRA F2): this returned ``is_clean: true`` with no axes and
+    v0.5.6 round 4: this returned ``is_clean: true`` with no axes and
     no warnings when OCR could not run. ``ImageExtractor`` recorded the loss in
     ``failures`` and ``extract()`` returned normally, so a caller who trusted the
     convenience function got "clean" for an image whose visible text was never

@@ -60,7 +60,7 @@ class QRExtractor:
     def _decode_frames(self, img, source: str) -> List[Tuple[str, str]]:
         """Decode every frame of a possibly-animated image.
 
-        v0.5.6 round 6 (ASTRA H1). This class used to call `decode(img)` ONCE on
+        v0.5.6 round 6. This class used to call `decode(img)` ONCE on
         the frame Pillow happens to open first. Round 5 taught OCR and metadata to
         walk `ImageSequence`; QR was left behind, and the result was the worst
         shape this release has produced: `qr-later.gif` and `qr-later.tiff` carry a
@@ -241,8 +241,7 @@ class QRExtractor:
 
         Walks frames for the same reason `extract()` does: the in-memory and
         on-disk paths must answer the same question about the same bytes, or one
-        of them is a quieter version of H1 (see `ImageExtractor.extract_from_bytes`
-        and ASTRA H5).
+        of them is a quieter version of the frame bug (see `ImageExtractor.extract_from_bytes`).
         """
         from .image import ImageExtractor, ImageRefused
 
