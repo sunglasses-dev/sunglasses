@@ -79,7 +79,7 @@ def _ascii_literal(av):
     """The lowercase ASCII character this LITERAL contributes, or None.
 
     A non-ASCII literal contributes NOTHING and breaks the run. Two reasons,
-    both found by execution (ASTRA, 2026-09-10):
+    both found by execution:
 
       `chr(0x130).lower()` is two codepoints, so lowercasing here injected a
       COMBINING DOT ABOVE into the requirement that the matching document never
@@ -798,7 +798,7 @@ def max_read_extent(rx, text: str, cache: dict) -> int:
     backward; never more than the length of the text, which is also what a shape
     that cannot be bounded counts as. It bounds where an attempt looks. It does not
     count looking at the same characters again inside one attempt (the alternatives
-    of a branch, backtracking), which every search has on main too and which a
+    of a branch, backtracking), which every search has anyway and which a
     pattern's size bounds.
     """
     key = (rx.pattern, rx.flags)

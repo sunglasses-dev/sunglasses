@@ -1,4 +1,4 @@
-"""Hook rows into chained bodies (spec §1 + §5, T9 RULING 11 Q3): an allowlist,
+"""Hook rows into chained bodies (spec §1 + §5): an allowlist,
 value-checked, integers only, and the error's CLASS NAME only -- its message
 never reaches a signed byte."""
 import pathlib
@@ -41,7 +41,7 @@ def test_a_decision_row_is_integers_only():
 
 
 def test_the_error_message_never_reaches_the_body():
-    """Q3: an exception message may quote the value that caused it."""
+    """An exception message may quote the value that caused it."""
     secret = "AKIAIOSFODNN7EXAMPLE"
     body = hook_rows.decision(_decision(error=f"ValueError: bad {secret!r}",
                                         degraded=True),

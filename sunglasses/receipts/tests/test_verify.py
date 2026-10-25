@@ -2,7 +2,7 @@
 
 Every chain here is assembled by `_Chain` from `wire.py` and the published
 test seed, NOT by the writer. A verifier tested only against its own writer's
-output proves the two agree, which is the one thing ASTRA said is not enough:
+output proves the two agree, which is not enough:
 the instrument is built from the frozen bytes, independently of the product.
 
 Each row names the expected value of EACH of the five results (key trust,

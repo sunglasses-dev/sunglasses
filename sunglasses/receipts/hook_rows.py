@@ -1,4 +1,4 @@
-"""The hook's receipt rows as chained bodies (spec §1 + §5, T9 RULING 11 Q3).
+"""The hook's receipt rows as chained bodies (spec §1 + §5).
 
 AN ALLOWLIST, VALUE-CHECKED. Every field a chained hook body may carry is named
 below with the grammar its value must meet. A field that is not named, or whose

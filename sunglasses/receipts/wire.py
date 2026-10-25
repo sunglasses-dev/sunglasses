@@ -1,8 +1,7 @@
 """The exact bytes a receipt chain is made of.
 
-ASTRA's design verdict of 2026-09-14 puts this file before everything else:
-"Publish exact byte vectors for hashes, signatures and fingerprint derivation
-before implementing both writer and verifier." A writer and a verifier written
+Exact byte vectors for hashes, signatures and fingerprint derivation come
+before the writer and the verifier. A writer and a verifier written
 against prose agree until the day they disagree, and the disagreement surfaces
 as an auditor being told their honest log is broken.
 

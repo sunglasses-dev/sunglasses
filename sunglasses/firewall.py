@@ -210,7 +210,7 @@ def _segments(text: str):
     difference is the whole fix.
 
     CASE IS PRESERVED. The caller lowercases for WORD comparison and never for
-    SHAPE comparison -- ASTRA's R1b: lowercasing the whole token first turns a
+    SHAPE comparison: lowercasing the whole token first turns a
     case-sensitive alphabet into a run of one character, and `qQqQ...` is
     material that only looks like filler after the material has been destroyed.
     """
@@ -438,7 +438,7 @@ def find_secret_material(text: str) -> list:
 def _span_owners(found: list) -> list:
     """Which occurrences speak for their span. One pass, not one scan each.
 
-    THE FIRST VERSION OF THIS WAS A DENIAL OF SERVICE and ASTRA found it: it
+    THE FIRST VERSION OF THIS WAS A DENIAL OF SERVICE: it
     asked "does anything else contain me?" by walking the ENTIRE match list for
     EVERY occurrence. On a document carrying 16,000 credential-shaped tokens
     that is 256,000,000 comparisons, and the hook's 10-second deadline passed
@@ -455,8 +455,8 @@ def _span_owners(found: list) -> list:
 
     STRICT CONTAINMENT needs an ACTIVE SET, not a stack, and the stack was
     wrong: it assumed the intervals NEST, popping any entry whose end lay left
-    of the current one's. Intervals from different rules CROSS. ASTRA's
-    CROSS-ANTHROPIC-AWS is the shape -- an Anthropic match [0,49), a JWT match
+    of the current one's. Intervals from different rules CROSS. CROSS-ANTHROPIC-AWS is
+    the shape -- an Anthropic match [0,49), a JWT match
     [10,91) that crosses it, and an AWS match [29,49) inside the Anthropic one.
     The JWT's farther-right end popped the Anthropic entry, so when the AWS
     match arrived its owner was gone and the receipt named AWS where ANTHROPIC
@@ -522,7 +522,7 @@ def _leading_literal_length(rule, token: str) -> int:
 
 
 def _owner_of_span(found: list, start: int, end: int, rule, reach: int):
-    """Which rule speaks for this span. ASTRA's R3-1, ruling R-173-R4.
+    """Which rule speaks for this span.
 
     `sk-ant-` + filler is a documented Anthropic placeholder AND a match for the
     broader OpenAI rule, which recognises three of those seven format bytes.
@@ -610,10 +610,10 @@ def egress_secret_hits(tool_name: str, tool_input: dict) -> tuple:
     decision; `check_egress_secrets` turns the first into one and `evaluate`
     puts the second in the receipt.
 
-    THE SECOND LIST EXISTS BECAUSE OF ASTRA'S C01. KNOWN_PUBLIC_CANARIES is the
-    only sanctioned way to clear a real format match, and it was also the only
-    event in this lane that left no trace: the raw hit was found, dropped here,
-    and the call ended on an ordinary clean decision. An exemption nobody can
+    THE SECOND LIST EXISTS SO THAT CLEARING A HIT LEAVES A TRACE.
+    KNOWN_PUBLIC_CANARIES is the only sanctioned way to clear a real format
+    match, and without this list the raw hit would be found, dropped here, and
+    the call would end on an ordinary clean decision. An exemption nobody can
     see in the receipts is an exemption nobody can audit, and this list is
     short and hand-maintained precisely so that each use of it is reviewable.
 
@@ -709,8 +709,7 @@ def _stat_or_absent(path):
     and a directory the hook cannot search on 3.14 (on 3.11 to 3.13 that one
     raised PermissionError out of the loader instead, and the hook caught it and
     deferred the call to the normal permission flow unchecked). Each loader read
-    False as "never installed" and the control went off with nothing on screen
-    (T9 ruling 59, Q4).
+    False as "never installed" and the control went off with nothing on screen.
     """
     try:
         return _os.stat(path)
@@ -1693,7 +1692,7 @@ def write_receipt(record: dict, home=None) -> None:
 class _Confession(str):
     """One evaluation's config errors: the text the legacy receipt has always
     carried, plus `types`, their class names, for the signed log, which never
-    carries a message (T9 ruling 11 Q3)."""
+    carries a message."""
     types: tuple = ()
 
     @classmethod
@@ -1705,9 +1704,9 @@ class _Confession(str):
 
 def _present(path) -> bool:
     """Whether any directory entry is at `path`. lstat, so a dangling symlink
-    is present (R57). Absence is False; an lstat that fails for any other
-    reason raises (R56), so it never reads as absent. And no entry is absent
-    only under a directory that can be listed (R62): with a file, a dangling
+    is present. Absence is False; an lstat that fails for any other
+    reason raises, so it never reads as absent. And no entry is absent
+    only under a directory that can be listed: with a file, a dangling
     symlink, a symlink to a file or an unlistable directory above it, this
     answers True, and the receipts code it hands to raises naming what is in
     the way. The walk is receipts._fs.obstruction's, repeated here so that an
@@ -1732,15 +1731,15 @@ class _HookReceipts:
     """Where one call's two records go.
 
     The legacy day file, unchanged, until the user runs `sunglasses receipts
-    init`. From then on the signed chain IS the log (T9 ruling 11 Q1): the
+    init`. From then on the signed chain IS the log: the
     opening is appended unsigned before the work, and the terminal goes with a
-    `close` checkpoint that seals the call (ruling 15). Whether a key exists is
+    `close` checkpoint that seals the call. Whether a key exists is
     one directory listing; nothing is imported to answer it, so an install
     without a key never loads the signing code.
 
     A key that exists but cannot be used (unsafe mode, the extra removed) is a
-    receipt failure like a full disk: it raises, and the caller's F6 rule
-    applies. It never falls back to writing unsigned lines, because a signed
+    receipt failure like a full disk: it raises, and the caller's rule for a
+    down audit trail applies. It never falls back to writing unsigned lines, because a signed
     log that silently turns into an unsigned one is the downgrade the signing
     exists to show.
     """
@@ -2199,7 +2198,7 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
 
 
 def _receipts_unwritable(decision, error, receipts, exc):
-    """F6 — THE AUDIT TRAIL IS DOWN.
+    """THE AUDIT TRAIL IS DOWN.
 
     Losing an audit line must not WEAKEN a decision, so a deny stays a deny
     and is returned unchanged. But a `defer` or an `allow` that nobody can
@@ -2207,7 +2206,7 @@ def _receipts_unwritable(decision, error, receipts, exc):
     the lifecycle records exist to remove. Those ASK, naming the dead control
     rather than echoing an exception at the user.
 
-    `receipts` is None when building it is what failed (T9 ruling 34). That
+    `receipts` is None when building it is what failed. That
     build is the opt-in decision, so it counts as signed: the key is a likely
     cause and the one a directory check would never find.
     """

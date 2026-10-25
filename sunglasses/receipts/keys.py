@@ -1,4 +1,4 @@
-"""The user's receipt key. T9 RULING 11 Q2.
+"""The user's receipt key.
 
 ONLY `init` MAKES ONE. Loading never creates: a chain with no signer is all
 unverified tail, and a file shaped like a chain with nothing able to sign it
@@ -8,7 +8,7 @@ WHAT THE KEY PROTECTS, stated where the key is made (the docs repeat it
 verbatim): anything that runs as the user can read a 0600 key and sign with it.
 The signature protects a history against edits by someone WITHOUT the key, and
 against rewriting anything before a checkpoint retained independently. It is
-not protection against the user's own compromised account (LC01).
+not protection against the user's own compromised account.
 
 Layout under the home:
     keys/receipt-<fp16>.ed25519      raw 32-byte seed, 0600, in a 0700 dir

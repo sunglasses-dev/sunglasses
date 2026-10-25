@@ -1,7 +1,6 @@
 """Wire level controls. Every one of them is a mutation, not a happy path.
 
-These cover the parts of ASTRA's SR01 to SR09 and SR19 that live in the
-encoding and the hashes. The parts that need a writer, a store, concurrency or
+These cover the encoding and the hashes. The parts that need a writer, a store, concurrency or
 an offline bundle are not here and are not claimed: this file proves the bytes,
 and nothing about a system that does not exist yet.
 
@@ -66,8 +65,9 @@ def test_the_two_domains_are_different(vectors):
 
 
 def test_the_four_domains_are_different_and_the_vectors_name_them(vectors):
-    """T9 ruling 60 adds the marker's. Each prefix is also no prefix of
-    another, so no signed bytes of one kind start like another kind's."""
+    """There are four domains, the marker's included. No domain prefix is a
+    prefix of another, so no signed bytes of one kind start like another
+    kind's."""
     domains = [wire.RECORD_DOMAIN, wire.CHECKPOINT_DOMAIN,
                wire.FINGERPRINT_DOMAIN, wire.MARKER_DOMAIN]
     for a in domains:

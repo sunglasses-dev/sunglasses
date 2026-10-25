@@ -118,7 +118,7 @@ def _signed_by_another_key(record):
 
 @pytest.mark.parametrize("tamper", [_forged_signature, _signed_by_another_key])
 def test_a_sealed_end_whose_seal_does_not_verify_is_not_continued(home, tamper):
-    """R15b: a sealed tail is continued only when its closing checkpoint's
+    """A sealed tail is continued only when its closing checkpoint's
     signature verifies under this writer's key. Otherwise the checkpoint is
     just bytes: the segment is closed untouched and a new genesis names the
     last checkpoint that does verify. The control is the test above."""
@@ -318,7 +318,7 @@ def _process(home, eval_id, mode):
 
 
 def test_a_writers_own_suffix_lives_in_its_memory_only(home):
-    """T9 R15d. The in-process exception (a long-lived writer keeps its own
+    """The in-process exception (a long-lived writer keeps its own
     unsigned rows across holds) must die with the process: nothing on disk
     remembers it, and the next PROCESS opens a new genesis, leaving the rows
     it did not write as an unverified tail it never repairs."""
