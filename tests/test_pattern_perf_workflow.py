@@ -127,8 +127,9 @@ def test_the_status_is_pending_first_then_success_only_on_a_successful_gate_and_
 
 def test_the_waivers_and_the_rule_tables_are_read_from_git_objects_by_sha_and_not_from_the_tree():
     src = SCRIPT.read_text(encoding="utf-8")
-    assert 'git_show(args.repo, args.head, p)' in src and 'git_show(args.repo, args.base, p)' in src
+    assert 'git_show(args.repo, args.head, p)' in src and 'git_show(args.repo, fork, p)' in src
     assert 'git_show(args.repo, args.base, WAIVERS)' in src and 'git_show(args.repo, args.head, WAIVERS)' in src
+    assert 'git_show(args.repo, fork, WAIVERS)' in src and "merge_base_of(args.repo, args.base, args.head)" in src
     assert "SHA.fullmatch(args.base) and SHA.fullmatch(args.head)" in src
     # the PR-mode branch of main() opens no file of the working tree
     pr_branch = src.split("if not (SHA.fullmatch(args.base)", 1)[1]
