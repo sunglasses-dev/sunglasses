@@ -307,6 +307,60 @@ def _requirement_for(source):
     return _thaw_requirement(hit) if hit is not None else _prefilter.requirement(source)
 
 
+_DERIVATION_TABLE = None
+_DERIVATION_LOCK = threading.Lock()
+
+
+def _derivation_table():
+    """(caret splits, anchor facts) of the shipped rule regexes, or two empty mappings.
+
+    Building an engine splits every caret-led rule regex into guards and a core by
+    scanning each character, and asks the regex parser about the rules that ask for
+    anchored mode. Both answers depend only on the regex source. scripts/gen_derivation_table.py
+    writes them to `_derivation_table` at build time, and `_shipped_split` and
+    `_shipped_anchor` look them up by source.
+
+    The module is read once per process under a lock and kept as read-only mappings of
+    tuples, ints, strings and None, with no link to the module's own dicts. An import
+    that fails leaves both mappings empty and every answer is derived live.
+    tests/test_derivation_table.py regenerates the table and requires it equal to the
+    live derivation, so a table that differs from it fails there.
+    """
+    global _DERIVATION_TABLE
+    if _DERIVATION_TABLE is None:
+        with _DERIVATION_LOCK:
+            if _DERIVATION_TABLE is None:
+                try:
+                    from . import _derivation_table as shipped
+                    held = (types.MappingProxyType(dict(shipped.SPLIT)),
+                            types.MappingProxyType(dict(shipped.ANCHOR)))
+                except Exception:
+                    held = (types.MappingProxyType({}), types.MappingProxyType({}))
+                _DERIVATION_TABLE = held
+    return _DERIVATION_TABLE
+
+
+def _shipped_split(source):
+    """`_split_caret_predicate(source)` read from the table, or None when it does not hold it.
+
+    None means "derive it": the source is not a shipped rule regex, or it is not caret-led.
+    """
+    if source not in _shipped_regex_sources():
+        return None
+    hit = _derivation_table()[0].get(_prefilter.table_key(source))
+    if hit is None:
+        return None
+    flags = source[:hit[0]]
+    return [flags + source[a:b] for a, b in hit[1]], flags + source[hit[2]:]
+
+
+def _shipped_anchor(source):
+    """(has_lookaround, max_match_length) of a shipped rule regex from the table, or None."""
+    if source not in _shipped_regex_sources():
+        return None
+    return _derivation_table()[1].get(_prefilter.table_key(source))
+
+
 class _LazyRegex:
     """A rule regex that is compiled on first use instead of at engine start.
 
@@ -1948,7 +2002,9 @@ class SunglassesEngine:
                     # the whole is valid (a global flag in the middle, an unterminated
                     # guard that parses as a guard plus an empty core, a lookbehind
                     # that refers to a renumbered group, the same group name twice).
-                    split = self._split_caret_predicate(r)
+                    split = _shipped_split(r)
+                    if split is None:
+                        split = self._split_caret_predicate(r)
                     if split is not None and r in _shipped_regex_sources():
                         try:
                             guard_rx = [compile_rx(g, re.IGNORECASE) for g in split[0]]
@@ -2011,7 +2067,8 @@ class SunglassesEngine:
                         # (any unbounded `+`/`*`, which is most real rules), the
                         # claim is what holds, and the timing fixtures hold the
                         # claim.
-                        proven = _prefilter.max_match_length(r)
+                        held = _shipped_anchor(r)
+                        proven = held[1] if held is not None else _prefilter.max_match_length(r)
                         span = (proven if proven is not None
                                 else int(pattern.get("anchor_span", self.ANCHOR_SPAN)))
                         # Keyed by (rule id, entry index). `id(rx)` looked like a
@@ -2305,7 +2362,8 @@ class SunglassesEngine:
         everything else is refused rather than reasoned about. That sweep is
         `test_ascii_anchor_terms_are_safe_for_every_codepoint`.
         """
-        if _prefilter.has_lookaround(source):
+        held = _shipped_anchor(source)
+        if held[0] if held is not None else _prefilter.has_lookaround(source):
             return ("the regex contains a lookahead or lookbehind, which reads "
                     "past what the match consumes, so a bounded window can be "
                     "shorter than the read the regex needs")
