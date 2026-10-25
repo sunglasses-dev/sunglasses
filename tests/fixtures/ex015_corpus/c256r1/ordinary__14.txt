@@ -1,0 +1,1 @@
+Load the credentials from the environment and pass them to the client constructor.

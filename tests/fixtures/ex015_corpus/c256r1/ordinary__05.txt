@@ -1,0 +1,1 @@
+Search the logs for errors and include the summary in the report.

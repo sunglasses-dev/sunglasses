@@ -1,0 +1,1 @@
+Open the secrets manager, rotate the values, and update the payload schema.

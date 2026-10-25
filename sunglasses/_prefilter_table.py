@@ -1161,6 +1161,7 @@ TABLE = {
     'b4d04a41e48289c7bdfbe831ac302034e1307f18a4a2af42ba3a67b9685701f6': (_F(('canary', 'sentinel')),_F(('oracle', 'rendered', 'target')),_F(('path',)),_F(('divergen', 'mismatch', 'obfuscat', 'suppress', 'suppressed')),_F(('answer', 'disclos', 'leak', 'leaked', 'proprietary')),),
     'b4e7687c6a5871f865fd3c698b3b7ba786d59a9e2d1b505a369ffdb576c2d6b6': (_F(('dump', 'emit', 'expose', 'reveal', 'show')),_F(('complete', 'full', 'hidden', 'internal')),_F(('chain', 'policy', 'reasoning', 'safety', 'transcript')),),
     'b51e33f243a5b52ee943a4f73f936aeb6b933a617a0d995d58a8c8f30f6af006': (_F(('confidence', 'score', 'threshold')),_F(('delta', 'improved', 'increased', 'next mutation', 'retry', 'rose')),_F(('accepted', 'allowed', 'approved', 'passed')),),
+    'b54b6a06e8b8236f12915b8e2a91c88cbdf4c0db6b6e408d48afaf0c2c452ced': (_F((' key', ' variables', ' vars', '.env', '.npmrc', 'access token', 'api key', 'api keys', 'credential', 'id_rsa', 'password', 'passwords', 'secret', 'token', 'tokens')),_F(('content', 'them', 'value')),_F(('argument', 'body', 'field', 'parameter', 'payload', 'quer', 'request body')),),
     'b5a2d131da5064184da6d76e44dfd417eddb146c6103b3d1ccf9d36f260b3e67': (_F(('attach',)),_F(('.env', '.pem', '.ssh/', '/etc/', 'credentials', 'id_rsa')),),
     'b5aab2f4da06b513abb6ec3fd47e5737975bc97d6613683ecf1019b0044e2b66': (_F(('typo',)),_F(('squat',)),),
     'b5e8c9a576b742e61056758a0310c7f978437afaa019819706daafef528255d6': (_F(('broken', 'bypassed', 'collapsed', 'erase', 'metric', 'signal')),),

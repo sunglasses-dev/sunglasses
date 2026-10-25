@@ -1,0 +1,1 @@
+This tool reads the file you specify and returns its contents in the result field.

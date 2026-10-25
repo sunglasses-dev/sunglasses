@@ -157,7 +157,7 @@ def _chain_texts(seed, count):
 
 
 def test_the_rule_carries_the_guarded_form():
-    assert _rule()["regex"] == [GUARDED]
+    assert _rule()["regex"][0] == GUARDED
     assert GUARDED != PLAIN
 
 

@@ -1,0 +1,1 @@
+Open the .env file in the project root and set DEBUG; the values are documented in the config reference.

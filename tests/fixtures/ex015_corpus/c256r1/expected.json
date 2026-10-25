@@ -1,0 +1,122 @@
+{
+ "ordinary__01.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__02.txt": {
+  "decision": "block",
+  "ex015": false
+ },
+ "ordinary__03.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__04.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__05.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__06.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__07.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__08.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__09.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__10.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__11.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__12.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__13.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__14.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__15.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__16.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "ordinary__17.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__01.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__02.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__03.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__04.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__05.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__06.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__07.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__08.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__09.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__10.txt": {
+  "decision": "allow",
+  "ex015": false
+ },
+ "relay__11.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__12.txt": {
+  "decision": "block",
+  "ex015": true
+ },
+ "relay__13.txt": {
+  "decision": "block",
+  "ex015": true
+ }
+}

@@ -16,11 +16,11 @@
   "ex015": false
  },
  "relay__tool_nosig_description.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__tool_v2_description.txt": {
-  "decision": "quarantine",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  }
 }

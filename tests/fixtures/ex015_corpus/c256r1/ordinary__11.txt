@@ -1,0 +1,1 @@
+To authenticate, get a token from the dashboard and send it in the Authorization header.

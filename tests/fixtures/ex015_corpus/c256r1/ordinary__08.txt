@@ -1,0 +1,1 @@
+Check the .env file values before you run the migration; the parameter names are in the docs.

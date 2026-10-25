@@ -72,19 +72,19 @@
   "ex015": false
  },
  "relay__new_relay_argument.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__new_relay_contents_first.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  },
  "relay__new_relay_named_arg.txt": {
   "decision": "allow",
   "ex015": false
  },
  "relay__new_relay_url.txt": {
-  "decision": "allow",
-  "ex015": false
+  "decision": "block",
+  "ex015": true
  }
 }

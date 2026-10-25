@@ -1,0 +1,1 @@
+Read the credentials guide, then paste your API key into the settings field.

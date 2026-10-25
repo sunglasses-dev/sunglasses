@@ -1,0 +1,1 @@
+Open the .env file and edit the values to match your database.
