@@ -1,0 +1,4 @@
+> /context last 30 minutes
+[Screenpipe shows: Error stack trace, API docs, Slack discussion]
+
+> Fix the error I saw and use the API pattern from the docs

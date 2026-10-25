@@ -1,0 +1,10 @@
+{
+  "id": "msg_…",
+  "role": "assistant",
+  "content": [
+    { "type": "thinking", "thinking": "…the model's reasoning…" },
+    { "type": "text",     "text": "…visible answer…" },
+    { "type": "tool_use", "id": "call_…", "name": "run_commands", "input": { … } }
+  ],
+  "modelInfo": { "id": "deepseek-v4.1-flash", "provider": "opencode-go", "family": "deepseek-flash" }
+}

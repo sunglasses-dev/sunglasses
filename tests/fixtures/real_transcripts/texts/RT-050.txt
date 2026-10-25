@@ -1,0 +1,12 @@
+# Command 34 characters over the budget: bash receives exactly 8186 chars and the epilogue is cut
+$ sed -z -n 3p /proc/$$/cmdline | wc -m; sed -z -n 3p /proc/$$/cmdline | tail -c 40
+8187
+< /dev/null && pwd -P >| /c/Users/user/
+/usr/bin/bash: line 97: /c/Users/user/: Is a directory
+
+# Command well over the budget
+/usr/bin/bash: -c: line 1: unexpected EOF while looking for matching `''
+
+# Backslash halving inside single quotes
+$ printf '%s|' 'a\b' 'a\\b' 'a\\\b' 'a\\\\b' 'q\\"q' 'end\\'; echo
+a\b|a\b|a\\b|a\\b|q\\"q|end\|

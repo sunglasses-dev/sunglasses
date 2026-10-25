@@ -1,0 +1,14 @@
+"<session title>" is running in the background (2ca23ba6).
+
+Run claude attach 2ca23ba6 to open it, or claude stop 2ca23ba6 first to resume it here.
+
+To branch off a copy instead, run:
+ claude --resume 2ca23ba6-3d18-483f-8095-8905790fc8bf --fork-session
+
+
+
+$ claude stop 2ca23ba6
+'stop' is disabled by the 'disableAgentView' setting.
+
+$ claude attach 2ca23ba6
+'attach' is disabled by the 'disableAgentView' setting.

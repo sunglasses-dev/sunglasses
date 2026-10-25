@@ -1,0 +1,10 @@
+$ lsof -p 33499 | awk '{print $5}' | sort | uniq -c | sort -rn
+  27 KQUEUE
+  17 REG
+   6 PIPE
+   4 unix
+   4 IPv4
+   4 DIR
+   2 IPv6
+   2 CHR
+   1 systm

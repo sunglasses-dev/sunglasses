@@ -1,0 +1,4 @@
+component: dynamic-app-tools-native-pipe
+event: dynamic_app_tools_request_failed
+errorMessage: The app tool call ended before producing a result
+method: tools/call

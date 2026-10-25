@@ -1,0 +1,14 @@
+> Can you try `curl` on that page? It likely works
+
+⏺ Bash(curl -s https://yahoo.co.jp | head -20)
+  ⎿  (No content)
+
+⏺ Bash(curl -I https://yahoo.co.jp)
+  ⎿  HTTP/1.1 301 Redirect
+     Date: Mon, 21 Jul 2025 04:34:17 GMT
+     Connection: close
+     … +11 lines (ctrl+r to expand)
+
+(snip)
+
+⏺ Yes, curl works fine! The page loads successfully through the corporate proxy. The issue is that the WebFetch tool has domain restrictions that prevent it from accessing yahoo.co.jp, even though the network connection works properly through curl with the Zscaler certificates.

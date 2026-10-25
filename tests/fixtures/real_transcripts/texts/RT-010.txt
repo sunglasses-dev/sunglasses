@@ -1,0 +1,14 @@
+Aider v0.62.2.dev0
+Main model: claude-3-5-sonnet-20241022 with diff edit format, prompt cache, infinite output
+Weak model: claude-3-5-haiku-20241022
+Git repo: .git with 57 files
+Repo-map: using 1024 tokens, files refresh
+VSCode terminal detected, pretty output has been disabled.
+Use /help <question> for help, run "aider --help" to see cmd line args
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> /load ro-list.txt  
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Read only files:
+../prompts/coding/coding-principles-o1.md cm-exec-summary.md docs/codemods.rst.txt docs/codemods_tutorial.rst.txt docs/metadata.rst.txt docs/metadata_tutorial.ipynb.txt docs/nodes.rst.txt                                
+> /read cm-arch-summary.md 

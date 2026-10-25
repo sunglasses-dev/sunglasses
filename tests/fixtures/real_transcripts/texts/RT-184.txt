@@ -1,0 +1,10 @@
+Observed tool: functions.exec -> exec_command
+Observed stage: CreateProcess rejection before requested command execution.
+Error excerpt, private command body redacted:
+exec_command failed: CreateProcess { message: "Rejected(\"<REDACTED_COMMAND> rejected: blocked by policy\")" }
+
+User explicitly authorized the SIM start and recording twice in the affected chat.
+The generic rejection persisted after both confirmations.
+No policy rationale, rule ID, or action-specific risk classification was returned.
+Exact per-denial time was not independently captured; do not treat a later diagnostic timestamp as that time.
+This file is a curated excerpt of observed tool output, not a newly executed reproduction.

@@ -1,0 +1,10 @@
+$ lsof -p 26081 | awk '{print $5}' | sort | uniq -c | sort -rn
+9779 KQUEUE
+ 436 unix
+ 120 CHR
+  27 REG
+   8 DIR
+   6 PIPE
+   5 IPv4
+   2 IPv6
+   1 systm

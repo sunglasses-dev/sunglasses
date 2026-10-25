@@ -1,0 +1,16 @@
+{
+  "id": "msg_Y6jiV1CK",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "call_function_yry2xhx704sa_1",
+      "name": "search_codebase",
+      "input": {
+        "queries": [
+          "IsCollapsible"
+        ]
+      }
+    }
+  ]
+}

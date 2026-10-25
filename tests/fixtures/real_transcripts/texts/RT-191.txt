@@ -1,0 +1,5 @@
+2026-10-21T13:17:11.747Z info [AppServerConnection] app_server_connection.closed code=1006 connectionId=12 failureReason=open_timeout hasReason=false hostKind=durable reason="" signal=null transport=websocket
+
+2026-10-21T13:17:11.752Z error [electron-message-handler] Request failed conversationId=<CLOUD_CONTEXT_ID> durationMs=35011 error={"code":-32000,"message":"Codex app-server is not available"} failureReason=remote_unavailable id=63897cfc-df90-4abf-864f-3dd9bdc99edf method=thread/read [nonessential fields omitted]
+
+2026-10-21T13:17:11.753Z warning [dynamic-app-tools-native-pipe] dynamic_app_tools_request_failed errorMessage="The app tool call ended before producing a result" errorName=Error errorStack=[omitted] method=tools/call

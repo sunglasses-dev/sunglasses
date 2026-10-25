@@ -1,0 +1,7 @@
+Command blocked by PreToolUse hook
+Event: pre-tool-use
+Status: block
+Command: apply_patch
+Checks:
+- native-apply-patch-primary-worktree-guard:
+  editing context error: applying a patch from the primary worktree context is not allowed for repository/task-worktree files

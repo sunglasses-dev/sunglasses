@@ -1,0 +1,18 @@
+{
+  "message": {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+      {
+        "id": "call_example",
+        "function": {
+          "index": 0,
+          "name": "list_files",
+          "arguments": {
+            "path": "."
+          }
+        }
+      }
+    ]
+  }
+}

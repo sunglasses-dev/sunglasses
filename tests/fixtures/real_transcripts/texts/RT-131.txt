@@ -1,0 +1,6 @@
+reasoning
+message
+function_call
+function_call_output
+token_count
+task_complete

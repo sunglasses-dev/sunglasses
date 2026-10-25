@@ -1,0 +1,9 @@
+$ pwd
+/Users/user/projects/github/spiff-arena
+
+$ ls -d .git
+.git
+
+$ cd spiffworkflow-backend
+
+$ aider --subtree-only

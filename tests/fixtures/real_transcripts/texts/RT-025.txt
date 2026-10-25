@@ -1,0 +1,36 @@
+> who are u
+
+    ░litellm.InternalServerError: InternalServerError: OpenAIException - Invalid response object Traceback (most recent call last):
+  File "C:\<path\to>\uv\tools\aider-chat\Lib\site-packages\litellm\litellm_core_utils\llm_response_utils\convert_dict_to_response.py", 
+line 564, in convert_to_model_response_object
+    message = Message(
+              ^^^^^^^^
+  File "C:\<path\to>\uv\tools\aider-chat\Lib\site-packages\litellm\types\utils.py", line 633, in __init__
+    super(Message, self).__init__(
+  File "C:\<path\to>\uv\tools\aider-chat\Lib\site-packages\pydantic\main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for Message
+content
+  Input should be a valid string [type=string_type, input_value=[{'type': 'reasoning', 's...ll be happy to help.'}], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.11/v/string_type
+
+
+received_args={'response_object': {'id': 'chatcmpl_< a random id >', 'choices': [{'finish_reason': 'stop', 'index': 0, 'logprobs': None,   
+'message': {'content': [{'type': 'reasoning', 'summary': [{'type': 'summary_text', 'text': 'The user asks "who are u". They want a response. According to system
+instructions, we must act as an expert software developer, respond in English_Australia. The user is not requesting code changes. So we should answer the       
+question about who we are. We should not propose any file changes. Just answer.'}]}, {'type': 'text', 'text': 'I’m ChatGPT, an AI language model created by     
+OpenAI. I’m here to help you with software development questions, code reviews, debugging, and any other programming‑related tasks you might have. If you need  
+assistance with your codebase, just let me know which files you’d like me to look at, and I’ll be happy to help.'}], 'refusal': None, 'role': 'assistant',      
+'annotations': None, 'audio': None, 'function_call': None, 'tool_calls': None}}], 'created': 11111111, 'model': 'gpt-oss-120b-080525', 'object':
+'chat.completion', 'service_tier': None, 'system_fingerprint': None, 'usage': {'completion_tokens': 146, 'prompt_tokens': 1711, 'total_tokens': 1857,
+'completion_tokens_details': None, 'prompt_tokens_details': None}}, 'model_response_object': ModelResponse(id='chatcmpl-< a random id>',  
+created=111111111, model=None, object='chat.completion', system_fingerprint=None, choices=[Choices(finish_reason='stop', index=0, message=Message(content=None,
+role='assistant', tool_calls=None, function_call=None, provider_specific_fields=None))], usage=Usage(completion_tokens=0, prompt_tokens=0, total_tokens=0,      
+completion_tokens_details=None, prompt_tokens_details=None)), 'response_type': 'completion', 'stream': False, 'start_time': None, 'end_time': None,
+'hidden_params': None, '_response_headers': {'content-type': 'application/json; charset=utf-8', 'server': 'databricks', 'date': 'Thu, 13 Nov 2025 00:25:41 GMT',
+'x-databricks-org-id': '< my org id >', 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload, max-age=31536000; includeSubDomains;     
+preload', 'x-content-type-options': 'nosniff, nosniff', 'x-request-id': '< a rnd id >', 'content-encoding': 'gzip', 'vary':
+'Accept-Encoding', 'alt-svc': 'clear', 'server-timing': 'request_id;dur=0;desc="< a rnd id >", client_protocol;dur=0;desc="HTTP/1.1"',  
+'transfer-encoding': 'chunked'}, 'convert_tool_call_to_json_mode': None}
+The API provider's servers are down or overloaded.

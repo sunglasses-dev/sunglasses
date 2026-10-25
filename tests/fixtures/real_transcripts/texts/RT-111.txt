@@ -1,0 +1,7 @@
+0 user   [text, text]
+1 model  [functionCall run_shell_command#554308]
+2 user   [functionResponse run_shell_command#554308, functionResponse run_shell_command#554308]   <- same id twice
+3 model  [functionCall read_file#412506]
+4 user   [functionResponse read_file#412506, functionResponse read_file#412506]                   <- same id twice
+5 model  [text]
+6 user   [text]

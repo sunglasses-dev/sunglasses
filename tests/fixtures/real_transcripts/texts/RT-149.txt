@@ -1,0 +1,5 @@
+response_item.type = function_call
+response_item.name = spawn_agent
+arguments.agent_type = custom-planner
+arguments.task_name = plan_task
+arguments.fork_turns = none

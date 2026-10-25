@@ -1,0 +1,21 @@
+the Continue LLM Prompt output view shows:
+
+> ##### Prompt #####
+> 
+> from flask import Flask, request, jsonify
+> import requests
+> app = Flask(__name__)
+> @app.route('/generate_text', methods=['POST'])
+> def generate_text():
+>     data = request.get_json()
+>     prompt = data['prompt']
+>     # Replace 'https://api.langchain.com/generate' with the actual LLM API endpoint
+>     response = requests.post('https://api.langchain.com/generate', json={'prompt': prompt})
+>     generated_text = response.json()['generated_text']
+>     return jsonify({'generated_text': generated_text})
+> if __name__ == '__main__':
+>     app.run(debug=True)
+> 
+> Please rewrite the above file to address the following request:
+> The following code was suggested as an edit:
+> 

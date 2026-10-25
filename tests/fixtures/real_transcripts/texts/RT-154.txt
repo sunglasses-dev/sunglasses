@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-08-23T20:15:21.938Z",
+  "type": "function_call",
+  "name": "followup_task",
+  "arguments": {
+    "target": "01a03037-2a04-7df3-b40d-1878a91e5902",
+    "message": "<redacted-follow-up-task>"
+  }
+}

@@ -1,0 +1,5 @@
+exec(
+  command=["ls", "-R"],
+  sandbox_permissions="allow",
+  justification="List project directory structure"
+)

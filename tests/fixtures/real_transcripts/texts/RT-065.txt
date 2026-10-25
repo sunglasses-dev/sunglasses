@@ -1,0 +1,11 @@
+{
+  "id": "msg_…",
+  "role": "assistant",
+  "content": [
+    { "type": "tool_use", "id": "call_…", "name": "run_commands",
+      "input": { "commands": ["python out\\cleanup.py"] } }
+  ],
+  "ts": 1791519495672,
+  "modelInfo": { "id": "deepseek-v4.1-flash", "provider": "opencode-go", "family": "deepseek-flash" },
+  "metrics": { "inputTokens": 103163, "outputTokens": 47, "cacheReadTokens": 100096, "cacheWriteTokens": 0 }
+}

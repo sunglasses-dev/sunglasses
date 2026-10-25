@@ -1,0 +1,12 @@
+❯ run echo hello using your bash shell tool
+
+● Running a quick shell command to print "hello" using bash. Reported intent alongside the command.
+
+● Print hello to stdout (shell)
+  │ echo hello
+  └ 1 line...
+
+✗ Read shell output Waiting up to 2 seconds for command output
+  └ Invalid shell ID: 0. Please supply a valid shell ID to read output from.
+
+● hello

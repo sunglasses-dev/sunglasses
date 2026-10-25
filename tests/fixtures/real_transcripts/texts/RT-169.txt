@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-09-13T14:58:11.309Z",
+  "type": "response_item",
+  "payload": {
+    "type": "function_call_output",
+    "id": "fco_<redacted>",
+    "name": "send_message_to_thread",
+    "namespace": "codex_app",
+    "output": "<codex_delegation>\n  <source_thread_id><redacted></source_thread_id>\n  <input><authorized handoff prompt redacted></input>\n</codex_delegation>"
+  }
+}

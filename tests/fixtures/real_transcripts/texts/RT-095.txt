@@ -1,0 +1,8 @@
+Random arrangement (1 of 360): yellow orange blue green
+PNG: 3,301 bytes
+
+control -- PNG as a blob attachment on the user turn
+  -> 'yellow orange blue green'  CORRECT
+
+mcp -- PNG returned from an MCP tool result
+  -> 'red green blue yellow'  tool_called=True  WRONG

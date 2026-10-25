@@ -1,0 +1,9 @@
+$ gemini extensions install https://github.com/Cloady/cloady-mcp --consent --skip-settings
+Extension "cloady" installed successfully and enabled.
+
+$ gemini extensions list
+✓ cloady (1.0.0)
+Source: https://github.com/Cloady/cloady-mcp (Type: github-release)
+Release tag: v1.0.0
+MCP servers:
+  cloady

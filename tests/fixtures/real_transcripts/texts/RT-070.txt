@@ -1,0 +1,47 @@
+{
+  "id": "chatcmpl-00c0402b-321c-4c64-be94-2d352c2cb5fc",
+  "created": 1746791853,
+  "model": "gpt-4o-mini",
+  "object": "chat.completion.chunk",
+  "system_fingerprint": "fp_7a53abb7a2",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "content": "Since",
+        "role": "assistant",
+        "tool_calls": [  
+ //As you can see here, the tool_calls array returned by gpt contains three file "write_file"  tools, 
+//but it should be called according to the index array.
+          {
+            "id": "call_REDACTED_ID",
+            "type": "function",
+            "index": 0,
+            "function": {
+              "arguments": "",
+              "name": "write_file"
+            }
+          },
+          {
+            "id": "call_REDACTED_ID",
+            "type": "function",
+            "index": 1,
+            "function": {
+              "arguments": "",
+              "name": "write_file"
+            }
+          },
+          {
+            "id": "call_REDACTED_ID",
+            "type": "function",
+            "index": 2,
+            "function": {
+              "arguments": "",
+              "name": "write_file"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

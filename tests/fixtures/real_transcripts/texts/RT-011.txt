@@ -1,0 +1,28 @@
+> List all the documents you have available and give me a 1 line description of each                                                                                                                                       
+
+                    
+Here are the documents I have available, with brief descriptions:
+
+READ-ONLY Reference Files:
+1. cm-exec-summary.md - Executive summary of the Enhanced Python AST Transformer
+2. docs/metadata.rst.txt - Documentation for LibCST metadata APIs and providers
+3. docs/nodes.rst.txt - Documentation of LibCST node types and hierarchy
+4. docs/metadata_tutorial.ipynb.txt - Tutorial notebook on working with metadata
+5. docs/codemods_tutorial.rst.txt - Tutorial on working with codemods
+6. docs/codemods.rst.txt - Documentation of LibCST codemod framework
+
+Repository File Summaries (not added for editing):
+1. debug_metadata_init.py - Contains MetadataManager class
+2. pyast_transformer/common/pattern_matcher.py - Pattern matching system
+3. pyast_transformer/common/tree_formatter.py - AST visualization formatter
+4. pyast_transformer/core/changes.py - Change tracking system
+5. pyast_transformer/core/diff.py - Diff generation
+6. pyast_transformer/core/logging.py - Enhanced logging system
+7. pyast_transformer/core/metadata.py - Metadata management
+8. pyast_transformer/core/operations.py - Node manipulation operations
+9. pyast_transformer/core/scope_handler.py - Scope validation and resolution
+10. pyast_transformer/visitors/mixins.py - Visitor metadata mixin
+
+Let me know which files you'd like me to propose changes to by adding them to the chat.
+
+Tokens: 40k sent, 20k cache write, 364 received. Cost: $0.14 message, $0.14 session.

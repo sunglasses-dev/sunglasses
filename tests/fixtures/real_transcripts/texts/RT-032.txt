@@ -1,0 +1,22 @@
+ we had to stop because of usage limits, which are now reset. review where we left off and then continue                   
+
+⏺ Bash(python3 ./scripts/craft-tools.py state read \
+        --task-dir ./tasks/LOCAL-032 --operation current-step 2>&1)
+  ⎿  {
+       "ok": true,
+       "step": {
+     … +6 lines (ctrl+o to expand)
+
+⏺ We left off at spec-critique in-progress. The last round of reviews completed successfully:
+  - Spec Critic R2: APPROVED — 0 blockers
+  - Architect R2: No blocking issues, all 7 revisions verified
+
+  But the workflow state still shows spec-critique as in-progress because we hit the usage limit before updating it and
+  proceeding to Gate 1. Let me mark it complete and proceed.
+
+⏺ Bash(python3 ./scripts/craft-tools.py state write \
+        --task-dir ./tasks/LOCAL-032 --operation set-step-status \…)
+  ⎿  {
+       "ok": true,
+       "step": "spec-critique",
+     … +2 lines (ctrl+o to expand)

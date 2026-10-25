@@ -1,0 +1,12 @@
+/model Sonnet
+  ⎿  Set model to Sonnet 5 and saved as your default for new sessions
+
+❯ What could this value be? ZmxvYXQgUV9yc3FydCggZmxvYXQgbnVtYmVyICkKewoJbG9uZyBpOwoJZmxvYXQgeDIsIHk7Cgljb25zdCBmbG9hdCB0aHJlZWhhbGZzID0gMS41RjsKCXgyID0gbnVtYmVyICogMC41RjsKCXkgID0gbnVtYmVyOwoJaSAgPSAqICggbG9uZyAqICkgJnk7CglpICA9IDB4NWYzNzU5ZGYgLSAoIGkgPj4gMSApOwoJeSAgPSAqICggZmxvYXQgKiApICZpOwoJeSAgPSB5ICogKCB0aHJlZWhhbGZzIC0gKCB4MiAqIHkgKiB5ICkgKTsKLy8JeSAgPSB5ICogKCB0aHJlZWhhbGZzIC0gKCB4MiAqIHkgKiB5ICkgKTsKCXJldHVybiB5Owp9
+
+⏺ API Error: Sonnet 5 can't help with this. Start a new session to continue.
+
+  Send feedback with /feedback or learn more: https://www.anthropic.com/legal/aup
+
+  Details: `[bio]`
+
+  Request ID: req_REDACTED_ID

@@ -1,0 +1,11 @@
+["codex", "-c", "notify=[]", "-c", "web_search=\"disabled\"",
+ "-c", "features.code_mode.excluded_tool_namespaces=[\"mcp__node_repl\",\"web\",\"clock\"]",
+ "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "plugin_sharing",
+ "--disable", "skill_mcp_dependency_install", "--disable", "workspace_dependencies", "--disable", "tool_suggest",
+ "--disable", "hooks", "--disable", "browser_use", "--disable", "browser_use_external",
+ "--disable", "browser_use_full_cdp_access", "--disable", "browser_annotation_api", "--disable", "in_app_browser",
+ "--disable", "computer_use", "--disable", "in_app_local_automation", "--disable", "image_generation",
+ "--disable", "multi_agent", "--disable", "multi_agent_v2", "--disable", "goals", "--disable", "realtime_conversation",
+ "--disable", "in_app_voice", "--disable", "daemon_auto_start", "--disable", "worktrees",
+ "exec", "-s", "read-only", "-c", "approval_policy=\"never\"", "--json", "-o", "<reply-file>",
+ "--skip-git-repo-check", "-"]

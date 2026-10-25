@@ -1,0 +1,7 @@
+>   
+> Are you sure you need this SEARCH/REPLACE block?  
+> The REPLACE lines are already in src/ptree/ptree.py!  
+>   
+> The SEARCH section must exactly match an existing block of lines including all white space, comments, indentation, docstrings, etc  
+> Only 3 reflections allowed, stopping.  
+

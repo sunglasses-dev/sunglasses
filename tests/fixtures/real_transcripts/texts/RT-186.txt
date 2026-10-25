@@ -1,0 +1,6 @@
+Denied invocation: process not launched; no upload or paid submission by this invocation.
+Recent 8-turn read_thread result: no exposed automaticApprovalReviews records or declined command items.
+Current conversation's local raw transcript, including nested event/response objects:
+  no observable structured automatic-review/guardian-review/denied-action record
+  corresponding to the rejected tool invocation.
+Visible rejection form: custom_tool_call_output containing exec_command / CreateProcess / Rejected.

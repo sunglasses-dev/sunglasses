@@ -1,0 +1,10 @@
+The OpenAI Responses API works correctly when called directly with curl.
+
+⸻
+
+Error
+
+Item 'fc_...' of type 'function_call' was provided without its required 'reasoning' item:
+'rs_...'.
+type=invalid_request_error
+param=input

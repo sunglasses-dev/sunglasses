@@ -1,0 +1,31 @@
+{
+  "choices": [
+    {
+      "finish_reason": "length",
+      "message": {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": "{}",
+              "name": "bash"
+            },
+            "id": "toolu_vrtx_01X5EZSmMahBSaU8p21MvQH8",
+            "type": "function"
+          }
+        ]
+      }
+    }
+  ],
+  "created": 1770869340,
+  "id": "msg_vrtx_012HHnioZgNQg77QVLyuDMJ8",
+  "usage": {
+    "completion_tokens": 16000,
+    "prompt_tokens": 32127,
+    "prompt_tokens_details": {
+      "cached_tokens": 31973
+    },
+    "total_tokens": 48127
+  },
+  "model": "claude-sonnet-4.5"
+}

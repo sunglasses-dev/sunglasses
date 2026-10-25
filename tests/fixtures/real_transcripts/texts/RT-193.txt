@@ -1,0 +1,4 @@
+tool call error: tool call failed for `codex_app/load_workspace_dependencies`
+
+Caused by:
+    Mcp error: -32000: MCP error -32000: Codex app tool request failed

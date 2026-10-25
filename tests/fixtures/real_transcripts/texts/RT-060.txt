@@ -1,0 +1,19 @@
+> LOG  [SdkController] askResponse: Resuming task 1786287906605_lx31r before follow-up
+> LOG  [SdkController] Resuming session from task: 1786287906605_lx31r
+> LOG  [SessionFactory] Resolved from StateManager: provider=litellm, model=anthropic--claude-4.8-opus, hasApiKey=true
+> LOG  [SdkController] Loaded 4 SDK-persisted messages for task: 1786287906605_lx31r     <-- only present after restart
+> LOG  [SdkController] Resuming with 4 initial messages                                   <-- only present after restart
+> DEBUG [SdkController] Ignoring stale SDK event for session 1786287906605_lx31r; active=none
+> WARN [MessageTranslator] Unhandled session event type: session_snapshot                 <-- benign (see below)
+> LOG  [VscodeSessionHost] send() called: sessionId=1786287906605_lx31r, prompt=Hallo again, after I have restarted VS Code now.
+> LOG  [MessageTranslator] Session status: running
+> DEBUG Context compaction diagnostics
+> DEBUG Agent model request diagnostics
+> ... (Agent events) ...
+> LOG  Agent loop caught error
+> ERROR Agent run failed
+> LOG  [OTEL] Created counter: cline.errors.total
+> LOG  [MessageTranslator] Session status: idle
+> LOG  [VscodeSessionHost] send() completed: text=Cannot read properties of undefined (reading 'hasFinished'), inputTokens=0
+> LOG  [SdkController] Agent turn completed for session: 1786287906605_lx31r
+> 

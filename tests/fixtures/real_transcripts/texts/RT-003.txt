@@ -1,0 +1,64 @@
+Applied edit to src/interactive/interactive_poker_game.cpp
+Applied edit to src/interactive/base_poker_game.cpp
+Applied edit to src/interactive/base_poker_game.h
+Commit ca09ce8 Removed the notion of hero, AI, and human players from BasePokerGame and moved the logic to handle different
+player types into InteractivePokerGame.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+CMakeLists.txt cpp src/apps/model_vs_model.cpp src/apps/play_model.cpp src/apps/random_test.cpp src/interactive/base_poker_
+> update `ModelManager` to conform to this new `BasePokerGame` `handlePlayerTurn`
+
+Traceback (most recent call last):
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/gitdb/db/loose.py", line 132, in _map_loose_object
+    return file_contents_ro_filepath(db_path, flags=self._fd_open_flags)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/gitdb/util.py", line 204, in file_contents_ro_filepath
+    fd = os.open(filepath, os.O_RDONLY | getattr(os, 'O_BINARY', 0) | flags)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/user/workspace/amirbot/csrc/amirbot/.git/objects/ca/09ce87565b66a58ab9dae581330d96647c4363'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/user/.pyenv/versions/3.11.4/bin/aider", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/main.py", line 547, in main
+    coder.run()
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 612, in run
+    new_user_message = self.run_loop()
+                       ^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 650, in run_loop
+    self.check_for_file_mentions(inp)
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 1052, in check_for_file_mentions
+    mentioned_rel_fnames = self.get_file_mentions(content)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 1029, in get_file_mentions
+    addable_rel_fnames = self.get_addable_relative_files()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 1257, in get_addable_relative_files
+    return set(self.get_all_relative_files()) - set(self.get_inchat_relative_files())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/coders/base_coder.py", line 1238, in get_all_relative_files
+    files = self.repo.get_tracked_files()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/aider/repo.py", line 227, in get_tracked_files
+    commit = self.repo.head.commit
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/git/refs/symbolic.py", line 297, in _get_commit
+    obj = self._get_object()
+          ^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/git/refs/symbolic.py", line 288, in _get_object
+    return Object.new_from_sha(self.repo, hex_to_bin(self.dereference_recursive(self.repo, self.path)))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/git/objects/base.py", line 149, in new_from_sha
+    oinfo = repo.odb.info(sha1)
+            ^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/gitdb/db/base.py", line 210, in info
+    return self._db_query(sha).info(sha)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/gitdb/db/loose.py", line 154, in info
+    m = self._map_loose_object(sha)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/user/.pyenv/versions/3.11.4/lib/python3.11/site-packages/gitdb/db/loose.py", line 143, in _map_loose_object
+    raise BadObject(sha) from e
+gitdb.exc.BadObject: BadObject: b'ca09ce87565b66a58ab9dae581330d96647c4363'

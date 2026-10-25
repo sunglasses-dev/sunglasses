@@ -1,0 +1,17 @@
+❯ When looking at a Git diff of a merge commit, how can I focus on the files that had conflicts and needed to be resolved by hand?
+
+◐ The user is asking about how to focus on conflict-resolved files when looking at a Git merge commit diff. This is a Git question, so I should answer from
+  knowledge. Let me think about the best approaches.
+...
+  Now I'll put together a clear answer highlighting these approaches with proper citations.
+
+● THERE ARE TWO MAIN TECHNIQUES, DEPENDING ON HOW PRECISELY YOU WANT TO ISOLATE CONFLICT RESOLUTIONS:
+
+  --------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  1. git show <merge> (DEFAULT COMBINED DIFF)
+
+  BY DEFAULT, git show ON A MERGE USES --cc (DENSE-COMBINED) FORMAT. THE COMBINED DIFF DOCS STATE:
+
+   "combined diff lists only files which were modified from all parents."
+...

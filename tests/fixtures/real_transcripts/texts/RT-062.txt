@@ -1,0 +1,5 @@
+{"data":{"choices":[{"finish_reason":"tool_calls","index":0,"message":{"content":null,
+ "provider_metadata":{"gateway":{"generationId":"gen_01M0BB…",
+   "routing":{"canonicalSlug":"private/deepseek-v4-flash-wave-cline",
+              "finalProvider":"openai-compatible-private", …}}}, …}}]},
+ "success":true}

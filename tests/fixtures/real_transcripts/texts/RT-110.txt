@@ -1,0 +1,7 @@
+mkdir /tmp/resume-repro && cd /tmp/resume-repro && echo "hello from the file" > note.txt
+
+# turn 1 — note the session_id in the init event
+gemini -p 'Call run_shell_command with `echo hello`, then call read_file on ./note.txt, then reply in one sentence.' --yolo -o stream-json
+
+# turn 2 — resume it
+gemini -p 'What did the file say?' --yolo -o stream-json -r <session_id>

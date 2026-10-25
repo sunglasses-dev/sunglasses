@@ -1,0 +1,7 @@
+{
+  "type": "function_call",
+  "namespace": "functions.",
+  "name": "apply_patch",
+  "arguments": "*** Begin Patch\n*** Add File: file.txt\n+patched\n*** End Patch",
+  "call_id": "call-id"
+}

@@ -1,0 +1,8 @@
+{
+  "type": "response_item",
+  "payload": {
+    "type": "function_call",
+    "name": "apply\\^@\\^@\\^@\\^@\\^@\\^@",
+    "call_id": "call_REDACTED_ID"
+  }
+}

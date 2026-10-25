@@ -1,0 +1,5 @@
+• I'll list the contents of the current directory for you.
+
+  <tool_call>
+  {"name": "shell", "arguments": {"command": ["ls"]}}
+  </tool_call>

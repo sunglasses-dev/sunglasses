@@ -1,0 +1,4 @@
+  ● General-purpose: Analyze repository
+    ⎿  Read src/utils/helpers.ts
+       +34 more tool uses (ctrl+o to expand)
+  

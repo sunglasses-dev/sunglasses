@@ -1,0 +1,4 @@
+$ compgen -e | grep --extended-regexp '^(CLAUDE|START_CLAUDE|TMUX)' || true
+CLAUDE_CODE_MESSAGING_TOKEN ARCH LINES PATH SHELL CLAUDE_CODE_SESSION_ID ... (every variable's name, on one line)
+$ printf 'BASH_VERSION=%s ZSH_VERSION=%s ...'
+BASH_VERSION= ZSH_VERSION=5.9 CLAUDE_CODE_SHELL=<unset> SHELL=/bin/zsh

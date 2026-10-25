@@ -1,0 +1,4 @@
+$ bash -c "source ~/.claude/shell-snapshots/snapshot-bash-*.sh; echo ok"
+<same syntax error>
+$ echo $?
+127

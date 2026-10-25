@@ -1,0 +1,17 @@
+<|endoftext|><|im_start|>
+<|im_start|>
+<|endoftext|><|im_start|>
+<|im_start|>
+<|endoftext|><|repo_name|>
+<function=shell>
+<parameter=command>
+["echo", "1", ">", "a.txt"]
+</parameter>
+<parameter=justification>
+Writing the number 1 to a file named a.txt as requested
+</parameter>
+<parameter=with_escalated_permissions>
+True
+</parameter>
+</function>
+</tool_call>

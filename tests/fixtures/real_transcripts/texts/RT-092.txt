@@ -1,0 +1,6 @@
+User: ... shell is powershell ...
+...
+Now I will build.
+
+I must not use `| head -` because the shell is powershell. Instead, use "| select -last ...".
+[tool name="bash" command="cmake ... | select -last 10"]

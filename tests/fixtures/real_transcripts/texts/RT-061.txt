@@ -1,0 +1,9 @@
+> LOG  [SdkController] initTask called: "hello"
+> LOG  [SessionFactory] Resolved from StateManager: provider=litellm, model=anthropic--claude-4.8-opus, hasApiKey=true
+> WARN [MessageTranslator] Unhandled session event type: session_snapshot        <-- SAME warning, yet task SUCCEEDS
+> LOG  [SdkController] Task initialized: ...
+> ... (Agent events) ...
+> LOG  [MessageTranslator] Session status: idle
+> LOG  [VscodeSessionHost] send() completed: text=Hello! I'm here to help ..., inputTokens=0
+> LOG  [SdkController] Agent turn completed for session: ...
+> 

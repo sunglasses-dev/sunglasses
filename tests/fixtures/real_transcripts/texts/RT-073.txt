@@ -1,0 +1,8 @@
+{
+        "role": "assistant",
+        "content": [
+        {
+            "type": "text",
+            "text": ""
+        }]
+} 

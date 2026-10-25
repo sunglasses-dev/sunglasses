@@ -1,0 +1,8 @@
+dynamic_app_tool_renderer_execution_started tool=wait_threads
+dynamic_app_tools_request_failed
+errorMessage="The app tool call ended before producing a result"
+method=tools/call
+
+Comparison:
+response_routed method=thread/read errorCode=null
+Sending server response success=true tool=read_thread

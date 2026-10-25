@@ -1,0 +1,12 @@
+Approximate context window usage, in tokens:
+
+$ 0.05    1,538 system messages                                            
+$ 0.03    1,065 repository map                                             use --map-tokens to resize
+$ 0.02      699 internal/analytics/infrastructure/segment_provider.go      use /drop to drop from chat
+$ 0.01      306 .ai/system/_task-plan.md                                   use /drop to drop from chat
+$ 0.01      283 internal/analytics/infrastructure/segment_provider_test.go use /drop to drop from chat
+$ 0.01      255 .ai/system/response-rules.md                               use /drop to drop from chat
+================
+$ 0.12    4,146 tokens total
+          4,046 tokens remaining in context window
+          8,192 tokens max context window size

@@ -1,0 +1,7 @@
+324 lines, 0 parse errors
+0 encrypted blobs (ocx1=0, fernet=0)
+0 old-format function_call items
+0 reasoning items
+23 custom_tool_call + 23 custom_tool_call_output (all paired, 0 orphaned)
+68 messages
+INTEGRITY: OK — matches working thread format

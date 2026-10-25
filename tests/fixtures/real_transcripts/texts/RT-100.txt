@@ -1,0 +1,20 @@
+{
+  "id": "msg_REDACTED_ID",
+  "object": "chat.completion",
+  "created": 1791980400,
+  "model": "claude-sonnet-5-5",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": null, "refusal": null },
+      "finish_reason": "tool_calls",
+      "logprobs": null
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 136561,
+    "completion_tokens": 193,
+    "total_tokens": 136754,
+    "completion_tokens_details": { "reasoning_tokens": 0 }
+  }
+}

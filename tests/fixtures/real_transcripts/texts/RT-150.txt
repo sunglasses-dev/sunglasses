@@ -1,0 +1,4 @@
+response_item.type = function_call
+response_item.name = wait
+arguments.cell_id = wrong
+arguments.yield_time_ms = 1000

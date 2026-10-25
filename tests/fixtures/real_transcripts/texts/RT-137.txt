@@ -1,0 +1,9 @@
+Source: codex_core::tools::router -> dispatch_tool_call_with_code_mode_result
+       -> dispatch_tool_call_with_terminal_outcome
+
+Cause: The LLM's streaming response emits a function_call with
+       arguments: "{" — a lone opening brace with no content.
+       The Rust serde JSON parser immediately hits EOF.
+
+Secondary Error (from Python subprocess):
+  json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

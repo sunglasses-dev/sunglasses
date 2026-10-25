@@ -1,0 +1,6 @@
+16:53:36.098  function_call          view_image    call_00_xOnP62dcYl3n9S9KIgyj0114
+16:53:36.981  function_call          exec_command  call_01_bAkMrxrT9wYGu6WvjHjs2192   (ran ~30 s)
+16:53:37.052  function_call_output   call_00_xOnP62dcYl3n9S9KIgyj0114 (image)
+16:53:37.052  message (developer)    <image_resize_notice>                       <- request goes out here
+16:54:07.421  function_call_output   call_01_bAkMrxrT9wYGu6WvjHjs2192 (command result, 30 s late)
+16:54:11.683  task_complete          error: No tool output found for tool call call_01_bAkMrxrT9wYGu6WvjHjs2192

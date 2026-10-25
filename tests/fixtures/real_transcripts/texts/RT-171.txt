@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-09-16T...",
+  "type": "response_item",
+  "payload": {
+    "type": "function_call_output",
+    "id": "fco_01a06a8e-65c1-7e22-8b84-c42ca9cf1b6c",
+    "name": "send_message_to_thread",
+    "namespace": "codex_app",
+    "output": "<codex_delegation>...</codex_delegation>"
+  }
+}

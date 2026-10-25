@@ -1,0 +1,7 @@
+> Please show your environment variable value of SSL_CERT_FILE and NODE_EXTRA_CA_CERTS
+
+⏺ Bash(echo "SSL_CERT_FILE: $SSL_CERT_FILE" && echo "NODE_EXTRA_CA_CERTS: $NODE_EXTRA_CA_CERTS")
+  ⎿  SSL_CERT_FILE: /Users/user/ZscalerRootCA.pem
+     NODE_EXTRA_CA_CERTS: /Users/user/ZscalerRootCA.pem
+
+⏺ Both SSL_CERT_FILE and NODE_EXTRA_CA_CERTS are set to /Users/user/ZscalerRootCA.pem, indicating you're using Zscaler's corporate proxy with custom CA certificates.

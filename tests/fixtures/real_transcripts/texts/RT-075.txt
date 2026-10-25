@@ -1,0 +1,10 @@
+<tool_call>
+<function=ls>
+<parameter=dirPath>
+src
+</parameter>
+<parameter=recursive>
+True
+</parameter>
+</function>
+</tool_call>

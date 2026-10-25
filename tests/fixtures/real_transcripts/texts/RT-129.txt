@@ -1,0 +1,7 @@
+model: gpt-5.4
+reasoning effort: medium
+input items: 80
+context size: 1,488,772 characters
+tools included: exec_command, web_search, mcp__computer_use__, ...
+sandbox policy in metadata: ReadOnly
+network access in metadata: false

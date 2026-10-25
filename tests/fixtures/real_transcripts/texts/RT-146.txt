@@ -1,0 +1,8 @@
+   dispatch_tool_call_with_code_mode_result{
+     otel.name = mcp__cowart_mcp__render_cowart_canvas_widget
+     tool_name = mcp__cowart_mcp__render_cowart_canvas_widget
+     call_id   = "call_REDACTED_ID"
+     aborted   = false
+   }:dispatch_tool_call_with_terminal_outcome:
+     error = unsupported call: mcp__cowart_mcp__render_cowart_canvas_widget
+   

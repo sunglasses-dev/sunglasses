@@ -1,0 +1,9 @@
+{
+  "type": "function_call_output",
+  "id": "...",
+  "name": "...",
+  "namespace": "",
+  "output": [{"type": "output_text", "text": "..."}],
+  "internal_chat_message_metadata_passthrough": {}
+  // missing: "call_id"
+}

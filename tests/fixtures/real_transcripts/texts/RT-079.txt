@@ -1,0 +1,18 @@
+The Continue session successfully executed 13 tool calls before the failure.
+
+The final assistant message contained:
+
+{"filepath":"convex/schema.ts"}
+
+but had no toolCalls or toolCallStates entry. Therefore Read(convex/schema.ts) was never dispatched.
+
+The relevant Continue source is processToolCallDelta() in the CLI bundle:
+
+if(e.id?(r=e.id,e.index!==void 0&&r&&n.set(e.index,r)):e.index!==void 0&&(r=n.get(e.index)),!r){
+  xe.warn("Tool call delta without ID or valid index mapping",{toolCallDelta:e});
+  return;
+}
+
+When the first Ollama delta has index but no id, n.get(e.index) returns undefined and the tool call is dropped.
+
+A local patch that generates a stable call_<index> ID and stores it in the index-to-ID map fixes the issue.
