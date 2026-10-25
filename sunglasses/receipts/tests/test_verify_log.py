@@ -258,7 +258,7 @@ def test_the_writers_own_rotation_verifies_as_one_log(tmp_path):
     assert _results(report) == LOG_OK
 
 
-# --- 12 · rotation: specified, not built (T9 ruling 40) -----------------------
+# --- 12 · rotation: specified, not built ------------------------------------
 
 def _rotated():
     """A log whose second segment names the first's last checkpoint, as a

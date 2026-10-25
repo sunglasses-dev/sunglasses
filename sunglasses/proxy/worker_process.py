@@ -59,14 +59,11 @@ CAUSE_MALFORMED_OUTPUT = "malformed_output"
 
 DECISION_REVIEW = "review"
 
-# THE STARTUP BUDGET IS NOT THE SCAN'S. Loading the engine costs ~1.5 s
-# (measured 9-23 on an M3 Max: `SunglassesEngine()` 1,512 ms, a warm scan
-# 0.6 ms), so a child spawned per scan spent ~80% of T8.R4's 2,000 ms before it
-# read a byte -- and on a slower machine every message would be a deadline.
-# A spare loads BEFORE it is given work and says so on a separate pipe; the
-# scan's clock starts at the payload write. Waiting for a spare that is still
-# loading is bounded HERE, separately, and a spare that never gets ready is
-# killed and the item faults -- it is never handed a scan.
+# THE STARTUP BUDGET IS NOT THE SCAN'S. A spare loads BEFORE it is given work
+# and says so on a separate pipe; the scan's clock starts at the payload write.
+# Waiting for a spare that is still loading is bounded HERE, separately, and a
+# spare that never gets ready is killed and the item faults -- it is never
+# handed a scan.
 STARTUP_MS = 10_000
 # The pipe is named on the spare's command line, `--ready-fd N`, never in its
 # environment: the package reads exactly four named environment variables and
@@ -107,13 +104,12 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
         except Exception:
             collected["broken"] = True
 
-    # DELIVERY IS INSIDE THE DEADLINE (ASTRA worker-design r1, R1). The write
-    # used to come first and the clock after it, so a child that stopped
-    # draining stdin -- handed an admitted payload bigger than the pipe -- held
-    # this thread in `write` with the kill below unreachable, and a slow drain
-    # was then given a fresh full budget. One absolute deadline now exists
-    # before a byte is written, the write runs on its own thread, and this
-    # thread only ever waits on the clock.
+    # DELIVERY IS INSIDE THE DEADLINE. A write placed before the clock would let a
+    # child that stopped draining stdin -- handed an admitted payload bigger than
+    # the pipe -- hold this thread in `write` with the kill below unreachable, and
+    # give a slow drain a fresh full budget. One absolute deadline exists before a
+    # byte is written, the write runs on its own thread, and this thread only ever
+    # waits on the clock.
     data = json.dumps(payload).encode("utf-8")
     deadline = time.monotonic() + timeout_ms / 1000.0
 
@@ -150,7 +146,7 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
     if timed_out or collected.get("over"):
         # Both faults end the same way and for the same reason: the child is
         # still there. Stopping the GROUP rather than the pid catches anything
-        # it spawned, which is T8.R12 read the same way serve.py reads it.
+        # it spawned, which is how serve.py reads it too.
         supervisor.stop_group(child.pid, grace_ms=grace_ms, handle=child)
         # The group is gone, so a blocked write has had its EPIPE. Join the
         # writer BEFORE closing stdin from here: BufferedWriter.close takes the
@@ -224,12 +220,11 @@ def _parse(out, binding):
         return _fault(binding, STATUS_EXCEPTION, CAUSE_MALFORMED_OUTPUT)
     if not isinstance(value, dict):
         return _fault(binding, STATUS_EXCEPTION, CAUSE_MALFORMED_OUTPUT)
-    # THE CHILD'S BINDING, AS THE CHILD SAID IT. This used to be
-    # `dict(value, binding=dict(binding))`: the parent stamped its own binding
-    # over the answer, so `worker.validate` compared the parent with itself and
-    # a child answering about ANOTHER item was accepted as this one's result
-    # (found by T10, 9-23; measured through the route: another item's `allow`
-    # forwarded this call). Faults above still carry the parent's binding --
+    # THE CHILD'S BINDING, AS THE CHILD SAID IT. Stamping the parent's own binding
+    # over the answer (`dict(value, binding=dict(binding))`) would make
+    # `worker.validate` compare the parent with itself, and a child answering about
+    # ANOTHER item would be accepted as this one's result (another item's `allow`
+    # would forward this call). Faults above still carry the parent's binding --
     # those are ours, built here, about the item we asked about.
     return value
 
@@ -308,8 +303,8 @@ class ProcessScan:
         spare = self._take()
         if spare is None:
             # close() already ran: the worker this call needed does not exist.
-            # Reachable only after teardown. crashed, from the three causes
-            # (T9 ruling 9-23): a missing process is the host's side.
+            # Reachable only after teardown. crashed, from the three causes: a missing
+            # process is the host's side.
             return _fault(binding, STATUS_EXCEPTION, CAUSE_CRASHED)
         child, ready_r = spare
         if not _await_ready(ready_r, self.startup_ms):

@@ -26,14 +26,14 @@ CONTROL = "control"
 UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
 UNINSPECTED_METHOD = "UNINSPECTED_METHOD"
 
-# T2.R0. The only things excluded from COVERAGE: fixed protocol scalars that the
+# contract row 2.0. The only things excluded from COVERAGE: fixed protocol scalars that the
 # schema validates. Everything else, including every key, is inspected.
 _PROTOCOL_SCALARS = frozenset({
     "jsonrpc", "id", "code", "isError", "nextCursor", "protocolVersion",
     "progress", "total",
 })
 
-# T3.R1. Excluded from the CONTENT BYTE count on top of all keys: the schema
+# contract row 3.1. Excluded from the CONTENT BYTE count on top of all keys: the schema
 # discriminants, whose vocabulary is fixed. Charging them makes an identical
 # payload cost more in one shape than in another.
 _DISCRIMINANTS = frozenset({"type", "role"})
@@ -53,27 +53,27 @@ _DISCRIMINANTS = frozenset({"type", "role"})
 # recognising the NAME is not recognising the POSITION.
 _OPAQUE_CONTAINERS = frozenset({"structuredContent", "_meta", "arguments"})
 
-# T2's rows, as a table rather than a chain of conditionals.
+# The contract rows, as a table rather than a chain of conditionals.
 _REQUEST_CHANNEL = {
-    "initialize": MESSAGE,          # T2.R1
-    "tools/call": MESSAGE,          # T2.R3
-    "tools/list": CONTROL,          # T2.R6
-    "resources/read": MESSAGE,      # T2.R8
-    "prompts/get": MESSAGE,         # T2.R10
-    # A bare ping never reaches the scan (T2.R14). One that carries params, a
+    "initialize": MESSAGE,          # contract row 2.1
+    "tools/call": MESSAGE,          # contract row 2.3
+    "tools/list": CONTROL,          # contract row 2.6
+    "resources/read": MESSAGE,      # contract row 2.8
+    "prompts/get": MESSAGE,         # contract row 2.10
+    # A bare ping never reaches the scan (contract row 2.14). One that carries params, a
     # `_meta` trace header for instance, is read like an initialized
     # notification's params and refused only if the scan says so.
     "ping": MESSAGE,
 }
 _RESULT_CHANNEL = {
-    "initialize": API_RESPONSE,     # T2.R2
-    "tools/call": API_RESPONSE,     # T2.R4
-    "tools/list": API_RESPONSE,     # T2.R7
-    "resources/read": API_RESPONSE, # T2.R9
-    "prompts/get": API_RESPONSE,    # T2.R11
+    "initialize": API_RESPONSE,     # contract row 2.2
+    "tools/call": API_RESPONSE,     # contract row 2.4
+    "tools/list": API_RESPONSE,     # contract row 2.7
+    "resources/read": API_RESPONSE, # contract row 2.9
+    "prompts/get": API_RESPONSE,    # contract row 2.11
 }
 
-# T2.R14. Exactly three shapes may be COMPLETE with no leaves at all.
+# contract row 2.14. Exactly three shapes may be COMPLETE with no leaves at all.
 _ZERO_LEAF_METHODS = frozenset({"ping", "notifications/initialized"})
 
 # T207. The notifications this protocol defines, ENUMERATED. The refusal table
@@ -109,7 +109,7 @@ def channel_for(method, direction):
     """T2's channel column. A rule is scoped to a channel, so choosing the wrong
     one silently disables every rule written for the right one."""
     if method.startswith("notifications/"):
-        # T2.R12 upstream, T2.R13 client.
+        # contract row 2.12 upstream, contract row 2.13 client.
         return API_RESPONSE if direction == "result" else MESSAGE
     # T204. A correlated ERROR is a reply, and its message and data are the
     # server's own text arriving in answer to a client request. That is the

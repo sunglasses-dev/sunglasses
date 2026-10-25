@@ -85,18 +85,15 @@ class QRExtractor:
             self.failures.append(over)
             return []
 
-        # v0.5.6 round 7 (ASTRA I1). `n_frames` is a PROPERTY THAT PARSES, so on a
-        # file whose later frame header is damaged it RAISES -- and `getattr(img,
-        # "n_frames", 1)` does not catch that, because the default only applies to
-        # a missing attribute, never to one whose getter throws.
+        # `n_frames` is a PROPERTY THAT PARSES, so on a file whose later frame header
+        # is damaged it RAISES -- and `getattr(img, "n_frames", 1)` does not catch that,
+        # because the default only applies to a missing attribute, never to one whose
+        # getter throws.
         #
-        # Round 6 therefore let a broken LATER header destroy a perfectly readable
-        # FIRST frame: `qr-first-short-later.gif` went from 6 findings / exit 1 on
-        # a21414b to 0 findings / exit 3. I lost a known finding while fixing lost
-        # findings, which is the defect this release exists to remove.
-        #
-        # The rule that replaces it: **a census of the whole sequence is never a
-        # prerequisite for scanning the frames that do read.** Discover what we
+        # Letting that exception escape would let a broken LATER header destroy a
+        # perfectly readable FIRST frame (a `qr-first-short-later.gif` with findings in
+        # frame one would report none). The rule: **a census of the whole sequence is
+        # never a prerequisite for scanning the frames that do read.** Discover what we
         # can, decode what we can, and NAME the remainder -- even when the size of
         # that remainder is itself unknown.
         results: List[Tuple[str, str]] = []
@@ -226,11 +223,11 @@ class QRExtractor:
         if not isinstance(image_path, Member) and not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
-        # v0.5.6 round 7 (ASTRA I5b): reset per EXTRACTION, not per instance. The
-        # list was initialised in `__init__` only, so a reused extractor carried the
-        # previous file's loss into the next scan -- a clean file inheriting a
-        # stranger's incomplete flag. The canonical wrappers build a fresh instance
-        # each time, which is exactly why this hid.
+        # Reset per EXTRACTION, not per instance. A list initialised in `__init__` only
+        # would let a reused extractor carry the previous file's loss into the next
+        # scan -- a clean file inheriting a stranger's incomplete flag. The canonical
+        # wrappers build a fresh instance each time, which is exactly why this would
+        # hide.
         self.failures = []
         try:
             img = ImageExtractor._open_lazy(image_path)
@@ -298,8 +295,8 @@ def scan_qr(image_path: str, engine=None) -> dict:
             f"{os.path.basename(image_path)} was inspected.")
 
     # Frames the decoder skipped are a COVERAGE loss on this surface too, not only
-    # through `dispatch`. Round 6 (ASTRA H1): `scan_qr()` is a public entry point,
-    # and it reported the same false completeness the CLI did.
+    # through `dispatch`: `scan_qr()` is a public entry point, and it would
+    # report the same false completeness the CLI would otherwise.
     _warnings = [_failed] if _failed else []
     for failure in getattr(extractor, "failures", []) if extractor else []:
         _warnings.append(

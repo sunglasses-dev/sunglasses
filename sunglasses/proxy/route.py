@@ -163,7 +163,7 @@ class Route:
         # nobody is holding. An id leaves this set when a frame is actually
         # WRITTEN for it, which is the only event that means answered.
         self._paying = False
-        # T2.R6's re-list runs through this. None means no control channel is
+        # contract row 2.6's re-list runs through this. None means no control channel is
         # wired, and a tools/list is then refused rather than forwarded: the
         # client asked us, and handing its request to the server unread is the
         # one answer this row never permits.
@@ -174,7 +174,7 @@ class Route:
         self._activated = False
         self._activated_sha = None
         self._state_fault = None
-        # T5.R4 and T6.R5, the two things that can retire a held item while its
+        # contract row 5.4 and contract row 6.5, the two things that can retire a held item while its
         # answer is still in flight. Kept on the session because ONE authority
         # decides whether a result may be released, and a check that lives in
         # the middle of the release path is a check the next release path
@@ -199,11 +199,11 @@ class Route:
         method = message.get("method")
         if method is None:
             # A response arriving from the client correlates to an upstream
-            # REQUEST, which T2.R15 never let through, so there is nothing it
+            # REQUEST, which contract row 2.15 never let through, so there is nothing it
             # can be an answer to.
             # Its own kind: this frame PARSED, so there is no parse fault to
             # inherit. The client sent a response, and a response from the
-            # client can only answer an upstream request, which T2.R15 never
+            # client can only answer an upstream request, which contract row 2.15 never
             # let through. My enumeration missed this site because I grouped it
             # with the ones that take their reason from a parse result; it
             # takes the reason but not the fault.
@@ -293,21 +293,18 @@ class Route:
         except receipts.ReceiptIOError:
             if owed is not None:
                 self.session.owe_again(owed)
-            # T9.R4. A release that cannot be recorded does not happen, and the
-            # session stops rather than continuing to mediate with nothing
-            # written down.
+            # A release that cannot be recorded does not happen, and the session stops
+            # rather than continuing to mediate with nothing written down.
             #
-            # R-168-R6/F2. THE COMMENT THAT USED TO SIT HERE WAS FALSE, and
-            # the reviewer measured it: it said the party that knows whose
-            # answer it is had already sent the bounded error, and on these
-            # executions nobody had. `_release_frame` only pays when the BUILD
-            # fails; authorisation failing here happens after a successful
-            # build, with the record already retired, and the client had
-            # received nothing at all.
+            # PAY FIRST, then stop. The party that knows whose answer it is has NOT already
+            # sent the bounded error on these executions: `_release_frame` only pays when
+            # the BUILD fails; authorisation failing here happens after a successful
+            # build, with the record already retired, and the client has received nothing
+            # at all.
             #
-            # The refusal is keyed on ownership rather than on this call
-            # failing, so the frame that already crossed is not answered twice
-            # and a notification -- which owns no id -- borrows nobody's.
+            # The refusal is keyed on ownership rather than on this call failing, so the
+            # frame that already crossed is not answered twice and a notification -- which
+            # owns no id -- borrows nobody's.
             self._record("SETTLED", reason_code=REASON_RECEIPT_IO_ERROR,
                          rule=RULE_RESOURCE, forwarded=False)
             self._pay_bounded_refusals()
@@ -324,7 +321,7 @@ class Route:
             raise
         # IDEMPOTENT, AND THE NAME IS LOAD-BEARING. The id was taken above,
         # before the authorisation; this confirms it once the bytes have
-        # actually moved, and a reviewer control locates this exact statement
+        # actually moved, and a test control locates this exact statement
         # by AST to pause a thread here (XS15). Deleting it turned that control
         # into a StopIteration -- an instrument broken by a change it had no
         # reason to notice, the `_handoff` signature lesson one more time.
@@ -412,7 +409,7 @@ class Route:
         if request_id is NO_ID:
             return None
         # R-168-R6/F1. THE ADAPTER, and the name is why it is still here. This
-        # attribute is wrapped by reviewer controls and its calls are COUNTED
+        # attribute is wrapped by test controls and its calls are COUNTED
         # (XE02_rederive_writer asserts exactly two), so the decision it
         # returns had to become reachable from somewhere that is not a call to
         # it -- the retirement re-derives after a writer lands during the
@@ -447,10 +444,10 @@ class Route:
         Best effort and never claimed durable, which is all a component that
         has just lost its log may claim.
         """
-        # R-168-R7. PURE, AND IT KEEPS ITS NAME. Reviewer controls wrap this
+        # PURE, AND IT KEEPS ITS NAME. Test controls wrap this
         # attribute to drive a writer during preparation (XE02_frame_cancel,
         # XE02_rederive_writer), so it stays the thing called once per build --
-        # but building is all it does now. A superseded decision leaves no
+        # but building is all it does. A superseded decision leaves no
         # trace in the receipt stream, because it is not a settlement: the item
         # settles once, `_release_record` writes that once, and a reader
         # counting SETTLED rows per item counts what the wire carried.
@@ -491,7 +488,7 @@ class Route:
             return None
 
         if method == "notifications/tools/list_changed":
-            # T5.R4. The descriptors moved, so every undelivered result of this
+            # contract row 5.4. The descriptors moved, so every undelivered result of this
             # generation is now an answer from a server nobody approved.
             self._invalidated = REASON_DESCRIPTOR_CHANGED
             self._activated = False
@@ -526,7 +523,7 @@ class Route:
         if surface is None:
             return None
 
-        # T2.R14 BEFORE everything else, exactly as in the client direction.
+        # contract row 2.14 BEFORE everything else, exactly as in the client direction.
         # A ping result with nothing in it has zero inspectable leaves and no
         # channel of its own, so scanning it means handing a worker nothing to
         # read on a channel that does not exist, and every rule is scoped to a
@@ -542,7 +539,7 @@ class Route:
                                          REASON_UNINSPECTED_METHOD,
                                          RULE_ADMISSION, record=False)
 
-        # T2.R4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
+        # contract row 2.4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
         # message is withheld. Skipping the blob and inspecting the rest
         # reports a clean scan of a message we did not read.
         if selector.unsupported(method, surface) is not None:
@@ -573,7 +570,7 @@ class Route:
             return self._withhold_result(request_id, REASON_SCAN_EXCEPTION,
                                          RULE_RESOURCE, record=False)
 
-        # An inbound result is not an outbound call, so T4.R4(7)'s direction
+        # An inbound result is not an outbound call, so contract row 4.4(7)'s direction
         # test is false here and a finding settles PROHIBITED_CONTENT. Saying
         # SECRET on an arriving message would describe an exfiltration that did
         # not happen.
@@ -600,7 +597,7 @@ class Route:
             return self._withhold_result(request_id, retired, RULE_APPROVAL, record=False)
 
         if settlement.reason == REASON_CLEAN:
-            # T2.R5, CB06. The ENTIRE original, its own id and its own code.
+            # contract row 2.5, CB06. The ENTIRE original, its own id and its own code.
             # An error is a real answer and rewriting it into ours loses what
             # the server said.
             return None
@@ -821,14 +818,14 @@ class Route:
         # origin answers WHO AUTHORED the request, which the proxy already knows
         # here -- it is part of the identity key (`pump.key()` is origin plus
         # JSON type plus value) and it was passed into `admit_request` a few
-        # lines above. It was known at this exact moment and dropped, so an
-        # auditor reading ADMITTED could not tell a client call from an
+        # lines above. It was known at this exact moment and dropped, so a
+        # reader of the ADMITTED record could not tell a client call from an
         # upstream-authored one. `FRAME_IN` carries `direction`, which is the
         # hop, not the author.
         self._record("ADMITTED", id_type=type(request_id).__name__,
                      origin=CLIENT)
 
-        # T2.R14. Zero inspectable leaves is COMPLETE for these shapes only, so
+        # contract row 2.14. Zero inspectable leaves is COMPLETE for these shapes only, so
         # they are forwarded without a scan rather than sent to a worker to
         # inspect nothing on a clock that can still expire.
         if selector.zero_leaves_is_complete(method, message):
@@ -836,23 +833,23 @@ class Route:
             return
 
         if method == "tools/list":
-            # T2.R6. The client's frame is NOT forwarded. One client request
+            # contract row 2.6. The client's frame is NOT forwarded. One client request
             # becomes up to sixty four of ours and is answered once, here.
             self._client_list(request_id, attempt=attempt)
             return
 
-        # T2.R16 AFTER T2.R14, because a named row beats the fallback: `ping`
-        # is advertised by T1.R3 and has no channel of its own, so the selector
-        # table has no row for it and asking the fallback first would refuse a
-        # method the contract advertises. Everything the selector has no row
-        # for and R14 does not name is refused here, which is fail closed and
-        # keeps it away from upstream either way.
+        # contract row 2.16: refuse methods the selector has no row for.
+        # `ping` is advertised by contract row 1.3, and a bare one carries nothing to scan
+        # (contract row 2.14). A ping that carries params is read on the message
+        # channel (see selector `_REQUEST_CHANNEL`). Everything else the
+        # selector has no row for is refused here, which is fail closed and keeps
+        # it away from upstream either way.
         if selector.refusal(method, REQUEST, origin=CLIENT) is not None:
             self._withhold(request_id, REASON_UNINSPECTED_METHOD, RULE_ADMISSION,
                            attempt=attempt)
             return
 
-        # T1.R2, the CLIENT side. `handshake.negotiate` judges the version the
+        # contract row 1.2, the CLIENT side. `handshake.negotiate` judges the version the
         # server answers with; the version the client OFFERS was never read, so
         # a `protocolVersion` of 7, null or a list went upstream and the
         # handshake began from a frame nobody had looked at. Only the TYPE is
@@ -874,7 +871,7 @@ class Route:
             approved_under = self._approval_stamp()
             blocked = self._approval_reason(message)
             if blocked is not None:
-                # T5.R2. Before any scan, because a call we may not make is not
+                # contract row 5.2. Before any scan, because a call we may not make is not
                 # a call whose contents are interesting.
                 if blocked == REASON_STATE_IO_ERROR:
                     self._withhold(request_id, blocked, RULE_RESOURCE,
@@ -885,18 +882,18 @@ class Route:
                                attempt=attempt)
                 return
 
-        # AR09, T8.R2. The content bound is a bound on CONTENT, not on the
-        # direction it happens to be travelling. It was applied to results and
-        # not to calls, so a client request carrying more than the cap went to
-        # the worker and then to the server: the limit that exists to stop an
-        # unbounded scan was reachable by sending the bytes the other way.
+        # The content bound is a bound on CONTENT, not on the direction it happens to
+        # be travelling. It applies to calls as well as results: a client request
+        # carrying more than the cap would otherwise go to the worker and then to the
+        # server, and the limit that exists to stop an unbounded scan would be
+        # reachable by sending the bytes the other way.
         #
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         #
         # Counted over `bound_surface`, as the notification side is: a top-level
         # member beside the envelope is not scanned for most methods, and counting
-        # only what is scanned let an oversized one cross past the bound that
+        # only what is scanned would let an oversized one cross past the bound that
         # exists to stop it. Counted, not scanned: what a scan reads is unchanged.
         over = bounds.check_content(
             selector.content_bytes(selector.bound_surface(method, message)))
@@ -913,7 +910,7 @@ class Route:
         self._inspect(raw, message, method, request_id=request_id,
                       attempt=attempt, approved_under=approved_under)
 
-    # ── T2.R6, T2.R7 and T5: the list flow ─────────────────────────────────
+    # ── contract rows 2.6 and 2.7, and the list flow ─────────────────────────────────
 
     def _client_list(self, request_id, *, attempt=None):
         """Re-list in our own namespace, scan every page, then decide.
@@ -937,7 +934,7 @@ class Route:
                 self.approvals, "server_id", None))
 
         if not outcome.activated and outcome.provenance == REASON_STATE_IO_ERROR:
-            # T9 ruling 64 (c). Our own state failed, so this id is refused as
+            # Our own state failed, so this id is refused as
             # a resource fault and the session ends: every later list would fail
             # the same way and no approval can ever be made from here.
             self._state_fault = outcome.detail
@@ -947,7 +944,7 @@ class Route:
             return
 
         if not outcome.activated:
-            # T5.R2. The provenance travels: APPROVAL_REQUIRED describes a
+            # contract row 5.2. The provenance travels: APPROVAL_REQUIRED describes a
             # server nobody approved, DESCRIPTOR_CHANGED one that moved, and a
             # scan reason describes what its descriptors carried. Collapsing
             # them would tell an operator the wrong thing to do next.
@@ -958,7 +955,7 @@ class Route:
             return
 
         found = outcome.snapshot
-        # T2.R7's gate, and it is defence in depth rather than a second
+        # contract row 2.7's gate, and it is defence in depth rather than a second
         # decision: a successful activation has already committed this exact
         # sha as the active snapshot, so this can only refuse if the store
         # moved between the two calls. The mutation that removes it is
@@ -971,13 +968,11 @@ class Route:
             return
 
         self._approved_tools = dict(found.tools)
-        # R-168-R11/F2 (ASTRA MS05, MS07), and this one is r9's own regression:
-        # it passes on 07c5c67 and failed here. r9 moved take/confirm OUT of
-        # `_to_client` and into the callers, repaired the three REFUSAL callers
-        # in this method, and left the SUCCESS caller behind -- so an approved
-        # list was delivered without ever taking its wire obligation, and under
-        # a receipt failure the same request was answered twice. Success is a
-        # response like any other: take, deliver, confirm.
+        # The SUCCESS caller takes and confirms its wire obligation like the three
+        # REFUSAL callers in this method, because take/confirm live in the callers and
+        # not in `_to_client`: an approved list delivered without taking it would be
+        # answered twice under a receipt failure. Success is a response like any
+        # other: take, deliver, confirm.
         owed = (attempt.token if attempt is not None
                 and attempt.request_id == request_id
                 else self.session.obligation_for(request_id))
@@ -986,7 +981,7 @@ class Route:
         self._to_client({"jsonrpc": "2.0", "id": request_id,
                          "result": {"tools": self._tools_of(found)}})
         self._answered(owed, final=True)
-        # T6.R1. Delivering the answer is not settling the item. Left pending,
+        # contract row 6.1. Delivering the answer is not settling the item. Left pending,
         # the teardown still owes this id a refusal and the client receives a
         # SECOND answer to a request it has already had answered, which is the
         # one thing the row forbids in either direction.
@@ -1006,7 +1001,7 @@ class Route:
             except ControlTimeout:
                 # A server that stops answering is not a short tool list. The
                 # collector reads this as an unusable page and refuses, and
-                # T8.R13 never activates a prefix.
+                # no prefix is activated.
                 return None
         return request
 
@@ -1093,7 +1088,7 @@ class Route:
                          rule=RULE_ADMISSION, forwarded=False)
             return
         if method == "notifications/cancelled":
-            # T6.R5. Honoured, not merely forwarded. The id is retired BEFORE
+            # contract row 6.5. Honoured, not merely forwarded. The id is retired BEFORE
             # any release, the client gets its one answer now, and the late
             # result is discarded rather than delivered to a caller that has
             # already been told the request is over.
@@ -1102,10 +1097,9 @@ class Route:
         if selector.zero_leaves_is_complete(method, message):
             self._release(raw, NO_ID)  # attempt-exempt: a notification has no id and gets no response, so admission is never called and there is no attempt
             return
-        # AR09 on the notification side. `_client_request` refuses a frame over
-        # the content bound before any scan; this path went straight to
-        # `_inspect`, so an oversized notification was scanned and forwarded
-        # (ASTRA's #393 r1 measured all 14 admitted no-id shapes). It has no
+        # The content bound on the notification side. `_client_request` refuses a frame over
+        # the content bound before any scan; a notification that went straight to
+        # `_inspect` would be scanned and forwarded oversized. It has no
         # response to give, so it is dropped like an unknown notification above:
         # one receipt carrying the budget, nothing to either side.
         over = bounds.check_content(
@@ -1148,7 +1142,7 @@ class Route:
         if self.session.is_settling(target, origin=CLIENT):
             # R-168-R3. The item has left `_pending` and its answer is in the
             # reader's hands, NOT the client's. Settling it here would be the
-            # second answer T6.R1 forbids, and returning early -- which is what
+            # second answer contract row 6.1 forbids, and returning early -- which is what
             # the `expects` test below used to do -- treated it as already
             # delivered and let the original cross. The cancellation is
             # recorded (above) and stays AUTHORITATIVE: `_release_gate` turns
@@ -1160,7 +1154,7 @@ class Route:
         # without it the late result arrives for an id nothing is waiting on,
         # the pump reads that as unsolicited and closes MALFORMED_UPSTREAM, and
         # the client is told its cancelled request failed on a protocol fault.
-        # T6.R5 calls a late answer to a cancelled id DISCARDED_LATE, and the
+        # contract row 6.5 calls a late answer to a cancelled id DISCARDED_LATE, and the
         # session stays serviceable.
         self.session.cancel(target, origin=CLIENT)
         body = envelope.withheld(
@@ -1190,17 +1184,16 @@ class Route:
             "generation": 1,
             "invocation_token": uuid.uuid4().hex,
         }
-        # T9.R2 names `kind` on this event and on FRAME_IN/OUT, and it cannot
-        # be passed: `Log.event(self, kind, **fields)` takes the EVENT in a
-        # parameter of that name, so `kind="request"` is a TypeError rather
-        # than a field. Reported rather than worked around in receipts.py,
-        # which is under review.
+        # A field named `kind` cannot go through `_record`: it forwards to
+        # `record_or_stop(self, kind, **fields)`, whose first parameter is also
+        # called `kind`, so the call would receive two values for `kind` and
+        # raise TypeError.
         if not self._record("HOLD_ENTERED"):
             return
         if not self._record("SCAN_STARTED", method=method):
             return
 
-        # The INSPECTED SURFACE, not the frame. T2's client rows all name
+        # The INSPECTED SURFACE, not the frame. The client contract rows all name
         # `params`, and handing the scan the whole message would inspect our
         # own envelope and the id we are correlating on.
         result = self.scan(params, channel=channel, binding=binding,
@@ -1210,7 +1203,7 @@ class Route:
                             held_content_bytes=held_bytes,
                             catalog=self.catalog)
         except worker.Invalid:
-            # T4.R2. A result we cannot believe is a fact about the scan, never
+            # contract row 4.2. A result we cannot believe is a fact about the scan, never
             # a verdict about the message, and reading an incoherent allow as
             # allow is how a scan that found the thing forwards it anyway.
             self._record_unusable(result)
@@ -1218,7 +1211,7 @@ class Route:
                                   RULE_RESOURCE, attempt=attempt)
             return
 
-        # T4.R4(7) takes a DESCRIPTOR of the held message, not the message.
+        # contract row 4.4(7) takes a DESCRIPTOR of the held message, not the message.
         # Handing it the raw frame makes `direction` and `is_request` absent,
         # the direction test false, and every outbound secret settles as the
         # weaker PROHIBITED_CONTENT while still looking blocked.
@@ -1303,7 +1296,7 @@ class Route:
                          settlement=None,
                          result=None):
         if request_id is NO_ID:
-            # T2.R13. Dropped with a receipt, and no acknowledgement, because a
+            # contract row 2.13. Dropped with a receipt, and no acknowledgement, because a
             # notification has no response to put one in.
             self._record("SETTLED", reason_code=reason, rule=rule,
                          forwarded=False)
@@ -1314,18 +1307,16 @@ class Route:
 
     def _withhold(self, request_id, reason, rule, *, attempt=None,
                   settlement=None, result=None, budget=None, rule_ids=None):
-        # R-168-R12/(b). THE BODY IS BUILT FIRST so the two cases can be one
-        # if/else and the take can sit at the top level, where it plainly
-        # dominates the write. Before this the take lived inside the claim
-        # branch and the write sat outside it, dominating only because the
-        # other path happened to return -- true, but invisible to any
-        # analysis that does not model returns, and ASTRA's GA01 is exactly
-        # a take hidden in a branch. Making the code obviously correct beats
-        # making the gate clever enough to follow it.
+        # THE BODY IS BUILT FIRST so the two cases can be one if/else and the take can
+        # sit at the top level, where it plainly dominates the write. A take inside the
+        # claim branch with the write outside it dominates only because the other path
+        # happens to return -- true, but invisible to any analysis that does not model
+        # returns, and exactly a take hidden in a branch. Making the code obviously
+        # correct beats making the gate clever enough to follow it.
         #
-        # Building the body earlier costs nothing: it is pure construction
-        # from the arguments, and every claim and take still happens before
-        # a single byte is written, which is what #179 requires.
+        # Building the body earlier costs nothing: it is pure construction from the
+        # arguments, and every claim and take still happens before a single byte is
+        # written.
         result = result or {}
         body = envelope.withheld(
             request_id=request_id,
@@ -1346,7 +1337,7 @@ class Route:
         # R-168-R9/(b). TAKE, do not assume. If this obligation is already
         # someone else's -- the payer has it, or a close drained it -- there is
         # nothing here to answer and writing anyway is the second frame.
-        # `_to_client` keeps the one argument a reviewer control stubs it with,
+        # `_to_client` keeps the one argument a test control stubs it with,
         # so the ownership call sits beside it rather than inside it.
         # MERGE, #168 r9 onto #179. THE ORDER OF THE TWO REPAIRS, and getting it
         # wrong is silent. r9's ownership take (below) returned before anything
@@ -1373,7 +1364,7 @@ class Route:
         self.session.claim_for_local_answer(attempt.token)
         # R-179-R7/(d) + R-168-R12/(a). THE SINGLE ACQUIRE, over both sets,
         # before a byte moves. It keeps the name `take_delivery` because
-        # reviewer controls hook that attribute to drive the reuse race; the
+        # test controls hook that attribute to drive the reuse race; the
         # plumbing gives way, not the control.
         if not self.session.take_delivery(attempt.token):
             return
@@ -1387,7 +1378,7 @@ class Route:
         self.session.commit_local_cause(attempt.token, reason, rule)
         self._to_client(body)
         self._answered(owed, final=True)
-        # T6.R1. The held item is settled here and not merely answered, so the
+        # contract row 6.1. The held item is settled here and not merely answered, so the
         # correlation table releases the id. Leaving it pending makes the next
         # legitimate use of that id look like a duplicate and closes the
         # session on the client for our own bookkeeping.
@@ -1466,7 +1457,7 @@ class Route:
         if self._state_fault is not None:
             return REASON_STATE_IO_ERROR
         # The descriptor sha comes from the snapshot this session ACTIVATED,
-        # not from an argument a caller supplies. T5.R2 admits a call when the
+        # not from an argument a caller supplies. contract row 5.2 admits a call when the
         # tool's descriptor matches the approved one, and a sha handed in from
         # outside would let the caller answer the question being asked.
         known = self._approved_tools.get(name) if name else None
@@ -1489,7 +1480,7 @@ class Route:
         if self._activated and self._activated_sha == self._record_sha():
             # Activated already, against the record that is still on disk.
             return
-        # T5.R3 says at session start AND whenever the approval record changes
+        # contract row 5.3 says at session start AND whenever the approval record changes
         # on disk. Both halves matter and both were missing. Without the retry,
         # a session that started before a human approved anything never
         # notices the approval and refuses for ever. Without the re-read, a
@@ -1505,10 +1496,9 @@ class Route:
         if outcome.activated:
             self._approved_tools = dict(outcome.snapshot.tools)
         elif outcome.provenance == REASON_DESCRIPTOR_CHANGED:
-            # ONLY an actual revoke is assigned (T9 ruling 120.1). This used to
-            # re-assign the CURRENT value on every other failure, and the setter
-            # reads every assignment as a revoke: a route already revoked
-            # accepted a second invalidation that never happened, bumping the
+            # ONLY an actual revoke is assigned. Re-assigning the CURRENT value on every
+            # other failure would be read by the setter as a revoke: a route already revoked
+            # would accept a second invalidation that never happened, bumping the
             # epoch again, and with the durable record it would write one too.
             # Nothing is lost by not re-assigning: the session's revoke is
             # sticky, so the release barrier already refuses everything.
@@ -1684,18 +1674,16 @@ class Route:
         """
         stop = self.log.record_or_stop(event, **fields)
         if stop.stopped:
-            # RS08 and RS09. The docstring above has said this since the slice
-            # that wrote it and the code only ever RETURNED the fact. A log
-            # that cannot be written is a session that is mediating with
-            # nothing written down, and T9.R4 does not let that continue: a
-            # caller who checks the return value stops one step, and every
-            # caller who does not carries on with no record at all.
+            # A log that cannot be written is a session that is mediating with nothing
+            # written down, and that must not continue: a caller who checks the return
+            # value stops one step, and every caller who does not carries on with no
+            # record at all, so the session is closed here.
             #
             # `_close` is idempotent on the session, so the first failed
             # receipt decides the cause and the ones that follow it -- there
             # are always several, because a failed log fails every write --
             # cannot relabel it.
-            # R-168-R6/F2. PAY FIRST, then close. The close records what the
+            # PAY FIRST, then close. The close records what the
             # SESSION still owes; this pays what the CLIENT is still owed, and
             # on the release paths those are not the same set -- the record is
             # retired by then and the client has had nothing.

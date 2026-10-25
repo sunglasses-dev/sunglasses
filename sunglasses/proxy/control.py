@@ -32,7 +32,7 @@ import uuid
 
 from .pump import CONTROL_PREFIX, ORIGIN_PROXY
 
-DEADLINE_MS = 10_000          # T8.R13's whole-list bound, per request here
+DEADLINE_MS = 10_000          # the whole-list bound, per request here
 POLL_S = 0.005
 
 

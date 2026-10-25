@@ -23,7 +23,7 @@ from __future__ import annotations
 WITHHELD_CODE = -32070
 WITHHELD_MESSAGE = "SUNGLASSES_WITHHELD"
 
-# T4.R5's catalog, the reasons an envelope may name. A reason outside it would
+# contract row 4.5's catalog, the reasons an envelope may name. A reason outside it would
 # be a free text field wearing a respectable name.
 REASONS = frozenset({
     "CLEAN", "NO_FINDING_KNOWN_DETECTOR_GAP", "PROHIBITED_CONTENT",
@@ -41,7 +41,7 @@ REASONS = frozenset({
     # turned a deliberate fault-and-close into a ValueError out of the reader.
     # Six gate rows (RC29 x4, RC32 x2) caught it.
     "INTERNAL_FAULT",
-    # T9 ruling 64. The proxy's own state could not be written, a capture the
+    # The proxy's own state could not be written, a capture the
     # operator would approve from. The proxy's fault and never the server's,
     # so it is not MALFORMED_UPSTREAM, and not INTERNAL_FAULT either: that one
     # closes for one reason only (session.py, DECISION_AUTHORITY_MOVED).
@@ -61,7 +61,7 @@ STATUSES = frozenset({"complete", "incomplete", "exception", "deadline",
                       "cancelled", "not_run"})
 BUDGETS = frozenset({"content", "frame", "depth", "nodes"})
 
-# T4.R7. Bounded so a worker cannot make the envelope arbitrarily large, and
+# contract row 4.7. Bounded so a worker cannot make the envelope arbitrarily large, and
 # ORDERED so the bound is deterministic.
 MAX_RULE_IDS = 32
 

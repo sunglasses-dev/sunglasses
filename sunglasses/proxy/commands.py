@@ -195,7 +195,7 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     try:
         store.approve(snapshot_sha256=snapshot, viewed=True)
     except OSError as failure:
-        # T9 ruling 64. A record that could not be written is a refusal that
+        # A record that could not be written is a refusal that
         # says where, never a traceback, and never "approved".
         return _state_fault(stderr, failure, root)
     stdout.write("approved\n")

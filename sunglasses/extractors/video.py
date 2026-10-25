@@ -135,13 +135,12 @@ class VideoExtractor:
                     ]
                     conv = subprocess.run(cmd, capture_output=True, timeout=30)
 
-                    # v0.5.6 round 5 (ASTRA G3). This return code was never read.
-                    # ffmpeg fails, writes nothing, and the empty temp file was
-                    # then read as "this track has no subtitles" -- so a failed
-                    # conversion looked exactly like a track with no text in it,
-                    # and the scan reported complete. ASTRA injected a nonzero
-                    # code at this one subprocess and watched seven findings
-                    # become zero, complete, clean.
+                    # The return code is read. If ffmpeg fails and writes nothing, the empty temp
+                    # file would be read as "this track has no subtitles" -- a failed conversion
+                    # would look exactly like a track with no text in it, and the scan would report
+                    # complete. Without the check below, a nonzero code at this one subprocess
+                    # would turn findings into zero, complete, clean; with it, the track is
+                    # recorded as not inspected and the scan says so in its warnings.
                     #
                     # Both halves are checked, because either alone is passable:
                     # a nonzero code with output, and a zero code with an empty

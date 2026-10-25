@@ -102,8 +102,7 @@ class SunglassesScanner:
                     "reason": "Large media file — requires DEEP scan",
                     "command": f'scanner.scan_deep("{path}")',
                 })
-                # Deferred is NOT inspected. This is the line ASTRA's R1 rerun
-                # was about: nothing in this attachment has been read yet.
+                # Deferred is NOT inspected: nothing in this attachment has been read yet.
                 extraction_complete = False
                 warnings.append(
                     f"Attachment not inspected — {os.path.basename(path)} requires a "

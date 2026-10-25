@@ -64,7 +64,7 @@ def default_engine():
     return _engine
 
 
-# T4.R6's helper lane pins, which are string literals at their call sites in
+# contract row 4.6's helper lane pins, which are string literals at their call sites in
 # firewall.py rather than a collection. Named here so the catalog ENUMERATES
 # them. A prefix test would accept any id shaped like one of these, and a
 # catalog that accepts a shape is not a catalog.
@@ -120,13 +120,13 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
     inspected = len(text.encode("utf-8", "surrogatepass"))
     # The join is ours, so the inspected count never exceeds what the peer
     # actually sent. Reporting our separators as inspected bytes would break
-    # T4.R2's inspected <= observed <= held on any message with two leaves.
+    # contract row 4.2's inspected <= observed <= held on any message with two leaves.
     inspected = min(inspected, content_bytes)
 
     try:
         result = engine.scan(text, channel=channel)
     except TimeoutError:
-        # T4.R3 names this one separately: an engine TIMEOUT is `deadline`, not
+        # contract row 4.3 names this one separately: an engine TIMEOUT is `deadline`, not
         # `exception`. Both landed in the generic branch, so a scan that ran out
         # of time recorded "the scanner broke" for "the scanner did not finish
         # in the budget" -- different facts, and only one is a reason to
@@ -136,7 +136,7 @@ def scan(params, *, channel, binding, content_bytes, engine=None):
             inspection_complete=False, decision=DECISION_REVIEW,
             inspected=0, observed=content_bytes, elapsed=0, findings=()))
     except Exception:
-        # T4.R3. A scan that raised did not look. `allow` is the engine's word
+        # contract row 4.3. A scan that raised did not look. `allow` is the engine's word
         # for having looked and found nothing, and the exception text is
         # peer-adjacent prose that never reaches a result.
         return worker.LocalFault(_result(

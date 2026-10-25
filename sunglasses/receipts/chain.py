@@ -75,7 +75,7 @@ class Chain:
         self._max_records = max_records
         self._max_bytes = max_bytes
         self._clock = clock
-        # Where this log's genesis marker goes (T9 ruling 60), or None for a log
+        # Where this log's genesis marker goes, or None for a log
         # that has none. Written once, at the first genesis, never rewritten.
         self._marker = None if marker is None else pathlib.Path(marker)
         # (path, size, head) at the end of OUR last write, while the unsigned

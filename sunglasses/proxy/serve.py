@@ -41,9 +41,9 @@ USAGE = ("usage: python -m sunglasses.proxy [--config PATH] "
          "[--state-root PATH] [--worker inprocess|process] "
          "-- <server command> [args...]\n")
 
-# OPT-IN, and the default is the behaviour that shipped. `process` runs every
-# scan in a child with T8.R4's kill on deadline and T8.R7's stdout bound;
-# `inprocess` is byte-for-byte what serve did before the flag existed.
+# OPT-IN, and the default is `inprocess`. `process` runs every scan in a child
+# with a kill on deadline and a stdout bound; `inprocess` runs it in the serving
+# process.
 WORKER_MODES = ("inprocess", "process")
 
 EXIT_OK = 0
@@ -171,7 +171,7 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     identity = _identity(upstream_argv)
     if store is None:
         store = approvals.Store(state_root(root), server_id=identity)
-    # T2.R6's channel. Without it the route refuses a tools/list rather than
+    # contract row 2.6's channel. Without it the route refuses a tools/list rather than
     # forwarding it, which is correct but useless: this is what lets the proxy
     # run its own list and therefore what lets a human ever approve a server.
     channel = control.Control(session=session, upstream_write=upstream_write)
@@ -243,18 +243,17 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
             "catalog_version": "sg-proxy-catalog/2",
             "contract_version": "GATE3_CONTRACT_v5.1"})
     except receipts.ReceiptIOError as failure:
-        # T9.R4, ruling 24b(a). No receipt, no mediation: the server is never
+        # No receipt, no mediation: the server is never
         # started, and the user is told what is wrong and how to clear it.
         stderr.write(f"sunglasses proxy: the receipt log could not be opened, "
                      f"so nothing was started. {receipts.printable(failure)}\n")
         return 1
 
-    # T9 ruling 64 (a). The approval store is made BEFORE the server is
-    # started, for the same reason as the log above: a file or a link where
-    # `approvals/` or `captures/` belongs raised out of `build_route` after the
-    # spawn, as a traceback, and left a server that ignores EOF running with
-    # nobody mediating it. After the log, so the log's own refusal still comes
-    # first and this one is written down.
+    # The approval store is made BEFORE the server is started, for the same reason
+    # as the log above: a file or a link where `approvals/` or `captures/` belongs
+    # would raise out of `build_route` after the spawn, as a traceback, and leave a
+    # server that ignores EOF running with nobody mediating it. After the log, so
+    # the log's own refusal still comes first and this one is written down.
     try:
         store = approvals.Store(state_root(root),
                                 server_id=_identity(upstream_argv))
@@ -276,9 +275,9 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         start_new_session=True)
-    # T9 ruling 64 (b). From here every way out stops the server's group. The
-    # teardown below only ran once the session threads had started, so a raise
-    # between the spawn and them orphaned the child.
+    # From here every way out stops the server's group. The teardown below runs
+    # once the session threads have started, so a raise between the spawn and them
+    # would orphan the child unless it is stopped here.
     try:
         session = pump.Session(strict=True)
         session.attach_upstream(child, pgid=_group_of(child))
@@ -290,7 +289,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
 
     write_lock = threading.Lock()
 
-    # AR13, T8.R9. When the current write to the client began, or None. A
+    # When the current write to the client began, or None. A
     # client that stops reading makes this write block for ever on a full pipe,
     # and the mediator then holds a frame it cannot deliver and a server it
     # cannot drain. The watchdog reads this cell; it cannot be checked here,
@@ -528,7 +527,7 @@ def _sweep_until_done(session, log, writing_since, done, interval):
         stalled = bounds.check_deadline(
             "write_stall", elapsed_ms=(time.monotonic() - started) * 1000)
         if stalled:
-            # T9.R2. The stall is RECORDED before the teardown, because the
+            # The stall is RECORDED before the teardown, because the
             # teardown is what makes it unobservable afterwards.
             try:
                 log.event("WRITE_STALLED", reason_code=stalled.reason,
@@ -544,15 +543,14 @@ def _drain(engine, child, done):
     try:
         engine.pump_upstream(child.stdout)
     except Exception as failure:
-        # T9 ruling R69. A reader that dies ends the session BY NAME. This was
-        # `pass` under a comment saying the session records the fault, and it
-        # did not: the teardown found no reason, wrote SESSION_TORN_DOWN with
-        # reason_code null, exited 0, and a request already forwarded was
-        # never answered (T8 probe 2026-09-25, both readers).
+        # A reader that dies ends the session BY NAME. A bare `pass` under a comment
+        # saying the session records the fault would not record it: the teardown would
+        # find no reason, write SESSION_TORN_DOWN with reason_code null, exit 0, and a
+        # request already forwarded would never be answered.
         #
         # The detail is the CLASS and never the message. A traceback here is
         # the one place upstream-adjacent text could reach an operator's
-        # terminal, and T10.R3's last sentence refuses that; the message is
+        # terminal, and the rule against showing upstream text there refuses that; the message is
         # the same text by another route.
         try:
             engine.session._close(
@@ -587,7 +585,7 @@ def _drain_client(engine, session, stdin, done):
                            "the client stopped in the middle of a frame",
                            kind="FRAME_UNTERMINATED")
     except Exception as failure:
-        # T9 ruling R69, the client side, and the same fault as `_drain`'s:
+        # The client side, and the same fault as `_drain`'s:
         # one kind, the direction in the detail, the class and not the message.
         # The debt is paid by the upstream reader, which is still running: the
         # close stops the server's group, its stdout ends, and `read_upstream`
@@ -595,12 +593,12 @@ def _drain_client(engine, session, stdin, done):
         # not already handed to the Route is forwarded, because it reads no
         # further.
         #
-        # T9 ruling 70 (a). A frame that raised before admission is owed no
+        # A frame that raised before admission is owed no
         # per-id refusal, so the close itself is said to the client, and it is
         # said FIRST. The close ends the server's group, the upstream reader
         # ends with it, and the process can be gone before this thread runs
         # another line: a write placed after `_close` never reached the client
-        # (T8 probe 2026-09-25). A close in a log line only is the silent
+        # A close in a log line only is the silent
         # `pass` again. Only when nothing closed first, so the frame never
         # names a cause that is not the session's.
         if session.closed_with() is None:

@@ -32,7 +32,7 @@ import time
 
 from . import framing
 
-# T4.R4's precedence, as an explicit order. Lower sorts first. This exists so
+# contract row 4.4's precedence, as an explicit order. Lower sorts first. This exists so
 # "which cause wins" is a table rather than a chain of ifs that reads correctly
 # and evaluates in the wrong order.
 _PRECEDENCE = {
@@ -148,10 +148,10 @@ CAUSE_KINDS = frozenset({
     # say what it did. A resource fault, not a protocol one.
     "RECEIPT_WRITE_FAILED",
     # route.py: a capture under the state root could not be written, so no
-    # approval can ever be made for this session. T9 ruling 64.
+    # approval can ever be made for this session.
     "CAPTURE_IO_ERROR",
     # serve.py: a reader thread raised out of the Route, so nothing is reading
-    # that side any more. Either direction, one fault. T9 ruling R69.
+    # that side any more. Either direction, one fault.
     "READER_FAILED",
 })
 
@@ -247,23 +247,22 @@ class Cause:
         return f"<Cause {self.rule}/{self.reason}>"
 
 
-# T4.R4. Rule A makes a FAULT terminal. Rule B keeps a NORMAL COMPLETION
+# contract row 4.4. Rule A makes a FAULT terminal. Rule B keeps a NORMAL COMPLETION
 # provisional until settlement, so a later hold or protocol fault still wins.
 # S1 allow, S2 prohibition and S7 review are completions; S3 faults and the
 # S4/S6 holds are not.
 # GENUINE FAULTS ONLY. S4 and S6 were in here, which made an approval hold
 # irrevocable and let it outrank a later accepted cancellation. A hold is not a
-# fault: it is a decision not to proceed yet, it is Rule B, and T4.R4's numbered
+# fault: it is a decision not to proceed yet, it is Rule B, and contract row 4.4's numbered
 # order puts cancellation (3) above approval (4). Rule A is for the things that
 # went WRONG, which is S3 and S5.
 _FAULT_RULES = frozenset({"S3", "S5"})
 _HOLD_RULES = frozenset({"S4", "S6"})
 
-# T4.R4's order, for holds known at one settlement instant.
+# contract row 4.4's order, for holds known at one settlement instant.
 _HOLD_ORDER = {"S6": 3, "S4": 4}
 
-# WHERE A SETTLEMENT CAME FROM. T9's ruling of 2026-09-13, to be confirmed or
-# overruled by ASTRA with a row id.
+# WHERE A SETTLEMENT CAME FROM.
 #
 # The contract's S5 trigger for an unsolicited response is a WIRE event: a
 # response FRAME arriving from upstream for an id nobody issued. A caller
@@ -272,9 +271,7 @@ _HOLD_ORDER = {"S6": 3, "S4": 4}
 # an unowned id from the WIRE closes the session, an unowned id from a CALLER is
 # refused and changes nothing.
 #
-# Without this parameter the two cases are indistinguishable at the API, which
-# is why ASTRA's C03 and his Q14 could both be reasonable and still contradict
-# each other.
+# Without this parameter the two cases are indistinguishable at the API.
 ORIGIN_API = "api"
 ORIGIN_UPSTREAM = "upstream"
 ORIGIN_CLIENT = "client"
@@ -292,7 +289,7 @@ class Session:
     """What is owed, what went wrong, and what has already been answered."""
 
     def __init__(self):
-        # ONE lock for the whole state, per T7.R2. Separate locks for "pending"
+        # ONE lock for the whole state, per contract row 7.2. Separate locks for "pending"
         # and "settled" is how an item gets answered twice: the check and the
         # settle have to be one atomic step or two threads both pass the check.
         self._lock = threading.RLock()
@@ -405,7 +402,7 @@ class Session:
                     return cause              # Rule A, the FIRST one
             holds = [c for c in recorded if is_hold(c)]
             if holds:
-                # Rule B. No fault, so the strongest HOLD decides, by T4.R4's
+                # Rule B. No fault, so the strongest HOLD decides, by contract row 4.4's
                 # order rather than by arrival: a cancellation outranks an
                 # approval hold whichever was recorded first.
                 return min(holds, key=lambda c: (_HOLD_ORDER.get(c.rule, 9),
@@ -455,7 +452,7 @@ class Session:
                            reason="not_owed", offered=cause.reason,
                            origin=origin)
                 if origin == ORIGIN_UPSTREAM:
-                    # A response FRAME for an id nobody issued. T7.R1 names that
+                    # A response FRAME for an id nobody issued. contract row 7.1 names that
                     # an S5 trigger, and it is a fact about the peer rather than
                     # about the caller, so the session cannot continue.
                     self._teardown_locked(Cause(
@@ -656,7 +653,7 @@ class Session:
         self.events.append({
             "seq": len(self.events),
             "mono": time.monotonic(),
-            # T9's schema. `mono_ns` because two events inside one millisecond
+            # `mono_ns` because two events inside one millisecond
             # are ordinary and a duration between them should not round to
             # zero; `wall` beside it because that is what a human correlates
             # against everything else.

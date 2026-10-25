@@ -90,7 +90,7 @@ class Store:
         self._active = None
         self._invalidation = None
 
-    # ── T5.R1: the human path is the only writer ───────────────────────────
+    # ── contract row 5.1: the human path is the only writer ───────────────────────────
     @property
     def _path(self):
         return self.approvals / f"{self.server_id}.json"
@@ -156,7 +156,7 @@ class Store:
         }
         with self._lock:
             self._path.write_text(json.dumps(record, sort_keys=True))
-            # T5.R1 and T505. The record names which descriptors a human
+            # contract row 5.1 and T505. The record names which descriptors a human
             # approved, so anything that can rewrite it can approve on their
             # behalf.
             os.chmod(self._path, 0o600)
@@ -234,10 +234,10 @@ class Store:
 
     def _record_or_reason(self):
         """The record, or the reason it cannot be used. Never a default."""
-        # T9 ruling 64 (e). `exists()` answers False on ANY OSError, so a
+        # `exists()` answers False on ANY OSError, so a
         # record in a directory that cannot be listed read as no record at
         # all: an approved server shown as never approved. Only "not there"
-        # is absent; every other failure to look is T507's unreadable.
+        # is absent; every other failure to look is unreadable.
         try:
             os.lstat(self._path)
         except FileNotFoundError:
@@ -249,9 +249,9 @@ class Store:
         except OSError:
             # T507. An unreadable record is not an absent one. Letting the
             # OSError escape turns a hold into a crash in whatever was asking,
-            # and T5.R5 says this state holds rather than decides.
+            # and contract row 5.5 says this state holds rather than decides.
             return None, INVALID
-        # Duplicate keys first: `json.loads` keeps the last silently, and T5.R5
+        # Duplicate keys first: `json.loads` keeps the last silently, and contract row 5.5
         # names duplicate tool names as ambiguous. A record that cannot say
         # which descriptor was approved has not approved one.
         try:
@@ -286,7 +286,7 @@ class Store:
                 return INVALIDATED
             return APPROVED if self._active else UNAPPROVED
 
-    # ── T5.R3: activation, all four conditions, one commit ─────────────────
+    # ── contract row 5.3: activation, all four conditions, one commit ─────────────────
     def activate(self, *, server_identity, snapshot_sha256, page_scans,
                  revision, epoch):
         """All four, and the last two are the ones that need the lock.
@@ -344,7 +344,7 @@ class Store:
         changed underneath an approval that existed. The provenance outlives
         the activation on purpose.
         """
-        # Only a generation that EXISTED can be invalidated. T5.R4 names the
+        # Only a generation that EXISTED can be invalidated. contract row 5.4 names the
         # state "INVALIDATED (from gen N)", so claiming it where nothing was
         # ever activated reports a server that changed underneath an approval
         # it never had. That one stays UNAPPROVED.
@@ -353,7 +353,7 @@ class Store:
         if had_generation:
             self._invalidation = reason
 
-    # ── T5.R4: invalidation, with provenance that outlives it ──────────────
+    # ── contract row 5.4: invalidation, with provenance that outlives it ──────────────
     def invalidate(self, *, reason=DESCRIPTOR_CHANGED):
         with self._lock:
             self._active = None
@@ -449,7 +449,7 @@ def _page_provenance(page_scans):
         if page.get("decision") == "review":
             return REVIEW_REQUIRED, []
         if page.get("check_pin") != "clean":
-            # T5.R3(c) wants the helper's pin outcome CLEAN for every tool.
+            # contract row 5.3(c) wants the helper's pin outcome CLEAN for every tool.
             # None is "the helper never ran" and "not applicable" is "it
             # declined to answer"; neither is a clean pin, and treating them as
             # one activates on a check that did not happen.

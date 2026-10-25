@@ -1509,17 +1509,12 @@ class SunglassesEngine:
     # tool. Selecting the patterns that declare the channel is the whole of it:
     # passing this label fetches nothing and intercepts nothing.
     #
-    # THE PACKAGE'S PROXY IS A DIFFERENT THING AND THIS COMMENT USED TO DENY IT.
-    # It said "nothing in this package intercepts a tool result", which is false
-    # on this tree: sunglasses.proxy inspects inbound upstream results through
-    # route.py `_inspect_result` -> proxy/inspection.py `scan`, and it does so on
-    # the `api_response` channel, not this one. ASTRA proved it by execution on
-    # 2026-09-20 (2/2 results reached engine inspection) after the sentence was
-    # written here as a reassurance. A false reassurance in a security product is
-    # worse than no comment, and the correct statement is narrow: passing
+    # THE PACKAGE'S PROXY IS A DIFFERENT THING. sunglasses.proxy inspects inbound
+    # upstream results through route.py `_inspect_result` -> proxy/inspection.py
+    # `scan`, and it does so on the `api_response` channel, not this one. Passing
     # `tool_output` to scan() installs no interception of any kind, and the proxy
-    # that does inspect results is a separate component with its own channel,
-    # its own approval gate and its own documented conditions.
+    # that does inspect results is a separate component with its own channel, its
+    # own approval gate and its own documented conditions.
     #
     # Four further names are REACHABLE but deliberately undocumented, because
     # loaded patterns declare them and valid_channels unions those in:
@@ -2134,13 +2129,12 @@ class SunglassesEngine:
         self._pattern_count = len(carriers)
         self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
-        # v0.5.6 round 4. ASTRA read `info()["keywords"] == 6642` beside the
-        # README's 6,944 as a stale number. It is not stale -- it is a DIFFERENT
-        # measurement: this index is the pre-screen automaton, which deliberately
-        # omits the generic keywords excluded above (they matched normal manifests
-        # and JSON-LD). The inventory of keywords the patterns actually declare is
-        # larger. Publishing only one of the two made the pair look like a
-        # contradiction, so `info()` now reports both and names which is which.
+        # `info()["keywords"]` and the README's keyword total are two different
+        # measurements, not a stale number: this index is the pre-screen automaton,
+        # which deliberately omits the generic keywords excluded above (they matched
+        # normal manifests and JSON-LD). The inventory of keywords the patterns
+        # actually declare is larger. Publishing only one of the two would make the pair
+        # look like a contradiction, so `info()` reports both and names which is which.
         declared = set()
         declared_entries = 0
         for _p in carriers:

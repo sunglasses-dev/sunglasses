@@ -61,7 +61,7 @@ CHECKPOINT = {
     "wire": wire.WIRE_VERSION,
 }
 
-# T9 ruling 60: the hook log's genesis marker, keys/log-hook.genesis. Its
+# The hook log's genesis marker, keys/log-hook.genesis. Its
 # chain_id is 32 lowercase hex and its key_id (added in build) the seed's real
 # fingerprint, as the writer writes them, so the verifier's shape checks hold.
 MARKER = {
@@ -168,7 +168,7 @@ def names(c):
 UNTRUSTED, TRUSTED = "KEY_UNTRUSTED", "KEY_TRUSTED"
 OK, UNKNOWN_EXTENT = "CHAIN_OK", "HISTORY_EXTENT_UNKNOWN"
 NO_TAIL, TAIL, COMPLETE = "NO_VISIBLE_TAIL", "UNVERIFIED_TAIL", "LIFECYCLE_COMPLETE"
-# T9 ruling 41: nothing verified is its own answer, printed by name. It is
+# Nothing verified is its own answer, printed by name. It is
 # never COMPLETE (there is no lifecycle to be complete) and never a failure
 # (the integrity result already says what went wrong, if anything did).
 EMPTY = "EMPTY_CHAIN"
@@ -288,7 +288,7 @@ def verifier_vectors() -> list:
     g.seal("genesis")
     out.append(_vector("6b", "genesis only: a started chain is not an empty one",
                        g.data(), g, results=_results(), through=1))
-    # T9 ruling 43 part 3: the proxy side of the same boundary. A proxy
+    # The proxy side of the same boundary. A proxy
     # session is opened by its HEADER, so a proxy genesis with no HEADER is
     # no session at all: not an orphan (nothing opened) and not complete.
     h = WireChain(producer="hook")
@@ -398,7 +398,7 @@ def verifier_vectors() -> list:
     c.seal()
     out.append(_vector("15b", "two terminals for one opening", c.data(), c,
                        results=_results(lifecycle="LIFECYCLE_DUPLICATE"), through=5))
-    # 19, T9 ruling 44, numbered past the spec freeze's 1 to 18: a signed
+    # 19, numbered past the spec freeze's 1 to 18: a signed
     # row's keys are the schema's, closed per record kind. A key outside it is
     # UNKNOWN_FIELD, a failure: the bytes verify, and the row still says
     # something no honest writer can say.

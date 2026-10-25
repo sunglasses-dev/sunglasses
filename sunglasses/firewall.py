@@ -119,7 +119,7 @@ class SecretRule:
         # The literal alternatives this format BEGINS with, written beside the
         # regex they come from. A prefix is part of the FORMAT only for the rule
         # that owns it: `ASIA` is AWS's grammar and plain material anywhere
-        # else, which is the whole of ASTRA's R1a. Longest first, so `sk-proj-`
+        # else. Longest first, so `sk-proj-`
         # is consumed before `sk-`.
         self.prefixes = tuple(sorted(prefixes, key=len, reverse=True))
 
@@ -254,9 +254,9 @@ def _is_filler(segment: str) -> bool:
 # second list that can drift away from them. A prefix is format only for the
 # rule that owns it; the union below is used only when no rule is in hand, and
 # even then it is consumed ONCE, at the START of the token, never inside a
-# segment further along. ASTRA's R1a is what the old global set allowed: the AWS
-# temporary-credential prefix dropped into a GitHub token's BODY was discarded
-# as "format", and the q-filler left behind cleared a live credential.
+# segment further along. A single global set would let the AWS
+# temporary-credential prefix dropped into a GitHub token's BODY be discarded
+# as "format", and the q-filler left behind would clear a live credential.
 _FORMAT_PREFIX_LITERALS: tuple = tuple(sorted(
     {prefix.lower() for rule in SECRET_RULES for prefix in rule.prefixes},
     key=len, reverse=True))
@@ -1483,30 +1483,27 @@ _TOOL_SCHEMA = {
 }
 
 # Bash is deliberately NOT narrowed here, and that is a decision rather than an
-# omission. Two cuts of this lane tried to subtract quoted heredoc bodies from a
-# command before asking which paths it touches. Both were unsafe, and the second
-# was unsafe in a way the first was not: an independent review (ASTRA,
-# 2026-09-10) EXECUTED nine shapes where the parser removed text the shell
-# really runs. A quoted heredoc fed to `bash`, directly or through a pipeline,
-# is not data, it is a program. An apparent opener inside a comment, inside
-# ordinary quoted text, or inside an arithmetic shift `$((1 << n))` is not a
-# redirection at all, and a delimiter word longer than the captured token
-# (`<<true-tail`) is not the delimiter it was read as. Each of those then finds
-# its guessed terminator further down and swallows the live commands in
-# between. Substitution extraction undercaptures nested and quote-bearing
-# parentheses, dropping the very operation that matters.
+# omission. Subtracting quoted heredoc bodies from a command before asking which
+# paths it touches is unsafe: executing nine shapes shows the parser removing
+# text the shell really runs. A quoted heredoc fed to `bash`, directly or
+# through a pipeline, is not data, it is a program. An apparent opener inside a
+# comment, inside ordinary quoted text, or inside an arithmetic shift
+# `$((1 << n))` is not a redirection at all, and a delimiter word longer than
+# the captured token (`<<true-tail`) is not the delimiter it was read as. Each
+# of those then finds its guessed terminator further down and swallows the live
+# commands in between. Substitution extraction undercaptures nested and
+# quote-bearing parentheses, dropping the very operation that matters.
 #
 # The lesson underneath: a fallback for a parser that FAILS does nothing for a
 # parser that confidently recognises the WRONG construct. Recognising bash well
 # enough to subtract from it needs a real grammar -- consumers, pipelines,
 # delimiter quoting forms, several documents on one line, line continuations --
 # not another alternation bolted on per counter-example. Until that exists a
-# Bash command is judged on all of its text, exactly as it was before this lane
-# was touched.
+# Bash command is judged on all of its text.
 #
 # The cost is stated rather than hidden: a Bash command whose TEXT names a
-# blocked path without touching it is still denied. That false positive is real,
-# it is what prompted this work, and for Bash it remains OPEN.
+# blocked path without touching it is still denied. That false positive is real
+# and for Bash it remains OPEN.
 
 def _action_surface(tool_name: str, tool_input: dict) -> list:
     """The values of a tool call that can act on a path. Values only."""
@@ -1907,7 +1904,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
     if cleared:
         # Rides in extras so it reaches the terminal record whatever decides
         # this call: a canary cleared on a call that is then denied for some
-        # OTHER material still has to be visible (ASTRA C01).
+        # OTHER material still has to be visible.
         extras["cleared_canaries"] = cleared
     if hits:
         return _deny_for_hits(hits, tool_name), None, extras
@@ -2101,12 +2098,12 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     payload, malformed = _read_envelope(stdin_text, too_deep)
     eval_id = _new_eval_id()
     error_types = ()
-    # T9 RULING 34. THE RECEIPTS PATH IS INSIDE THE GUARD, construction too.
-    # Building `_HookReceipts` decides whether the user opted in, which reads
-    # the chain's tail, and it used to run above every `try`: an exception
-    # there left `run_hook` altogether and the hook exited 1, which the host
-    # does not block on. A failure here is F6 like the terminal's, below: the
-    # call asks, naming the cause, and a deny stays a deny.
+    # THE RECEIPTS PATH IS INSIDE THE GUARD, construction too. Building
+    # `_HookReceipts` decides whether the user opted in, which reads the chain's
+    # tail, so it runs inside a `try`: an exception there that left `run_hook`
+    # altogether would make the hook exit 1, which the host does not block on. A
+    # failure here is F6 like the terminal's, below: the call asks, naming the
+    # cause, and a deny stays a deny.
     receipts = None
     receipts_down = None
     try:
@@ -2835,7 +2832,7 @@ def main(argv=None) -> int:
     try:
         out, malformed = run_hook_ex(stdin_text)
     except Exception as exc:  # noqa: BLE001
-        # T9 RULING 35, THE BELT. Anything that escapes `run_hook` would exit
+        # THE BELT. Anything that escapes `run_hook` would exit
         # 1, and the host proceeds on exit 1: the fail-open. It asks instead,
         # naming the exception's TYPE only -- its text is not trusted to be
         # printable, or even to exist.

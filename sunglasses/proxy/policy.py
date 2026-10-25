@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from . import worker
 
-# T4.R5's catalog, the subset this module can produce. Frozen for 0.6.0.
+# contract row 4.5's catalog, the subset this module can produce. Frozen for 0.6.0.
 CLEAN = "CLEAN"
 NO_FINDING_KNOWN_DETECTOR_GAP = "NO_FINDING_KNOWN_DETECTOR_GAP"
 PROHIBITED_CONTENT = "PROHIBITED_CONTENT"
@@ -154,7 +154,7 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
     happen rather than as a client who changed their mind.
     """
     if independent_cause is not None:
-        # T4.R4 Rule A. An earlier fault is terminal, and the completion that
+        # contract row 4.4 Rule A. An earlier fault is terminal, and the completion that
         # arrives afterwards does not get to relabel it.
         return Settlement(independent_cause, rule_for(independent_cause),
                           accepted=result["accepted"],
@@ -167,7 +167,7 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
     blocking = [f for f in findings
                 if f["severity"] in worker.BLOCKING_SEVERITIES]
     if blocking and result["status"] == worker.STATUS_COMPLETE:
-        # T4.R4(7). COMPLETE and TRUE, both of them. The calibration found the
+        # contract row 4.4(7). COMPLETE and TRUE, both of them. The calibration found the
         # spike reporting inspection_complete=false here, which said a scan that
         # ran to the end and found exactly what it was looking for had not
         # finished.
@@ -176,7 +176,7 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
                           inspection_complete=True, rule_ids=rule_ids)
 
     if result["status"] != worker.STATUS_COMPLETE:
-        # T4.R4(6b). An accepted result that did not complete, with no
+        # contract row 4.4(6b). An accepted result that did not complete, with no
         # authorized hold explaining it, is S3 and its findings are PRESERVED.
         reason = {worker.STATUS_EXCEPTION: SCAN_EXCEPTION,
                   worker.STATUS_DEADLINE: SCAN_DEADLINE,
@@ -193,7 +193,7 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
                           inspection_complete=False, rule_ids=rule_ids)
 
     if result["decision"] == worker.DECISION_REVIEW or findings:
-        # T4.R4(8). Complete, and either the engine asked for review or there
+        # contract row 4.4(8). Complete, and either the engine asked for review or there
         # are findings below the blocking severities.
         return Settlement(REVIEW_REQUIRED, "S7", accepted=True,
                           status=worker.STATUS_COMPLETE,
@@ -204,12 +204,12 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
         helper_outcome=helper_outcome, independent_cause=None)
     if failed:
         # Anything accepted that is not S2 or S7 and is not fully S1 eligible is
-        # S3, per T4.R2's cause 6b. "Nearly clean" is not a verdict.
+        # S3, per contract row 4.2's cause 6b. "Nearly clean" is not a verdict.
         return Settlement(SCAN_EXCEPTION, "S3", accepted=result["accepted"],
                           status=result["status"], inspection_complete=False,
                           rule_ids=rule_ids, detail="; ".join(failed))
 
-    # T4.R4(9). The one verdict that lets bytes through.
+    # contract row 4.4(9). The one verdict that lets bytes through.
     #
     # The gap disposition is CHANNEL `message` ONLY, as the rule writes it. On
     # `api_response` it labels an ARRIVING result as a known published miss of

@@ -99,7 +99,7 @@ PATTERNS = [
         "description": "Attempt to confuse the model about where instructions end and user content begins."
     },
 
-    # --- GLS-PI-016: Policy override chained to prompt exfiltration (Jack Cycle 58, FP=0 FN=0) ---
+    # --- GLS-PI-016: Policy override chained to prompt exfiltration ---
     {
         "id": "GLS-PI-016",
         "name": "Policy override chained to system prompt exfiltration",
@@ -687,7 +687,7 @@ PATTERNS = [
         ],
         "description": "Reaches api_response, log_memory and agent_input only. Its parent rule is unchanged and still owns message, file, web_content and tool_output, so this adds a channel without altering a single existing verdict. The predicate is a VERB-to-OBJECT CLASS PAIRING: a disclosure verb must reach a secret-class object, or an override verb must reach a control-class object. Bare 'safety' and 'security' are not objects, because a sensitive word near a verb is vocabulary rather than an operation. Three earlier attempts decided this with a follower rule (what comes after the object) and each was itself a word-keyed escape: append 'please', 'privately' or 'as plain text' and the rule went silent. There is no follower rule here. DISCLOSED LIMIT, new channels only: a sensitive word used as a MODIFIER can fire, such as 'configuration guides', 'credentials template' or 'access-token format guide'. Measured on the reviewer's boundary set, 22 of 48 such rows fire. Separating them needs noun-phrase grammar, which is what three rounds of regex failed to do, so the limit is stated rather than faked.",
     },
-    # --- GLS-PI-017: Typoglycemic override of redaction + secret disclosure (Jack Cycle 60, FP=0 FN=0) ---
+    # --- GLS-PI-017: Typoglycemic override of redaction + secret disclosure ---
     {
         "id": "GLS-PI-017",
         "name": "Typoglycemic override of redaction combined with secret disclosure",
@@ -1695,7 +1695,7 @@ PATTERNS = [
 
     # =========================================================================
     # PROMPT EXTRACTION — Attempts to steal the agent's system prompt
-    # Added: v0.2.0 (April 3, 2026) — Source: CAVA audit + OWASP + research
+    # Added: v0.2.0 (April 3, 2026) — Source: OWASP + research
     # =========================================================================
     {
         "id": "GLS-PX-001",
@@ -1720,7 +1720,7 @@ PATTERNS = [
 
     # =========================================================================
     # ENCODING EVASION — Instructions hidden through encoding/transformation
-    # Added: v0.2.0 (April 3, 2026) — Source: CAVA audit + Lakera dataset
+    # Added: v0.2.0 (April 3, 2026) — Source: Lakera dataset
     # =========================================================================
     {
         "id": "GLS-EE-001",
@@ -1739,7 +1739,7 @@ PATTERNS = [
 
     # =========================================================================
     # INVISIBLE UNICODE — Zero-width and control characters hiding instructions
-    # Added: v0.2.0 (April 3, 2026) — Source: CAVA audit + Unicode security research
+    # Added: v0.2.0 (April 3, 2026) — Source: Unicode security research
     # =========================================================================
     {
         "id": "GLS-IU-001",
@@ -1759,10 +1759,10 @@ PATTERNS = [
 
     # =========================================================================
     # INDIRECT PROMPT INJECTION — Attacks via retrieved content, not direct chat
-    # Added: v0.2.0 (April 3, 2026) — Source: CAVA audit + Greshake et al.
+    # Added: v0.2.0 (April 3, 2026) — Source: Greshake et al.
     # =========================================================================
     # =========================================================================
-    # THREAT DB PATTERNS — Derived from CAVA's validated GHSA threat intelligence
+    # THREAT DB PATTERNS — Derived from validated GHSA threat intelligence
     # Added: v0.2.0 (April 3, 2026) — Source: 51 validated threats from Day 0 R&D cycle
     # =========================================================================
     {
@@ -2337,8 +2337,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # JACK'S RESEARCH PATTERNS — Extracted from 24-task autonomous security mission
-    # Source: ~/jack-data/JACK_EXTRACTED_PATTERNS.md
+    # RESEARCH PATTERNS — Extracted from an autonomous security research mission
     # Added: April 8, 2026
     # =========================================================================
 
@@ -3378,7 +3377,7 @@ PATTERNS = [
         "description": "Detects hidden exfiltration instructions embedded in HTML comments targeting AI agents."
     },
 
-    # --- GLS-HI-004: Behavioral instruction injection — affiliate/sponsor/recommendation steering (Cava, Apr 6) ---
+    # --- GLS-HI-004: Behavioral instruction injection — affiliate/sponsor/recommendation steering ---
     {
         "id": "GLS-HI-004",
         "name": "Behavioral instruction injection (affiliate/sponsor/recommendation steering)",
@@ -3716,7 +3715,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # APRIL 2026 MERGE — Patterns from Cava + Jack research (validated by FORGE)
+    # APRIL 2026 MERGE — Patterns from research
     # =========================================================================
 
     # --- GLS-AB-006: JWT algorithm none bypass (renamed from duplicate AB-001) ---
@@ -3845,7 +3844,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # CAVA CYCLE4 — April 10, 2026 — 30 validated GHSA advisories
+    # CYCLE4 — April 10, 2026 — GHSA advisories
     # =========================================================================
     {
         "id": 'GLS-CMD-GHSA-024',
@@ -3914,7 +3913,7 @@ PATTERNS = [
     # =========================================================================
     # v0.2.8 batch — 2026-04-11 — 27 new patterns
     # 2 NEW categories (tool_poisoning, identity_phishing)
-    # Sources: Cava research files, Jack pattern improvements, GHSA Apr 4-11 (PraisonAI cluster)
+    # Sources: research files, pattern improvements, GHSA Apr 4-11 (PraisonAI cluster)
     # =========================================================================
     {
         "id": 'GLS-TP-001',
@@ -4011,7 +4010,7 @@ PATTERNS = [
         ],
         "description": 'Detection for GHSA-4f8g-77mw-3rxc: trusted-proxy gateway auth where operator.read + operator.write scopes widen at runtime without re-consent.',
     },
-    # GLS-AW-011 RETIRED v0.3.3 (Jul-16 2026, AZ GO): required the literal word
+    # GLS-AW-011 RETIRED v0.3.3 (Jul-16 2026): required the literal word
     # "ssrf" in the scanned input, so it could only ever match prose DESCRIBING
     # SSRF (changelogs, security docs — it blocked claude-seo's "83 SSRF and
     # DNS-rebinding bypass tests" line), never an actual attack payload. No
@@ -4466,7 +4465,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # v0.2.11 batch — 2026-04-11 — 15 new patterns from Jack's fixture research
+    # v0.2.11 batch — 2026-04-11 — 15 new patterns from fixture research
     # Sources: arXiv mining, GHSA API, OWASP LLM Top 10, MITRE ATLAS, multilingual
     # jailbreak literature, multimodal attack synthesis, supply-chain analysis
     # =========================================================================
@@ -5010,7 +5009,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # v0.2.12 — Jack autonomous research cycle (Apr 12-13, 2026)
+    # v0.2.12 — autonomous research cycle (Apr 12-13, 2026)
     # 18 patterns across 3 families: Semantic UI, ITDP, SUIEI
     # =========================================================================
     # --- GLS-SEM-UI-216: Semantic UI overlay instruction injection ---
@@ -5537,7 +5536,7 @@ PATTERNS = [
     },
 
     # =========================================================================
-    # v0.2.14 — NEW CATEGORIES (5 patterns from Jack research, Apr 16, 2026)
+    # v0.2.14 — NEW CATEGORIES (5 patterns from research, Apr 16, 2026)
     # tool_metadata_smuggling, memory_eviction_rehydration,
     # multi_stage_encoding, tool_output_poisoning, provenance_chain_fracture
     # =========================================================================
@@ -5785,7 +5784,7 @@ PATTERNS = [
     },
 
     # ================================================================
-    # v0.2.17 — 10 patterns, 5 new categories (Jack CYCLE237/266/192/193/232/234/233/49/62/38)
+    # v0.2.17 — 10 patterns, 5 new categories
     # ================================================================
 
     # --- GLS-TCR-245: Tool chain race — ordered handoff policy bypass (NEW CATEGORY) ---
@@ -6018,7 +6017,7 @@ PATTERNS = [
         "description": "Detects ITDP (indirect tool data poisoning) variant using compliance/legal/audit pretext to justify disabling PII redaction/masking and then export/share/send/upload the unredacted data. Novel angle leveraging authority framing to bypass data-protection controls.",
     },
     # =========================================================================
-    # v0.2.18 — Jack pattern dump (34 patterns)
+    # v0.2.18 — pattern batch (34 patterns)
     # Shipped Apr 20 2026. 25 additional patterns held for v0.2.19+.
     # =========================================================================
 
@@ -7978,7 +7977,7 @@ PATTERNS = [
 
     # === v0.2.24 batch — Apr 27, 2026 — high-quality pool patterns ===
     # 15 patterns: 5 provenance_chain (NEW cat), 2 approval_graph_poisoning (NEW cat),
-    # 8 cross_agent_injection. All passed Jack's regex test bed at 100% TP / 0 FP.
+    # 8 cross_agent_injection.
     # --- provenance_chain ---
     {
         "id": 'GLS-PCF-666',
