@@ -3554,7 +3554,7 @@ PATTERNS = [
             "commit secrets",
         ],
         "regex": [
-            r"(?i)(?:read|open|search|grep|find).{0,100}(?:\.env|credentials|token|secret|id_rsa|config).{0,220}(?:include|embed|paste|store|write|attach).{0,100}(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report)",
+            r"(?i)(?:read|open|search|grep|find)(?=.{0,100}(?=[.ctsi])(?:\.env|credentials|token|secret|id_rsa|config))(?=.{0,438}(?=[itcpalsnr])(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report)).{0,100}(?=[.ctsi])(?:\.env|credentials|token|secret|id_rsa|config)(?=.{0,327}(?=[itcpalsnr])(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report))(?=.{0,220}(?=[iepswa])(?:include|embed|paste|store|write|attach)).{0,220}(?=[iepswa])(?:include|embed|paste|store|write|attach).{0,100}(?=[itcpalsnr])(?:issue|ticket|commit|pull request|pr|artifact|log|summary|notes|report)",
         ],
         "description": "Detects secret movement into seemingly legitimate internal outputs instead of obvious external exfiltration."
     },
