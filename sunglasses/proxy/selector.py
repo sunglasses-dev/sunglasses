@@ -1,11 +1,11 @@
 """What gets inspected, on which channel, and what counts against the budget.
 
-T2's table and T3.R1's accounting. Written against
-`tests/test_proxy_selector.py`, committed first from the rows.
+Contract row 2's table and contract row 3.1's accounting. Written against
+`tests/test_proxy_selector.py`.
 
-THE TWO ACCOUNTINGS ARE SEPARATE AND THAT IS THE POINT. T2.R0 freezes coverage:
+THE TWO ACCOUNTINGS ARE SEPARATE AND THAT IS THE POINT. Contract row 2.0 freezes coverage:
 every string leaf AND every object KEY, recursively, everything except the fixed
-protocol scalars. T3.R1 freezes the content-byte count: only string VALUES at
+protocol scalars. Contract row 3.1 freezes the content-byte count: only string VALUES at
 content positions, keys excluded, the `type` and `role` discriminants excluded,
 duplicates counted twice.
 
@@ -106,7 +106,7 @@ _SUPPORTED_BLOCK_TYPES = frozenset({"text", "resource"})
 
 
 def channel_for(method, direction):
-    """T2's channel column. A rule is scoped to a channel, so choosing the wrong
+    """Contract row 2's channel column. A rule is scoped to a channel, so choosing the wrong
     one silently disables every rule written for the right one."""
     if method.startswith("notifications/"):
         # contract row 2.12 upstream, contract row 2.13 client.
@@ -123,13 +123,13 @@ def channel_for(method, direction):
 
 
 def coverage_leaves(value, path=""):
-    """T2.R0. Every string leaf and every object KEY, in document order.
+    """Every string leaf and every object KEY, in document order.
 
     Keys are yielded as leaves of their own because a key is content: a tool
     named for an instruction, or a `_meta` member whose NAME carries the
     payload, is inspected here and nowhere else.
 
-    Numbers and booleans are yielded in their JSON spelling, per T3.R1, so a
+    Numbers and booleans are yielded in their JSON spelling, per contract row 3.1, so a
     rule matching text sees them the way the wire wrote them rather than the way
     Python prints them: `false`, not `False`.
     """
@@ -156,7 +156,7 @@ def _walk_coverage(value, path, out, opaque=False):
 
 
 def content_bytes(value):
-    """T3.R1 and T8.R2. Decoded UTF-8 bytes of string VALUES at content
+    """Decoded UTF-8 bytes of string VALUES at content
     positions, and nothing else.
 
     Keys are excluded, discriminants are excluded, duplicates count twice, and
@@ -224,12 +224,12 @@ def bound_surface(method, message):
 
 
 def zero_leaves_is_complete(method, message, *, surface_only=False):
-    """T2.R14. Three shapes, and each has a condition attached.
+    """Three shapes, and each has a condition attached.
 
     A `tools/call` result whose `content` is `[]` WITH NO OTHER MEMBERS. An
     empty content list arriving beside a `structuredContent` object has leaves,
     and calling that complete would pass the other members uninspected, which is
-    the reading the row's own wording rules out.
+    the reading contract row 2.14's own wording rules out.
 
     `ping` and `notifications/initialized` have zero leaves when they CARRY
     nothing: no `params`, `result` or `error`, or an empty object in its place.
@@ -253,7 +253,7 @@ def zero_leaves_is_complete(method, message, *, surface_only=False):
 
 
 def unsupported(method, result):
-    """T2.R4, R9 and R11. Binary content is UNSUPPORTED, never skipped.
+    """Binary content is UNSUPPORTED, never skipped.
 
     Skipping a blob and inspecting the rest reports a clean scan of a message we
     did not read, which is the most dangerous kind of clean there is.
@@ -305,9 +305,9 @@ class Refusal:
 
 
 def refusal(method, direction, *, origin):
-    """T2.R15 and T2.R16. Who is answered, and who never sees it.
+    """Who is answered, and who never sees it.
 
-    The two rows are mirror images and the mirror is the security property. An
+    The two rows (contract rows 2.15 and 2.16) are mirror images and the mirror is the security property. An
     upstream request is answered UPSTREAM and the client never sees it, because
     forwarding it would let the server drive the client through us, which is the
     thing a mediator exists to prevent. A client's unknown method is answered to

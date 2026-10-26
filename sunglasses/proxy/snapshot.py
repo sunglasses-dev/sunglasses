@@ -1,13 +1,12 @@
-"""T2.R7 and T8.R13, the paged descriptor snapshot the activation compares to.
+"""The paged descriptor snapshot the activation compares to.
 
-Written against `tests/test_proxy_snapshot.py`, committed first from the rows.
+Written against `tests/test_proxy_snapshot.py`.
 
-T5's activation invariant has been built for hours and had nothing to activate:
-it takes a snapshot sha and a per-page scan verdict and nothing produced
-either, so the approval gate could not open and no tools/call could be
-forwarded at all.
+The activation invariant (contract row 5.3) takes a snapshot sha and a
+per-page scan verdict. This module produces both, which is what lets the
+approval gate open and a tools/call be forwarded.
 
-One clause decides the shape of this module, and it is T8.R13's last one: NEVER
+One clause decides the shape of this module, and it is contract row 8.13's last one: NEVER
 ACTIVATE A PREFIX. A server that stops paging, loops its cursor, or runs the
 list past its deadline has not handed us a short tool list. It has handed us an
 unknown one. The approved sha was computed over a COMPLETE snapshot, so a
@@ -64,7 +63,7 @@ class Snapshot:
         self.detail = detail
 
     def capture(self):
-        """T5.R1's stored capture. A human approves these bytes and they are
+        """Contract row 5.1's stored capture. A human approves these bytes and they are
         re-hashed at approve time, never re-fetched.
 
         `tools_by_name` is the shape `Store.approve` reads, and it is written
@@ -90,7 +89,7 @@ def collect(request, *, scan, now=None, max_pages=MAX_PAGES,
     """Drive tools/list to a terminal page, bounded, scanning every page.
 
     `request(cursor)` issues ONE tools/list in the proxy's own id namespace
-    (T2.R6) and returns its result. `scan(page)` inspects that page on the
+    (contract row 2.6) and returns its result. `scan(page)` inspects that page on the
     api_response channel and returns a worker result.
     """
     now = now or (lambda: time.monotonic() * 1000.0)
@@ -195,11 +194,11 @@ def _incomplete(pages, scans, detail, reason=None, rule=None):
 
 
 def _scan_provenance(result):
-    """RS11. WHAT the page scan found, not merely that it found something.
+    """WHAT the page scan found, not merely that it found something.
 
     A page carrying a critical engine finding and a page nobody has approved
     yet are both "not activated", and reporting them the same way tells an
-    operator to go and approve a descriptor that a scanner is refusing. T5.R2
+    operator to go and approve a descriptor that a scanner is refusing. Contract row 5.2
     keeps the provenance for exactly this reason: APPROVAL_REQUIRED describes a
     server nobody approved, and a scan reason describes what its descriptors
     carried.
@@ -215,7 +214,7 @@ def _scan_provenance(result):
 
 
 def _page_is_clean(result):
-    """T5.R3(c), the four terms, each checked rather than summarised."""
+    """The terms, each checked rather than summarised."""
     if not isinstance(result, dict):
         return False
     return (result.get("accepted") is True
@@ -230,7 +229,7 @@ def _canonical(value):
 
 
 def _descriptor_sha(tool):
-    """T5.R2's per-tool hash, over the WHOLE descriptor.
+    """Contract row 5.2's per-tool hash, over the WHOLE descriptor.
 
     `description` and `inputSchema` are in it because they are what a model
     reads and what an attacker edits. A hash over the name alone approves the

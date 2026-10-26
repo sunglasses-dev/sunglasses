@@ -4,7 +4,7 @@ Written against `tests/test_proxy_route.py`, committed first from the rows.
 
 Every decision here was already built and none of it was wired. The selector
 knows the channel and the two accountings, the worker validates, the policy
-settles, the envelope carries only what T4.R7 names, the receipt log makes a
+settles, the envelope carries only what contract row 4.7 names, the receipt log makes a
 release durable before the bytes move. This module is the order they happen in,
 and the order IS the security property: a proxy whose parts each pass their own
 tests while nothing drives them forwards every payload it was installed to
@@ -56,7 +56,7 @@ CAUSE_SCHEMA_INVALID = "schema_invalid"
 def _unusable(result):
     """The SCAN_RESULT fields for a result `worker.validate` refused.
 
-    ASTRA r1 on ccee55d: both catches wrote `schema_invalid` for EVERYTHING
+    Both catches wrote `schema_invalid` for EVERYTHING
     that raised `Invalid`, and every fault this process builds has
     `accepted=False`, which `validate` always refuses. So a crash, unusable
     output, an engine exception and a deadline were all recorded as a contract
@@ -104,7 +104,7 @@ REASON_CLEAN = "CLEAN"
 class _NoId:
     """The absence of an id, which is NOT the id `null`.
 
-    T1.R2 makes null a legal JSON-RPC id, so `{"id": null, "method": ...}` is a
+    Contract row 1.2 makes null a legal JSON-RPC id, so `{"id": null, "method": ...}` is a
     REQUEST owed exactly one response, while a frame with no `id` member at all
     is a notification owed none. Both arrive in Python as None, and using None
     for the second meant every null-id call was settled as a notification: no
@@ -237,7 +237,7 @@ class Route:
     def pay_retained_refusals(self):
         """The debt a close retained, paid by the side still standing.
 
-        T9 ruling R69. `Session._close` keeps a refusal for every client still
+        `Session._close` keeps a refusal for every client still
         owed a frame, and `read_upstream` pays them on its way out. When the
         upstream reader is the thing that failed, that generator is dead and
         its exit is never reached, so serve.py's drain calls this instead. Each
@@ -249,18 +249,18 @@ class Route:
             self._release_inbound(raw)
 
     def announce_close(self, reason, rule):
-        """T9 ruling 70 (a). The close, said to the client, as the one error
+        """The close, said to the client, as the one error
         JSON-RPC allows without an id. A frame that raised before admission
         has no id this proxy trusts, so it is owed no per-id refusal, and this
         is how the client learns why it was cut off. The frame is the one
         `_answer_close` sends a request that arrives after a close. It carries
         the reason and the rule; the class is in the close's detail, because
-        `envelope.withheld` drops every detail by design (T4.R7).
+        `envelope.withheld` drops every detail by design (contract row 4.7).
         """
         self._answer_close((reason, rule), None)
 
     def _release_inbound(self, raw):
-        """AR08. T9.R2 applies in BOTH directions.
+        """Contract row 9.2 applies in BOTH directions.
 
         A frame going to the client is as irreversible as one going upstream:
         once the model has read it, no later receipt can unsay it. The outbound
@@ -354,17 +354,17 @@ class Route:
 
     @_invalidated.setter
     def _invalidated(self, reason):
-        """Setting this attribute IS accepting the authority (R-168-R4a).
+        """Setting this attribute IS accepting the authority.
 
         A property rather than a method because the attribute is what the
-        reviewer's controls assign -- `rt._invalidated = 'DESCRIPTOR_CHANGED'`
-        is how an invalidation is driven in four of them -- and an acceptance
+        test controls assign -- `rt._invalidated = 'DESCRIPTOR_CHANGED'`
+        is how an invalidation is driven in them -- and an acceptance
         that only happens when someone remembers to call a method is an
         acceptance that a later caller will forget. Recording it here means
         every way of setting it, ours or a control's, bumps the epoch the
         reader validates against.
 
-        And every way of setting it is a DURABLE record (T9 ruling 120.1). The
+        And every way of setting it is a DURABLE record. The
         session's own APPROVAL_INVALIDATED goes to `session.events`, which is
         memory; this is the one that reaches the chain. Here rather than in the
         session because the route owns the log, and after the acceptance so the
@@ -377,34 +377,34 @@ class Route:
             self._record("APPROVAL_INVALIDATED", reason_code=reason)
 
     def _release_gate(self, request_id):
-        """R-168-R3/R4a. The release barrier, asked again AT THE HANDOFF.
+        """The release barrier, asked again AT THE HANDOFF.
 
-        THE NAME IS LOAD-BEARING. Reviewer controls wrap this attribute to
-        drive a close from inside the decision (XC01 does exactly that and
-        measures whether the settlement owner blocks the close while it runs).
-        Renaming it to `_release_decision` when the frame building moved out
-        turned three of those rows from PASS into ERROR -- an instrument broken
-        by a rename, which is the same lesson as the `_handoff` signature.
-        This returns a DECISION only; `_release_frame` builds the frame.
+        THE NAME IS LOAD-BEARING. Test controls wrap this attribute to drive a
+        close from inside the decision and measure whether the settlement owner
+        blocks the close while it runs. A control finds it by name, so renaming
+        it breaks the instrument, the same constraint as the `_handoff`
+        signature. This returns a DECISION only; `_release_frame` builds the
+        frame.
 
         `_release_barrier` is asked once in `_inspect_result`, which runs
         BEFORE the scan -- and the scan is where the time goes. A cancellation
-        or a descriptor invalidation that completed during it was therefore
-        being judged against a question asked before it happened, and the
-        original crossed anyway. ASTRA's instrument pauses the reader on the
-        yield line itself and completes the action there; on the previous head
-        the original (or, with a finding, the PROHIBITED_CONTENT refusal)
-        still went to the client instead of REQUEST_CANCELLED or
-        DESCRIPTOR_CHANGED.
+        or a descriptor invalidation that completes during it would otherwise
+        be judged against a question asked before it happened, and the original
+        would cross anyway. A test instrument pauses the reader on the yield
+        line itself and completes the action there; the client then receives
+        REQUEST_CANCELLED or DESCRIPTOR_CHANGED instead of the original (or,
+        with a finding, the PROHIBITED_CONTENT refusal).
 
-        Returns None to let the crossing through unchanged, or the bytes that
-        replace it. `b""` is a legitimate answer meaning nothing crosses.
+        Returns None to let the crossing through unchanged, or the reason the
+        original is withheld. `_release_frame` builds the replacement bytes for
+        that reason.
 
         Called by the pump INSIDE the settlement critical section, so the
-        decision and the discharge of the obligation are one step. It builds a
-        frame and writes a receipt; it does not settle in the core, because the
-        item was settled when it left `_pending` and T6.R1 allows exactly one
-        answer -- this REPLACES the frame, it does not add one.
+        decision and the discharge of the obligation are one step. It takes the
+        decision only: it builds no frame, writes no receipt and does not settle
+        in the core, because the item was settled when it left `_pending` and
+        contract row 6.1 allows exactly one answer -- a withheld reason
+        REPLACES the frame, it does not add one.
         """
         if request_id is NO_ID:
             return None
@@ -426,20 +426,22 @@ class Route:
     def _release_frame(self, request_id, reason):
         """The frame for a decision already taken, built OUTSIDE the owner.
 
-        This is where the receipt is written, and that is why it is out here:
-        a failed write answers by calling `Session._close`, which takes the
-        settlement lock the reader was holding while it decided. XB06 reached
-        that deadlock with the log's fail-writes seam.
+        Building is all this does: it makes the withheld frame without writing
+        a receipt. `_release_record` writes the receipt once the obligation has
+        been retired, and that is why the write is kept out of here and out of
+        the decision: a failed write answers by calling `Session._close`, which
+        takes the settlement lock the reader was holding while it decided, so a
+        write under that lock deadlocks.
 
-        R-168-R5. XB06 PASSING MEANS NO DEADLOCK, NOT ONE ANSWER DELIVERED.
-        With the deadlock gone the receipt failure took the answer with it:
-        the write below closes the session, the reader hands over nothing, and
-        `_release_inbound` refuses to release anything it cannot authorise --
-        so the client got zero frames for a request it is still blocked on
-        (XD03). The bounded refusal is sent from HERE because this is the
-        frame's owner and the only party that still knows whose answer it was:
+        NO DEADLOCK DOES NOT MEAN ONE ANSWER IS DELIVERED.
+        A receipt failure takes the answer with it: the failed write closes
+        the session, the reader hands over nothing, and `_release_inbound`
+        refuses to release anything it cannot authorise -- so the client would
+        get zero frames for a request it is still blocked on. The bounded
+        refusal is sent by the ownership payer (`_pay_bounded_refusals`),
+        because it is the party that still knows whose answer it was:
         `_release_inbound` holds bytes with no id, and a second bounded error
-        raised down there would be the second answer T6.R1 forbids.
+        raised down there would be the second answer contract row 6.1 forbids.
 
         Best effort and never claimed durable, which is all a component that
         has just lost its log may claim.
@@ -458,7 +460,7 @@ class Route:
     def _release_record(self, request_id, reason, rule=None, forwarded=False):
         """The FALLIBLE half, once, after the decision can no longer move.
 
-        R-168-R7. Called by the pump when the obligation has been retired under
+        Called by the pump when the obligation has been retired under
         `_authority_lock`, so the answer this records is the answer that
         crosses. It is the half that can fail, and a failure here is covered by
         the ownership payer: the id is still unanswered on the wire until its
@@ -624,7 +626,7 @@ class Route:
         return sorted(set(message) - read)
 
     def _surface(self, message, method):
-        """The inspected surface and its channel, per T2's result rows."""
+        """The inspected surface and its channel, per contract row 2's result rows."""
         for member in ("result", "error", "params"):
             if member in message:
                 surface = message[member]
@@ -645,7 +647,7 @@ class Route:
         """One answer in the client's own typed id, or nothing at all when the
         thing withheld was a notification.
 
-        R-168-R7. `record=False` builds the BYTES and writes nothing. The
+        `record=False` builds the BYTES and writes nothing. The
         result direction re-derives its answer when authority moves during
         preparation, so the build may run more than once for one item -- and a
         SETTLED row per build is a second terminal for an item that settles
@@ -731,13 +733,13 @@ class Route:
     def _withhold_refusal(self, request_id, attempt):
         """The answer to an admission that was REFUSED, and nothing else.
 
-        R-179-R4, and the difference from `_withhold` is the whole point.
+        The difference from `_withhold` is the whole point.
         `_withhold` ends with `settle_from(CLIENT, request_id, ...)`, which
         retires whatever is pending under that ID. For an item that WAS
         admitted that is exactly right. For a refusal it is a live grenade: a
         refused attempt and a later admitted attempt share the id, so the
-        earlier attempt's answer retired the later attempt's real request --
-        ASTRA's XR03_OWNER, where the live item ended neither owed nor
+        earlier attempt's answer retired the later attempt's real request -- the live
+        item ended neither owed nor
         answerable.
 
         A refused attempt has nothing of its own to settle here. The pump
@@ -915,12 +917,10 @@ class Route:
     def _client_list(self, request_id, *, attempt=None):
         """Re-list in our own namespace, scan every page, then decide.
 
-        MERGE, #168 r9 onto #179. The attempt is threaded because all three
-        refusals below are this attempt's own answer and `_client_request` has
-        it in scope at the one call site. r9 wrote the list flow before the
-        attempt existed, so every one of them defaulted to None: R-179-R4 lost
-        on the whole list flow, silently, because the parameter has a default.
-        Found by attempt_threading_audit.py.
+        The attempt is threaded because every refusal below is this
+        attempt's own answer and `_client_request` has it in scope at the one
+        call site. A refusal left at the default of None would lose the rule on
+        the whole list flow, silently, because the parameter has a default.
         """
         if self.control is None:
             self._withhold(request_id, REASON_APPROVAL_REQUIRED, RULE_APPROVAL,
@@ -1013,7 +1013,7 @@ class Route:
         return tools
 
     def _scan_page(self, page):
-        """T5.R3(c). Every page, on the api_response channel it arrived on."""
+        """Every page, on the api_response channel it arrived on."""
         binding = {"digest": hashlib.sha256(
                        json.dumps(page, sort_keys=True).encode()).hexdigest(),
                    "channel": selector.API_RESPONSE,
@@ -1032,15 +1032,15 @@ class Route:
         return dict(result, check_pin=self._pin_outcome(page))
 
     def _pin_outcome(self, page):
-        """T1.R1's helper adaptation for `check_pin`, over one page of tools.
+        """Contract row 1.1's helper adaptation for `check_pin`, over one page of tools.
 
         The adapter converts the helper's own return into an explicit outcome
         rather than reading None as "nothing to say": None from an applicable
         helper is `clean`, a deny is `deny`, an ask is `ask`, and an exception
-        is `error`. T5.R3(c) then requires clean for every tool, so an ask
+        is `error`. Contract row 5.3(c) then requires clean for every tool, so an ask
         holds the activation rather than passing it.
 
-        The name is QUALIFIED before the call, per T1.R1: `check_pin` ignores
+        The name is QUALIFIED before the call, per contract row 1.1: `check_pin` ignores
         anything that is not `mcp__<server>__<tool>`, so handing it a bare wire
         name would make every tool non-applicable and return None, and reading
         THAT as clean is the exact misreading the row names.
@@ -1081,7 +1081,7 @@ class Route:
     # ── notifications ──────────────────────────────────────────────────────
 
     def _client_notification(self, raw, message, method):
-        """T2.R13. A notification has no response, whatever we decide about it,
+        """A notification has no response, whatever we decide about it,
         so the only two outcomes are forwarded or dropped with a receipt."""
         if selector.refusal(method, REQUEST, origin=CLIENT) is not None:
             self._record("SETTLED", reason_code=REASON_UNINSPECTED_METHOD,
@@ -1239,11 +1239,11 @@ class Route:
     # ── the two exits ──────────────────────────────────────────────────────
 
     def _release(self, raw, request_id, *, attempt=None, approved_under=None):
-        """T9.R2. The authorisation is durable BEFORE the first original byte
+        """The authorisation is durable BEFORE the first original byte
         leaves, so there is no moment where the payload is gone and the record
         of letting it go is not there.
 
-        R106.3. A request whose cancellation the client has already been
+        A request whose cancellation the client has already been
         answered for is never forwarded. The session decides, inside its
         settlement owner, and `_cancel` has already written SETTLED and the
         client's one answer, so this adds neither.
@@ -1393,7 +1393,7 @@ class Route:
                      forwarded=False)
 
     def _refuse_unparsed(self, frame):
-        """T7.R3. One error where JSON-RPC allows one, with a null id because
+        """One error where JSON-RPC allows one, with a null id because
         there is no id we can trust, then the session closes. A frame we could
         not parse is not a frame we may resynchronise after."""
         self._to_client(envelope.withheld(  # to-client-exempt: an unparsed frame has a null id and no correlation, so no obligation exists to take
@@ -1412,7 +1412,7 @@ class Route:
             catalog=self.catalog))
 
     def _receipt_failure(self, request_id):
-        """T9.R4. Best effort, bounded, and never claimed durable, because it is
+        """Best effort, bounded, and never claimed durable, because it is
         being sent by something that has just discovered it cannot write
         anything down."""
         if request_id is NO_ID:
@@ -1435,7 +1435,7 @@ class Route:
     # ── plumbing ───────────────────────────────────────────────────────────
 
     def _approval_stamp(self):
-        """R111.3. What a call's approval is read under: the session's
+        """What a call's approval is read under: the session's
         descriptor revision and the approval record's own revision."""
         return (self.session.descriptor_revision(),
                 getattr(self.approvals, "revision", None))
@@ -1465,7 +1465,7 @@ class Route:
                                        known or self.descriptor_sha_for(name))
 
     def _activate_once(self):
-        """T5.R3's activation, run on the first admission rather than at the
+        """Contract row 5.3's activation, run on the first admission rather than at the
         literal first frame.
 
         The row says at session start. Doing it on the first call that needs it
@@ -1534,7 +1534,7 @@ class Route:
         Idempotent, and `final` is the half that matters: the take before the
         authorisation is reversible, this is not. The token comes from the
         reader rather than from the frame, because the frame's id names an
-        item and not an attempt (R-168-R9). A reviewer control locates this
+        item and not an attempt. A test control locates this
         statement by AST, so the name stays whatever it is handed.
         """
         if owed is not None:
@@ -1557,12 +1557,10 @@ class Route:
         return _NO_FRAME_ID
 
     def _to_client(self, body):
-        """ONE ARGUMENT. R-168-R9, and the reason is a broken instrument.
-
-        A reviewer control substitutes this method with a one-argument stub to
-        watch what reaches the client, so giving it a second parameter turned
-        that control into a TypeError -- the `_handoff` signature lesson, and I
-        have now been taught it five times this week by five different files.
+        """Keep one argument, because tests substitute this method with a
+        one-argument sink to watch what reaches the client; a second parameter
+        would make that substitute raise TypeError (the same constraint as the
+        `_handoff` signature).
 
         The obligation a local answer discharges is therefore confirmed by the
         CALLER, which is the party that knows its token, immediately before
@@ -1580,7 +1578,7 @@ class Route:
             self.session.answered_on_the_wire(token, final=final)
 
     def _close_on_state_fault(self):
-        """T9 ruling 64 (c). Pay first, then close, as the receipt fault does
+        """Pay first, then close, as the receipt fault does
         below; the literal is kept so test_t4_contract's sweep reads it."""
         self._pay_bounded_refusals()
         self.session._close(
@@ -1591,7 +1589,7 @@ class Route:
     def _pay_bounded_refusals(self):
         """One bounded RECEIPT_IO_ERROR to every client still owed a frame.
 
-        R-168-R6/F2. T9.R4's answer, finally given on every path rather than
+        Contract row 9.4's answer, finally given on every path rather than
         one. A receipt failure anywhere -- the scan events, the first
         settlement, the release authorisation, the fsync inside it -- used to
         end with the session closed and, for most of those sites, ZERO frames
@@ -1600,10 +1598,9 @@ class Route:
         retain, and `_release_inbound` will not release what it cannot
         authorise.
 
-        NOT A BLANKET REFUSAL ON EVERY FAILURE, which the reviewer names as the
-        wrong fix. It pays what is OWED and nothing else, so a failure to
-        record completion AFTER a frame has crossed pays nobody
-        (XE03_receipt_WRITE_COMPLETE_*), and an id paid once is never paid
+        NOT A BLANKET REFUSAL ON EVERY FAILURE, which would be the wrong fix.
+        It pays what is OWED and nothing else, so a failure to record
+        completion AFTER a frame has crossed pays nobody, and an id paid once is never paid
         twice however many later writes fail.
 
         Written straight to the sink: no receipt, no authorisation, never
@@ -1696,20 +1693,20 @@ class Route:
         return not stop.stopped
 
     def _token(self, request_id, attempt=None, *, token=None):
-        """R-179-R5/(2). ID AND GENERATION.
+        """ID AND GENERATION.
 
         Hashing the id alone gave two attempts on one id the same release
         token, so a receipt could not say which attempt a release belonged to
         -- the same id-only key as everything else this round, in the one place
         that is supposed to be evidence.
 
-        MERGE ROUND, T9's ruling. `token=` takes a raw obligation token for the
+        `token=` takes a raw obligation token for the
         one caller that holds the token WITHOUT an Attempt: `_release_inbound`
         gets it from `obligation_of_last_yield`, because the reader is what
         knows which obligation a frame discharges. It used to hash the literal
         marker "inbound", so the one receipt that exists to say WHAT WAS
         ANSWERED named nothing -- the id-only key again, wearing no id at all.
-        R-168-R6a: the receipt equals the wire.
+        the receipt equals the wire.
         """
         if token is not None:
             owned = token

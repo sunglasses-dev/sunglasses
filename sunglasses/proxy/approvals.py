@@ -1,8 +1,8 @@
 """Who approved what, and whether that approval is still true right now.
 
-T5. Written against `tests/test_proxy_approvals.py`, committed first.
+Written against `tests/test_proxy_approvals.py`.
 
-The whole module exists for one sentence in T5.R3: the activation invariant is
+The whole module exists for one sentence in contract row 5.3: the activation invariant is
 "checked AND COMMITTED under the same release lock as call admission". An
 activation scan takes time, and everything it learned can stop being true while
 it runs. A scan that completes successfully after a `list_changed` has arrived
@@ -59,7 +59,7 @@ _HEX = frozenset("0123456789abcdefABCDEF")
 
 
 def _valid_sha(value):
-    """T506. HEX, not merely alphanumeric.
+    """HEX, not merely alphanumeric.
 
     `isalnum` accepts `z` * 64, which is the right length and the right shape
     and is not a sha256 of anything. A record carrying one has not named a
@@ -108,7 +108,7 @@ class Store:
         return snapshot_sha256
 
     def approve(self, *, snapshot_sha256, viewed):
-        """T5.R1. After the human viewed EXACTLY that stored capture.
+        """After the human viewed EXACTLY that stored capture.
 
         `viewed` is a parameter rather than an inference because the thing being
         recorded is that a person looked. A store that decided for itself
@@ -168,7 +168,7 @@ class Store:
     def _write_pins(self, stored):
         """Approving PINS the descriptors, which is what approving means.
 
-        T5.R3(c) wants `check_pin` clean for every tool, and the helper's own
+        Contract row 5.3(c) wants `check_pin` clean for every tool, and the helper's own
         trust-on-first-use path says so in its message: an unpinned tool asks,
         and approving is the act that pins it. Without this the two halves
         deadlock, because activation needs a clean pin and nothing ever writes
@@ -210,7 +210,7 @@ class Store:
         os.chmod(path, 0o600)
 
     def write_without_human(self, record):
-        """The door that does not exist. T5.R1 says the approve command only."""
+        """The door that does not exist. Contract row 5.1 says the approve command only."""
         raise NotApprovable(
             "approvals are written by `sunglasses proxy approve` after a human "
             "viewed the capture, and by nothing on the serving path")
@@ -337,7 +337,7 @@ class Store:
             return Activation(True)
 
     def _retire(self, reason):
-        """T5.R4. Drop the admission AND remember why.
+        """Drop the admission AND remember why.
 
         Clearing `_active` alone makes the next call read as APPROVAL_REQUIRED,
         which describes a server nobody ever approved and hides that this one
@@ -398,7 +398,7 @@ class Store:
         """The reason nothing may pass, in the order the rows put them.
 
         The invalidation is checked BEFORE the absence of an approval, because
-        T5.R4 keeps its provenance for the session: once a server has changed
+        contract row 5.4 keeps its provenance for the session: once a server has changed
         underneath an approval, saying APPROVAL_REQUIRED would describe it as
         never approved and hide the change.
         """
@@ -426,7 +426,7 @@ def _no_duplicates(pairs):
 
 
 def _page_provenance(page_scans):
-    """T5.R3(c), EVERY page, with the provenance the row names for each.
+    """EVERY page, with the provenance contract row 5.3(c) names for each.
 
     Checked in severity order rather than in the order the fields appear, so a
     page that is both incomplete and carrying a finding reports the finding.

@@ -1,7 +1,7 @@
 """Stopping a process group, including the part that outlives its leader.
 
-T8.R12: process groups for upstream and workers; kill and reap the group EVEN
-WHEN THE LEADER EXITED. T7.R2: SIGTERM then SIGKILL, descendants included.
+Contract row 8.12: process groups for upstream and workers; kill and reap the group EVEN
+WHEN THE LEADER EXITED. Contract row 7.2: SIGTERM then SIGKILL, descendants included.
 
 That first clause is the whole reason this is a module rather than two lines
 inside teardown. Killing by the leader's pid does nothing once the leader is
@@ -40,7 +40,7 @@ def _signal_group(pgid, sig):
 
     ESRCH means nothing is there to signal, which is the state this function is
     trying to reach. Raising on it turns a completed teardown into a failed one,
-    and T7.R2 runs this on paths where the group may well have exited already.
+    and contract row 7.2 runs this on paths where the group may well have exited already.
     """
     try:
         os.killpg(pgid, sig)
@@ -62,7 +62,7 @@ def _signal_group(pgid, sig):
 def _reap(handle):
     """Collect the child through the handle that OWNS it, or not at all.
 
-    T8.R12 says kill and reap, and the first version of this called
+    Contract row 8.12 says kill and reap, and the first version of this called
     `os.waitpid(pid, WNOHANG)` directly. That reaps, and it also STEALS the exit
     status from the `subprocess.Popen` the caller is holding, which then reports
     returncode 0 for a process that exited 7 and `poll() is None` for one that is

@@ -1,7 +1,8 @@
 """Turning an accepted worker result into the one reason the client is told.
 
-T4.R3 maps the engine's vocabulary onto the wire's, and T4.R4 decides which
-cause wins. The row that has already cost a run is T4.R4(7), and it is worth
+Contract row 4.3 maps the engine's vocabulary onto the wire's, and contract row 4.4
+decides which
+cause wins. The row that has already cost a run is contract row 4.4(7), and it is worth
 stating before the code says it:
 
   PROHIBITED_SECRET iff the held message is a client to upstream `tools/call`
@@ -10,18 +11,18 @@ stating before the code says it:
   PROHIBITED_CONTENT.
 
 Both halves are load bearing and each one alone is a different bug. Dropping the
-direction test labels G2-14, a client notification carrying GLS-SD-001, as a
-secret exfiltration when it is not an outbound call at all. Dropping the family
+direction test labels a client notification carrying GLS-SD-001 as a secret
+exfiltration when it is not an outbound call at all. Dropping the family
 test labels any high finding on an outbound call a secret. And the helper
 credential lane, `GLS-FW-SEC-*`, deliberately does NOT qualify. It reads like a
-secret rule to a human and is not in the engine secret family, so G2-16 settles
+secret rule to a human and is not in the engine secret family, so it settles
 PROHIBITED_CONTENT. A check written as "looks like a credential rule" gets that
 backwards, which is why the family is a prefix rather than a resemblance.
 
-The paired G2-04 calibration measured the spike settling PROHIBITED_CONTENT with
-`inspection_complete=false` for a COMPLETE engine finding. Both halves of that
-were wrong and both are fixed here: the reason, and the completeness that the
-harness had been deriving from whether anything was forwarded.
+A COMPLETE scan with a blocking finding settles with
+`inspection_complete=true`. Both halves are decided here: the reason from the
+direction and the family, and the completeness from the scan's own status
+rather than from whether anything was forwarded.
 """
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ ENGINE_SECRET_PREFIX = "GLS-SD-"
 
 
 def is_outbound_tool_call(held):
-    """T4.R4(7)'s direction test, spelled out as the three things it excludes.
+    """Contract row 4.4(7)'s direction test, spelled out as the three things it excludes.
 
     `held` describes the message the finding is about: its direction, whether it
     is a request, and its method. A notification has no id and is not a request;
@@ -61,14 +62,12 @@ def has_engine_secret_finding(findings):
 
     The PREFIX is what keeps the helper credential lane out: `GLS-FW-SEC-*`
     reads like a secret rule to a human but does not start with `GLS-SD-`, so
-    G2-16 settles PROHIBITED_CONTENT on the prefix alone. A check written as
+    it settles PROHIBITED_CONTENT on the prefix alone. A check written as
     "looks like a credential rule" would get that backwards, which is why the
     family is a prefix and not a resemblance.
 
-    The SOURCE test guards something else, and I nearly wrote a comment claiming
-    it guarded G2-16 until the mutation that removes it failed to flip G2-16 and
-    flipped only one other case. What it actually guards is a HELPER reporting
-    an engine-prefixed id. The helper lane is deterministic and separate, and a
+    The SOURCE test guards something else, not the prefix check. It guards
+    against a HELPER reporting an engine-prefixed id. The helper lane is deterministic and separate, and a
     helper naming `GLS-SD-001` is not the engine having found it, so it must not
     buy the stronger reason. One check, one thing, stated as the thing it does.
     """
@@ -78,7 +77,7 @@ def has_engine_secret_finding(findings):
 
 
 def finding_reason(held, findings):
-    """T4.R4(7). Which of the two prohibition reasons this finding settles as."""
+    """Which of the two prohibition reasons this finding settles as."""
     if is_outbound_tool_call(held) and has_engine_secret_finding(findings):
         return PROHIBITED_SECRET
     return PROHIBITED_CONTENT
@@ -136,7 +135,7 @@ def rule_for(reason):
 def settle(result, *, held, held_content_bytes, helper_outcome="clean",
            independent_cause=None, known_detector_gap=False,
            cancellation_owned=False):
-    """T4.R4(6b) through (9), for an ALREADY VALIDATED worker result.
+    """Contract row 4.4(6b) through (9), for an ALREADY VALIDATED worker result.
 
     Validation is `worker.validate` and is deliberately a separate step: this
     function may assume the result is coherent, and giving it the job of
@@ -149,7 +148,7 @@ def settle(result, *, held, held_content_bytes, helper_outcome="clean",
     `cancellation_owned` says whether the CLIENT cancelled this request, and is
     passed in for the same reason: a worker reporting `cancelled` says only
     that its scan stopped, never who stopped it, and the tombstones that answer
-    that live in the session. T406. Defaulting to False makes the quiet answer
+    that live in the session. Defaulting to False makes the quiet answer
     the conservative one -- an unexplained abort reads as a scan that did not
     happen rather than as a client who changed their mind.
     """

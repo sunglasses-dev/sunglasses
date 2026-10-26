@@ -1,14 +1,14 @@
 """The log, written before the thing it records.
 
-T9. Written against `tests/test_proxy_receipts.py`, committed first.
+Written against `tests/test_proxy_receipts.py`, committed first.
 
-The ordering in R2 is the whole design. RELEASE_AUTHORIZED is made durable
+The ordering in contract row 9.2 is the whole design. RELEASE_AUTHORIZED is made durable
 BEFORE the first original byte leaves, because a receipt written afterwards
 describes something that already happened: a crash in the gap leaves a payload
 delivered and no record that it was, and an audit trail whose weakest moment is
 the irreversible act is not an audit trail.
 
-R4 follows from the same thought. Once the log cannot be written, this component
+Contract row 9.4 follows from the same thought. Once the log cannot be written, this component
 can no longer honestly say what it did, so it stops rather than continuing to
 mediate silently. A clean-looking session with no evidence behind it is worse
 than a refused one.
@@ -219,7 +219,7 @@ def _kept_rule_ids(rule_ids):
 
 
 def _check_value(name, value):
-    """T903. What may be INSIDE a permitted field.
+    """What may be INSIDE a permitted field.
 
     The allowlist above says which names may appear. Five of them were carrying
     whatever the peer chose: a method, a status, a reason code, a rule id and
@@ -328,7 +328,7 @@ class Stop:
         self.durable = durable
 
     def client_refusals(self, pending_ids):
-        """T9.R4. ONE bounded refusal per known pending id, best effort.
+        """ONE bounded refusal per known pending id, best effort.
 
         Never the original, and never claimed durable: this is being sent by a
         component that has just discovered it cannot write anything down, so it
@@ -389,7 +389,7 @@ class Log:
 
     # ── writing ─────────────────────────────────────────────────────────────
     def event(self, kind, /, **fields):
-        """T901. `kind` is POSITIONAL ONLY, so a caller passing a field of that
+        """`kind` is POSITIONAL ONLY, so a caller passing a field of that
         name lands it in `fields` instead of colliding with the discriminator.
         It used to raise TypeError out of the logging path, which is a receipt
         that cannot be written because of what someone tried to record in it.
@@ -436,7 +436,7 @@ class Log:
         """The same allowlisted fields, as one chain record. The chain keeps
         the order and the time: `t_mono_ns` is the proxy's clock, an integer,
         and the wall clock is the writer's. Any failure to append, including a
-        value the wire refuses, is a receipt failure (R4): it is remembered, and
+        value the wire refuses, is a receipt failure (contract row 9.4): it is remembered, and
         every later write stops the session through `record_or_stop`."""
         body = self._clean(fields)
         with self._lock:
@@ -457,7 +457,7 @@ class Log:
             return dict(body, seq=self._seq - 1, kind=kind)
 
     def _clean(self, fields):
-        """T9.R3. An allowlist, and provenance reduced to indices and hashes."""
+        """An allowlist, and provenance reduced to indices and hashes."""
         clean, truncated, sanitized, digested = {}, {}, {}, {}
         for name, value in (fields or {}).items():
             if name in FORBIDDEN_FIELDS or name not in PERMITTED_FIELDS:
@@ -509,7 +509,7 @@ class Log:
 
     @staticmethod
     def _leaf(entry):
-        """T3.R2. The pointer is HASHED, never carried.
+        """The pointer is HASHED, never carried.
 
         A pointer names the shape of the document, which is information about
         the payload even when the payload itself is absent: `/params/arguments/
@@ -605,7 +605,7 @@ from ..receipts._shown import (ESCAPED_NOTE, _escape, _hidden,  # noqa: F401
 
 
 def _make_receipts_dir(root):
-    """T9 ruling 63 (b). A file, a dangling symlink or a symlink to a file at
+    """A file, a dangling symlink or a symlink to a file at
     the receipts directory, at the state root or above it made `mkdir` raise
     out of `serve.main` as a traceback with no cause named. It is a receipt
     failure like any other: raised before the session opens, naming what is
@@ -637,7 +637,7 @@ def _chain_for(directory, home):
 
     Whether a key exists is one directory listing, so an install without one
     imports none of the signing code. A key that exists and cannot sign is not
-    a reason to write unsigned rows (R21, R24b): it is a receipt failure, raised
+    a reason to write unsigned rows: it is a receipt failure, raised
     here before the session opens, naming the cause and the command that clears
     it."""
     if home is None:

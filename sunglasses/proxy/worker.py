@@ -1,7 +1,7 @@
 """What the scanner said, checked before any of it is believed.
 
-T4.R1 fixes the worker's one line of stdout and T4.R2 fixes what makes it
-acceptable. The reason T4.R2 is as long as it is: almost every field can be
+Contract row 4.1 fixes the worker's one line of stdout and contract row 4.2 fixes what makes it
+acceptable. The reason contract row 4.2 is as long as it is: almost every field can be
 wrong in a way that reads as a pass.
 
 The spike this replaces decided from the worker's EXIT CODE and never read the
@@ -17,7 +17,7 @@ are exactly the ones that look clean:
   a rule id that is not in the trusted catalog, which is how a worker invents
   the authority to clear something.
 
-So S1 ELIGIBILITY is written as an explicit CONJUNCTION, per T4.R2, and anything
+So S1 ELIGIBILITY is written as an explicit CONJUNCTION, per contract row 4.2, and anything
 that is not S1, S2 or S7 is S3. "Not obviously bad" is not a verdict.
 """
 from __future__ import annotations
@@ -80,7 +80,7 @@ def _typed(value, kind):
     An earlier version carried an `int` branch, nothing called it, a mutation
     that removed its bool guard killed no test, and it was deleted as dead code
     "rather than left for a caller that may never arrive". The caller arrived:
-    T403 makes the byte counters whole numbers, because 19.5 bytes were not
+    the byte counters are whole numbers, because 19.5 bytes were not
     inspected by anything. It is back WITH the bool guard the mutation found
     missing, and this paragraph stays as the record that removing it was the
     right call on the evidence available and still turned out to be wrong.
@@ -96,9 +96,9 @@ def _typed(value, kind):
 
 
 def validate(result, *, binding, held_content_bytes, catalog):
-    """T4.R2. Return the result, or raise Invalid naming the first thing wrong.
+    """Return the result, or raise Invalid naming the first thing wrong.
 
-    `catalog` is T4.R6's trusted id set. A worker reporting an id outside it has
+    `catalog` is contract row 4.6's trusted id set. A worker reporting an id outside it has
     either found something with a rule nobody pinned or invented one, and both
     are the same fact about how much we can rely on the answer.
     """
@@ -231,7 +231,7 @@ def validate(result, *, binding, held_content_bytes, catalog):
 
 def is_s1_eligible(result, *, held_content_bytes, helper_outcome,
                    independent_cause):
-    """T4.R2's S1 conjunction, spelled out, every term required.
+    """Contract row 4.2's S1 conjunction, spelled out, every term required.
 
     Written as an explicit AND of named terms rather than as a chain of early
     returns, because S1 is the one verdict that lets bytes through and the way

@@ -10,7 +10,7 @@ nothing.
 Three things it has to get right.
 
 The child is started in its OWN PROCESS GROUP and its handle is attached to the
-session. T8.R12 says liveness has three answers and only the handle tells them
+session. Contract row 8.12 says liveness has three answers and only the handle tells them
 apart, and the group is what teardown kills. A child sharing our group is worse
 than untidy: the kill aimed at the server lands on this process too.
 
@@ -161,12 +161,13 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
                 root=None, worker=None, store=None, stderr=None):
     """The wiring, separated so it can be inspected without spawning anything.
 
-    The approval store is the REAL one and not a bypass. T5.R2 refuses calls
-    until a human has approved the snapshot, and that gate stays shut here even
-    though it means no tools/call can be forwarded yet, because the list and
-    activation flow (T2.R6/R7, T5.R3) is the next slice. A gate opened to make
-    the artifact feel finished is the one change that would make the rest of
-    this decorative.
+    The approval store is the REAL one and not a bypass. Contract row 5.2 refuses calls
+    until a human has approved the snapshot, and that gate stays shut here
+    until a valid approval exists: the list and activation flow (contract rows
+    2.6 and 2.7, contract row 5.3) runs through the control channel wired below,
+    and a tools/call is forwarded only after it. A gate opened to make the
+    artifact feel finished is the one change that would make the rest of this
+    decorative.
     """
     identity = _identity(upstream_argv)
     if store is None:
@@ -391,8 +392,8 @@ def _record_refusal(log, reason):
 
 
 def _abandon(child, log, stderr, failure=None):
-    """T9 ruling 64 (b). The server was started and the session was not: stop
-    its group, then say so. Never a traceback from here (T10.R3)."""
+    """The server was started and the session was not: stop
+    its group, then say so. Never a traceback from here (contract row 10.3)."""
     _close(child)
     supervisor.stop_group(child.pid, handle=child)
     _record_refusal(log, "INTERNAL_FAULT")
@@ -477,12 +478,12 @@ def client_writer(stdout, write_lock, writing_since):
 
 
 def _watchdog(session, log, writing_since, done, child, interval=0.1):
-    """AR10, AR11 and AR13. The deadlines, on a thread that is never blocked.
+    """The deadlines, on a thread that is never blocked.
 
-    Every bound this checks was already written down in `bounds.py` and asked
-    by nobody, so a server could hold a request for ever, stop halfway through
-    a frame, or wait for a client that had stopped reading, and the proxy would
-    wait exactly as long as it was asked to. A mediator that can be made to
+    Every bound this checks is written in `bounds.py` and this thread is what
+    asks, so a server cannot hold a request for ever, stop halfway through a
+    frame, or wait for a client that has stopped reading while the proxy waits
+    exactly as long as it was asked to. A mediator that can be made to
     wait indefinitely can be taken out of the path by doing nothing at all,
     which is the cheapest attack there is.
 
@@ -625,15 +626,14 @@ def _close(child):
 
 
 def _exit_code(session, child):
-    """T8.R14. A fault is nonzero always; an ordinary clean exit propagates.
+    """A fault is nonzero always; an ordinary clean exit propagates.
 
-    AR14b. This read `child.poll()`, and poll answers None both for "still
-    running" and for "exited, not reaped yet" -- and None was mapped to
-    EXIT_OK. So an upstream that had already failed was reported as a clean run
-    whenever the status had not been collected in time, which on an idle
-    machine was 3 runs in 12. A non-blocking question cannot tell those two
-    states apart, so it is the wrong question: the child's stdin is already
-    closed by `_close` above, and a child that is going to exit has begun.
+    `child.poll()` answers None for a child that has not finished exiting, and
+    mapping None to EXIT_OK would report an upstream that was on its way to
+    failing as a clean run. A non-blocking question cannot wait out an exit
+    already under way, so it is the wrong question: the child's stdin is
+    already closed by `_close` above, and a child that is going to exit has
+    begun.
 
     The wait is BOUNDED by the same kill grace the teardown uses, and a timeout
     still means EXIT_OK. Unknown is not a fault -- the proxy may be leaving
@@ -650,7 +650,7 @@ def _exit_code(session, child):
 
 
 def _identity(upstream_argv):
-    """T1.R1, reduced to what this slice can honestly compute: the resolved
+    """Reduced to what this slice can honestly compute: the resolved
     command, its arguments and the working directory. The env allowlist belongs
     with the config work and is named here rather than quietly omitted."""
     material = "\x00".join([os.path.realpath(upstream_argv[0])]

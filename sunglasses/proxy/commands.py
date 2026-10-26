@@ -2,13 +2,12 @@
 
 Written against `tests/test_proxy_commands.py`, committed first.
 
-R-DOCTOR-OWNER (T9, 2026-09-15): `doctor`, `install` and `uninstall` are NOT
-here. They were, backed by a second install/uninstall/classify implementation
-in this lane's own doctor.py, and `sunglasses/install.py` is the one that has
-been through the property controls and the mutation round. Two classify()
-functions on main is how the doctor and the install command come to disagree
-about what WRAPPED means. What remains is the mediator form and `approve`,
-which is T5.R1's door and reads approvals.py, not the doctor.
+`doctor`, `install` and `uninstall` are NOT
+here, because `sunglasses/install.py` is the one install/uninstall/classify
+implementation. A second classify() in this lane's own doctor.py is how the
+doctor and the install command would come to disagree about what WRAPPED
+means. What remains is the mediator form and `approve`,
+which is contract row 5.1's door and reads approvals.py, not the doctor.
 
 The dispatch has one rule that is not obvious and matters. A first token that
 is neither a known command nor `--` is a USAGE ERROR. It is never treated as a
@@ -16,7 +15,7 @@ server command, because doing that executes whatever the user mistyped, with
 whatever followed it, as a child process. `docter` should print usage, not run
 a program called docter.
 
-Printing is where T10.R3's last sentence finally bites, too. Every other module
+Printing is where contract row 10.3's last sentence finally bites, too. Every other module
 merely carried the route checks; this one renders them, so the allowlist that
 kept upstream text out of the data has to survive contact with a formatter.
 """
@@ -118,7 +117,7 @@ def _options(argv):
 
 
 def _approve(server_id, options, stdout, stderr, *, confirm=None):
-    """T5.R1's door, and the only one. Nothing on the serving path may write an
+    """Contract row 5.1's door, and the only one. Nothing on the serving path may write an
     approval record; this is what does, after a human has seen the capture.
 
     The command existed only in the contract and in `approvals.py`'s own
@@ -131,9 +130,9 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
       the capture named does not exist -- there is nothing a human could have
       looked at, so there is nothing to record;
 
-      this is not an interactive terminal -- `viewed` records that a PERSON
+      This is not an interactive terminal -- `viewed` records that a PERSON
       looked, and a pipe cannot look. Approving here would write the record on
-      their behalf, which is exactly what T5.R1 forbids and what
+      their behalf, which is exactly what contract row 5.1 forbids and what
       `write_without_human` refuses in the library;
 
       the person said no.

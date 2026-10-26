@@ -1,9 +1,9 @@
-"""T4.R1's worker, as a real child with real bounds.
+"""Contract row 4.1's worker, as a real child with real bounds.
 
 Written against `tests/test_proxy_worker_process.py`, committed first.
 
-The engine ran in the proxy's own process until now, which meant T8.R4's kill
-on deadline and T8.R7's stdout bound had nothing to apply to. Nothing was
+The engine ran in the proxy's own process until now, which meant contract row 8.4's kill
+on deadline and contract row 8.7's stdout bound had nothing to apply to. Nothing was
 released by a hanging or flooding scan, so the direction was safe, but a bound
 you cannot enforce is not a bound.
 
@@ -81,7 +81,7 @@ def run(payload, *, binding, argv=None, timeout_ms=None, grace_ms=None,
     With `child=None` the process is created before the clock, and the cold
     engine load that remains competes with delivery and collection inside
     `timeout_ms`; the product path is `ProcessScan`, which loads before the
-    clock (R114).
+    clock.
     """
     timeout_ms = bounds.INSPECTION_MS if timeout_ms is None else timeout_ms
     grace_ms = bounds.KILL_GRACE_MS if grace_ms is None else grace_ms
@@ -193,7 +193,7 @@ def default_argv():
 
 
 class _TooMuch(Exception):
-    """The child went past T8.R7 while we were still reading."""
+    """The child went past contract row 8.7 while we were still reading."""
 
 
 def _read_bounded(stream, limit):
@@ -231,7 +231,7 @@ def _parse(out, binding):
 
 def _fault(binding, status, cause=None):
     """A fault is a worker RESULT, so it carries the binding it was asked
-    about. One bound to nothing is another item's answer under T4.R2, and it
+    about. One bound to nothing is another item's answer under contract row 4.2, and it
     carries nothing the child said.
 
     `cause` is optional because a DEADLINE has no cause to add: the status
@@ -273,7 +273,7 @@ def _await_ready(ready_r, timeout_ms):
 
 
 class ProcessScan:
-    """The route's `scan=` through a real child, with T8.R4 and T8.R7 applied.
+    """The route's `scan=` through a real child, with contract rows 8.4 and 8.7 applied.
 
     ONE WARM SPARE. Each scan takes the spare and a replacement starts loading
     at once, so the next scan normally finds it ready. When it does not -- two

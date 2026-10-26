@@ -1,6 +1,6 @@
 """The only thing the client is ever told, built from an allowlist.
 
-T4.R7. Written against `tests/test_proxy_envelope.py`, committed first.
+Contract row 4.7. Written against `tests/test_proxy_envelope.py`, committed first.
 
 The row's last sentence is the specification: never payload, never secret, never
 descriptor text, never exception or worker or stderr text, never arbitrary ids.
@@ -96,7 +96,7 @@ def withheld(*, request_id, reason_code, rule, accepted, status,
              inspection_complete, inspected_utf8_bytes, observed_content_bytes,
              elapsed_ms, rule_ids=(), catalog=frozenset(), budget=None,
              server_id=None, snapshot_sha256=None, **ignored):
-    """T4.R7's envelope, and nothing else.
+    """Contract row 4.7's envelope, and nothing else.
 
     `**ignored` is deliberate and is the point of the design. A caller with a
     detail string, a worker's stderr or an exception to explain will pass it,

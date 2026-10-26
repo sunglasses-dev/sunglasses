@@ -1,6 +1,6 @@
-"""T8's bounds, and what each breach is called.
+"""The proxy's bounds, and what each breach is called.
 
-Written against `tests/test_proxy_bounds.py`, committed first from the rows.
+Written against `tests/test_proxy_bounds.py`.
 
 A bound is three decisions and only the first is the number. The value, whether
 it is INCLUSIVE, and what the breach is CALLED. The second is where off-by-ones
@@ -9,8 +9,8 @@ byte at every boundary and fails two shipped fixtures that sit precisely on it.
 The third is where ungradeable receipts live: a breach reported under the wrong
 reason cannot be compared to the expectation that describes it.
 
-The reasons here are T4.R5's frozen catalog, and `budget` is populated ONLY for
-OVER_BUDGET, per T4.R7 v5.1. A deadline is not a budget breach, and saying
+The reasons here are contract row 4.5's frozen catalog, and `budget` is populated ONLY for
+OVER_BUDGET, per contract row 4.7 v5.1. A deadline is not a budget breach, and saying
 `budget: content` on a SCAN_DEADLINE would describe a bound that did not break.
 """
 from __future__ import annotations
@@ -102,7 +102,7 @@ _OK = Breach()
 
 
 def check_frame(size):
-    """R1. Inclusive: the cap counts the LF and a frame AT it is allowed."""
+    """Contract row 8.1. Inclusive: the cap counts the LF and a frame AT it is allowed."""
     if size <= WIRE_FRAME_BYTES:
         return _OK
     return Breach("OVER_BUDGET", "S3", budget="frame",
@@ -110,7 +110,7 @@ def check_frame(size):
 
 
 def check_content(size):
-    """R2. Inclusive, and two shipped fixtures sit exactly on it."""
+    """Contract row 8.2. Inclusive, and two shipped fixtures sit exactly on it."""
     if size <= CONTENT_BYTES:
         return _OK
     return Breach("OVER_BUDGET", "S3", budget="content", inspection_complete=False,
@@ -118,7 +118,7 @@ def check_content(size):
 
 
 def check_admission(*, outstanding, queued):
-    """R6. BOTH limits, because checking one leaves the other reachable.
+    """Contract row 8.6. BOTH limits, because checking one leaves the other reachable.
 
     `outstanding` is compared with `>=` because the number is a count of items
     already held: admitting one more at the limit would make it nine.
@@ -133,7 +133,7 @@ def check_admission(*, outstanding, queued):
 
 
 def overload_victim():
-    """T6.R7 and R6. The NEW item is refused; a held one is never dropped.
+    """The NEW item is refused; a held one is never dropped.
 
     Dropping a held message to make room withdraws an answer somebody is already
     waiting for, which turns a load problem into a correctness one.
@@ -142,7 +142,7 @@ def overload_victim():
 
 
 def check_deadline(name, *, elapsed_ms):
-    """R3, R4, R5, R9. Expired AFTER the limit, never at it.
+    """Contract rows 8.3, 8.4, 8.5 and 8.9. Expired AFTER the limit, never at it.
 
     `budget` stays None. A deadline is not a budget breach, and naming one would
     describe a bound that did not break.
@@ -158,7 +158,7 @@ def check_deadline(name, *, elapsed_ms):
 
 
 def watchdog_deadline_ms(name):
-    """R10. Strictly PAST the deadline it guards.
+    """Contract row 8.10. Strictly PAST the deadline it guards.
 
     The watchdog exists to catch a deadline that did not fire, so it cannot
     share a boundary with one: at equal values the thing being watched and the
@@ -168,7 +168,7 @@ def watchdog_deadline_ms(name):
 
 
 def check_snapshot(*, pages, tools, decoded, elapsed_ms, cursors=()):
-    """R13. Four totals and a cursor rule, each its own answer.
+    """Contract row 8.13. Four totals and a cursor rule, each its own answer.
 
     A repeated cursor is a FAULT rather than a stopping condition. A server
     returning the same cursor for ever would otherwise page until some other
@@ -198,7 +198,7 @@ def check_snapshot(*, pages, tools, decoded, elapsed_ms, cursors=()):
 
 
 def may_activate_partial_snapshot():
-    """R13's closing words, as a function so the answer is stated once.
+    """Contract row 8.13's closing words, as a function so the answer is stated once.
 
     A prefix of a descriptor set is not a smaller version of it. The tools that
     did not arrive are exactly the ones an approval would not have covered, so
@@ -208,7 +208,7 @@ def may_activate_partial_snapshot():
 
 
 def exit_status(*, fatal, upstream_code, pending):
-    """R14. Nonzero on a fault, the upstream's own code otherwise.
+    """Contract row 8.14. Nonzero on a fault, the upstream's own code otherwise.
 
     The clean code is PROPAGATED rather than flattened to zero, which is the
     row's word: a server that exited 7 said something, and reporting 0 throws

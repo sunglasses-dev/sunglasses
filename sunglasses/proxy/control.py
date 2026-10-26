@@ -1,4 +1,4 @@
-"""The proxy's own request and answer channel, T2.R6 and T6.R6.
+"""The proxy's own request and answer channel, contract rows 2.6 and 6.6.
 
 Written against `tests/test_proxy_control_channel.py`, committed first.
 
