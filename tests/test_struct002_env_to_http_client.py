@@ -396,17 +396,7 @@ def test_deep_nesting_does_not_raise_and_does_not_hide_a_call_before_it():
 
 
 # ---------------------------------------------------------------------------------- cost
-
-import time
-
-
-def best_of(call, runs=3):
-    out = 9e9
-    for _ in range(runs):
-        start = time.perf_counter()
-        call()
-        out = min(out, time.perf_counter() - start)
-    return out
+# The cost of the layer is a count of steps (see WORK_FAMILIES below), never time.
 
 
 def families(size):
@@ -463,12 +453,14 @@ def families(size):
 
 
 @pytest.mark.parametrize("family", sorted(families(1000)))
-def test_the_layer_costs_a_bounded_multiple_of_the_scan_without_it(family):
-    text = families(1 << 20)[family]
-    on, off = SunglassesEngine(PATTERNS), SunglassesEngine(PATTERNS, validators=False)
-    with_layer = best_of(lambda: on.scan(text, channel="message"))
-    without = best_of(lambda: off.scan(text, channel="message"))
-    assert with_layer <= 2.0 * without + 0.35, (family, with_layer, without)
+def test_the_steps_of_the_layer_over_each_hostile_shape_grow_in_step_with_the_input(family):
+    reader = validator()
+    steps = []
+    for size in WORK_SIZES:
+        text = families(size)[family]
+        steps.append(max(1, reader.work(text)))
+        assert steps[-1] <= 8 * len(text), (family, len(text), steps)
+        assert len(steps) == 1 or steps[-1] <= 10 * steps[-2], (family, steps)
 
 
 def test_a_full_stop_before_a_line_of_code_is_not_member_access():
