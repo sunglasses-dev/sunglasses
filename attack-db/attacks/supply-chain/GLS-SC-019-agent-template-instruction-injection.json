@@ -10,7 +10,7 @@
   "description": "Detects Jinja/template injection via agent instructions that reach tool execution \u2014 SSTI to RCE (PraisonAI CVE-2026-39891).",
   "keywords": [],
   "regex": [
-    "(?is)(?:agent\\.start|instruction|prompt|user\\s*input).{0,200}(?:template|jinja|render|\\{\\{.*\\}\\}).{0,200}(?:acp_create_file|tool|file\\s*creation|auto\\s*approve|approval_mode)"
+    "(?is)\\b(?:agent\\.start|instructions?|prompts?|user\\s*input)\\b.{0,200}(?:\\b(?:templates?|jinja|render(?:s|ed|ing)?)\\b|\\{\\{.*\\}\\}).{0,200}\\b(?:acp_create_file|tools?|file\\s*creation|auto\\s*approve|approval_mode)\\b"
   ],
   "examples": {
     "malicious": [],
