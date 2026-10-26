@@ -18,6 +18,7 @@ both sides wait for each other is the shape that stalls the pump, and the pump
 is what would otherwise notice the upstream dying.
 """
 import json
+import queue
 import threading
 import time
 
@@ -131,39 +132,98 @@ def test_an_answer_that_arrives_while_we_are_waiting_is_picked_up():
     assert control.await_answer(request_id)["tools"] == [{"name": "echo"}]
 
 
+class _OpenStream:
+    """An in-memory upstream for this one test: `read1` waits for the next
+    queued chunk and returns b"" once it reaches the end marker. `close` queues
+    that marker behind any chunks still buffered, so a reader sees them first,
+    and takes no lock of its own. The `size` argument is ignored because the
+    frames here are small; this is not a general file object."""
+
+    _END = object()
+
+    def __init__(self):
+        self._queue = queue.SimpleQueue()
+        self._ended = False
+
+    def feed(self, data):
+        self._queue.put(data)
+
+    def close(self):
+        self._queue.put(self._END)
+
+    def read1(self, size):
+        if self._ended:
+            return b""
+        item = self._queue.get()
+        if item is self._END:
+            self._ended = True
+            return b""
+        return item
+
+    read = read1
+
+
 def test_the_pager_drives_a_whole_list_through_one_channel():
     """What the collector is handed: `pager(cursor)` issues one page and
-    returns its result, so snapshot.collect can stay ignorant of transport."""
+    returns its result, so snapshot.collect can stay ignorant of transport.
+
+    The pages arrive on ONE upstream stream that stays open until the last page
+    is answered. End of stream with a call still pending is a fault by
+    contract, so a stream that ended after each page would close the session
+    whenever the second request was admitted before the reader reached that
+    end."""
     session = pump.Session()
     written, write = _sink()
     control = channel.Control(session=session, upstream_write=write,
                               deadline_ms=3000)
+    upstream = _OpenStream()
+    stop = threading.Event()
 
     def reader():
+        list(session.read_upstream(upstream))
+
+    def server():
         seen = 0
-        while seen < 2:
+        while seen < 2 and not stop.is_set():
             if len(written) > seen:
                 sent = json.loads(written[seen])
                 cursor = (sent.get("params") or {}).get("cursor")
                 page = {"tools": [{"name": "a"}]}
                 if cursor is None:
                     page["nextCursor"] = "p2"
-                list(session.read_upstream(
-                    (json.dumps({"jsonrpc": "2.0", "id": sent["id"],
-                                 "result": page}) + "\n").encode()))
+                upstream.feed((json.dumps({"jsonrpc": "2.0", "id": sent["id"],
+                                           "result": page}) + "\n").encode())
                 seen += 1
             else:
                 time.sleep(0.005)
 
-    threading.Thread(target=reader, daemon=True).start()
+    reading = threading.Thread(target=reader, daemon=True)
+    serving = threading.Thread(target=server, daemon=True)
     pages = []
-    pager = control.pager("tools/list")
-    cursor = None
-    for _ in range(2):
-        page = pager(cursor)
-        pages.append(page)
-        cursor = page.get("nextCursor")
+    try:
+        reading.start()
+        serving.start()
+        pager = control.pager("tools/list")
+        cursor = None
+        for _ in range(2):
+            page = pager(cursor)
+            pages.append(page)
+            cursor = page.get("nextCursor")
+    finally:
+        # The server loop is told to stop and the end of stream is queued for
+        # the reader. Each worker is then joined with a bound. A thread cannot
+        # be killed from here, so a worker still held past its bound is left
+        # running as a daemon and fails the test, on this path as on the
+        # passing one.
+        stop.set()
+        upstream.close()
+        for worker in (serving, reading):
+            if worker.is_alive():
+                worker.join(timeout=HANG_GUARD_S)
+        survivors = [w for w in (serving, reading) if w.is_alive()]
+        assert not survivors, "worker still running after the bounded join"
     assert len(pages) == 2 and pages[0]["nextCursor"] == "p2"
+    assert session.closed_with() is None
 
 
 def test_a_closed_session_stops_the_channel_rather_than_waiting_it_out(
