@@ -17,7 +17,8 @@ rebuilds to `[source[:flag_end] + source[a:b], ...]` and `source[:flag_end] + so
 
 The table is a SPEED-UP, never a source of truth:
   * a source the table does not hold is derived live;
-  * only a source that ships with the package is looked up, so a custom rule keeps the live path;
+  * only a source that ships with the package is looked up: a source outside the shipped set is
+    derived live, and a custom rule whose text is identical to a shipped one can use the table;
   * tests/test_derivation_table.py regenerates the table and fails when it differs from the
     shipped one, and compares every entry with a live derivation, on every Python version CI runs.
 
