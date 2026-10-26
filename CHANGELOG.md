@@ -5,6 +5,166 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.14] — 2026-10-26
+
+### Changed
+
+- GLS-EX-015 (indirect secret relay): the regex gets lookahead guards in front of its later parts.
+  Each guard asks only for something every full match already needs: a secret word within reach of
+  the opening word, a closing word within reach of the opening word, a closing word and an inclusion
+  word within reach of the secret word, and the first letter of each part before the part itself.
+  A lookahead consumes nothing, so the rule returns the same match (start, end, text) on every text,
+  holds the same texts, reports the same span, and keeps its channels, keywords and description. The
+  rule's entry in `attack-db` and `sunglasses/_prefilter_table.py` are regenerated for the new regex
+  text. `tests/test_ex015_cost_only_equivalence.py` pins the guarded form and compares the unguarded
+  and guarded regexes on span, text and groups over a table of word combinations, gaps at their
+  bound and one either side, line breaks, case-folding letters and seeded random strings, and scans
+  with the engine under either form in each channel the rule declares. Equivalence is argued from
+  the guards being necessary conditions and checked on those texts; it is not a proof over all
+  texts. (#492)
+
+- GLS-MCP-047, GLS-DFP-069 and GLS-SC-019 read a narrower set of texts as their carrier. GLS-MCP-047
+  ends in a consuming authority-phrase condition, so a finding carries match text, and the decision
+  on any text is the one the lookahead form gave; its MCP-context condition does not count the bare
+  word `total` (`MCP`, `Model Context Protocol`, `completion/complete`, `values[]`, `hasMore`,
+  `ref/prompt` and the other named forms count). In the JSON form of GLS-DFP-069 only the policy
+  keys `x-conda-agent-policy`, `agent_instructions` and `scanner_policy` read as a conda
+  descriptor; a quoted `name`, `channels`, `dependencies`, `variables` or environment-path key does not,
+  and the `environment.yml` and YAML `channels:` forms are unchanged. GLS-SC-019 matches its three
+  terms as whole words, with plural, `-ing` and `-ed` forms, so `prompt_templates` and `_tool_call`
+  in a stack trace are not terms; `{{ ... }}` is unchanged. The `attack-db` rows, the prefilter
+  table and the derivation table are regenerated for the three rules. Recall of the three is
+  measured on the probes in the test file only, not on a held-out set. (#494)
+
+### Internal
+
+- `scripts/pattern_perf_gate.py` reads the tables it times as "before" at `git merge-base <base>
+  <head>`, not at the base revision, so a pull request that forked before another one changed a
+  rule is not judged on that rule. When the checkout cannot name a merge-base the gate fails and
+  says to fetch the full history and the head commit; it never falls back to the base revision, and
+  the output names the merge-base it used. A pull request that changes a rule may also remove
+  waivers: the waivers that decide the verdict are the base revision's file minus the ids the head
+  removes, and every entry of the head's file must be an entry of the merge-base's file with the
+  same reason. An added entry or an edited reason alongside a rule change fails, and so does a file
+  that is not a JSON object. A removed id is judged with no waiver and every expression of its
+  rule is timed, changed or not, so a rule that still trips fails and a rule that stops tripping
+  passes; a waived rule that is bounded and keeps its waiver still fails as stale. The workflow
+  file, the timing constants and the waiver contents are not changed. Tests run on real git
+  repositories (`tests/test_pattern_perf_gate.py`), and `tests/test_pattern_perf_workflow.py` pins
+  the new reads in the script. (#499)
+
+- `tests/pattern_perf_waivers.json` is new: a list of rule ids, each with a dated reason, for the
+  rules the pattern timing check found over budget on the tree when the list was made. A waiver
+  suppresses the growth, ratio and cap failures of that id for later pull requests; it does not
+  change what the rule costs, and no rule is bounded by this file. No rule, script or workflow
+  changes. (#496)
+
+- `tests/fixtures/real_transcripts/` holds 195 excerpts of real agent text taken from public issues
+  of coding-agent projects (tool-call logs, session captures, protocol payloads, API error bodies,
+  console output), with `MANIFEST.json` recording for each the source issue URL, the licence the
+  repository declares (or that it declares none), a hand label (190 `ordinary`, 3 `relay`, 2
+  `attack`), whether the text was read in full or screened, a hash, and the scanner's decision and
+  finding ids on the `message`, `file`, `api_response` and `tool_output` channels. Tokens,
+  token-shaped values in authentication fields, e-mail addresses, home-path user names and provider
+  request ids are replaced before a text is stored. `tests/test_real_transcripts_corpus.py` checks
+  that rows and files match, that each hash matches, that no replaced detail has come back, and
+  that a scan is no worse than the recorded decision: an `ordinary` or `relay` text may not step up
+  (allow, quarantine, block) and an `attack` text may not step down. A better scan passes. The
+  README says the texts are third-party text quoted for testing and that an excerpt is removed on
+  request through an issue. No rule, pattern, table or workflow is touched. The corpus measures
+  false positives on ordinary agent text and holds too few attack texts to say anything about
+  recall. (#490)
+
+- Comments under `sunglasses/` name no working session, agent or reviewer, and cite contract rows
+  as `contract row n.m`. A few comments that carried
+  unsupported timing, error-rate or test-count claims say only what the code does. Comment text
+  only: `ast.dump` of each of the 41 changed files is identical before and after. Ruling,
+  finding and test-case ids and review-round mentions remain in some comments. (#500)
+
+- Tests only: `test_a_signal_stops_every_child_even_in_the_middle_of_a_file[sigint]` starts the
+  command under test with SIGINT at its default, as a terminal does, so it does not time out
+  when the test run is started in the background of a non-interactive shell (that shell hands down
+  SIGINT as ignored, Python then installs no `KeyboardInterrupt` handler, and the command ignores
+  the signal). The stand-in child in `tests/test_scan_file_deadline.py` writes its pid to the file
+  named by `READING_LOG` when it begins to read a marked file, and the test waits until four pids
+  are there instead of pausing a set time; after the command ends it polls for each child to be
+  gone. Without `READING_LOG` the stand-in writes nothing there. No file under `sunglasses/` is
+  touched. (#495)
+
+- Tests only: `test_the_pager_drives_a_whole_list_through_one_channel` serves both pages over one
+  in-memory stream that stays open until the second page is answered, and asserts that
+  `session.closed_with()` is `None`. A page answered over its own one-frame stream reaches end of
+  stream, and a call pending at end of stream closes the session (a malformed-upstream fault, the
+  intended behavior), which happened whenever the reader thread was descheduled between handing
+  page 1 over and its end-of-stream check. The test body runs in a `try`, and its `finally` stops the server loop,
+  closes the stream and joins both threads with a bound; a worker still running after its bound
+  fails the test. No product change. (#504)
+
+- The receipts wire specification (`WIRE_SPEC.md`), the reason texts printed by `sunglasses receipts
+  --verify` (`codes.py`) and the rotation note in the test vectors (`VECTORS.json`, regenerated byte for
+  byte by `make_vectors.py`) cite no ruling numbers and name no reviewer. The rotation reason says that
+  a later segment whose genesis names another key is a claimed transition whose continuity is not
+  verified because rotation is not built, and that the result is not a pass. The pairing-limit reason
+  points at the spec section "A proxy chain's lifecycle is the session". Strings only: `ast.dump` of the
+  five changed Python files is identical once string constants are blanked. `tests/test_receipts_exit_classes.py`
+  and `tests/test_receipts_proxy_lifecycle.py` require the new exit-codes heading and the section
+  pointer. (#501)
+
+- `tests/test_empty_match_rules.py` is a ratchet over every rule and mechanism regex: each regex is
+  parsed and its width measured before the ids are reduced, so a regex that does not parse fails
+  the gate wherever it sits in a rule's list. A rule whose parsed width is zero must be in
+  `ZERO_WIDTH`, and a listed rule that consumes text must leave it; the list holds the rules that
+  have the shape today and may only shrink. For each of GLS-MCP-047, GLS-DFP-069 and GLS-SC-019 the
+  file holds an attack that still fires it (with non-empty match text for GLS-MCP-047) and texts of
+  ordinary form that stay quiet: a status listing with `Total loaded` and `override`, a JSON request
+  body with one of the five removed keys per case, and a Python stack trace. The three policy keys
+  of GLS-DFP-069 are each shown to read as a carrier. The other zero-width rules are listed in the
+  ratchet and not rewritten. (#494)
+
+- Docstrings under `sunglasses/proxy` and `sunglasses/extractors` cite contract rows by number
+  (`contract row 5.3`) in place of seat-and-row labels, and drop ruling numbers, reviewer names and
+  finding ids. Statements that did not match the code say what it does: the two refusals
+  `Session.request_release_decision` returns and who owes the answer for each, the control channel and
+  activation flow `build_route` wires, the order in which `Session._close` walks the pending, settling
+  and claimed tables, which attempt `Session.settle_attempt` settles for a token from an earlier
+  generation, the precedence `process_exit_code` applies, and how `ImageExtractor._decode_partial` counts
+  UTF-16 loss. Docstring text only: `ast.dump` of each changed file is identical to the base once string
+  constants are blanked, every changed string constant is a docstring, and every comment is identical
+  token for token. (#505)
+
+- `sunglasses/_prefilter_table.py` and `sunglasses/_derivation_table.py` are marked
+  `linguist-generated=true` in `.gitattributes`, so GitHub collapses their diffs in a review; no merge
+  driver is set and Git's ordinary conflict handling applies. `CONTRIBUTING.md` says to resolve the
+  conflicts in the files a generated module is generated from, run the script its docstring names and
+  stage the result. The docstring of `scripts/gen_derivation_table.py` states which sources the table
+  serves. `tests/test_generated_tables_marked.py` finds each module under `sunglasses/` whose docstring
+  starts with `GENERATED`, reads Git's effective attributes for it and requires `linguist-generated` set
+  and `merge` unspecified, runs the script the docstring names with `--check` and requires exit status 0,
+  and requires the rule sentence in `CONTRIBUTING.md`. The rules are run on small repositories built to
+  break them. A script that exits 0 on `--check` without comparing anything is not detected; the content
+  comparison of each table is in `tests/test_prefilter_table.py` and `tests/test_derivation_table.py`.
+  No pattern, engine or generated module changes. (#493)
+
+- Docstrings in the top-level `sunglasses` modules, `sunglasses/receipts` and `sunglasses/receipts/tests`
+  cite contract rows by number and drop ruling numbers, reviewer names and finding ids, keeping the
+  statement of what the code does. `sunglasses/_prefilter_table.py` is regenerated: one line changes, the
+  recorded hash of `sunglasses/_prefilter.py`, whose docstring text changed. Docstring text only:
+  `ast.dump` of every other changed file is identical to the base once string constants are blanked, and
+  every changed string constant is a docstring. Round and release labels that are not ruling references,
+  reviewer names or finding ids stay as written, so some history wording remains in docstrings. (#506)
+
+- Tests only: `test_paired_g2_04_exact_transport_calibration` reads the `terminated` flag of the `SETTLED`
+  receipt and checks the whole outcome against it. The proxy's deadline starts when it begins the scan,
+  after the content is extracted. A worker still running when the wait ends is terminated and settles
+  `SCAN_DEADLINE` with an incomplete inspection and no finding; a worker that exited inside the wait and
+  returned a complete result settles the finding it made. Both are possible for the same request. In both
+  cases the client gets exactly one reply, with the id of its request, and it is the withholding error;
+  the `SETTLED` receipt names the same request, is not forwarded, and states the same reason and
+  completeness as the reply; nothing arrives at the destination and no bytes go upstream. Terminated:
+  reason `SCAN_DEADLINE`, inspection incomplete, no finding and no detector. Not terminated: reason
+  `PROHIBITED_SECRET`, inspection complete, a blocked finding, and at least one `GLS-SD-` rule id. The
+  control route's delivery assertion is unchanged. No harness or product change. (#503)
+
 ## [0.6.13] — 2026-10-25
 
 ### Added
