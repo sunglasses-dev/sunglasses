@@ -1591,9 +1591,9 @@ class SettingsWithoutPrompts:
 _CREDENTIAL_TOKENS = frozenset(("credential", "credentials", "secret", "secrets", "apikey", "apikeys"))
 _CREDENTIAL_PAIRS = frozenset((("api", "key"), ("api", "keys"), ("private", "key"), ("private", "keys")))
 # A private key is known by its name alone: one of the six default SSH key file names below, a file
-# with one of the key extensions, or a `.pem` whose name holds one of the pem words. A key under
-# any other name (a custom SSH key file name, a `.pem` with none of those words) is not read as a
-# credential file.
+# with one of the key extensions, or a `.pem` whose name holds one of the pem words or starts with
+# `id_`. A key under any other name (a custom SSH key file name, a `.pem` with none of those
+# words) is not read as a credential file.
 _PRIVATE_KEYS = frozenset(("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk"))
 _CREDENTIAL_FILES = frozenset((".netrc", "_netrc", ".pgpass", ".npmrc", ".pypirc", ".dockercfg", ".htpasswd"))
 _KEY_EXTENSIONS = frozenset(("key", "p12", "pfx", "ppk", "jks", "keystore"))
@@ -1896,12 +1896,19 @@ def _sed_may_print(script):
 
 def _emits_nothing(name, args):
     """Does the filter write none of the text it reads (a quiet or counting grep, a `sed -n` whose
-    script prints nothing)? Its output then carries no payload, whatever file it read."""
+    script prints nothing)? Its output then carries no payload, whatever file it read. The value
+    of an option (`grep -e -q`, where `-q` is the pattern) is not an option."""
     quiet = False
+    known = _FILTER_VALUE_OPTIONS.get(name)
+    skip = 0
     for arg in args:
         if arg.kind != "w":
+            skip = 0
             continue
         value = arg.value
+        if skip:
+            skip -= 1
+            continue
         if value == "--":
             break
         if value.startswith("--"):
@@ -1915,12 +1922,56 @@ def _emits_nothing(name, args):
                     break
                 if (name in ("grep", "egrep", "fgrep") and ch in "qclL") or (name == "sed" and ch == "n"):
                     quiet = True
+        if value.startswith("-") and value != "-":
+            skip = (_option_takes_next_word(value, known) if known is not None
+                    else _unlisted_option_takes_next_word(value))
     if name in ("grep", "egrep", "fgrep"):
         return quiet
     if name == "sed" and quiet:
         operands, given = _operand_words("sed", args)
-        return not given and bool(operands) and not _sed_may_print(operands[0])
+        if given:
+            scripts = _sed_scripts(args)
+            return bool(scripts) and not any(_sed_may_print(script) for script in scripts)
+        return bool(operands) and not _sed_may_print(operands[0])
     return False
+
+
+def _sed_scripts(args):
+    """The scripts that `-e` or `--expression` give to sed, or None where a `-f` file gives one
+    (its text is not known)."""
+    scripts = []
+    words = [a.value for a in args if a.kind == "w"]
+    k = 0
+    while k < len(words):
+        value = words[k]
+        k += 1
+        if value == "--":
+            break
+        if value.startswith("--"):
+            option, equals, rest = value.partition("=")
+            if len(option) > 2 and "--file".startswith(option):
+                return None
+            if len(option) > 2 and "--expression".startswith(option):
+                if equals:
+                    scripts.append(rest)
+                elif k < len(words):
+                    scripts.append(words[k])
+                    k += 1
+        elif value.startswith("-") and value != "-":
+            for position, ch in enumerate(value[1:], 1):
+                if ch == "f":
+                    return None
+                if ch in "el":
+                    rest = value[position + 1:]
+                    if rest:
+                        if ch == "e":
+                            scripts.append(rest)
+                    elif k < len(words):
+                        if ch == "e":
+                            scripts.append(words[k])
+                        k += 1
+                    break
+    return scripts
 
 
 def _marks(word):
@@ -2108,6 +2159,20 @@ def _printf_conversions(fmt):
     return flags, False
 
 
+def _stops_output(text):
+    """Does a `\\c` end the output of a `%b` argument? An escaped backslash before the `c`
+    (`\\\\c`) is a backslash and a letter, not a stop."""
+    i = 0
+    while i < len(text):
+        if text[i] == "\\":
+            if text[i + 1:i + 2] == "c":
+                return True
+            i += 2
+        else:
+            i += 1
+    return False
+
+
 def _printed_words(given, scan):
     """The words `printf` writes: its format, and the arguments that a conversion prints (the
     format is used again while arguments remain), in order, up to the first `\\c` that stops the
@@ -2131,7 +2196,7 @@ def _printed_words(given, scan):
         writes, cuts = flags[k % len(flags)] if flags else (False, False)
         if writes:
             printed.append(arg)
-            if cuts and not arg.subs and "\\c" in arg.value:
+            if cuts and not arg.subs and _stops_output(arg.value):
                 break                  # `%b` of an argument that holds \c ends the output there
     return given[:1] + printed
 
