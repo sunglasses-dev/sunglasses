@@ -1195,7 +1195,7 @@
   }
  ],
  "verifier_not_exported": {
-  "12": "rotation is specified, not built and not claimed (T9 ruling 40). The verifier prints ROTATION_UNSUPPORTED for a segment signed by another key; the SUCCESSOR_ASSERTED row is a strict xfail in tests/test_verify_log.py until rotation is built.",
+  "12": "rotation is specified, not built and not claimed. The verifier prints ROTATION_UNSUPPORTED for a segment signed by another key; the SUCCESSOR_ASSERTED row is a strict xfail in tests/test_verify_log.py until rotation is built.",
   "16": "the positive control is vector 1: every mutation starts from bytes this verifier accepts, so a verifier that refuses everything fails vector 1."
  },
  "wire_version": "sg-receipt-chain/1"

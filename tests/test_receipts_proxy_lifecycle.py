@@ -57,7 +57,8 @@ def test_a_session_that_ended_names_the_pairing_limit(home, terminal):
 
 def test_the_pairing_limit_is_neither_a_pass_nor_a_failure():
     assert "PAIRING_UNKEYED" in codes.CODES
-    assert "R24" in codes.CODES["PAIRING_UNKEYED"]
+    assert ("WIRE_SPEC, a proxy chain's lifecycle is the session"
+            in codes.CODES["PAIRING_UNKEYED"])
     passing = {"key_trust": "KEY_TRUSTED", "chain_integrity": "CHAIN_OK",
                "unsigned_tail": "NO_VISIBLE_TAIL",
                "expected_endpoint": "ENDPOINT_CONFIRMED"}
