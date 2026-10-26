@@ -158,11 +158,10 @@ class SunglassesScanner:
         Returns dict with scan results.
 
         Routing is delegated to ``extractors.dispatch`` so this and
-        ``SunglassesEngine.scan_file()`` cannot drift apart. Audit finding C1 was
-        exactly that drift: two file-scanning surfaces with two extension tables,
-        returning opposite verdicts on one PDF. An unknown extension is now read as
-        text rather than refused — refusing it was the older, quieter version of the
-        same bug, since the caller got no scan and no threat either.
+        ``SunglassesEngine.scan_file()`` cannot drift apart: two file-scanning surfaces
+        with two extension tables could return opposite verdicts on one PDF. An
+        unknown extension is read as text rather than refused, since a refusal
+        leaves the caller with no scan and no threat either.
         """
         from .extractors.dispatch import extract_file_sources
 
@@ -211,7 +210,7 @@ class SunglassesScanner:
         through to the caller -- the identical defect the corrupt-PDF case
         exposed, one extractor over. Unreadable still propagates as operational.
 
-        v0.5.6 round 4 (ASTRA F2). This checked whether ``extract()`` RAISED, and
+        v0.5.6 round 4. This checked whether ``extract()`` RAISED, and
         nothing else. ``ImageExtractor.extract()`` returns normally when OCR could
         not run -- it records the loss in ``failures`` and hands back whatever EXIF
         it did get -- so with Tesseract absent from PATH and pyzbar decoding fine,

@@ -1,4 +1,4 @@
-"""The user's key (T9 RULING 11 Q2): made only by an explicit `init`, stored
+"""The user's key: made only by an explicit `init`, stored
 0600 in 0700, public halves append-only, and no key of ours in the package."""
 import os
 import pathlib
@@ -70,7 +70,7 @@ def test_two_homes_get_two_keys(tmp_path):
 
 
 def test_no_key_of_ours_ships_in_the_package():
-    """Q2: the package carries no private key and no hardcoded seed except the
+    """The package carries no private key and no hardcoded seed except the
     published TEST seed the vectors are made from."""
     package = HERE.parent.parent
     assert not [p for p in package.rglob("*.ed25519")]

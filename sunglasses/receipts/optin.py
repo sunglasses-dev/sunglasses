@@ -1,4 +1,4 @@
-"""Whether the user opted into a signed log, and the key that signs it (R21).
+"""Whether the user opted into a signed log, and the key that signs it.
 
 The user opts in with `sunglasses receipts init`, which writes the key. From
 then on a key that exists but cannot sign is a receipt failure, never a quiet
@@ -51,7 +51,7 @@ def _shown(path):
 
 
 def has_key(home) -> bool:
-    """R56: a key directory that cannot be listed is not "no key". Whether a
+    """A key directory that cannot be listed is not "no key". Whether a
     key is there cannot be known, so the key cannot sign, said by name."""
     home = pathlib.Path(home)
     try:
@@ -123,9 +123,9 @@ def hook_marker(home) -> pathlib.Path:
 
 
 def opted_in(home) -> bool:
-    """A key, or a hook chain whose last word is not `receipts off` (R21).
+    """A key, or a hook chain whose last word is not `receipts off`.
 
-    Never False on a directory it could not list (R56): an unlistable key
+    Never False on a directory it could not list: an unlistable key
     directory raises KeyUnusable, an unlistable hook chain raises
     _fs.Unlistable, and the caller's receipt-failure path answers."""
     return has_key(home) or _chain_open(hook_log(home))

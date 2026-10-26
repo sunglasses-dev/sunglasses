@@ -10,7 +10,7 @@ from sunglasses._prefilter import ClassClause as _R, Clause as _C
 
 _F = frozenset
 
-PREFILTER_SHA256 = "0cf2079083a6e5fecfd05a153d11b462c6b9d42f26e9b1185a94e5e4751fde15"
+PREFILTER_SHA256 = "bbf0ce3f154dfe82d58ae0248cc559b86235792be5dd1f8f6637c00bc611a019"
 
 TABLE = {
     '0032bef35b658ab219cab4f974a8b5d78b6f41260981a9f998a64c4fc016dfe2': (_F(('anchor', 'ground', 'measured', 'silently', 'undetected')),),

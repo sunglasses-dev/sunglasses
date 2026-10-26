@@ -270,7 +270,7 @@ def _endpoint(prefix, records, expected):
 def _lifecycle(prefix):
     """Judged over the VERIFIED prefix only, by the rules of its producer.
 
-    Nothing verified is EMPTY_CHAIN (ruling 41). Calling it complete would
+    Nothing verified is EMPTY_CHAIN. Calling it complete would
     say every opening has its terminal about a log where nothing was read. A
     genesis alone IS verified, so a chain that started and recorded nothing
     stays LIFECYCLE_COMPLETE (vector 6b pins that side)."""
@@ -306,7 +306,7 @@ def _lifecycle(prefix):
 
 
 def _unknown_field(record, producer):
-    """A key outside the closed schema for this record's kind (ruling 44).
+    """A key outside the closed schema for this record's kind.
     A body with no named producer is only a test vector's, and is not judged;
     its envelope still is."""
     event = record.get("event")
@@ -332,7 +332,7 @@ def _outside(value, schema):
 def _proxy_lifecycle(prefix):
     """A session opened by HEADER and ended by a terminal. An ended session is
     PAIRING_UNKEYED, never LIFECYCLE_COMPLETE: that code says every opening
-    has its terminal, and the items inside were not paired (ruling 24)."""
+    has its terminal, and the items inside were not paired."""
     events = [record.get("event") for _, record, _ in prefix
               if record.get("event") not in CHAIN_EVENTS]
     if not events:

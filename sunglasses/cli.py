@@ -47,7 +47,7 @@ RESET = "\033[0m"
 
 
 def _color_wanted(stream=None) -> bool:
-    """CU-M6. Colour only on a terminal, and never when NO_COLOR is set.
+    """Colour only on a terminal, and never when NO_COLOR is set.
 
     no-color.org: the variable counts when present and NON-EMPTY. A pipe or a
     file is not a terminal, and escape bytes in it are noise to the next reader
@@ -1634,7 +1634,7 @@ def _usage_error(args, message, hint=None):
 def _read_stdin_text(args) -> str:
     """Read stdin as text, or refuse operationally. Never a traceback, never exit 1.
 
-    v0.5.6 round 4 (ASTRA F5). `sys.stdin.read()` sat outside every error handler,
+    v0.5.6 round 4. `sys.stdin.read()` sat outside every error handler,
     so a byte stream that is not valid UTF-8 -- `PYTHONIOENCODING=utf-8:strict` and
     one 0xff -- raised `UnicodeDecodeError` out of `main()`. Python exits 1 on an
     uncaught exception, and 1 is this package's code for THREAT FOUND. A CI job
@@ -1642,7 +1642,7 @@ def _read_stdin_text(args) -> str:
     traceback instead of a document. That is the same class as the `UnreadableFile`
     repair: an operational failure wearing a verdict's exit code.
 
-    POLICY, stated because there were two defensible answers (T9's brief, item C2):
+    POLICY, stated because there were two defensible answers:
     an undecodable stream is an OPERATIONAL error (exit 2), not a partial scan.
     Decoding with `errors="replace"` was the alternative, and it is worse here: it
     would silently substitute U+FFFD for the attacker-controlled bytes and then
@@ -2341,12 +2341,11 @@ def _names_its_paths(cause) -> bool:
 def _display(value, limit: int = 96, written: bool = False) -> str:
     """The ONE way a receipt-supplied string reaches a terminal on this path.
 
-    Round 4 said `sanitize_receipt_field` was "the same function every other
-    untrusted field on this render path goes through". That was false by one
-    path and the reviewer found it: the orphan line interpolated `eval_id`
-    verbatim, so a VALID JSON row carrying `ESC [2J ESC [H` erased the warning
-    printed above it. Valid rows never touch `_unreadable_preview`, and naming a
-    gate does not put anything through it.
+    Every untrusted field of a valid row goes through here, the orphan
+    line's `eval_id` included: interpolated verbatim, a VALID JSON row carrying
+    `ESC [2J ESC [H` would erase the warning printed above it. Material pulled
+    out of a line that could not be read takes the separate path in
+    `_unreadable_preview`, which `_verify_lifecycle` prints without `_display`.
 
     `repr` first, because repr is the guard that holds. It makes a control
     visible instead of active, and it escapes a LONE SURROGATE, which the
@@ -2355,8 +2354,7 @@ def _display(value, limit: int = 96, written: bool = False) -> str:
     outer quotes are stripped so an ordinary value still renders as itself.
     `sanitize_receipt_field` stays behind it as depth and as the single place
     this module defines control and bidi. Its output is NOT ASCII: repr keeps
-    printable non-ASCII as itself, and an earlier version of this sentence said
-    otherwise. What repr does guarantee, swept over all 1,114,112 code points,
+    printable non-ASCII as itself. What repr does guarantee, swept over all 1,114,112 code points,
     is that nothing in category Cc, Cf, Cs, Zl or Zp survives it and every
     output code point is one of a bounded printable set, which is the property
     the sanitizer behind it has nothing left to remove from.
@@ -2380,11 +2378,9 @@ def _display(value, limit: int = 96, written: bool = False) -> str:
 def _unreadable_preview(material, reason: str = "") -> str:
     """The ONE quoting path for anything pulled out of a line that could not be read.
 
-    Round 3 had two of them: the decode branch built a byte preview (safe), the
-    JSON branch stored the decoded line as it stood (not safe), and a receipts
-    line carrying `ESC [2J ESC [H` repainted the audit display it was supposed to
-    be evidence for. Both branches come through here now, so they cannot drift
-    apart again.
+    The decode branch and the JSON branch both come through here, so they
+    cannot drift apart: a receipts line carrying `ESC [2J ESC [H` must not
+    repaint the audit display it is evidence for.
 
     Two steps, and the second is the one that is allowed to be boring:
     `repr` makes a control VISIBLE instead of active and keeps the preview
@@ -2395,11 +2391,8 @@ def _unreadable_preview(material, reason: str = "") -> str:
     nothing in Cc, Cf, Cs, Zl or Zp, so the sanitizer is a no-op on it, which is
     what a gate behind a correct step should be.
 
-    An earlier version of this docstring called that sanitizer "the same function
-    every other untrusted field on this render path goes through". It was not.
-    Valid rows had their own renderer that interpolated `eval_id` raw. Everything
-    displayed on this path now goes through `_display` above, and that is a
-    property of the code rather than a sentence about it.
+    Fields of valid rows are rendered by `_display` above, `eval_id` included.
+    This function is the separate path for unreadable material only.
     """
     from .firewall import sanitize_receipt_field
 
@@ -2413,7 +2406,7 @@ _RECEIPTS_EXTRA = 'pip install "sunglasses[receipts]"'
 
 
 def _receipts_init(home):
-    """T9 ruling 11 Q2: the USER's key, made only here, never on a first write."""
+    """The USER's key, made only here, never on a first write."""
     try:
         from .receipts import keys
     except ImportError:
@@ -2436,7 +2429,7 @@ def _receipts_init(home):
 
 
 def _receipts_off(home):
-    """R21 (c): the only road back to unsigned rows, and it is on the record."""
+    """The only road back to unsigned rows, and it is on the record."""
     from .receipts import optin
     try:
         done = optin.turn_off(home)
@@ -2460,7 +2453,7 @@ def _receipts_off(home):
 
 
 def _verify_key(home):
-    """R21 (b): signing is on and the key cannot sign. Said by name, with the
+    """Signing is on and the key cannot sign. Said by name, with the
     cause; the logs are still verified with the public key."""
     from .receipts import optin
     try:
@@ -2476,12 +2469,12 @@ def _verify_key(home):
 
 
 def _chain_logs(directory, is_log_name):
-    """Each signed log is its own directory of segments (T9 ruling 15). A
-    directory here that cannot be listed raises Unlistable (R57): a signed log
+    """Each signed log is its own directory of segments. A
+    directory here that cannot be listed raises Unlistable: a signed log
     it hides is not "no log". An entry whose NAME is a log's name, by the rule
     its writer names it with (the hook's `hook`, a proxy run's 32 hex), is
     listed with no is_dir() filter first, so a file or a symlink standing where
-    that log should be raises too (R58). Any other entry that is not a
+    that log should be raises too. Any other entry that is not a
     directory is not a log, and is passed over as it always was."""
     from .receipts import _fs
     return [p for p in _fs.listing(directory, "*")
@@ -2512,8 +2505,8 @@ def _log_chain_ids(log, wire):
 
 def _verify_chains(logs, args, home, public=None):
     """Five results per log, printed per log. Exit 1 on any failure, else 3 on
-    any limit, else 0; --strict counts a limit as a failure (T9 rulings R46,
-    R48). 2 stays the usage exit. `public` is the key for a received log
+    any limit, else 0; --strict counts a limit as a failure. 2 stays the usage exit.
+    `public` is the key for a received log
     (`--log`); without it the key is read from `home`."""
     try:
         from .receipts import codes, keys, verify, wire
@@ -2554,7 +2547,7 @@ def _verify_chains(logs, args, home, public=None):
 
 
 def _verify_received(args):
-    """`--verify --log PATH`: a log someone else sent (T9 ruling 47, gap G3).
+    """`--verify --log PATH`: a log someone else sent.
 
     The home is never read: not its logs, not its keys, not its signing state,
     so a verifier's own setup cannot fail or pass a log it did not write. The
@@ -2619,7 +2612,7 @@ def _receipt_public_key(home, keys):
 
 
 def _path_unreadable(unreadable):
-    """R57: a path that is there and cannot be listed. One code, a failure in
+    """A path that is there and cannot be listed. One code, a failure in
     both modes, naming the path and the OS cause."""
     from .receipts import codes
     print(f"\n  {RED}PATH_UNREADABLE{RESET} {DIM}-- "
@@ -2633,7 +2626,7 @@ _MARKER_FIELDS = {"wire", "event", "log", "chain_id", "key_id", "t_wall_ns",
 
 
 def _hook_marker(home):
-    """The hook log's genesis marker (T9 ruling 60): its path, None when there
+    """The hook log's genesis marker: its path, None when there
     is none, or the Unlistable that says whether there is one cannot be known."""
     from .receipts import _fs, optin
     path = optin.hook_marker(home)
@@ -2644,7 +2637,7 @@ def _hook_marker(home):
 
 
 def _verify_marker(marker, hook, home):
-    """Ruling 60: the marker names the chain the hook log first opened with.
+    """The marker names the chain the hook log first opened with.
     That chain in the log is nothing to say; that chain absent is LOG_MISSING.
     A marker that cannot be read is PATH_UNREADABLE, and one that does not hold
     is a failure naming why, never "missing". Every outcome but the first is
@@ -2708,7 +2701,7 @@ def _verify_marker(marker, hook, home):
 
 def cmd_receipts(args):
     """Pretty-print the firewall audit trail. A directory it must list and
-    cannot is PATH_UNREADABLE, exit 1, whichever road reached it (R57)."""
+    cannot is PATH_UNREADABLE, exit 1, whichever road reached it."""
     from .receipts import _fs
     try:
         import json as _json
@@ -3569,7 +3562,7 @@ class _MachineAwareParser(argparse.ArgumentParser):
     def _argv_wants_machine_output(argv) -> bool:
         """Every spelling of "give me a machine document" that argparse accepts.
 
-        v0.5.6 round 4 (ASTRA F5): this listed `--output=json`, `-o=json` and
+        v0.5.6 round 4: this listed `--output=json`, `-o=json` and
         `-o json`, and missed the ATTACHED short form `-ojson` -- which argparse
         accepts and which people write. So `sunglasses scan -ojson --channel nope`
         exited 2 with an EMPTY stdout: the caller asked for JSON, the parser failed
@@ -3965,8 +3958,8 @@ def _install_config_path(args):
     inspected by the build it was editing. A wiring command that defaults into
     HOME is the same hazard wearing a different filename.
 
-    An EMPTY `--config` is refused, never defaulted. ASTRA found this on
-    `doctor` (F1, 2026-09-21) where it only widened a read; the same line was
+    An EMPTY `--config` is refused, never defaulted. On `doctor` it only widened a read;
+    the same line was
     here, where the verb is EDIT, so `install <name> --config ""` resolved to
     `./.mcp.json` and rewrote a file the operator never named. `--config "$CFG"`
     with CFG unset is the everyday shape of it.
@@ -3981,7 +3974,7 @@ def _install_config_path(args):
 
 
 def cmd_install(args):
-    """T10.R4 — wrap one MCP server entry so its traffic runs through us."""
+    """Wrap one MCP server entry so its traffic runs through us."""
     from . import install as _inst
     from .proxy.serve import install_records_home
 
@@ -4031,7 +4024,7 @@ def cmd_install(args):
 
 
 def cmd_uninstall(args):
-    """T10.R5 — put the entry back, byte-exact when the file has not moved."""
+    """Put the entry back, byte-exact when the file has not moved."""
     from . import install as _inst
     from .proxy.serve import install_records_home
 
@@ -4075,7 +4068,7 @@ def cmd_uninstall(args):
 
 
 def _say_approvals_outlive_uninstall():
-    """CU-M7. Uninstall puts the file back and leaves the approval where it is.
+    """Uninstall puts the file back and leaves the approval where it is.
     That is by design: an approval is keyed on the server's identity, so wrapping
     the same command from the same folder again needs no new one. Nothing said so,
     and there is no other command that revokes one. So when there is something to

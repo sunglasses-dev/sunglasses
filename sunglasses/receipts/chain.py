@@ -1,5 +1,5 @@
-"""The receipt chain writer (spec §3-4). WHEN to seal is the producer's policy
-(T9's A/B ruling); this module only guarantees what every policy relies on.
+"""The receipt chain writer (spec §3-4). WHEN to seal is the producer's policy; this
+module only guarantees what every policy relies on.
 
 ONE WRITER AT A TIME. Every write holds `flock(LOCK_EX)` on the directory's
 LOCK file around read-tail -> append -> (checkpoint) -> fsync, and re-reads the
@@ -170,7 +170,7 @@ class Chain:
                      producer=producer if isinstance(producer, str) else None)
 
     def _vouched(self, record, chain_id) -> bool:
-        """R15b: a checkpoint seals a tail only if it is this chain's and its
+        """A checkpoint seals a tail only if it is this chain's and its
         signature verifies under THIS writer's key. A forged, garbled or
         foreign seal is just bytes: it counts as unsigned, so the tail is not
         continued and the next genesis names the last checkpoint that does."""
@@ -297,7 +297,7 @@ class Chain:
 
     def _mark(self, genesis) -> bool:
         """The marker naming the chain this segment opens, made with O_EXCL
-        before the segment is (T9 rulings 60, 62 B). True when this call made
+        before the segment is. True when this call made
         it. A marker already there is never an error and never replaced: a log
         wiped and begun again opens another chain, and the verifier says the
         one the marker names is missing. Any other OSError is MarkerUnwritable,
@@ -334,8 +334,8 @@ class Chain:
 
 
 class MarkerUnwritable(OSError):
-    """The hook log's marker could not be made, so no segment was begun (T9
-    ruling 62 B). The hook asks naming it, and the next call tries again."""
+    """The hook log's marker could not be made, so no segment was begun. The hook asks
+    naming it, and the next call tries again."""
 
     def __init__(self, path, cause: OSError):
         self.path = pathlib.Path(path)

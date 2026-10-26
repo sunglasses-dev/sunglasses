@@ -1,17 +1,17 @@
-"""Which entries in a directory match, asked one way (T9 ruling 56).
+"""Which entries in a directory match, asked one way.
 
 `Path.glob` answers [] when it cannot scan a directory: it swallows the
 scan's OSError, PermissionError included. So a key directory or a hook chain
 nobody could list read exactly like an empty one, and "no key" or "no chain"
-was decided on a failure (ASTRA receipts172 r3, item 3). Every presence
+was decided on a failure. Every presence
 decision in the receipts paths asks here instead: a directory that is not
 there has no entries, and one that is there and cannot be listed raises.
-Ruling 57 draws "there" at the directory entry: a file or a symlink where
-the directory should be is there, and raises too. Ruling 62 draws "not
-there" on the way down: a path is absent only when its nearest existing
+"There" is drawn at the directory entry: a file or a symlink where
+the directory should be is there, and raises too. "Not there" is drawn on the way down:
+a path is absent only when its nearest existing
 ancestor is a directory that can be listed. A file, a dangling symlink, a
 symlink to a file or an unlistable directory standing above it is in the
-way, and raises naming that ancestor (ASTRA receipts172 r4).
+way, and raises naming that ancestor.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class Unlistable(OSError):
 def obstruction(path):
     """For a path with no directory entry: None when it is genuinely absent,
     that is when its nearest existing ancestor is a directory that can be
-    listed (T9 ruling 62); otherwise that ancestor, which stands in the way.
+    listed; otherwise that ancestor, which stands in the way.
     A symlink to a directory is a directory here, as it is to every open."""
     for parent in pathlib.Path(path).parents:
         if not os.path.lexists(parent):
@@ -63,10 +63,10 @@ def obstruction(path):
 
 def listing(directory, pattern) -> list[pathlib.Path]:
     """The entries of `directory` whose names match `pattern`, sorted. Three
-    outcomes, and only one of them is "nothing there" (T9 ruling 57):
+    outcomes, and only one of them is "nothing there":
 
     - absent: no directory entry at the path, and the nearest existing
-      ancestor is a directory that can be listed (R62) -> [];
+      ancestor is a directory that can be listed -> [];
     - a listable directory -> its matching entries;
     - anything else at the path -> Unlistable: a directory that cannot be
       read, and also a regular file, a dangling symlink or a symlink to a

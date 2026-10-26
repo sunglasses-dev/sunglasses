@@ -137,7 +137,7 @@ class ScanResult:
     def reported_findings(self) -> list:
         """The findings a HUMAN should see: one per matched span.
 
-        Audit M9: an 8-word attack produced seven findings across four distinct
+        An 8-word attack produced seven findings across four distinct
         spans — three of them quoting the identical text under three different
         attack names, two of those mislabelled. A non-expert cannot tell seven
         findings from seven problems, and a reviewer who sees the same span
@@ -2428,8 +2428,8 @@ class SunglassesEngine:
         A rule like the api_response siblings begins with a marker that is cheap
         to find and common in adversarial text, then spends two bounded gaps
         looking for an object that never comes. Cost is (number of marker
-        starts) x (gap work), which is why 1 MiB of `<admin>show ` took 18
-        seconds where main took 0.53.
+        starts) x (gap work), so a document made of nothing but markers is
+        the expensive shape for an unanchored search.
 
         The OBJECT is the rare token. A rule that declares `anchor_terms` is
         searched only from start positions near those tokens, so a document with
@@ -2769,7 +2769,8 @@ class SunglassesEngine:
         """Whether a list mark, a joining word, or a line break (with text in the stretch)
         stands between the end of the previous sentence and the cue: back to that end, however
         far. ``lo`` (0 unless a list is being read in a later view of a multi-view text, see
-        _check_negation) is the earliest place looked at; at 0 this is the reading main has."""
+        _check_negation) is the earliest place looked at; at 0 the stretch is read back to the previous sentence
+        end of the whole text."""
         ends = getattr(_SCAN_LOCAL, "ends", None)
         ends_at, joins_at, breaks_at = (
             cls._index_sentences(text) if ends is None else ends.sentence_index(text, cls._index_sentences))
@@ -2809,17 +2810,19 @@ class SunglassesEngine:
     @classmethod
     def _sentence_shape(cls, text: str, cue_start: int, gap: str, match_end: int,
                         view: Optional[tuple] = None) -> str:
-        """The shape of the sentence a new cue stands in, read exactly as main reads whether a
-        cue is in a list (this is its three-way form: "other" and "list" together are main's
-        True). "plain": no list mark, joining word or line break with text after it stands
+        """The shape of the sentence a new cue stands in, as a three-way answer: "plain",
+        "list", or "other", which is a conservative rejection and not a proof that the cue is in a
+        list (an exceeded bound with no list syntax is "other" too). "plain": no
+        list mark, joining word or line break with text after it stands
         between the previous sentence end (see _SENTENCE_END_RX; the start of the text is one)
         and the payload's sentence end, so the cue governs as any cue does. "list": the front is
         clean, but the gap or the rest of the sentence holds one; the cue governs only if the
         bounded list reading of _negation_reach accepts it. "other": a mark, word or break stands
         in front of the cue, however far back, or the sentence reaches no sentence end, or the end
         of the text, within NEGATION_SENTENCE_SCAN characters of the payload's end; the cue
-        governs nothing and the finding is read as on main. The payload itself is neither scanned
-        nor counted (a URL has a colon and solidi). ``view`` (None: main's reading) is the
+        governs nothing and the finding is read as though the cue were absent. The payload itself
+        is neither scanned nor counted (a URL has a colon and solidi). ``view`` (None: the whole
+        text is one reading) is the
         (start, end) of the view of a multi-view text that holds the cue: the sentence then stays
         inside it, and the end of the view is the end of its sentence (every view is the whole input,
         read another way, and the raw input is asked the same by _raw_sentence_shape)."""
@@ -2841,12 +2844,13 @@ class SunglassesEngine:
 
     def _list_shape(self, text: str, cue_start: int, cue_len: int, gap: str, match_start: int,
                     match_end: Optional[int], align, raw_frame: bool) -> str:
-        """_cue_shape as main reads a sentence, and, when that says "other", once more inside the
-        view of a multi-view text that holds the cue. Main reads a sentence in a later view from
-        the end of the text before it, so a list mark in an earlier view keeps the cue from
-        governing; that stays so for every plain sentence. Only a sentence that reads as a LIST
-        inside its view is let through (the caller then needs _negation_reach to accept it), so a
-        sentence without a list is read exactly as on main. The raw input has no views."""
+        """_cue_shape over the whole text, and, when that says "other", once more inside the
+        view of a multi-view text that holds the cue. Over the whole text a sentence in a later
+        view runs from the end of the text before it, so a list mark in an earlier view keeps the
+        cue from governing; that stays so for every plain sentence. Only a sentence that reads as
+        a LIST inside its view is let through (the caller then needs _negation_reach to accept
+        it), so a sentence without a list is read over the whole text only. The raw input has no
+        views."""
         shape = self._cue_shape(text, cue_start, cue_len, gap, match_start, match_end, align)
         if shape != "other" or raw_frame:
             return shape
@@ -4160,10 +4164,10 @@ class SunglassesEngine:
     def scan_file(self, filepath: str) -> ScanResult:
         """Scan a file, routing images and PDFs through their extractors.
 
-        Audit finding C1: this used to be a raw ``open().read()``, so the CLI's
-        ``scan --file`` reported "no threats detected" on a PDF whose payload sat in
-        a compressed content stream, while ``SunglassesScanner.scan_auto()`` caught
-        the same file. The extractors existed; this path never dispatched to them.
+        A raw ``open().read()`` would let the CLI's ``scan --file`` report "no
+        threats detected" on a PDF whose payload sits in a compressed content
+        stream, while ``SunglassesScanner.scan_auto()`` catches the same file. This
+        path dispatches to the extractors so both read the same text.
 
         The returned result carries ``extraction_complete``. When it is False we could
         not read part of the file, and a caller must not render the verdict as a clean

@@ -1,25 +1,23 @@
-"""T10.R4/R5/R6 — wire an MCP server entry to this artifact, and unwire it.
+"""Wire an MCP server entry to this artifact, and unwire it.
 
-Contract rows: GATE3_CONTRACT_v5_2026-09-13.md T10.R4, T10.R5, T10.R6.
-Round 2, rebuilt against ASTRA's NO GO on 0c184de and T9's ruling R-177-R2.
+Contract rows 10.4, 10.5 and 10.6.
 
-Round 1 passed 16 of its own mutations and failed 24 of 48 independent property
-controls. The gap was not effort, it was that the mutations were chosen from the
-implementation, so they asked whether the code did what it already did. These
-notes record the properties the controls actually check, because they are the
-ones a later edit will quietly break.
+These notes record the properties the controls check, because they are the
+ones a later edit will quietly break. The controls are property checks written
+apart from the implementation: mutations chosen from the implementation only
+ask whether the code does what it already does.
 
 **The record is bound to the target it describes.** `installs/<name>.json` is
-keyed by name alone, so the same name installed into a second config used to
+keyed by name alone, so the same name installed into a second config would
 overwrite the first record and its retained bytes, and uninstalling the first
-file then restored the second file's original. A record carries `target_path`
-and a name occupied by another target is refused.
+file would then restore the second file's original. A record carries
+`target_path` and a name occupied by another target is refused.
 
-**Retained bytes are validated before they are restored.** Round 1 recorded
-`file_sha_before` and never read it, so altering the `.original` file made
-uninstall copy corrupted bytes into the config and report byte-exact success.
-That was reachable from the public CLI with no proxy involved. Retention is now
-checked against the recorded digest and a mismatch is a refusal.
+**Retained bytes are validated before they are restored.** Without that,
+altering the `.original` file would make uninstall copy corrupted bytes into the
+config and report byte-exact success, reachable from the public CLI with no
+proxy involved. Retention is checked against the recorded digest
+(`file_sha_before`) and a mismatch is a refusal.
 
 **Replace and record are one recoverable transaction.** A pending record is
 written first, then the target is replaced, then the record is completed. If
@@ -27,11 +25,11 @@ completion fails the target is rolled back to the retained bytes, so the
 original-intact outcome holds on a catchable fault rather than leaving a changed
 target with no record to undo it.
 
-**An existing wrapper is never wrapped again.** Round 1 only skipped re-wrapping
-when the wrapper verified against the current artifact, so a changed digest or a
-byte-identical artifact at another path nested a second wrapper. Any marker at
-all is now a stop: verified means refuse as already installed, anything else
-means refuse as unverifiable.
+**An existing wrapper is never wrapped again.** Skipping re-wrapping only when
+the wrapper verified against the current artifact would nest a second wrapper
+for a changed digest or a byte-identical artifact at another path. Any marker at
+all is a stop: verified means refuse as already installed, anything else means
+refuse as unverifiable.
 
 **WRAPPED is bound to what the entry executes.** Matching metadata is not
 enough. The command and the leading argv must actually launch the recorded
@@ -91,29 +89,29 @@ class _RetainedUnusable(Exception):
 
 
 class ConfigConflict(Exception):
-    """Unknown or conflicting state (R5). Never mutates."""
+    """Unknown or conflicting state. Never mutates."""
 
 
 class ConfigIOError(Exception):
-    """Unusable input, or an interrupted write (R6). Original left intact."""
+    """Unusable input, or an interrupted write. Original left intact."""
 
 
 class ArtifactUnresolved(Exception):
-    """The artifact we were asked to wire cannot be resolved (C5)."""
+    """The artifact we were asked to wire cannot be resolved."""
 
 
 class UninstallResult:
     """`byte_exact` False means the entry was restored but the file is not
-    byte-identical, which R5 requires us to report rather than paper over.
+    byte-identical, which we report rather than paper over.
 
     `kept_at` names a retained copy that could NOT be used -- gone, or failing
     the digest recorded at install -- and was set aside rather than deleted, so
     a person can look at what failed. It is None on every ordinary uninstall.
 
     `earlier` True means the file is byte-identical to the bytes an EARLIER
-    install on the same file captured, not the bytes this one captured (R38).
+    install on the same file captured, not the bytes this one captured.
     Two wraps undone first-installed-first end exactly where the user started,
-    and the second uninstall used to call that a change.
+    and the second uninstall does not call that a change.
 
     `later` names the sunglasses installs still wrapped on top when they are
     the ONLY difference from this install's after-image, oldest first. Empty
@@ -294,7 +292,7 @@ def _read_bytes_and_identity(path):
     """Bytes and file identity taken from ONE descriptor, so they describe the
     same file and not two files that happened to share a path.
 
-    R7-ABA (ASTRA round 6, `R6_TWO_RECOVERIES_ABA`). Content is not identity. A
+    Content is not identity (round 6). A
     second process uninstalled and installed again while a recovery was in
     flight; the new install re-rendered the SAME BYTES the crashed transaction
     had written, so a digest comparison saw an unchanged file that had in fact
@@ -443,9 +441,8 @@ def _render_from(path, seen, fn):
     """Declare what the next write to `path` was rendered FROM, and how to
     render it again if that is no longer what is there.
 
-    R8-WAITING-WRITER (ASTRA round 7,
-    `R7_WAITING_INSTALL_MUST_NOT_RESURRECT_FOCUS`). Round 7 locked the compare
-    and the rename, and a writer that had read the whole config BEFORE waiting
+    Round 7 locked the compare and the rename, and a writer that had read the whole
+    config BEFORE waiting
     for that lock still published a whole-file rendering built from what it read.
     While it waited, a recovery restored another server and removed that
     server's record, journal and retained original; the waiter then resurrected
@@ -491,12 +488,11 @@ def _exclusive(lock_path):
     config, NOT its validation, NOT the record and journal writes around it,
     and NOT the transaction as a whole. A lock held from a caller's read to its
     publication would deadlock any racing install that has to complete inside
-    that window, which is the shape of the reviewer's own controls. What makes
+    that window, which is the shape of the race controls. What makes
     a stale read safe is therefore not this lock but `_render_from`: whoever
     read before waiting re-reads under the lock and re-derives, or refuses.
 
-    R7-CHECK-RENAME-GAP (ASTRA round 6, `R6_CHECK_RENAME_GAP`). The
-    compare-and-swap compares and then renames, and his barrier sits INSIDE the
+    The compare-and-swap compares and then renames, and a race test's barrier sits INSIDE the
     rename: the one instant left after the comparison. No amount of moving the
     check closes it, because the gap is not where the check is, it is that a
     check and a rename are two operations. Two operations become one only under
@@ -561,7 +557,7 @@ def _exclusive(lock_path):
 
 def _atomic_write(path, data: bytes):
     """Replace in place, preserving mode. On failure the original is untouched
-    and no temp file is left behind (R6). Every OSError on this boundary becomes
+    and no temp file is left behind. Every OSError on this boundary becomes
     ConfigIOError, including the stat and the mkstemp.
 
     WHAT IS LOCKED HERE: from the re-read below to the rename, and nothing
@@ -569,13 +565,13 @@ def _atomic_write(path, data: bytes):
 
     A caller inside `_expect_unchanged` makes the replace a COMPARE-AND-SWAP,
     checked immediately before the rename rather than by the caller. It travels
-    out of band rather than as an argument ON PURPOSE: the reviewer's race
-    barrier substitutes this function with a two-positional stub, and adding a
-    keyword would raise TypeError inside his instrument, which reads as a broken
+    out of band rather than as an argument ON PURPOSE: the race barrier in
+    the tests substitutes this function with a two-positional stub, and adding a
+    keyword would raise TypeError inside that instrument, which reads as a broken
     harness rather than as a refusal. The expectation must reach the rename
     without changing the shape of the call that reaches it.
 
-    R5-RECOVERY-OTHER-RACE (ASTRA round 5). A recovery had validated that the
+    A recovery had validated that the
     target was the wrapper it wrote, then paused here while a second install
     added ANOTHER server to the same file and succeeded. The recovery resumed
     and wrote its stale whole-file original over that second wrapper, reporting
@@ -667,13 +663,11 @@ def _atomic_write(path, data: bytes):
 def _open_nofollow(path, *, what):
     """Open for writing WITHOUT following a symlink at the final component.
 
-    The deferred half of ASTRA's F3 (R-177-R5a). Round 5 closed the family by
-    refusing BEFORE any mutation, which is what a planted symlink needs, and
-    left the writer itself trusting. That check and this one answer different
-    questions: the check asks whether a symlink is there when we look, and this
-    asks what happens if one arrives after we looked. Only the second survives
-    a race, and only the first produces a diagnostic a user can act on, so the
-    row keeps both.
+    The early symlink check (`_refuse_symlinked_storage`) refuses BEFORE any
+    mutation, which keeps the recovery state and gives the user a diagnostic
+    they can act on. This open answers a different question: what happens if a
+    symlink arrives after that check. Only the no-follow open survives that
+    race, so both are kept.
 
     O_NOFOLLOW fails with ELOOP rather than following.
     """
@@ -724,8 +718,8 @@ def _temp_beside(path):
 def _publish_atomically(path, data: bytes, *, what):
     """Publish by RENAME, so a reader sees all of it or none of it.
 
-    R4-COMPLETE-PARTIAL, the other half. Round 5 made an unreadable completed
-    record fall back to the journal, which stops the STRANDING. This stops the
+    Round 5 made an unreadable completed record fall back to the journal, which
+    stops the STRANDING. This is the other half: it stops the
     unreadable record from ever existing: a kill during the write leaves bytes
     in a hidden temp name that nothing reads, and the rename is what publishes.
     Recovery and prevention are different properties and the fallback stays.
@@ -746,22 +740,22 @@ def _publish_atomically(path, data: bytes, *, what):
 def _refuse_symlinked_storage(name, *paths):
     """Refuse BEFORE any mutation if a symlink occupies one of our own names.
 
-    F1-JOURNAL-RETRY-SYMLINK (ASTRA round 4). `_retained_of` guarded both
-    uninstall paths; the install RETRY path never called it and then wrote
+    `_retained_of` guarded both uninstall paths; the install RETRY path never called it
+    and then wrote
     through `write_bytes`, which follows a symlink planted at the canonical
     retained name and overwrote an unrelated file with exit 0. Guarding the
     READERS of a resource is not guarding the resource.
 
-    The check lives HERE, before any mutation, rather than at the write, for
-    two reasons. It preserves the unrelated file AND the recovery state,
-    because the journal is discarded further down and a refusal after that
-    point would strand it. And it leaves the write itself as an ordinary
-    `write_bytes`/`write_text`, which is what the reviewer's crash driver
-    injects SIGKILL into by patching `Path.write_text` and `Path.write_bytes`
-    keyed on the record filenames. An `O_NOFOLLOW` writer closes the same hole
-    and makes four of the sixteen crash phases unreachable, so the fault can no
-    longer be tested; see the note in the PR body. Refusing early is the fix
-    that does not break the instrument that proves it.
+    The check lives HERE, before any mutation, rather than only at the write.
+    It preserves the unrelated file AND the recovery state, because the journal
+    is discarded further down and a refusal after that point would strand it.
+
+    The write is the second safeguard: `_write_private` opens with
+    `_open_nofollow` and writes with `os.write`, so a symlink that appears
+    after this check still fails instead of being followed. The crash tests
+    inject their fault at the OS layer (`tests/proxy/crash_storage_driver.py`
+    hooks `os.open`, `os.write` and `os.replace`), so the no-follow writer is
+    exercised by them.
     """
     for path in paths:
         if pathlib.Path(path).is_symlink():
@@ -836,8 +830,8 @@ _NAME_SERIAL = itertools.count()
 def _unique_name(build):
     """The first name `build(k)` produces that nothing is using.
 
-    R13-A-FLAT-COUNT-IS-NOT-A-BOUND (ruling R-177-R13 item 4,
-    `test_contested_forgets_keep_every_held_file_named`). Every private name in
+    `test_contested_forgets_keep_every_held_file_named` pins this. Every
+    private name in
     this file used to be built from `id(<object>)`, and `id()` is an address
     CPython hands out AGAIN once the previous object is collected. It is unique
     among objects alive at the same moment, which is all it was ever asked for
@@ -918,8 +912,8 @@ def _note_is_live(taking, *, d):
 def _claim_take_note(taking, intent):
     """Create the note ATOMICALLY, and own the take only if we created it.
 
-    R10-NOTE-ATOMIC (ASTRA round 9, `R9_NOTE_PUBLISHED_BETWEEN_CHECK_AND_WRITE`).
-    Round 9 asked whether a live note was there and then wrote one, and a second
+    Round 9 asked whether a live note was there and then
+    wrote one, and a second
     cleanup published its note and took its bytes in the gap, so the answer was
     already old when it was used. `O_EXCL` removes the gap: the creation IS the
     question, and the file system answers it once. A check before this is a fast
@@ -976,7 +970,7 @@ def _owner_file(private):
 
     DELIBERATELY NOT `<alias>.owner`. Every scan that looks for notes globs on
     `.taking`, and `_reclaim_taken` reads what it finds and turns an unreadable
-    one into a refusal; the reviewer's own bound control counts
+    one into a refusal; the bound control in the tests counts
     `focus.taking*.forgetting-*` as private notes and requires that set to be
     empty after recovery. A lock file wearing a note's name would have been
     counted as a note by both, so the name drops `.taking` and carries a marker
@@ -995,8 +989,7 @@ def _owner_identity(fd):
 def _hold_owner_file(private):
     """Create the owner file and hold its lock BEFORE the alias exists.
 
-    R16-THE-OWNER-EXISTS-FIRST (ASTRA round 15,
-    `test_R15_PRELOCK_DEATH_ALIAS_BOUND`). Round 15 took this lock AFTER the
+    Round 15 took this lock AFTER the
     rename that publishes the alias, which leaves an ordinary crash window: die
     in between and there is an alias with no owner file, and the conservative
     missing-owner rule then keeps it for ever. Eight deaths, eight aliases --
@@ -1008,8 +1001,7 @@ def _hold_owner_file(private):
     before the lock now leaves an unlocked owner file and NO alias, and that
     file is collectable garbage rather than a retention.
 
-    R16-AN-OWNER-IS-AN-INODE-NOT-A-PATH (`R15_OWNER_REPLACED_WHILE_LIVE`,
-    `R15_OWNER_REPLACED_BETWEEN_OPEN_AND_FLOCK`). The lock lives on an INODE and
+    The lock lives on an INODE and
     the collector reaches it by a PATH, so a path swapped to a different inode
     hands the collector a free lock on a file nobody was ever holding. The
     identity of what was locked is therefore written INTO the file, by the only
@@ -1036,8 +1028,7 @@ _RECLAIM_RETRY = object()
 def _take_owner_file(owner):
     """One attempt: create it exclusively, or reclaim a dead predecessor's.
 
-    R18-A-LOCK-ON-AN-UNLINKED-INODE-OWNS-NOTHING (ruling R-177-R18 (2)). The
-    reclaim path opens a name and locks what it found, and a sweep may unlink
+    The reclaim path opens a name and locks what it found, and a sweep may unlink
     that name in between -- leaving us holding an exclusive lock on an inode no
     path leads to, while the next caller creates a fresh file at the same name
     and locks that. Two writers, two locks, one name, and neither is wrong about
@@ -1100,7 +1091,7 @@ def _release_owner_file(private, fh):
     costs: a contested forget that COMPLETES leaves its alias behind on purpose
     -- that is round 12 -- and removing the owner file with it left an alias no
     later collector could ever prove dead. The bound would have come back by a
-    quieter road than the reviewer drove, on the ordinary path rather than
+    quieter road, on the ordinary path rather than
     under a kill.
 
     Since round 16 this also runs when the rename never happened, so the file
@@ -1212,10 +1203,10 @@ def _filesystem_type(path):
 def _lock_enforcement_is_provable(path):
     """Whether a free lock on `path` can mean the writer has ended.
 
-    R17-A-LOCK-IS-ONLY-AS-WIDE-AS-ITS-KERNEL (T10's own round-16 probe, a shim
-    of a filesystem that enforces `flock` host-locally and not across hosts --
-    NFS without a lock daemon is the ordinary one, and `SUNGLASSES_HOME` can sit
-    on it). There the collector's own lock is GRANTED while a live owner on
+    A lock is only as wide as its kernel: some filesystems enforce `flock` host-locally
+    and not across hosts -- NFS without a lock daemon is the ordinary one, and
+    `SUNGLASSES_HOME` can sit on it. There the collector's own lock is GRANTED while a
+    live owner on
     another host holds it, and the same-process self-test below is REFUSED,
     because local state knows about it. The self-test then reports "enforced",
     the lock reads free, and a live owner's alias is collected. That is a wrong
@@ -1289,21 +1280,20 @@ def _alias_owner_is_gone(private, *, retained=None):
 
     THE LAST CLAUSE IS THE ROUND-16 REPAIR. A lock lives on an inode; a
     collector reaches it by a path. Replace the path with an unlocked inode and
-    a free lock says nothing about the writer who is still holding the original
-    (`R15_OWNER_REPLACED_WHILE_LIVE`), and doing it between the open and the
-    flock says nothing either (`R15_OWNER_REPLACED_BETWEEN_OPEN_AND_FLOCK`).
-    Both are answered by asking what we actually locked and whether the name
+    a free lock says nothing about the writer who is still holding the original, and
+    doing it between the open and the
+    flock says nothing either. Both are answered by asking what we actually locked and
+    whether the name
     still means it. Any disagreement is UNPROVEN, and unproven retains.
 
-    R19a-A-RETAIN-THE-RECORD-CANNOT-SEE-CONTRADICTS-THE-RULING. Ruling
-    R-177-R17 said "refuse to collect and log RETAINED", and every identity
+    The rule is "refuse to collect and log RETAINED", and every identity
     refusal here happens BEFORE any unlink -- so round 19's record, written at
     the unlink, never saw them. The outcome was safe and the report said
     nothing: a reader finding `retained == []` beside a file that had plainly
     been retained would call it a claim mismatch and would be right. `retained`
     is therefore an optional out-list, KEYWORD-ONLY and defaulting to None, so
     positional callers and the bool contract are untouched -- which matters,
-    because the reviewer's rows assert `is False` and `is True` against it.
+    because the tests assert `is False` and `is True` against it.
 
     A live owner is NOT a retention: keeping a file whose owner is running is
     the mechanism working, not doubt about it. Only the unprovable cases are
@@ -1375,9 +1365,7 @@ def _alias_owner_is_gone(private, *, retained=None):
 def _unlink_under_proof(fh, target, *, owner, retained):
     """Remove `target` ONLY while `fh` is still the file `owner` names.
 
-    R19-A-LOCKED-DESCRIPTOR-AUTHORISES-ONE-NAME (ASTRA round 18,
-    `test_R18_COLLECTOR_OPEN_UNLINK_RECREATE_LOCKED_INODE`). Round 18 closed the
-    check-then-act gap by holding the lock across the removal, and left a
+    Round 18 closed the check-then-act gap by holding the lock across the removal, and left a
     smaller one of the same shape INSIDE it: collector A opens the owner file
     (inode X) and has not locked yet; collector B locks, unlinks the NAME, and a
     replacement owner claims that name (inode Y); A resumes, locks its fd --
@@ -1416,13 +1404,11 @@ def _unlink_under_proof(fh, target, *, owner, retained):
 def _owner_proven_gone(private):
     """Hold the proof while the removal happens, or yield nothing.
 
-    R18-A-CHECK-YOU-STOPPED-HOLDING-IS-A-CHECK-YOU-DID-NOT-MAKE (ASTRA round 17,
-    `test_R17_ORPHAN_RECLAIM_BETWEEN_FREE_CHECK_AND_UNLINK` and
-    `..._REAL_PROCESS`). Round 17 asked `_alias_owner_is_gone`, which takes the
+    Round 17 asked `_alias_owner_is_gone`, which takes the
     lock, answers, and RELEASES it -- and then the caller unlinked on the
     strength of that answer. Between the two a new owner reclaims the same file
     with a real kernel lock, and the sweep deletes a live owner's coordination
-    file. The reviewer's sentence is the rule: merely repeating an unlocked
+    file. The rule is that merely repeating an unlocked
     check does not close it.
 
     So the proof and the act are one thing. The exclusive lock taken here IS the
@@ -1469,12 +1455,11 @@ _OUR_OWNER_PREDICATE = _alias_owner_is_gone
 def _ask_owner_is_gone(private, retained):
     """Ask the predicate, and ask for a reason ONLY if it is still ours.
 
-    R19a, and the reason is a lesson rather than a nicety. The out-list is
+    The reason is a lesson rather than a nicety. The out-list is
     keyword-only so that callers INTO this module are unaffected -- but the
-    reviewer's controls do something else: they SUBSTITUTE the predicate with a
+    controls do something else: they SUBSTITUTE the predicate with a
     one-argument function and then drive a collection. Passing a keyword to
-    that raises TypeError, and three of his rows went red the moment the report
-    was added. A report is never worth breaking the thing it reports on.
+    that raises TypeError. A report is never worth breaking the thing it reports on.
 
     So: identity, not exception handling. If the predicate is the one this
     module defined, it can be asked for reasons; if somebody has replaced it,
@@ -1490,7 +1475,7 @@ def _ask_owner_is_gone(private, retained):
 def _collect_orphaned_owner_files(d):
     """Owner files whose alias never appeared, left by a death before the rename.
 
-    R16: creating the owner first turns the prelock crash from a retained alias
+    Creating the owner first turns the prelock crash from a retained alias
     into a stray lock file. Stray is not free -- it is the same leak wearing a
     different name -- so the same collector removes it, under the same proof:
     the lock is takeable and the file is the one its own content names.
@@ -1517,9 +1502,8 @@ def _collect_orphaned_owner_files(d):
 def _collect_discharged_notes(d, held_name):
     """Every note naming held bytes that are no longer there.
 
-    R14-COLLECT-DISCHARGED (ruling R-177-R14 (a), ASTRA round 13
-    `test_R13_PROCESS_DEATH_AFTER_RENAME_RECOVERS`). Once recovery has put the
-    held file back at the canonical name, the file the notes name is GONE and
+    Once recovery has put the held file back at the canonical name, the file the notes
+    name is GONE and
     nothing can be recovered from them: they are spent, not evidence. This is a
     fact about the file system rather than a claim by a competing note, which
     is what makes it safe to act on where round 12's discard was not.
@@ -1560,9 +1544,8 @@ def _collect_discharged_notes(d, held_name):
 def _collect_stale_aliases(d, private, intent):
     """Private aliases for THESE held bytes left by processes that have ended.
 
-    R14-A-CRASH-IS-NOT-A-QUANTITY (ruling R-177-R14 (b), ASTRA round 13
-    `test_R13_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND`). A forget links its note
-    back and then unlinks the private alias. Killed between the two, it leaves
+    A forget links its note back and then unlinks the private alias. Killed between the
+    two, it leaves
     the alias -- a hard link to the same inode, not a copy of the bytes, but a
     name all the same. Eight deaths left eight aliases for ONE held file, so
     the retention the round-13 control certified as bounded grew with the crash
@@ -1622,17 +1605,14 @@ def _collect_stale_aliases(d, private, intent):
 def _forget_take(taking, owner):
     """Remove the note for THIS take, and never another take's.
 
-    R9-NOTE-OWNERSHIP (ASTRA round 8,
-    `R8_TAKE_NOTE_MUST_SURVIVE_UNTIL_RECOVERY[second_cleanup]`). A second
-    cleanup whose own take failed removed the note here by path, and the first
+    A second cleanup whose own take failed removed the note here by path, and the first
     cleanup's bytes were then sitting under a held name nothing could find. The
     note lives at one name by design -- it is the name recovery looks for -- so
     ownership is checked by reading it: a note that names somebody else's held
     file is somebody else's note.
 
-    R10-NOTE-FORGET-ATOMIC (ASTRA round 9,
-    `R9_NOTE_REPLACED_BETWEEN_CHECK_AND_UNLINK`). Reading the note and then
-    unlinking it by path is the same gap in the other direction: a new owner
+    Reading the note and then unlinking it by path is the same gap in the other
+    direction: a new owner
     published its note between the two and round 9 deleted it. So the note is
     taken OUT of the way first, by a rename that only one process can win, and
     only then read. If it turns out to be somebody else's, it goes straight
@@ -1834,8 +1814,7 @@ def _authorise_from_one_fd(record, name, *, home):
 def _open_set_aside(record, name, *, home):
     """The set-aside copy, opened ONCE, or None.
 
-    R12-ONE-DESCRIPTOR (ASTRA round 11, `R11_FAILED_STATE_VALIDATION`). Round 11
-    asked `is_file()` and then digested by path: `is_file` follows a symlink, so
+    Round 11 asked `is_file()` and then digested by path: `is_file` follows a symlink, so
     a link planted at that name answered for a file somewhere else, and the two
     opens meant the thing checked and the thing used could differ. Everything
     below happens on ONE descriptor: no-follow open, `fstat` for "regular file",
@@ -1881,8 +1860,7 @@ def _open_set_aside(record, name, *, home):
 def _failed_copy_is_present(record, name, *, home):
     """Whether the state that licenses an entry-only restore is ON DISK.
 
-    R11-NO-FIELD-DECIDES (ASTRA round 10, `R10_FORGED_MARKER_REFUSES`). A record
-    is not a capability: what licenses the fallback is a copy this transaction
+    A record is not a capability: what licenses the fallback is a copy this transaction
     SET ASIDE because it failed, still on disk, still hashing to the failure
     recorded at the time, and a canonical copy genuinely absent or mismatched.
     """
@@ -1943,8 +1921,7 @@ def _standby_pairs(home, name):
 def _adopt_standby(home, name, target):
     """Promote a standby inverse into the canonical pair, or say why not.
 
-    R10-DISCOVERABLE (ASTRA round 9, `R9_STANDBY_PROCESS_END` and
-    `R9_PROMOTION_IO_FAILURE`). Round 9 put the inverse on disk before the
+    Round 9 put the inverse on disk before the
     wrapper, which was right, and then made it reachable ONLY through the
     promotion inside the transaction that wrote it. A process that ended
     between publication and promotion left a perfectly good inverse on disk
@@ -2099,7 +2076,7 @@ def _reclaim_taken(home, name):
     file on its own proves nothing: the name is a convention, and trusting a
     convention is how a leftover becomes the thing we restore a config from.
 
-    EVERY note is tried, not just the first (ASTRA round 11). Round 11 took the
+    EVERY note is tried, not just the first. Round 11 took the
     first name it found, refused on its empty content, and left a valid private
     note beside it holding the only route back.
     """
@@ -2185,7 +2162,7 @@ def _reclaim_one(taking, name, *, d, bytes_path):
 def _discard(*paths):
     """Remove our own transaction files, and NEVER one that is in use.
 
-    R5-RECOVERY-RETRY-RACE (ASTRA round 5). A recovery that had already read and
+    A recovery that had already read and
     validated everything paused here, a SECOND install of the same name
     completed in another process and published its own record and retained
     original, and this loop then deleted that NEW retained original by path and
@@ -2304,7 +2281,7 @@ def _is_digest(value) -> bool:
 def _earlier_originals(home, name, target_id, sha_before):
     """The pre-install digests of every wrap this install stacks directly on.
 
-    R38. An install on top of another install's wrapper captures THAT wrapper
+    An install on top of another install's wrapper captures THAT wrapper
     as its original, so the bytes the user started from live only in the
     earlier record, and that record is gone once the earlier wrap is undone.
     Carried forward here as digests only: they decide the WORDING of an
@@ -2457,7 +2434,7 @@ def resolve_artifact(*, package_root=None):
 
     Refuses when it is absent rather than returning a path that cannot run. On a
     tree without the proxy lane's `__main__.py` that means `install` refuses
-    every time, which is the honest state and is C5 one level up from the
+    every time, which is the honest state, the same refusal one level up from the
     argument check.
     """
     if package_root is None:
@@ -2472,7 +2449,7 @@ def resolve_artifact(*, package_root=None):
 
 
 def _could_execute(command) -> bool:
-    """Is this EXACTLY the interpreter we wired (F2)?
+    """Is this EXACTLY the interpreter we wired?
 
     Decided WITHOUT the marker, because the marker is the thing being checked.
 
@@ -2501,10 +2478,11 @@ def classify(entry, *, artifact):
     """DIRECT (no wrapper) · WRAPPED (this artifact, and the entry really runs
     it) · UNVERIFIED (a wrapper we cannot vouch for).
 
-    Matching metadata is not enough. C6-ROUTE: with a correct path and digest in
-    the marker, changing the command, changing the argv or emptying it still
-    left round 1 calling the route WRAPPED. Classification is bound to what the
-    entry executes.
+    Matching metadata is not enough. With a correct path and digest in
+    the marker, a command that differs from the marker's or could not execute
+    the artifact, an empty argv, and an argv that does not begin with the
+    launcher prefix are UNVERIFIED, not WRAPPED. Arguments after the launcher prefix are not
+    checked. Classification is bound to what the entry executes.
     """
     if not isinstance(entry, dict):
         return "UNVERIFIED"
@@ -2634,11 +2612,10 @@ def install(config_path, name, *, artifact, home, argv=None):
     """Wrap one entry. Validates everything, then mutates recoverably.
 
     The whole transaction runs under one lock on the target, not just the
-    write: round 6 closed the compare against the rename and round 7's
-    `R6_OWNER_CHECK_UNLINK_GAP` moved the same race to the cleanup, where a
-    second install completed between the check that the retained original was
-    unclaimed and the unlink that removed it. Serialising one syscall at a time
-    is how a race gets moved rather than closed.
+    write: a lock around only the compare and the rename leaves the same race
+    in the cleanup, where a second install can complete between the check that
+    the retained original is unclaimed and the unlink that removes it.
+    Serialising one syscall at a time moves a race rather than closing it.
     """
     _check_name(name)
     _refuse_symlinked_config(config_path)
@@ -2993,7 +2970,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
 
 def _retained_of(record, name, *, home):
     """The retained original, validated against the digest recorded at install
-    AND against the only path we are willing to read it from (R5-RETAINED, F1).
+    AND against the only path we are willing to read it from.
 
     The digest check vouches for the BYTES and says nothing about WHERE they
     came from. `original_bytes_path` is a string in a file on disk, so a record
@@ -3063,12 +3040,12 @@ def _installed_rendering(retained: bytes, name, journal):
 def _recover_from_journal(target, name, pending_path, *, home):
     """Finish an interrupted install backwards, and ONLY from a state we left.
 
-    R5-JOURNAL-CONFLICT (ASTRA round 4). This used to check the journal's target
+    This used to check the journal's target
     path and the retained digest and then copy the whole retained original over
     whatever was there. Both of those describe the JOURNAL; neither describes
     the file in front of us. So an unrelated edit made after the interrupted
     install was silently erased, and a conflicting edit was overwritten instead
-    of refused, both with exit 0. A pending journal does not waive R5.
+    of refused, both with exit 0. A pending journal does not waive the refusal of conflicting state.
 
     There are exactly two states we are entitled to act on: the target is still
     the before-image, so the crash preceded the replace and there is nothing to

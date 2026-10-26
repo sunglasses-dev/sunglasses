@@ -1,4 +1,4 @@
-"""The verifier over one LOG: a directory of segments (T9 ruling 15).
+"""The verifier over one LOG: a directory of segments.
 
 One chain per log. A log rotates into segments, and each segment after the
 first opens with a genesis naming the last checkpoint of the one before it. The
@@ -104,7 +104,7 @@ def test_a_deleted_segment_is_named_by_its_successor(tmp_path, gone):
 
 
 def test_the_last_segment_deleted_is_not_detectable_here(tmp_path):
-    """LC02 at log scale: nothing names the newest segment, so removing it
+    """At log scale nothing names the newest segment, so removing it
     leaves a log that verifies. Only a retained endpoint can tell."""
     a, b, c = _three()
     log = _write(tmp_path / "hook", a, b)

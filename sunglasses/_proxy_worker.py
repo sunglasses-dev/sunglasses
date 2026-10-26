@@ -1,6 +1,6 @@
 """The child `worker_process` spawns: one payload in, one result line out.
 
-At `sunglasses/_proxy_worker.py` because T4.R1 names that path. It sits beside
+At `sunglasses/_proxy_worker.py` because contract row 4.1 names that path. It sits beside
 the package rather than inside `proxy/` so the thing being spawned is one file
 with one job, and the underscore says what the name already implies: it is
 spawned, not imported by anyone else.
