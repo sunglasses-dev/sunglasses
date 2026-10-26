@@ -4125,7 +4125,15 @@ class SunglassesEngine:
                 continue
             try:
                 if validator.pregate(text):
-                    findings.extend(validator.run(text))
+                    if getattr(validator, "reads_channel", False):
+                        got = validator.run(text, channel)
+                    else:
+                        got = validator.run(text)
+                    findings.extend(got)
+                    if getattr(got, "unread", False):
+                        validator_failures.append(
+                            f"validator {validator.id} could not read part of the text; "
+                            "that part was skipped")
             except Exception as exc:
                 validator_failures.append(
                     f"validator {validator.id} failed ({type(exc).__name__}); its check was skipped")
