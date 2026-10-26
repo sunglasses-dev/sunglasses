@@ -1591,9 +1591,9 @@ class SettingsWithoutPrompts:
 _CREDENTIAL_TOKENS = frozenset(("credential", "credentials", "secret", "secrets", "apikey", "apikeys"))
 _CREDENTIAL_PAIRS = frozenset((("api", "key"), ("api", "keys"), ("private", "key"), ("private", "keys")))
 # A private key is known by its name alone: one of the six default SSH key file names below, a file
-# with one of the key extensions, or a `.pem` whose name holds one of the pem words or starts with
-# `id_`. A key under any other name (a custom SSH key file name, a `.pem` with none of those
-# words) is not read as a credential file.
+# with one of the key extensions, or a `.pem` whose name holds one of the pem words or is one of
+# those six names (`id_rsa.pem`). A key under any other name (a custom SSH key file name, a `.pem`
+# with none of those words) is not read as a credential file.
 _PRIVATE_KEYS = frozenset(("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk"))
 _CREDENTIAL_FILES = frozenset((".netrc", "_netrc", ".pgpass", ".npmrc", ".pypirc", ".dockercfg", ".htpasswd"))
 _KEY_EXTENSIONS = frozenset(("key", "p12", "pfx", "ppk", "jks", "keystore"))
@@ -1624,11 +1624,12 @@ _PROSE_END = (":", ".", ",", ";", "!")
 _MAX_UPLOAD_FINDINGS = 50
 # The reader's budget, in steps and never in time: the characters of the text (the fence pass and
 # the line join), of each line, and of each substitution, wrapper and here-document body that is
-# lexed; the tokens and segments of each command walked; each look-ahead window; and each text
-# searched for an uploader name once the findings list is full. The walks over the words of one
-# command (operands, provenance, printf) are not counted on their own. A text of n characters is
-# given this floor plus this many per character; a run that would take more stops and says it
-# did not read the rest.
+# lexed; the tokens and segments of each command and of each substitution body walked; each
+# look-ahead window; and each text searched for an uploader name once the findings list is full.
+# The walks over the words of one command (operands, provenance, printf) are not counted on their
+# own. A text of n characters is given this floor plus this many per character. Each stage is
+# charged before it is begun, and a stage that would take the count past that is not begun: the
+# run stops there and says it did not read the rest.
 _WORK_FLOOR = 4096
 _WORK_PER_CHARACTER = 64
 
@@ -1659,7 +1660,7 @@ def _credential_name(path):
     if ext in _KEY_EXTENSIONS:
         return not _says_public(tokens, _STANDIN_TOKENS)
     if ext == "pem":
-        named = any(t in _PEM_WORDS for t in tokens) or base.startswith("id_")
+        named = any(t in _PEM_WORDS for t in tokens) or stem in _PRIVATE_KEYS
         return named and not _says_public(tokens, _STANDIN_TOKENS)
     named = any(t in _CREDENTIAL_TOKENS for t in tokens) \
         or any(pair in _CREDENTIAL_PAIRS for pair in zip(tokens, tokens[1:]))
@@ -1851,14 +1852,15 @@ def _file_operands(name, args):
 
 
 _QUIET_LONGS = ("--quiet", "--silent", "--count", "--files-with-matches", "--files-without-match")
-_SED_COMMANDS_THAT_WRITE_NOTHING = frozenset("dDnNgGhHxzqQ")
+_SED_COMMANDS_THAT_WRITE_NOTHING = frozenset("dDnNgGhHxzqQ=")
 
 
 def _sed_may_print(script):
     """Can this sed script write the text it reads? `-n` turns off the automatic printing, so only
-    a `p`, `P`, `l`, `=` command or a flag of `s` that prints or writes does. Addresses, the parts
-    of `s` and `y`, and commands that only edit the pattern space write nothing; any command not
-    known to write nothing counts as one that may."""
+    a `p`, `P`, `l` command or a flag of `s` that prints or writes does. Addresses, the parts of
+    `s` and `y`, commands that only edit the pattern space, and `=` (which writes a line number,
+    none of the input) write none of it; any command not known to write nothing counts as one
+    that may."""
     i, n = 0, len(script)
     while i < n:
         c = script[i]
@@ -2238,7 +2240,10 @@ def _substitution_reads(body, depth, scan, stdin=None):
         return None
     scan.spend(len(body) + 1)
     try:
-        segments = _segments(_lex(body))
+        toks = _lex(body)
+        scan.spend(len(toks) + 1)
+        segments = _segments(toks)
+        scan.spend(len(segments))
         ins, outs = _flows(segments, lambda segment, given: _emitted(segment, depth, scan, given), stdin,
                            lambda target: _heredoc_reads(target, depth, scan))
         for index, segment in enumerate(segments):
@@ -2247,6 +2252,10 @@ def _substitution_reads(body, depth, scan, stdin=None):
     except (_Syntax, RecursionError):
         scan.unread = True
     return None
+
+
+class _OutOfWork(Exception):
+    """A stage of reading that the budget does not cover (``_Scan.spend``); the run ends there."""
 
 
 class _Findings(list):
@@ -2270,22 +2279,21 @@ class _Scan:
         self.found = []
         self.work = 0
         self.limit = _WORK_FLOOR + _WORK_PER_CHARACTER * size
-        self.spent = False
         # text that searches for the close of a substitution may read in the whole run
         self.merge_left = min(_MERGE_BUDGET, _MERGE_PER_CHARACTER * size + _MERGE_WINDOW)
 
     def spend(self, steps):
-        """Count ``steps`` of reading. The budget is a count of steps, never time: when the run
-        has taken more than the text allows, the rest of the text is not read and the run is
-        reported as not inspected."""
+        """Count ``steps`` of reading before they are taken. The budget is a count of steps, never
+        time: a stage that would take the count past it is not begun. The stage raises, the run
+        ends there and is reported unread (``_read`` catches it), and what was found before it
+        stands, so the count never passes the budget."""
+        if self.work + steps > self.limit:
+            raise _OutOfWork
         self.work += steps
-        if self.work > self.limit and not self.spent:
-            self.spent = True
-            self.unread = True
 
     def done(self):
-        """Nothing more can be reported: the budget is spent, or the list holds only blocks."""
-        return self.spent or (len(self.found) >= _MAX_UPLOAD_FINDINGS and not self.notices)
+        """Nothing more can be reported: the list holds only blocks."""
+        return len(self.found) >= _MAX_UPLOAD_FINDINGS and not self.notices
 
     def add(self, evidence, marked):
         low = self.fenced or (self.soft and marked)
@@ -2436,7 +2444,8 @@ _SUBSTITUTION_OPEN = re.compile(r"\$\(|`")
 # A here-document operator and its delimiter word, as far as a line shows them (not `<<<`).
 _HEREDOC_OPEN = re.compile(r"(?<!<)<<(-?)[ \t]*(?:'([^'\n]*)'|\"([^\"\n]*)\"|\\?([^\s;|&<>()'\"\\]+))")
 # How far ahead a substitution that a line opens is searched for its close (a window is never
-# extended past this many characters), and how much text all such searches in one run may read.
+# extended past this many characters), and how much text all such windows in one run may take
+# in all (each window counts in full, and none takes more than is left).
 _MERGE_WINDOW = 8192
 _MERGE_BUDGET = 1 << 20
 # ... which, for a text of n characters, is at most this many per character plus one window,
@@ -2465,11 +2474,12 @@ def _spanning_units(physical, scan=None):
     the lines of the document (to the end of the text if the delimiter never comes), so the text of
     the document is read with the command that takes it and not as commands of its own. Only a line
     that names an uploader is searched for a substitution's close. The search looks ahead a window
-    that doubles from a few lines up to ``_MERGE_WINDOW`` characters (a line that would carry it
-    past that is not joined), each window is charged, and all the windows of one run share
-    ``scan.merge_left``. A substitution that does not close within that, or that the allowance no
-    longer reaches, leaves its line alone, and the line is then read as it stands: its substitution
-    never closes there, so the run is reported unread."""
+    that doubles in lines, from a few up to ``_MERGE_WINDOW`` characters (a line that would carry
+    it past that is not joined). Each window is charged before it is built, and all the windows of
+    one run share ``scan.merge_left``: a window never takes more than that has left. A substitution
+    that does not close within that, or that the allowance no longer reaches, leaves its line
+    alone, and the line is then read as it stands: its substitution never closes there, so the run
+    is reported unread."""
     units = []
     count = len(physical)
     if scan is None:
@@ -2493,25 +2503,27 @@ def _spanning_units(physical, scan=None):
                         skip_to = end
                         continue
                     # Opens here and does not close here: look for the close a window ahead.
-                    if scan.merge_left <= 0:
+                    if len(line) > scan.merge_left:
                         break
                     parts = [line]
                     size = len(line)
                     tail = index
                     ahead = 2
                     while True:
-                        # the window grows by doubling, so a close on a near line costs a near
-                        # window and the windows tried in all cost at most twice the last one
+                        # the window grows by doubling in lines, so a close on a near line costs a
+                        # near window; it never passes _MERGE_WINDOW characters or what the
+                        # allowance has left
                         grew = False
+                        room = min(_MERGE_WINDOW, scan.merge_left)
                         while tail + 1 < count and tail - index < ahead \
-                                and size + len(physical[tail + 1]) + 1 <= _MERGE_WINDOW:
+                                and size + len(physical[tail + 1]) + 1 <= room:
                             tail += 1
                             parts.append(physical[tail])
                             size += len(physical[tail]) + 1
                             grew = True
+                        scan.merge_left -= size
+                        scan.spend(size)        # the window is charged before it is built
                         window = "\n".join(parts)
-                        scan.merge_left -= len(window)
-                        scan.spend(len(window))
                         end = _substitution_end(window, at)
                         if end is not None:
                             if end > 0:
