@@ -4,4 +4,4 @@
 #
 # "Don't let your agents get fooled."
 
-__version__ = "0.6.13"
+__version__ = "0.6.14"
