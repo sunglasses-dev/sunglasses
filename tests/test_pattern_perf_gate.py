@@ -896,10 +896,10 @@ def test_a_head_that_changes_no_rule_may_change_the_waiver_file():
     assert g.waiver_conflict(rules, dict(rules), "{}", '{"R": "2026-10-24 reason"}') == []
 
 
-def test_the_waiver_file_text_is_compared_not_its_parsed_meaning():
+def test_an_edit_that_keeps_every_entry_adds_nothing_so_it_is_not_a_conflict():
     base, head = {"R": (LINEAR,)}, {"R": (QUADRATIC,)}
-    assert g.waiver_conflict(base, head, '{"R": "2026-10-24 r"}', '{"R":   "2026-10-24 r"}')
-    assert g.waiver_conflict(base, head, None, "{}")                 # a file created, even empty, is a change
+    assert g.waiver_conflict(base, head, '{"R": "2026-10-24 r"}', '{"R":   "2026-10-24 r"}') == []
+    assert g.waiver_conflict(base, head, None, "{}") == []           # an empty file adds no entry
 
 
 def test_an_unchanged_waiver_file_is_not_a_problem_when_a_rule_changes():
@@ -939,3 +939,276 @@ def test_a_sha_with_a_trailing_newline_is_not_a_sha(capsys):
     assert g.main(["--base", "a" * 40 + "\n", "--head", "b" * 40]) == 2
     assert g.main(["--base", "a" * 40, "--head", "b" * 40 + "\n"]) == 2
     assert "40-character" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- C249: merge-base tables, removal-only waiver edits
+
+W1 = "2026-10-24 reason one"
+W2 = "2026-10-24 reason two"
+
+
+def test_a_rule_change_may_remove_waivers():
+    base, head = {"R": (QUADRATIC,)}, {"R": (LINEAR,)}
+    both = json.dumps({"R": W1, "S": W2})
+    assert g.waiver_conflict(base, head, both, json.dumps({"S": W2})) == []     # one entry removed
+    assert g.waiver_conflict(base, head, both, "{}") == []                      # all removed
+    assert g.waiver_conflict(base, head, both, None) == []                      # the file deleted
+
+
+def test_a_rule_change_may_not_add_or_edit_a_waiver_or_leave_a_file_that_is_not_an_object():
+    base, head = {"R": (QUADRATIC,)}, {"R": (LINEAR,)}
+    before = json.dumps({"R": W1})
+    for after in (json.dumps({"R": W1, "S": W2}),             # an entry added
+                  json.dumps({"R": W2}),                      # a reason edited
+                  json.dumps({"R": W1 + " "}),                # one byte more
+                  json.dumps({"S": W1}),                      # one removed and another added
+                  "[]", "not json", '"R"'):
+        assert g.waiver_conflict(base, head, before, after), after
+    assert g.waiver_conflict(base, head, None, before)
+
+
+def test_the_waivers_that_decide_are_the_tip_ones_minus_the_ids_the_head_removed():
+    tip = {"A": W1, "B": W1, "NEW": W2}
+    fork = {"A": W1, "B": W1}
+    assert g.effective_waivers(tip, fork, {"B": W1}) == {"B": W1, "NEW": W2}      # A removed
+    assert g.effective_waivers(tip, fork, {}) == {"NEW": W2}                      # both removed
+    assert g.effective_waivers(tip, fork, dict(fork)) == tip                      # none removed
+    assert g.effective_waivers(tip, fork, {"NEW": W2}) == {"NEW": W2}             # the head's own entries never add
+
+
+def test_bounding_a_waived_rule_and_removing_its_waiver_is_one_pull_request():
+    w = {"R": W1}
+    waivers = g.effective_waivers(w, w, {})
+    _, failures, _ = run({"R": (QUADRATIC,)}, {"R": (LINEAR,)}, waivers_base=waivers, waivers_head={},
+                         growth_floor=1, ratio_floor=1)
+    assert failures == []
+    _, kept, _ = run({"R": (QUADRATIC,)}, {"R": (LINEAR,)}, waivers_base=w, waivers_head=w,
+                     growth_floor=1, ratio_floor=1)
+    assert any("does not trip" in f for f in kept)                    # the waiver left in place is still stale
+
+
+def test_a_removed_waiver_is_no_longer_an_exception_for_a_rule_that_still_trips(monkeypatch):
+    _by_shape(monkeypatch, {QUADRATIC: (1e-8, 2), r"a+c": (1e-8, 2)})
+    w = {"R": W1}
+    _, failures, _ = run({"R": (QUADRATIC,)}, {"R": (r"a+c",)}, waivers_base=g.effective_waivers(w, w, {}),
+                         waivers_head={})
+    assert failures and not any("does not trip" in f for f in failures)
+
+
+def _two(rx):
+    """PATTERNS for R1 and R2; each element of `rx` is one regex or a tuple of regexes."""
+    return repr([{"id": f"R{n}", "regex": list(x) if isinstance(x, tuple) else [x]} for n, x in enumerate(rx, 1)])
+
+
+def _fork(tmp_path, fork, tip=None, head=None, fork_w=None, tip_w=None, head_w=None):
+    """A repo with a fork commit, a base branch that moved on (`tip`) and a pull request branch (`head`).
+
+    Each of fork, tip and head is the pair of regexes of R1 and R2 at that commit; None keeps the
+    previous one. The w arguments are the waiver file at that commit (None: unchanged, False: absent).
+    Returns (repo, base_tip_sha, head_sha, fork_sha).
+    """
+    repo = tmp_path / "r"
+    (repo / "sunglasses").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", "-b", "trunk", str(repo))
+    _git(repo, "config", "user.email", "t@example.invalid")
+    _git(repo, "config", "user.name", "t")
+
+    def commit(rx, w, msg):
+        if rx is not None:
+            (repo / "sunglasses" / "patterns.py").write_text("PATTERNS = " + _two(rx) + "\n")
+        (repo / "sunglasses" / "mechanisms.py").write_text(MECH)
+        f = repo / "tests" / "pattern_perf_waivers.json"
+        if w is False:
+            f.exists() and f.unlink()
+        elif w is not None:
+            f.parent.mkdir(exist_ok=True)
+            f.write_text(json.dumps(w))
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "--allow-empty", "-m", msg)
+        return _git(repo, "rev-parse", "HEAD")
+
+    fork_sha = commit(fork, fork_w, "fork")
+    _git(repo, "checkout", "-q", "-b", "pr")
+    head_sha = commit(head or fork, head_w, "pr")
+    _git(repo, "checkout", "-q", "trunk")
+    tip_sha = commit(tip or fork, tip_w, "tip")
+    return repo, tip_sha, head_sha, fork_sha
+
+
+def test_cli_a_pull_request_that_bounds_a_waived_rule_and_removes_its_waiver_passes(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (QUADRATIC, LINEAR), head=(LINEAR, LINEAR), fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_cli_a_pull_request_that_bounds_a_waived_rule_and_keeps_its_waiver_fails_as_stale(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (QUADRATIC, LINEAR), head=(LINEAR, LINEAR), fork_w={"R1": W1})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "does not trip" in r.stdout
+
+
+def test_cli_a_pull_request_that_removes_a_waiver_and_still_trips_fails(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (QUADRATIC, LINEAR), head=(r"a+c", LINEAR), fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "WAIVED" not in r.stdout and "growth" in r.stdout
+
+
+def test_cli_a_rule_change_that_adds_a_waiver_still_fails(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (QUADRATIC, LINEAR), head=(LINEAR, LINEAR), head_w={"R1": W1})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "pull request of its own" in r.stdout
+
+
+def test_cli_a_rule_the_base_branch_changed_after_the_fork_is_not_charged_to_the_pull_request(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, QUADRATIC), tip=(LINEAR, LINEAR), head=(r"read\s+tokens?", QUADRATIC))
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "changed 1, added 0" in r.stdout
+
+
+def test_cli_a_waiver_the_base_branch_gained_after_the_fork_still_covers_the_pull_request(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, LINEAR), head=(QUADRATIC, LINEAR), tip_w={"R1": W1})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "WAIVED" in r.stdout
+
+
+def test_cli_names_the_merge_base_it_compared_with(tmp_path):
+    repo, tip, head, fork = _fork(tmp_path, (LINEAR, LINEAR), tip=(LINEAR, r"read\s+tokens?"), head=(r"read\s+tokens?", LINEAR))
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0 and f"merge-base {fork[:12]}" in r.stdout
+
+
+def test_cli_without_a_merge_base_fails_and_says_to_fetch_the_history(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, LINEAR))
+    _git(repo, "checkout", "-q", "--orphan", "unrelated")
+    _git(repo, "rm", "-rqf", ".")
+    (repo / "sunglasses").mkdir()
+    (repo / "sunglasses" / "patterns.py").write_text("PATTERNS = " + _two((LINEAR, LINEAR)) + "\n")
+    (repo / "sunglasses" / "mechanisms.py").write_text(MECH)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "unrelated")
+    other = _git(repo, "rev-parse", "HEAD")
+    r = _cli(repo, "--base", tip, "--head", other)
+    assert r.returncode == 1 and "fetch-depth" in r.stderr and "no merge-base" in r.stderr
+
+
+def test_cli_a_shallow_clone_that_loses_the_fork_fails_and_never_falls_back_to_the_tip(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, LINEAR), tip=(LINEAR, r"read\s+tokens?"), head=(r"read\s+tokens?", LINEAR))
+    shallow = tmp_path / "shallow"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", "--no-single-branch", f"file://{repo}", str(shallow)],
+                   check=True, capture_output=True)
+    _git(shallow, "fetch", "-q", "--depth", "1", "origin", head)
+    r = _cli(shallow, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "fetch-depth" in r.stderr
+
+
+# ---------------------------------------------------------------- C249 r2: the review's cases
+
+def _by_shape(monkeypatch, shapes):
+    """time_once that answers from the regex's pattern: seconds = k * len(text) ** power, per pattern."""
+    def fake(rxs, text, cap=g.RUN_CAP_S):
+        return sum(k * len(text) ** power for k, power in (shapes[rx.pattern] for rx in rxs))
+    monkeypatch.setattr(g, "time_once", fake)
+
+
+def test_a_removed_waiver_leaves_no_expression_of_its_rule_untimed(monkeypatch):
+    # fixed times, so the test judges which expressions are selected and not the runner's clock
+    _by_shape(monkeypatch, {QUADRATIC: (1e-8, 2), LINEAR: (1e-9, 1), r"read\s+tokens?": (1e-9, 1)})
+    w = {"R": W1}
+    base = {"R": (QUADRATIC, LINEAR)}
+    head = {"R": (QUADRATIC, r"read\s+tokens?")}                     # only the second expression changed
+    waivers = g.effective_waivers(w, w, {})
+    _, kept, _ = run(base, head, waivers_base=waivers, waivers_head={}, removed_waivers=g.removed_waiver_ids(w, {}))
+    assert kept and any(f.startswith("R r0/") and "growth" in f for f in kept)
+    _, skipped, _ = run(base, head, waivers_base=waivers, waivers_head={})      # the id is not retimed: unchanged one skipped
+    assert skipped == []
+
+
+def test_cli_a_pull_request_that_removes_a_waiver_cannot_hide_an_unchanged_expression_that_still_trips(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, ((QUADRATIC, LINEAR), LINEAR), head=((QUADRATIC, r"read\s+tokens?"), LINEAR),
+                               fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "WAIVED" not in r.stdout and "growth" in r.stdout
+
+
+def test_cli_the_same_pull_request_passes_when_every_expression_of_the_rule_is_bounded(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, ((QUADRATIC, LINEAR), LINEAR), head=((r"read\s+tokens?", r"read\s+tokens?"), LINEAR),
+                               fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_a_waiver_only_the_base_gained_still_gets_the_stale_check_when_the_head_never_had_it(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, LINEAR), head=(r"read\s+tokens?", LINEAR), tip_w={"R1": W1})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "R1" in r.stdout and "does not trip" in r.stdout
+
+
+def test_the_conflict_is_judged_against_the_fork_not_the_base_tip(tmp_path):
+    # the base gained the waiver after the fork; a head that changes another rule and adds the same entry is
+    # still adding it
+    repo, tip, head, _ = _fork(tmp_path, (LINEAR, LINEAR), head=(LINEAR, r"read\s+tokens?"),
+                               tip_w={"R1": W1}, head_w={"R1": W1})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "pull request of its own" in r.stdout
+
+
+# ---------------------------------------------------------------- C249 r3: a removed waiver on a rule the head leaves unchanged
+
+BOUNDED = (r"read\s+tokens?", r"read\s+tokens")
+
+
+def test_a_removed_waiver_on_an_unchanged_rule_times_every_expression_of_it(monkeypatch):
+    _by_shape(monkeypatch, {QUADRATIC: (1e-8, 2), LINEAR: (1e-9, 1)})
+    w = {"R": W1}
+    rules = {"R": (QUADRATIC, LINEAR)}
+    waivers = g.effective_waivers(w, w, {})
+    removed = g.removed_waiver_ids(w, {})
+    rows, failures, _ = run(rules, rules, waivers_base=waivers, waivers_head={}, removed_waivers=removed)
+    assert any(f.startswith("R r0/") for f in failures)
+    assert {r["case"][:2] for r in rows} == {"r0", "r1"}
+    assert not any(r["verdict"] == "WAIVED" for r in rows)
+
+
+def test_a_removed_waiver_on_an_unchanged_rule_is_not_timed_without_the_removal_set():
+    w = {"R": W1}
+    rules = {"R": (QUADRATIC, LINEAR)}
+    rows, failures, notes = run(rules, rules, waivers_base=g.effective_waivers(w, w, {}), waivers_head={})
+    assert rows == [] and failures == [] and "timing 0 + 0 new" in notes[0]
+
+
+def test_an_unchanged_rule_whose_waiver_was_removed_passes_when_every_expression_is_bounded():
+    w = {"R": W1}
+    rules = {"R": BOUNDED}
+    _, failures, _ = run(rules, rules, waivers_base=g.effective_waivers(w, w, {}), waivers_head={},
+                         removed_waivers=g.removed_waiver_ids(w, {}), growth_floor=1, ratio_floor=1)
+    assert failures == []
+
+
+def test_a_removed_waiver_for_a_rule_the_head_deletes_or_empties_has_nothing_to_time():
+    w = {"R": W1}
+    removed = g.removed_waiver_ids(w, {})
+    for head in ({}, {"R": ()}):
+        rows, failures, _ = run({"R": (QUADRATIC,)}, head, waivers_base=g.effective_waivers(w, w, {}),
+                                waivers_head={}, removed_waivers=removed)
+        assert rows == [] and failures == []
+
+
+def test_cli_a_waiver_only_pull_request_cannot_unwaive_a_rule_that_still_trips(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, ((QUADRATIC, LINEAR), LINEAR), fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "WAIVED" not in r.stdout and "R1 r0/" in r.stdout
+
+
+def test_cli_an_unrelated_edit_does_not_hide_an_unchanged_rule_whose_waiver_was_removed(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, ((QUADRATIC, LINEAR), LINEAR), head=((QUADRATIC, LINEAR), r"read\s+tokens?"),
+                               fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 1 and "WAIVED" not in r.stdout and "R1 r0/" in r.stdout
+
+
+def test_cli_a_waiver_only_pull_request_passes_when_the_rule_is_bounded(tmp_path):
+    repo, tip, head, _ = _fork(tmp_path, (BOUNDED, LINEAR), fork_w={"R1": W1}, head_w={})
+    r = _cli(repo, "--base", tip, "--head", head)
+    assert r.returncode == 0, r.stdout + r.stderr

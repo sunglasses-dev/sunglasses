@@ -26,12 +26,22 @@ is kept unconfirmed.
 The engine's lead-in, window and guard bounding is NOT modelled, so a flagged id can be one the
 engine already bounds; that is what tests/pattern_perf_waivers.json is for:
 {id: "YYYY-MM-DD reason"}. A waived id is still printed; a waiver suppresses growth, ratio and cap
-failures of its id. A waiver is a reviewed exception, visible as a diff of that file. The verdict
-reads the waiver file of the BASE only: the head's file is checked for its format and never decides
-a verdict, and a pull request that changes any rule cannot change the waiver file in the same pull
-request (that fails), so a waiver arrives in a pull request of its own, which changes no rule, and
-applies to the pull requests after it. A waived id that is timed (new or changed) and does not trip
-FAILS. Waivers on ids nobody touches are not retimed.
+failures of its id. A waiver is a reviewed exception, visible as a diff of that file.
+
+The comparison is against the MERGE-BASE of the two shas, not the tip of the base branch: the rule
+tables "before" are the ones the pull request forked from, so a rule that another pull request changed
+on the base branch after the fork is not charged to this one. A checkout that cannot name the
+merge-base (too shallow, or the head not fetched) FAILS; it never falls back to the tip.
+
+The waivers that decide a verdict are the base tip's, minus the ids the head removes. The head's own
+file never ADDS an exception: a pull request that changes any rule cannot add or edit a waiver in the
+same pull request (that fails), so a waiver arrives in a pull request of its own, which changes no
+rule, and applies to the pull requests after it. A pull request that changes a rule MAY remove
+waivers: every entry of the head's file must be an entry of the merge-base's file with the same reason.
+A removed id is judged with no waiver, so bounding a waived rule and dropping its waiver is one pull
+request, and so is a pull request that only drops a waiver: the id is timed whole even when its rule
+is unchanged. A waived id that is timed (new or changed) and does not trip FAILS. Waivers on ids nobody
+touches, and that the head keeps, are not retimed.
 
 What the gate trusts: it runs from the base branch (the workflow is .github/workflows/pattern-perf.yml,
 a pull_request_target job, so the pull request cannot edit the job that judges it), it reads the rule
@@ -268,16 +278,59 @@ def changed_ids(base_rules, head_rules):
     return changed, added
 
 
+def _waiver_dict(text):
+    """The waiver file as {id: reason}, or None when it is not a JSON object."""
+    if text is None:
+        return {}
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def waiver_conflict(base_rules, head_rules, text_base, text_head):
-    """Problems when one pull request changes a rule and the waiver file together.
+    """Problems when one pull request changes a rule and also adds or edits a waiver.
 
     "Changes a rule" is any difference between the two rule mappings (an added, removed or changed
-    id, a list emptied, a regex moved); "changes the waiver file" is any difference in its text.
+    id, a list emptied, a regex moved). A waiver file edit that only REMOVES entries is allowed with a
+    rule change: every entry of the head's file must be an entry of the base's file with the same
+    reason. Any other difference (an entry added, a reason edited, a file that is not a JSON object)
+    is a change that must arrive in a pull request of its own. `text_base` is the file at the
+    merge-base.
     """
-    if head_rules != base_rules and text_head != text_base:
-        return [f"this pull request changes a rule and also {WAIVERS}; a waiver arrives in a pull request "
-                "of its own that changes no rule"]
-    return []
+    if head_rules == base_rules or text_head == text_base:
+        return []
+    kept, before = _waiver_dict(text_head), _waiver_dict(text_base)
+    if kept is not None and before is not None and all(k in before and before[k] == v for k, v in kept.items()):
+        return []
+    return [f"this pull request changes a rule and also adds or edits {WAIVERS}; a waiver arrives in a pull "
+            "request of its own that changes no rule (a rule change may only remove waivers)"]
+
+
+def removed_waiver_ids(merge_base, head):
+    """The ids the head removed: in the merge-base's waiver file and not in the head's.
+
+    An entry that the base gained after the fork is not in the merge-base's file, so a head that never
+    saw it cannot have removed it.
+    """
+    return set(merge_base) - set(head)
+
+
+def effective_waivers(tip, merge_base, head):
+    """The waivers that decide the verdict: the base tip's, minus the ids the head removed."""
+    gone = removed_waiver_ids(merge_base, head)
+    return {k: v for k, v in tip.items() if k not in gone}
+
+
+def merge_base_of(repo, base, head):
+    """The merge-base sha, or a GateError: a checkout that cannot name it is never judged on the tip."""
+    r = subprocess.run(["git", "-C", repo, "merge-base", base, head], capture_output=True, text=True)
+    out = r.stdout.strip()
+    if r.returncode != 0 or not SHA.fullmatch(out):
+        raise GateError(f"no merge-base of {base[:12]} and {head[:12]} in the checkout; "
+                        "fetch the full history (actions/checkout fetch-depth: 0) and the head commit")
+    return out
 
 
 def check_waivers(waivers, head_rules):
@@ -498,21 +551,27 @@ def judge(base, head, sizes, growth_floor=GROWTH_FLOOR_S, ratio_floor=RATIO_FLOO
 
 def gate(base_rules, head_rules, waivers_base, waivers_head, sizes=SIZES, added_sizes=ADDED_SIZES,
          repeats=REPEATS, wall_cap=WALL_CAP_S, only=None, clock=time.monotonic, started=None,
-         growth_floor=GROWTH_FLOOR_S, ratio_floor=RATIO_FLOOR_S, probe_added_fully=False, budget=None):
+         growth_floor=GROWTH_FLOOR_S, ratio_floor=RATIO_FLOOR_S, probe_added_fully=False, budget=None,
+         removed_waivers=()):
     """Run the gate. Returns (rows, failures, notes); an empty failures list is a pass.
 
     One row per (regex, unit). Row ids are neutral labels `rN/uM`: regex N of the rule, unit M of
     that regex; the unit text itself is kept in the row for a local `--show-units` run only.
     """
-    # The waivers of the BASE decide every verdict. The head's file is checked for its format and
-    # nothing else: it takes effect, for the pull requests after it, once it is in the base.
+    # `waivers_base` is the set the caller built: the base's file minus the ids the head removed. It
+    # decides every verdict. The head's file is checked for its format and nothing else: an entry it
+    # adds takes effect, for the pull requests after it, once it is in the base.
     failures = check_waivers(waivers_head, head_rules)
     waivers = waivers_base or {}
     changed, added = changed_ids(base_rules, head_rules)
     # Every regex of a waived id that changed is timed, changed or not: "does not trip" is a
-    # statement about the whole id, so it cannot rest on the changed expression alone.
-    retime_all = {i for i in changed if i in waivers}
-    todo = sorted(changed)
+    # statement about the whole id, so it cannot rest on the changed expression alone. The same
+    # holds for an id whose waiver the head removed: it is judged with no waiver, and an unchanged
+    # expression of it that still trips must not be skipped, nor may an id the head left wholly
+    # unchanged (it is queued here with every expression it still has).
+    unwaived = {i for i in removed_waivers if head_rules.get(i)} - set(added)
+    retime_all = {i for i in changed if i in waivers} | unwaived
+    todo = sorted(changed | unwaived)
     new = sorted(added)
     if only is not None:
         todo, new = [i for i in todo if i in only], [i for i in new if i in only]
@@ -670,16 +729,21 @@ def main(argv=None):
             print("pattern-perf: --base and --head must be 40-character lowercase hex shas", file=sys.stderr)
             return 2
         head_src = {p: git_show(args.repo, args.head, p) for p, _ in TABLES}
-        base_src = {p: git_show(args.repo, args.base, p) for p, _ in TABLES}
         head_waiver_text = git_show(args.repo, args.head, WAIVERS)
-        base_waiver_text = git_show(args.repo, args.base, WAIVERS)
+        tip_waiver_text = git_show(args.repo, args.base, WAIVERS)       # also proves the base commit is here
+        fork = merge_base_of(args.repo, args.base, args.head)
+        base_src = {p: git_show(args.repo, fork, p) for p, _ in TABLES}
+        base_waiver_text = git_show(args.repo, fork, WAIVERS)
         w_head = read_waivers(head_waiver_text)
-        w_base = read_waivers(base_waiver_text)
+        w_fork = read_waivers(base_waiver_text)
+        w_tip = read_waivers(tip_waiver_text)
         base_rules = rules_from_sources(base_src, budget)
         head_rules = rules_from_sources(head_src, budget)
         waiver_problems = waiver_conflict(base_rules, head_rules, base_waiver_text, head_waiver_text)
-        rows, failures, notes = gate(base_rules, head_rules, w_base, w_head, wall_cap=args.wall_cap,
-                                     budget=budget)
+        rows, failures, notes = gate(base_rules, head_rules, effective_waivers(w_tip, w_fork, w_head), w_head,
+                                     wall_cap=args.wall_cap, budget=budget,
+                                     removed_waivers=removed_waiver_ids(w_fork, w_head))
+        notes.append(f"compared with the merge-base {fork[:12]}")
         failures = waiver_problems + failures
     except (GateError, ValueError, OSError) as e:
         print(f"pattern-perf: FAIL: {e}", file=sys.stderr)
