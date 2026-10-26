@@ -102,12 +102,15 @@ documented limits; the carriers still run.
 """
 from __future__ import annotations
 
+import bisect
 import ipaddress
 import json
 import re
 import urllib.parse
+from array import array
 
-__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
+__all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "EnvironmentToHttpClient", "VALIDATORS",
+           "classify_command"]
 
 # ----------------------------------------------------------------------------- JSON side
 
@@ -1537,4 +1540,1365 @@ class SettingsWithoutPrompts:
         return findings
 
 
-VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts())
+# ---------------------------------------------------------------------- source-code side
+#
+# GLS-STRUCT-002 reads Python and Node source. The reader below is not a parser of either
+# language: one pass turns the text into tokens (comments dropped, a string is one token), pairs
+# the brackets, and cuts statements and indented blocks from the tokens; then it answers three
+# questions about a call by walking tokens: which call it is, which of its arguments carry data,
+# and whether the whole process environment reaches that argument.
+
+_ENV_MAX_DEPTH = 200      # brackets nested deeper than this are not paired (calls inside are not read)
+_ENV_MAX_FINDINGS = 20
+_CALLEE_MAX_STEPS = 12    # dotted names and constructor calls read in one chain (the longest real one has 4)
+
+_PREFIX_LETTERS = "rRbBuUfF"
+
+
+def _body_pattern(quote, triple, hole):
+    escape = r"\\[\s\S]"
+    closer = re.escape(quote * 3 if triple else quote)
+    parts = [escape]
+    if not triple:
+        parts.append(r"\n")
+    parts.append(closer)
+    if hole == "f":
+        parts.extend([r"\{\{", r"\{"])
+    elif hole == "template":
+        parts.append(r"\$\{")
+    return re.compile("|".join(parts))
+
+
+_BODY = {}
+for _q in ("'", '"'):
+    for _t in (False, True):
+        _BODY[(_q, _t, "")] = _body_pattern(_q, _t, "")
+        _BODY[(_q, _t, "f")] = _body_pattern(_q, _t, "f")
+_BODY[("`", False, "template")] = re.compile(r"\\[\s\S]|`|\$\{")
+
+
+def _scan_body(s, p, spec):
+    """Walk a string body from ``p``. Returns (how, end of this piece, where scanning resumes):
+    how is 'close', 'eol', 'eof' or 'hole'. A hole is a replacement field of an f-string or a
+    ``${`` of a template; the text after its closing brace is another piece of the same string."""
+    pattern = _BODY[spec]
+    while True:
+        m = pattern.search(s, p)
+        if m is None:
+            return "eof", len(s), len(s)
+        g = m.group()
+        if g[0] == "\\" or g == "{{":
+            p = m.end()
+        elif g == "\n":
+            return "eol", m.start(), m.start()
+        elif g in ("{", "${"):
+            return "hole", m.start(), m.end()
+        else:
+            return "close", m.end(), m.end()
+
+
+# What the lexer knows about the token before a slash. A slash starts a regular-expression
+# literal at the start of the text or of a line, after an operator or an opening bracket, after a
+# keyword that takes a value (written as a name of its own: ``obj.return`` is a member, so the
+# slash after it divides), and after the closing bracket of an ``if``/``while``/``for``
+# condition. After a name, a number, a literal or any other closing bracket it divides.
+_REGEX_AFTER = frozenset("=(,:[!&|?{};+-*%<>~^")
+_REGEX_WORDS = frozenset(("return", "typeof", "in", "of", "case", "void", "throw", "else", "do",
+                          "yield", "await", "delete"))
+_CONTROL_WORDS = frozenset(("if", "while", "for", "with", "catch", "switch"))
+# What the token before an opening brace says about it: after one of these characters, or one of
+# these words, the brace opens an object literal (its closing brace ends a value); anywhere else
+# it opens a block.
+_OBJECT_AFTER = frozenset("=(,[?!&|+-*%<~^")
+_OBJECT_WORDS = frozenset(("return", "typeof", "in", "of", "yield", "await", "throw", "void", "delete", "new"))
+# Where a ``function`` or ``class`` keyword starts an expression, not a declaration: its closing
+# brace ends a value, and a slash after it divides.
+_ASSIGN_RUN = 32                        # tokens of an assignment target the reader follows
+_EXPRESSION_AFTER = _OBJECT_AFTER | frozenset(">:")
+# Words after which a round bracket opens a grouping and not an argument list.
+_EXPRESSION_WORDS = _REGEX_WORDS | frozenset(("not", "and", "or", "is", "if", "elif", "while", "assert", "lambda"))
+# Where a double slash cannot be a division when the language is not known: after one of these
+# (or at the start of the text) it opens a comment. After a name, a number, a string or a closing
+# round or square bracket it divides, unless it is the first thing on a line outside every bracket.
+_COMMENT_AFTER = frozenset(";{},(=:[!&|?+-*%<>~^}")
+# A line break outside every bracket ends a statement, unless the line ends with one of the first
+# characters or the next token is one of the second.
+_CONTINUES = frozenset("=,.+-*/%&|^<>?")
+_CONTINUED_BY = frozenset(".?&|,=*/%<>^")
+_BLOCK_WORDS = {"with": 0, "def": 1, "class": 2}
+_MOCK_FACTORIES = frozenset(("Mock", "MagicMock", "AsyncMock", "fn", "stub", "spy"))
+_MOCK_WORDS = _MOCK_FACTORIES | frozenset(("patch", "spyOn", "start", "stop", "stopall"))
+_FENCE_LANGS = {"py": "py", "python": "py", "python3": "py", "py3": "py",
+                "js": "js", "javascript": "js", "node": "js", "nodejs": "js", "mjs": "js", "cjs": "js",
+                "jsx": "js", "ts": "js", "typescript": "js", "tsx": "js"}
+
+
+def _regex_literal_end(s, i, memo):
+    """Where a JavaScript regular-expression literal that starts at the slash ``s[i]`` ends, or 0
+    when it does not close on its line: an unescaped slash outside a character class, then its
+    flags. The lexer has already decided from the token before it that a literal can start here.
+    ``memo`` holds, for every (position, inside a class) a scan has passed, the slash it closed at
+    (or -1), so that a line of unfinished literals is walked once and not once per slash."""
+    j = i + 1
+    in_class = False
+    n = len(s)
+    path = []
+    close = -1
+    while j < n and s[j] != "\n":
+        key = j * 2 + in_class
+        hit = memo.get(key)
+        if hit is not None:
+            close = hit
+            break
+        path.append(key)
+        c = s[j]
+        if c == "\\":
+            j += 2
+            continue
+        if in_class:
+            in_class = c != "]"
+        elif c == "[":
+            in_class = True
+        elif c == "/":
+            close = j
+            break
+        j += 1
+    for key in path:
+        memo[key] = close
+    if close < 0:
+        return 0
+    j = close + 1
+    while j < n and s[j].isalpha():
+        j += 1
+    return j if j - i > 2 else 0
+
+
+_TOK = re.compile(r"[^\S\n]*(?:((?:[^\W\d]|\$)[\w$]*)|(\d[\w.]*)|(\\\r?\n)|(\n)|(\S))")
+_IDENT = re.compile(r"(?:[^\W\d]|\$)[\w$]*")
+
+
+_ROOTS = frozenset(("requests", "httpx", "aiohttp", "axios", "got", "fetch", "urllib", "urllib2",
+                    "urllib3", "urlopen"))
+_GLOBALS = frozenset(("global", "globalThis", "window", "self"))
+_CTORS = frozenset(("Session", "Client", "AsyncClient", "PoolManager", "ProxyManager",
+                    "ClientSession", "create", "extend"))
+_RECEIVERS = frozenset((
+    "requests", "httpx", "aiohttp", "axios", "got", "urllib3",
+    "requests.Session()", "requests.sessions.Session()", "httpx.Client()", "httpx.AsyncClient()",
+    "aiohttp.ClientSession()", "urllib3.PoolManager()", "urllib3.ProxyManager()",
+    "axios.create()", "got.extend()"))
+_METHODS = frozenset(("get", "post", "put", "patch", "delete", "head", "options", "request", "stream"))
+_BARE = frozenset(("fetch", "axios", "got", "urlopen", "urllib.request.urlopen", "urllib2.urlopen",
+                   "urllib.request.Request", "urllib2.Request"))
+_DATA_KEYWORDS = frozenset(("json", "data", "params", "headers", "files", "content", "body", "cookies"))
+_LOCAL_HOSTS = frozenset(("localhost", "127.0.0.1", "::1"))
+
+_ENV_PICKS = frozenset(("get", "getlist", "pop", "filter", "keys", "has", "includes"))
+_ENV_VIEWS = frozenset(("items", "values"))           # a view of the values (or pairs), not of the names
+# A call that hands its argument on as the same mapping: iterating the result still gives names.
+_MAPPING_NAMES = frozenset((
+    "dict", "OrderedDict", "collections.OrderedDict", "copy", "copy.copy", "copy.deepcopy", "deepcopy",
+    "Object.assign"))
+_MAPPING_LAST = frozenset(("assign", "deepcopy"))
+# A call that hands its argument on as text or as values: the result carries the values.
+_PASS_NAMES = frozenset((
+    "str", "repr", "ascii", "bytes", "bytearray", "Map", "URLSearchParams",
+    "Object.fromEntries", "Object.entries", "Object.values"))
+_PASS_LAST = frozenset(("dumps", "stringify", "urlencode", "fromEntries", "entries", "URLSearchParams"))
+_KEYS_NAMES = frozenset(("list", "sorted", "set", "tuple", "len", "frozenset", "reversed",
+                         "Object.keys", "Object.getOwnPropertyNames", "Reflect.ownKeys"))
+
+# A name that is followed by a list literal, not an index: ``for k in [..]``, ``return [..]``.
+_BEFORE_LITERAL = frozenset(("in", "return", "and", "or", "not", "if", "else", "yield", "await", "is",
+                             "lambda", "for", "while", "elif", "assert", "print", "del", "from",
+                             "case", "of", "typeof", "void", "throw", "new", "delete", "do"))
+# What each client reads from its options object: the body, the query and the headers. ``url`` is
+# the destination of an axios config, and is read as a data field for every client.
+_CLIENT_FIELDS = {
+    "fetch": frozenset(("body", "headers")),
+    "got": frozenset(("body", "json", "form", "searchParams", "headers")),
+    "axios": frozenset(("data", "params", "headers")),
+}
+
+
+def _options_position(key):
+    """Index of the options-object argument of a fetch, got or axios call, or -1 for any other call."""
+    receiver, _, method = key.rpartition(".")
+    if method == "fetch" or key == "got" or receiver == "got" or receiver == "got.extend()":
+        return 1
+    if key == "axios" or method == "request" and receiver.startswith("axios"):
+        return 0
+    if receiver.startswith("axios"):
+        return 1 if method in ("get", "delete", "head", "options") else 2
+    return -1
+
+
+
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})([^\n]*)$", re.M)
+# A fence marks documentation only where a person wrote it. A tool result and a fetched page
+# are what an attacker hands the agent, and a fence costs three characters there.
+_NOTICE_CHANNELS = ("file", "message")
+# The package guard refuses the whole word of an environment reader as a string constant. The
+# validator has to name it to find it, so the word is built from its stem.
+_ENV_STEM = "env"
+_ENV_READER = _ENV_STEM + "iron"
+_URL_HEAD = re.compile(r"(?:https?|wss?)://([^/?#]*)", re.I)
+_PORT = re.compile(r"\d{0,5}")
+
+
+def _fence_lang(info):
+    """``py``, ``js`` or ``unknown`` from the info string of a code fence."""
+    m = re.match(r"[{.\s]*([\w+-]+)", info)
+    return _FENCE_LANGS.get(m.group(1).lower(), "unknown") if m else "unknown"
+
+
+def _fenced_segments(text, channel):
+    """Split ``text`` into (start, end, fenced, language). A real code fence (three or more backticks or
+    tildes at the start of a line, closed by the same character) of a prose text is its own
+    segment, so the fence lines are never read as a string and the words after the opening ticks
+    (the info string) are read as ordinary text; it is ``fenced`` (a notice) only in a ``file`` or
+    ``message`` text; its language comes from the info string. The ``code`` channel is never
+    split, it is source."""
+    if channel == "code" or ("```" not in text and "~~~" not in text):
+        return [(0, len(text), False, "unknown")]
+    softened = channel in _NOTICE_CHANNELS
+    segments = []
+    cursor = 0
+    opened = None
+    for m in _FENCE.finditer(text):
+        ticks, info = m.group(1), m.group(2)
+        if opened is None:
+            if ticks[0] == "`" and "`" in info:
+                continue
+            opened = (ticks[0], len(ticks), min(m.end() + 1, len(text)), _fence_lang(info))
+            segments.append((cursor, m.start(), False, "unknown"))
+            segments.append((m.start(2), m.end(2), False, "unknown"))
+        elif ticks[0] == opened[0] and len(ticks) >= opened[1] and not info.strip():
+            segments.append((opened[2], m.start(), softened, opened[3]))
+            cursor = min(m.end() + 1, len(text))
+            opened = None
+    if opened is None:
+        segments.append((cursor, len(text), False, "unknown"))
+    else:
+        segments.append((opened[2], len(text), softened, opened[3]))
+    return [seg for seg in segments if seg[1] > seg[0]]
+
+
+def _is_local_url(url):
+    """True for a literal http(s)/ws(s) URL whose host, after userinfo and port, is the local machine."""
+    m = _URL_HEAD.match(url)
+    if m is None:
+        return False
+    authority = m.group(1)
+    if any(ch in authority for ch in "\\ \t\r\n\x00"):
+        return False
+    host = authority.rpartition("@")[2]
+    if host.startswith("["):
+        end = host.find("]")
+        if end < 0 or not _PORT.fullmatch(host[end + 1:].lstrip(":")) or host[end + 1:end + 2] not in ("", ":"):
+            return False
+        host = host[1:end]
+    else:
+        host, sep, port = host.partition(":")
+        if sep and not _PORT.fullmatch(port):
+            return False
+    return host.lower() in _LOCAL_HOSTS
+
+
+def _literal_text(original):
+    """The text between the quotes of a string literal as it was written."""
+    i = 0
+    while original[i] in _PREFIX_LETTERS:
+        i += 1
+    quote = original[i]
+    width = 3 if original[i:i + 3] == quote * 3 else 1
+    return original[i + width:len(original) - width]
+
+
+
+
+class _Reader:
+    """Tokens, bracket pairs, statements and the environment references of one piece of source.
+
+    One left-to-right pass reads the text. Comments are dropped, a string is one token (an
+    f-string or a template is a run of pieces with its fields read as code), and what is
+    remembered about what came before is the last significant token, whether it ends a value
+    (a name, a literal, a closing bracket, a postfix ``++``, the brace of an object literal) and
+    whether a line break follows it: whether a slash divides or opens a regular expression, and
+    whether ``//`` opens a comment, are decided from that."""
+
+    def __init__(self, seg, lang="unknown"):
+        s = self.seg = seg
+        self.lang = lang
+        self.os_envs = self.node_envs = 0    # environment references of each runtime
+        n = len(s)
+        starts, ends = array("l"), array("l")
+        kinds = bytearray()                  # 0 punctuation, 1 name, 2 string or regex, 3 number
+        match, parent = array("l"), array("l")
+        row, ind, sstart = array("l"), array("l"), array("l")
+        flags = bytearray()                  # per opening bracket: 1 holds `for`, 2 holds `if` after it
+        self.starts, self.ends, self.kinds = starts, ends, kinds
+        self.match, self.parent, self.flags = match, parent, flags
+        self.row, self.ind, self.sstart = row, ind, sstart   # physical line, its indentation, statement start
+        self.literals = literals = {}        # start -> end of each string literal written in one piece
+        self.for_at = for_at = {}            # opening bracket -> token index of its first `for`
+        self.calls = calls = []              # token index of every name that can start a client call
+        self.envs = envs = []                # (first, last) token index of each environment reference
+        self.leads = leads = []              # first token of each line that starts outside every bracket
+        self.lead_cols = lead_cols = []      # ... and its column
+        self.mock_at = mock_at = []          # names a double can be made with
+        self.kw_at = kw_at = []              # def, class and with
+        stack, cstack, ostack, holes = [], [], [], []
+        xstack = []                          # per opening bracket: the brace of a function or class expression
+        walked = 0                           # tokens the assignment targets were read over
+        fxs = []                             # depths at which function or class expressions wait for their braces, innermost last
+        aexpr = False                        # the last ``async`` stood where an expression starts
+        closers = {")": "(", "]": "[", "}": "{"}
+        too_deep = 0
+        pk, pch, pword, pmem, pctl = 0, "", "", False, False   # the last significant token
+        pdiv = False                         # it is punctuation that ends a value (``x++``, the ``}`` of an object)
+        pv = pv2 = False                     # it, and the one before it, end a value
+        nl = False                           # a line break since it
+        cur, brk = 0, 0                      # statement start; 1 = a break waits for the next token, 2 = forced
+        clean, line_ind, rown, ls = True, 0, 0, 0
+        rx_memo = {}                         # (position, inside a class) -> where a literal that passes it closes
+        self.assign_at = assign_at = []      # names an assignment binds: ``a = ..``, ``a, b = ..``, ``q = a = ..``, ``a: T = ..``
+
+        def assigned(idx, a):
+            """Record the names the plain ``=`` at token ``idx`` binds. The target is the run of names,
+            commas, ``*`` and brackets that ends just before it and starts at the statement or at an
+            earlier ``=`` of the chain, at the nesting level the statement started at (at most
+            ``_ASSIGN_RUN`` tokens); an annotated name and a walrus bind the name before the colon."""
+            nonlocal walked
+            prev = idx - 1
+            if prev < 0:
+                return
+            lo = sstart[prev]
+            if kinds[prev] == 0 and s[starts[prev]] == ":" and ends[prev] == a:
+                if prev >= 1 and kinds[prev - 1] == 1:
+                    assign_at.append(prev - 1)         # ``(p := value)``
+                return
+            if lang != "js" and lo + 1 < prev and kinds[lo] == 1 and kinds[lo + 1] == 0 \
+                    and s[starts[lo + 1]] == ":" and (kinds[prev] != 0 or s[starts[prev]] in ")]"):
+                assign_at.append(lo)                   # ``p: Type = value``
+                return
+            if kinds[prev] == 0 and s[starts[prev]] not in ")]":
+                return
+            k = prev
+            while k >= lo and prev - k < _ASSIGN_RUN:
+                if kinds[k] == 1:
+                    pass
+                elif kinds[k] == 0 and s[starts[k]] in ",*()[]":
+                    pass
+                elif kinds[k] == 0 and s[starts[k]] == "=" and k < prev:
+                    break
+                else:
+                    return
+                k -= 1
+            else:
+                if k >= lo:
+                    return                             # a longer target is not read
+            walked += prev - k
+            first = k + 1
+            if first > prev or parent[prev] != parent[first]:
+                return
+            for j in range(first, prev + 1):
+                if kinds[j] == 1 and not (j < prev and kinds[j + 1] == 0 and s[starts[j + 1]] in "(["):
+                    assign_at.append(j)
+
+        def emit(a, b, kind, w=None):
+            nonlocal cur, brk, clean, line_ind, pk, pch, pword, pmem, pctl, pdiv, pv, pv2, nl, too_deep, aexpr
+            idx = len(starts)
+            c = s[a]
+            ppk, pw, pm, ppch = pk, pword, pmem, pch
+            was_val2 = pv2
+            member = pk == 3 and pch == "."
+            if brk:
+                if brk == 2 or kind != 0 or c not in _CONTINUED_BY:
+                    cur = idx
+                brk = 0
+            starts.append(a)
+            ends.append(b)
+            kinds.append(kind)
+            match.append(-1)
+            parent.append(stack[-1] if stack else -1)
+            flags.append(0)
+            row.append(rown)
+            sstart.append(cur)
+            if clean:
+                line_ind = a - ls
+                if not stack and not too_deep:
+                    leads.append(idx)
+                    lead_cols.append(line_ind)
+                clean = False
+            ind.append(line_ind)
+            nl = False
+            pctl = pdiv = False
+            if kind == 1:
+                pk, pword, pmem = 1, w, member
+                if not member:
+                    here = (ppk == 3 and ppch in _EXPRESSION_AFTER) or (ppk == 1 and pw in _OBJECT_WORDS and not pm)
+                    if w == "async":
+                        aexpr = here
+                    elif w == "function" or w == "class":
+                        if here or (ppk == 1 and pw == "async" and aexpr):
+                            fxs.append(len(stack))
+                if w in _ROOTS:
+                    calls.append(idx)
+                elif w == _ENV_READER or w == _ENV_STEM:
+                    first = self._env_owner(idx, "os" if w == _ENV_READER else "process")
+                    if first >= 0:
+                        envs.append((first, idx))
+                        if w == _ENV_READER:
+                            self.os_envs += 1
+                        else:
+                            self.node_envs += 1
+                elif stack and w == "for":
+                    if not flags[stack[-1]] & 1:
+                        for_at[stack[-1]] = idx
+                    flags[stack[-1]] |= 1
+                elif stack and w == "if" and flags[stack[-1]] & 1:
+                    flags[stack[-1]] |= 2
+                if w in _MOCK_WORDS:
+                    mock_at.append(idx)
+                elif w in _BLOCK_WORDS and not member:
+                    kw_at.append(idx)
+            elif kind != 0:
+                pk = 2
+            else:
+                pk, pch = 3, c
+                if c in "+-" and ppk == 3 and ppch == c and ends[idx - 1] == a and was_val2 \
+                        and row[idx - 2] == rown:
+                    pdiv = True                # ``x++``: the value is still there after the sign
+                elif c == "=" and s[b:b + 1] not in ("=", ">"):
+                    assigned(idx, a)
+                if c in "([{":
+                    if len(stack) >= _ENV_MAX_DEPTH:
+                        too_deep += 1          # left unpaired; its closer is skipped below
+                    else:
+                        stack.append(idx)
+                        cstack.append(c == "(" and ppk == 1 and pw in _CONTROL_WORDS and not pm)
+                        xstack.append(c == "{" and bool(fxs) and fxs[-1] == len(stack) - 1)
+                        if xstack[-1]:
+                            fxs.pop()
+                        ostack.append(c == "{" and (
+                            ppk == 3 and (ppch in _OBJECT_AFTER or ppch == ":" and not (
+                                stack[:-1] and s[starts[stack[-2]]] == "{" and not ostack[-1]))
+                            or ppk == 1 and pw in _OBJECT_WORDS and not pm))
+                    if c == "{" and holes:
+                        holes[-1][1] += 1
+                elif c in closers and too_deep:
+                    too_deep -= 1
+                elif c in closers and stack and s[starts[stack[-1]]] == closers[c]:
+                    opener = stack.pop()
+                    pctl = cstack.pop() and c == ")"
+                    obj, fun = ostack.pop(), xstack.pop()
+                    pdiv = (obj or fun) and c == "}"
+                    while fxs and fxs[-1] > len(stack):
+                        fxs.pop()
+                    match[opener] = idx
+                    match[idx] = opener
+                    parent[idx] = parent[opener]
+                elif c == ";" and not stack and not too_deep:
+                    brk = 2
+                if c == ";":
+                    while fxs and fxs[-1] >= len(stack):
+                        fxs.pop()
+            pv2, pv = pv, kind in (2, 3) or (kind == 1 and (member or w not in _REGEX_WORDS)) or (
+                kind == 0 and (pdiv or c in ")]" and not pctl))
+
+        def string(a, p, spec, whole):
+            """Read one piece of a string that starts at ``a`` with its body at ``p``; returns where
+            code resumes."""
+            nonlocal rown, ls, pk, pch
+            how, blank_to, resume = _scan_body(s, p, spec)
+            if blank_to > a:
+                emit(a, blank_to, 2)
+            if how == "close" and whole:
+                literals[a] = resume
+            lines = s.count("\n", a, resume)
+            if lines:
+                rown += lines
+                ls = s.rfind("\n", a, resume) + 1
+            if how == "hole":
+                emit(resume - 1, resume, 0)
+                holes.append([spec, 0])
+            pk, pch = 2, ""
+            return resume
+
+        pos = 0
+        while True:
+            m = _TOK.match(s, pos)
+            if m is None:
+                break
+            g = m.lastindex
+            a, b = m.span(g)
+            pos = b
+            if g == 1:
+                w = m.group(1)
+                if len(w) <= 2 and s[b:b + 1] in ("'", '"') and not w.strip(_PREFIX_LETTERS):
+                    q = s[b]
+                    triple = s[b:b + 3] == q * 3
+                    pos = string(a, b + (3 if triple else 1), (q, triple, "f" if "f" in w.lower() else ""), True)
+                else:
+                    emit(a, b, 1, w)
+            elif g == 2:
+                emit(a, b, 3)
+            elif g == 3:
+                rown += 1
+                ls = b
+            elif g == 4:
+                rown += 1
+                ls = b
+                clean = nl = True
+                if not stack and not too_deep and pk and not brk and not (pk == 3 and pch in _CONTINUES):
+                    brk = 1
+            else:
+                c = s[a]
+                if c == "/" and lang != "py":
+                    nxt = s[b:b + 1]
+                    if nxt == "/" and (lang == "js" or lang == "node" or pk == 0 or (pk == 3 and pch in _COMMENT_AFTER)
+                                       or (pk == 1 and pword in _REGEX_WORDS and not pmem)
+                                       or (clean and not stack and not too_deep)):
+                        e = s.find("\n", a)
+                        pos = n if e < 0 else e
+                    elif nxt == "*":
+                        e = s.find("*/", a + 2)
+                        e = n if e < 0 else e + 2
+                        lines = s.count("\n", a, e)
+                        if lines:
+                            rown += lines
+                            ls = s.rfind("\n", a, e) + 1
+                            clean, nl = False, True
+                            if not stack and not too_deep and pk and not brk \
+                                    and not (pk == 3 and pch in _CONTINUES):
+                                brk = 1
+                        pos = e
+                    else:
+                        regex = (pk == 0 or (pk == 3 and ((pch in _REGEX_AFTER and not pdiv) or (pch == ")" and pctl)
+                                                          or (pch == "." and s[ends[-1] - 3:ends[-1]] == "...")))
+                                 or (pk == 1 and pword in _REGEX_WORDS and not pmem))
+                        if nl and not regex:
+                            regex = b < n and not s[b].isspace()      # a line that starts with ``/`` after a value
+                        end = _regex_literal_end(s, a, rx_memo) if regex else 0
+                        if end:
+                            emit(a, end, 2)
+                            pos = end
+                        else:
+                            emit(a, b, 0)
+                elif c == "#":
+                    private = lang == "js" or (pk == 3 and pch == "." and ends[-1] == a)
+                    im = _IDENT.match(s, b) if private else None
+                    if im is not None:
+                        emit(a, im.end(), 1, s[a:im.end()])        # a private name, ``this.#x``
+                        pos = im.end()
+                    elif lang == "js":
+                        emit(a, b, 0)
+                    else:
+                        e = s.find("\n", a)
+                        pos = n if e < 0 else e
+                elif c == "`":
+                    pos = string(a, b, ("`", False, "template"), True)
+                elif c in "'\"":
+                    triple = s[a:a + 3] == c * 3
+                    pos = string(a, a + (3 if triple else 1), (c, triple, ""), True)
+                elif c == "}" and holes:
+                    emit(a, b, 0)
+                    if holes[-1][1] == 0:
+                        pos = string(b, b, holes.pop()[0], False)
+                    else:
+                        holes[-1][1] -= 1
+                else:
+                    emit(a, b, 0)
+        self.count = len(starts)
+        self.work = self.count + len(rx_memo) + walked
+        self.env_first = [e[0] for e in envs]
+        self.need = {}
+        self.group = {}
+        self.dotted = {}
+
+    def _env_owner(self, idx, owner):
+        """First token of the owner of the environment reader named at token ``idx`` (``os`` for the
+        reader, ``process`` for the stem), or -1. The owner may sit in transparent parentheses:
+        ``(os).environ``. ``other.os`` is not the owner the program holds."""
+        starts, kinds, match, s = self.starts, self.kinds, self.match, self.seg
+        j = idx - 1
+        if j < 1 or kinds[j] != 0 or s[starts[j]] != ".":
+            return -1
+        o = first = j - 1
+        if kinds[o] == 0 and s[starts[o]] == ")":
+            first = match[o]
+            if first > 0 and self._is_call_before(first - 1):
+                return -1
+            while kinds[o] == 0 and s[starts[o]] == ")":
+                m = match[o]
+                if m == -1:
+                    return -1
+                if m + 2 == o:
+                    o -= 1
+                    break
+                if kinds[o - 1] == 0 and s[starts[o - 1]] == ")" and match[o - 1] == m + 1:
+                    o -= 1
+                    continue
+                return -1
+        if kinds[o] != 1 or s[starts[o]:self.ends[o]] != owner or first < 0:
+            return -1
+        return first if self._owns(first, starts, self.ends, kinds) else -1
+
+    def _is_call_before(self, j):
+        """True when the token ``j`` just before an opening round bracket makes it an argument list
+        or an index: a name that is not a keyword, a closing bracket, a string or a number."""
+        kind = self.kinds[j]
+        if kind == 1:
+            return self.word(j) not in _EXPRESSION_WORDS
+        if kind == 0:
+            return self.seg[self.starts[j]] in ")]"
+        return True
+
+    def blocks(self):
+        """[[keyword, colon, end, kind, ...]] for every ``def`` (kind 1), ``class`` (2) and ``with``
+        (0) that starts a statement or follows ``async``; ``end`` is the first token after the block.
+        The header ends at the first colon outside brackets in the same statement. A body that
+        follows the colon on its line ends with the line; any other body ends at the first line that
+        starts outside every bracket with an indentation no deeper than the statement's. One pass
+        over the keywords and one over the line starts."""
+        starts, kinds, match, parent = self.starts, self.kinds, self.match, self.parent
+        sstart, row, s, count = self.sstart, self.row, self.seg, self.count
+        out, open_ones = [], []
+        scanned = 0
+        for kw in self.kw_at:
+            h = sstart[kw]
+            if h != kw and not (h == kw - 1 and kinds[h] == 1 and s[starts[h]:self.ends[h]] == "async"):
+                continue
+            p = parent[kw]
+            colon = -1
+            j = kw + 1
+            while j < count and sstart[j] == h:
+                scanned += 1
+                if kinds[j] == 0:
+                    c = s[starts[j]]
+                    if c == ":" and parent[j] == p:
+                        colon = j
+                        break
+                    if c in "([{":
+                        if match[j] == -1:
+                            break
+                        j = match[j]
+                j += 1
+            if colon < 0:
+                continue
+            kind = _BLOCK_WORDS[s[starts[kw]:self.ends[kw]]]
+            if colon + 1 < count and row[colon + 1] == row[colon]:
+                out.append([kw, colon, bisect.bisect_right(row, row[colon], colon + 1), kind])
+            else:
+                block = [kw, colon, count, kind, self.ind[h]]
+                out.append(block)
+                open_ones.append(block)
+        open_ones.sort(key=lambda b: b[1])
+        pending, k = [], 0
+        for li, lead in enumerate(self.leads):
+            while k < len(open_ones) and open_ones[k][1] < lead:
+                pending.append(open_ones[k])
+                k += 1
+            while pending and pending[-1][4] >= self.lead_cols[li]:
+                pending.pop()[2] = lead
+        self.work += scanned + len(self.leads) + len(open_ones)
+        return out
+
+    def _member_of_other(self, k, starts, kinds):
+        """True when the name at token ``k`` is written after a dot that follows a name, a literal
+        or a closing bracket: ``other.os``, ``other. os`` and ``(other).os`` all take ``os`` from
+        something else. A run of dots before it (a spread) does not."""
+        return k >= 2 and kinds[k - 1] == 0 and self.seg[starts[k - 1]] == "." \
+            and (kinds[k - 2] != 0 or self.seg[starts[k - 2]] in ")]")
+
+    def _owns(self, k, starts, ends, kinds):
+        """True when the owner name at token ``k`` (``os``, ``process``) is the one the program
+        holds: written alone, or after one global object (``globalThis.process``) that is itself
+        not a member of something else."""
+        if not self._member_of_other(k, starts, kinds):
+            return True
+        g = k - 2
+        return kinds[g] == 1 and self.seg[starts[g]:ends[g]] in _GLOBALS \
+            and not self._member_of_other(g, starts, kinds)
+
+    def word(self, i):
+        return self.seg[self.starts[i]:self.ends[i]]
+
+    def is_name(self, i):
+        return 0 <= i < self.count and self.kinds[i] == 1
+
+    def is_punct(self, i, ch):
+        return 0 <= i < self.count and self.kinds[i] == 0 and self.seg[self.starts[i]] == ch
+
+    # ---- which call
+
+    def callee(self, t):
+        """(key, index of the name before the argument list) for a client call starting at name
+        ``t``, or None. A constructor in the chain reads as ``Name()``. A dot in the chain joins two
+        names only when it touches one of them (``axios\n  .post`` does, ``requests . post`` does not);
+        a dot before the first name is member access only when it touches the name."""
+        if t > 0 and self.is_punct(t - 1, ".") and self.starts[t - 1] + 1 == self.starts[t]:
+            if not (t >= 2 and self.is_name(t - 2) and self.word(t - 2) in _GLOBALS):
+                return None
+        parts = [self.word(t)]
+        j = t
+        self.work += 1
+        for _ in range(_CALLEE_MAX_STEPS):
+            self.work += 1
+            if self.is_punct(j + 1, ".") and self.is_name(j + 2) \
+                    and (self.ends[j] == self.starts[j + 1] or self.ends[j + 1] == self.starts[j + 2]):
+                parts.append(self.word(j + 2))
+                j += 2
+            elif self.is_punct(j + 1, "(") and parts[-1] in _CTORS and self.match[j + 1] != -1 \
+                    and self.is_punct(self.match[j + 1] + 1, "."):
+                parts[-1] += "()"
+                j = self.match[j + 1]
+            else:
+                break
+        else:
+            return None                        # no client chain is this long
+        if not self.is_punct(j + 1, "(") or self.match[j + 1] == -1:
+            return None
+        key = ".".join(parts)
+        receiver, _, method = key.rpartition(".")
+        if key in _BARE or (receiver in _RECEIVERS and method in _METHODS):
+            return key, j
+        return None
+
+    def arguments(self, opener):
+        """[(first token, end token)] for the top-level arguments between ``opener`` and its closer."""
+        close = self.match[opener]
+        out = []
+        lo = opener + 1
+        i = lo
+        self.work += 1
+        while i < close:
+            self.work += 1
+            if self.kinds[i] == 0:
+                ch = self.seg[self.starts[i]]
+                if ch in "([{" and self.match[i] != -1:
+                    i = self.match[i] + 1
+                    continue
+                if ch == ",":
+                    out.append((lo, i))
+                    lo = i + 1
+            i += 1
+        out.append((lo, close))
+        return out
+
+    def dotted_before(self, o):
+        """Start index and text of the dotted name written right before the bracket at ``o``. Read
+        once per bracket: every reference inside it asks again."""
+        if o in self.dotted:
+            return self.dotted[o]
+        j = o - 1
+        if not self.is_name(j):
+            found = None
+        else:
+            while j >= 2 and self.is_punct(j - 1, ".") and self.is_name(j - 2):
+                j -= 2
+            self.work += (o - j) // 2 + 1
+            found = j, ".".join(self.word(k) for k in range(j, o, 2))
+        self.dotted[o] = found
+        return found
+
+    # ---- does the whole environment reach the argument
+
+    def _level(self, a, b, keys_view):
+        """One step outward from the unit of tokens a..b: what is written after it, then the
+        bracket around it. Returns ('stop', need) when something there selects (``need`` is the
+        first token the argument must start at for that selection to count), ('root',) when no
+        bracket is left, or ('up', start, close, keys_view) for the group the unit became."""
+        self.work += 1
+        while True:                            # methods and attributes written after the unit
+            nxt = b + 1
+            if self.is_punct(nxt, "["):
+                return ("stop", a)
+            if self.is_punct(nxt, ".") and self.is_name(nxt + 1):
+                name = self.word(nxt + 1)
+                if self.is_punct(nxt + 2, "(") and self.match[nxt + 2] != -1:
+                    if name in _ENV_PICKS:
+                        return ("stop", a)
+                    if name in _ENV_VIEWS:
+                        keys_view = 2 if name == "items" else 0
+                    b = self.match[nxt + 2]
+                    continue
+                return ("stop", a)             # one named variable
+            break
+        o = self.parent[a]
+        if o == -1:
+            return ("root",)
+        kind = self.word(o)
+        close = self.match[o]
+        flag = self.flags[o]
+        if close == -1 or flag == 3:           # unclosed, or a comprehension with a condition
+            return ("stop", o)
+        if flag & 1:
+            if a < self.for_at[o]:
+                keys_view = 0                  # the unit is the body: every value goes into the result
+            elif keys_view == 1 or keys_view == 2 and self._names_comprehension(o):
+                return ("stop", o)             # iterating names only
+        start = o
+        if kind == "(":
+            found = self.dotted_before(o)
+            if found is not None:
+                start, name = found
+                last = name.rpartition(".")[2]
+                if name == "filter":
+                    return ("stop", o)
+                if name == "len":
+                    return ("stop", o)         # a count carries no value
+                if name in _KEYS_NAMES or last == "keys":
+                    if keys_view == 1:
+                        return ("stop", o)
+                elif name in _MAPPING_NAMES or last in _MAPPING_LAST:
+                    pass
+                elif name in _PASS_NAMES or last in _PASS_LAST:
+                    keys_view = 0
+                elif not (a == o + 1 and b == close - 1):
+                    return ("stop", o)         # unknown function with other arguments
+        elif kind == "[":
+            if o > 0 and (self.kinds[o - 1] in (1, 2, 3) and self.word(o - 1) not in _BEFORE_LITERAL
+                          or self.is_punct(o - 1, ")") or self.is_punct(o - 1, "]")):
+                return ("stop", o)             # an index into something else
+            keys_view = 0
+        else:
+            keys_view = 0
+        return ("up", start, close, keys_view)
+
+    def _names_comprehension(self, o):
+        """True for ``[key for key, value in ...]``: the bracket at ``o`` keeps the first name of
+        each pair and nothing else."""
+        if not (self.is_name(o + 1) and self.word(o + 2) == "for"):
+            return False
+        k = o + 4 if self.is_punct(o + 3, "(") else o + 3
+        return self.word(k) == self.word(o + 1) and self.is_punct(k + 1, ",") and self.is_name(k + 2)
+
+    def need_for(self, e):
+        """For environment reference ``e``: None when the whole environment reaches the root of
+        any argument unselected, else the token index ``need`` such that an argument starting at
+        or before ``need`` sees a selection and one starting after it does not. Climbs are shared
+        between references (memoised per bracket), so the cost is linear in the text."""
+        if e in self.need:
+            return self.need[e]
+        a, b = self.envs[e]
+        result = self._level(a, b, 1)
+        path = []
+        while result[0] == "up":
+            key = (result[1], result[3])
+            if key in self.group:
+                outcome = self.group[key]
+                break
+            path.append(key)
+            result = self._level(result[1], result[2], result[3])
+        else:
+            outcome = result[1] if result[0] == "stop" else None
+        for key in path:
+            self.group[key] = outcome
+        self.need[e] = outcome
+        return outcome
+
+
+_EVIDENCE_NOTE = "environment"
+
+
+class EnvironmentToHttpClient:
+    """GLS-STRUCT-002: source code hands the whole process environment to an HTTP client."""
+
+    id = "GLS-STRUCT-002"
+    name = "Code sends the whole process environment to an HTTP client"
+    category = "exfiltration"
+    severity = "high"
+    channel = ["file", "code", "tool_output", "message", "web_content"]
+    reads_channel = True
+    description = ("Python or Node source in which the whole process environment, every variable the "
+                   "process holds including tokens and keys, is written as the data-bearing argument "
+                   "of an HTTP client call.")
+    _EXAMPLE = ("A call in a code block of a document that hands the whole process environment "
+                "to an HTTP client. The text shows the call; this is a notice, not a verdict.")
+
+    _CLIENT_WORDS = ("requests", "httpx", "aiohttp", "urllib", "axios", "fetch", "got", "urlopen")
+
+    def pregate(self, text):
+        if _ENV_READER not in text and not ("process" in text and _ENV_STEM in text):
+            return False
+        return any(word in text for word in self._CLIENT_WORDS)
+
+    def run(self, text, channel="file"):
+        findings = []
+        room = {False: _ENV_MAX_FINDINGS, True: _ENV_MAX_FINDINGS}
+        for start, end, fenced, lang in _fenced_segments(text, channel):
+            if room[fenced] <= 0:
+                if not room[False]:
+                    break
+                continue
+            segment = text[start:end]
+            if _ENV_STEM not in segment:
+                continue
+            found = self._read(text, start, segment, fenced, room[fenced], lang)
+            room[fenced] -= len(found)
+            findings.extend(found)
+        # A notice (a fenced example) must never push a bare call past the cap: keep the
+        # worst findings, in text order within a severity.
+        findings.sort(key=lambda f: f["severity"] != "high")
+        return findings[:_ENV_MAX_FINDINGS]
+
+    def _mocks(self, reader):
+        """{name: (los, his)}: the stretches of the segment, as token indices merged and in order,
+        where a client call is replaced by a double. An assignment, ``spyOn`` or ``stub`` holds to
+        the end of the text. ``patch`` holds inside its ``with`` block (the header may span lines),
+        inside the function or class it decorates, or from ``.start()`` until the ``.stop()`` of the
+        same patcher, a ``patch.stopall()``, the end of the function that started it, or the end of
+        the text. A patcher is the variable it was bound to, as the whole statement
+        ``name = patch(...)``, in the function that holds the assignment (a class body is visible
+        only from itself) until the variable is assigned something else (a plain, tuple, list,
+        starred, annotated, walrus or chained assignment; a target longer than 32 tokens, an
+        augmented assignment and a rebinding by ``for``, ``as``, ``import``, ``def``, ``del`` or
+        ``global`` are not read); a ``patch`` call whose result is used as a value holds nothing;
+        a decorator counts when it is the ``patch`` call itself, and a ``patch`` call written in
+        grouping parentheses is the same call as a decorator, as the whole value of an assignment
+        and before ``.start()``; a stop or stopall counts only in the function that started the
+        patch, a ``patch`` that is built and never started replaces nothing, and a ``with`` block
+        holds a patch only when its header enters it (a patch written inside another manager's
+        argument is not entered; one manager may sit in any number of parentheses, and a variable is
+        looked up through every enclosing function, both within the depth to which brackets are
+        paired). Names match exactly, so ``patch("pkg.requests.post")`` does not stand in for
+        ``requests.post``. One sweep over the tokens that can make a double."""
+        if not reader.mock_at:
+            return {}
+        blocks = reader.blocks()
+        withs = [b for b in blocks if b[3] == 0]
+        scopes = sorted((b for b in blocks if b[3]), key=lambda b: b[1])
+        s, starts, ends, kinds, sstart = reader.seg, reader.starts, reader.ends, reader.kinds, reader.sstart
+        count = reader.count
+        is_name, is_punct, word = reader.is_name, reader.is_punct, reader.word
+        found = {}
+        ivs = []                           # [name, first token, end token or None, cap] of started patches
+        by_key, by_scope = {}, {}          # open patches by (patcher, function) and by function
+        bound = {}                         # variable -> [[depth, function, value]], outermost first; the value is (serial, target) or False once the variable holds something else
+        in_class = {}                      # (variable, class) -> the same, for an assignment in a class body
+        deco = {}                          # statement start of a decorator -> [target]
+        stack, hdr = [], []                # functions and classes around the token; open ``with`` headers
+        si = wi = serial = 0
+        first_memo, chains_done = {}, set()
+        assigns = set(reader.assign_at)
+
+        def chain_first(t):
+            """First name of the dotted chain that holds the name at token ``t``; every name of a
+            chain shares the answer."""
+            path = []
+            while t not in first_memo and t >= 2 and is_punct(t - 1, ".") and is_name(t - 2):
+                path.append(t)
+                t -= 2
+            first = first_memo.get(t, t)
+            path.append(t)
+            for k in path:
+                first_memo[k] = first
+            return first
+
+        def add(name, lo, hi):
+            for prefix in ("global.", "globalThis.", "window.", "self."):
+                if name.startswith(prefix):
+                    name = name[len(prefix):]
+            found.setdefault(name, []).append((lo, hi))
+
+        def literal(i):
+            if 0 <= i < count and kinds[i] == 2 and reader.literals.get(starts[i]) == ends[i]:
+                return _literal_text(s[starts[i]:ends[i]])
+            return None
+
+        def dotted(i):
+            """(token after, text) of the dotted name that starts at token ``i``, or None."""
+            if not is_name(i):
+                return None
+            j = i
+            while is_punct(j + 1, ".") and is_name(j + 2):
+                j += 2
+            return j + 1, ".".join(word(k) for k in range(i, j + 1, 2))
+
+        def argument_ends(i):
+            return is_punct(i, ",") or is_punct(i, ")")
+
+        def patch_target(t):
+            """(target, opening bracket, token after the last argument) of ``patch("x")`` or
+            ``patch.object(obj, "x")`` at ``t``."""
+            if is_punct(t + 1, "("):
+                name = literal(t + 2)
+                if name is not None and argument_ends(t + 3):
+                    return name, t + 1, t + 3
+            elif is_punct(t + 1, ".") and is_name(t + 2) and word(t + 2) == "object" and is_punct(t + 3, "("):
+                owner = dotted(t + 4)
+                if owner is not None and is_punct(owner[0], ","):
+                    name = literal(owner[0] + 1)
+                    if name is not None and argument_ends(owner[0] + 2):
+                        return (name if owner[1] in _GLOBALS else owner[1] + "." + name), t + 3, owner[0] + 2
+            return None
+
+        def open_patch(target, t, key, scope):
+            ivs.append([target, t, None, stack[-1][2] if stack else count])
+            by_scope.setdefault(scope, []).append(len(ivs) - 1)
+            if key is not None:
+                by_key.setdefault(key, []).append(len(ivs) - 1)
+
+        def close_patches(group, t):
+            for i in group or ():
+                if ivs[i][2] is None:
+                    ivs[i][2] = t
+            if group:
+                group.clear()
+
+        def ends_statement(close):
+            """True when the call that closes at token ``close`` is the whole of its statement: a
+            method call or an operator after it makes the statement hold something else."""
+            nxt = close + 1
+            return close != -1 and (nxt >= count or is_punct(nxt, ";") or sstart[nxt] != sstart[close])
+
+        def manages(w, first, close):
+            """True when the patch call at ``first``..``close`` is one of the context managers the
+            ``with`` header ``w`` enters, and not merely written inside another manager's argument."""
+            kw, colon = w[0], w[1]
+            after = close + 1
+            if close == -1 or not (after == colon or is_punct(after, ",") or is_punct(after, ")")
+                                    or is_name(after) and word(after) == "as"):
+                return False
+            if reader.parent[first] == reader.parent[kw]:
+                return first == kw + 1 or is_punct(first - 1, ",")
+            lo, hi = first, close
+            o = reader.parent[first]
+            while True:
+                reader.work += 1
+                if o < 0 or not is_punct(o, "("):
+                    return False
+                if o == kw + 1:
+                    end = reader.match[o] + 1
+                    return (end == colon or is_punct(end, ",") or is_name(end) and word(end) == "as") \
+                        and (lo == o + 1 or is_punct(lo - 1, ","))
+                if lo != o + 1 or not is_punct(hi + 1, ")"):
+                    return False          # an inner layer is one parenthesized manager, not a tuple
+                lo, hi = o, reader.match[o]
+                o = reader.parent[o]
+
+        def unwrap(first, close, base):
+            """The token that closes the outermost grouping around the call at ``first``..``close``
+            when the layers are nothing but parentheses and the outermost one opens at ``base``
+            (the call itself when ``first`` is ``base``); -1 otherwise. The call never starts before
+            ``base``, and a call whose closer was not found has no match to equal."""
+            hi = close
+            for lo in range(first - 1, base - 1, -1):
+                reader.work += 1
+                if not is_punct(lo, "(") or reader.match[lo] != hi + 1:
+                    return -1
+                hi += 1
+            return hi
+
+        def started(close):
+            """True when the call that closes at token ``close`` is followed by ``.start(``."""
+            return close != -1 and is_punct(close + 1, ".") and is_name(close + 2) \
+                and word(close + 2) == "start" and is_punct(close + 3, "(")
+
+        def alive(chain):
+            """Drop from the end of ``chain`` the bindings of functions that have ended."""
+            while chain:
+                depth, owner = chain[-1][0], chain[-1][1]
+                if depth == 0 or depth <= len(stack) and stack[depth - 1][0] == owner:
+                    break
+                chain.pop()
+                reader.work += 1
+
+        def bind(name, value):
+            """``name`` holds ``value`` (a patcher, or False for something else) from here on, in
+            the function that holds the assignment."""
+            reader.work += 1
+            if stack and stack[-1][3] == 2:
+                in_class[(name, stack[-1][0])] = value
+                return
+            chain = bound.setdefault(name, [])
+            alive(chain)
+            chain.append([len(stack), stack[-1][0] if stack else -1, value])
+
+        def resolve(name):
+            """(serial, target) of the patcher bound to ``name`` where it is visible from here: the
+            innermost function or class body that holds it, then the enclosing functions, from the
+            nearest one outward, then the module. A class body is looked in only from itself."""
+            reader.work += 1
+            if stack and stack[-1][3] == 2 and (name, stack[-1][0]) in in_class:
+                return in_class[(name, stack[-1][0])] or None
+            chain = bound.get(name)
+            if not chain:
+                return None
+            alive(chain)
+            return chain[-1][2] or None if chain else None
+
+        mock_set = set(reader.mock_at)
+        for t in sorted(mock_set | assigns):
+            while si < len(scopes) and scopes[si][1] < t:
+                while stack and stack[-1][2] <= scopes[si][1]:
+                    stack.pop()
+                stack.append(scopes[si])
+                si += 1
+            while stack and stack[-1][2] <= t:
+                stack.pop()
+            while wi < len(withs) and withs[wi][0] < t:
+                if withs[wi][1] > t:
+                    hdr.append(withs[wi])
+                wi += 1
+            while hdr and hdr[-1][1] < t:
+                hdr.pop()
+            scope = stack[-1][0] if stack else -1
+            name = word(t)
+            if t in assigns:
+                bind(name, False)                      # the variable holds something else from here on
+                if t not in mock_set:
+                    continue
+            if name == "patch":
+                hit = patch_target(t)
+                if hit is None:
+                    continue
+                target, opener, tail = hit
+                head = sstart[t]
+                close = reader.match[opener]
+                if close == -1 and is_punct(tail, ")"):
+                    close = tail               # the bracket is too deep to be paired, its closer is the one that ends the arguments
+                first = chain_first(t)
+                variable = is_name(head) and is_punct(head + 1, "=") and not is_punct(head + 2, "=")
+                if hdr and manages(hdr[-1], first, close):
+                    add(target, t, hdr[-1][2])
+                elif kinds[head] == 0 and s[starts[head]] == "@":
+                    end = unwrap(first, close, head + 1)
+                    if end != -1 and ends_statement(end):
+                        deco.setdefault(head, []).append(target)
+                elif started(close):
+                    open_patch(target, t, None, scope)
+                else:
+                    end = unwrap(first, close, head + 2 if variable else head)
+                    if end != -1 and started(end):
+                        open_patch(target, t, None, scope)
+                    elif end != -1 and variable and ends_statement(end):
+                        bind(word(head), (serial, target))
+                        serial += 1
+            elif name in ("spyOn", "stub") and is_punct(t + 1, "("):
+                owner = dotted(t + 2)
+                if owner is not None and is_punct(owner[0], ","):
+                    method = literal(owner[0] + 1)
+                    if method is not None and argument_ends(owner[0] + 2):
+                        add(method if owner[1] in _GLOBALS else owner[1] + "." + method, t, count)
+            elif name in ("start", "stop", "stopall") and is_punct(t - 1, ".") and is_punct(t + 1, "("):
+                receiver = t - 2
+                if name == "stopall":
+                    if is_name(receiver) and word(receiver) == "patch":
+                        close_patches(by_scope.get(scope), t)
+                elif is_name(receiver) and not is_punct(receiver - 1, "."):
+                    hit = resolve(word(receiver))
+                    if hit is not None:
+                        if name == "start":
+                            open_patch(hit[1], t, (hit[0], scope), scope)
+                        else:
+                            close_patches(by_key.get((hit[0], scope)), t)
+            if name in _MOCK_FACTORIES:
+                j = chain_first(t)
+                if j not in chains_done and j >= 2 and is_punct(j - 1, "=") and is_name(j - 2):
+                    chains_done.add(j)
+                    left = chain_first(j - 2)
+                    reader.work += j - left
+                    if not is_punct(left - 1, "."):
+                        add(".".join(word(k) for k in range(left, j - 1, 2)), left, count)
+        for target, lo, hi, cap in ivs:
+            add(target, lo, min(cap, hi) if hi is not None else cap)
+        for block in blocks:
+            if not block[3]:
+                continue
+            head = sstart[block[0]]
+            while head > 0 and kinds[sstart[head - 1]] == 0 and s[starts[sstart[head - 1]]] == "@":
+                head = sstart[head - 1]
+                for target in deco.get(head, ()):
+                    add(target, block[0], block[2])
+        reader.work += len(mock_set) + len(assigns) + len(ivs) + len(first_memo)
+        merged = {}
+        for name, spans in found.items():
+            spans.sort()
+            los, his = [], []
+            for lo, hi in spans:
+                if his and lo <= his[-1]:
+                    his[-1] = max(his[-1], hi)
+                else:
+                    los.append(lo)
+                    his.append(hi)
+            merged[name] = (los, his)
+        return merged
+
+    @staticmethod
+    def _mocked(mocks, key, at):
+        spans = mocks.get(key)
+        if spans is None:
+            return False
+        k = bisect.bisect_right(spans[0], at) - 1
+        return k >= 0 and at < spans[1][k]
+
+    def work(self, text, lang="unknown"):
+        """The selected traversal steps the reader takes over one piece of source (a count, never
+        time), summed over every reading of it: what the growth tests measure."""
+        trace = []
+        self._read(text, 0, text, False, _ENV_MAX_FINDINGS, lang, trace)
+        return sum(reader.work for reader in trace)
+
+    def _read(self, text, offset, segment, fenced, room, lang="unknown", trace=None):
+        """Findings for one segment. When its language is not known, a double slash after a value
+        is a comment if the segment names only the Node environment and floor division if it names
+        only the Python one; a segment that names both is read both ways and a call counts when
+        both readings find it."""
+        reader = _Reader(segment, lang)
+        if trace is not None:
+            trace.append(reader)
+        if lang != "unknown" or not reader.node_envs or not reader.envs or not reader.calls:
+            return [f for _, f in self._read_calls(text, offset, segment, fenced, room, reader)]
+        node = _Reader(segment, "node")
+        if trace is not None:
+            trace.append(node)
+        if not reader.os_envs:
+            return [f for _, f in self._read_calls(text, offset, segment, fenced, room, node)]
+        agreed = {at for at, _ in self._read_calls(text, offset, segment, fenced, _ENV_MAX_FINDINGS, node)}
+        return [f for at, f in self._read_calls(text, offset, segment, fenced, _ENV_MAX_FINDINGS, reader)
+                if at in agreed][:room]
+
+    def _read_calls(self, text, offset, segment, fenced, room, reader):
+        """[(token start, finding)] for every client call in ``reader``'s segment that is handed the
+        whole environment."""
+        if not reader.envs or not reader.calls:
+            return []
+        mocks = self._mocks(reader)
+        findings = []
+        for t in reader.calls:
+            if len(findings) >= room:
+                break
+            hit = reader.callee(t)
+            if hit is None:
+                continue
+            key, last = hit
+            opener = last + 1
+            close = reader.match[opener]
+            k = bisect.bisect_right(reader.env_first, opener)
+            if k >= len(reader.env_first) or reader.env_first[k] >= close:
+                continue
+            if self._mocked(mocks, key, t):
+                continue
+            method = key.rpartition(".")[2]
+            receiver = key.rpartition(".")[0]
+            if method == "request" and receiver not in ("axios", "got", "axios.create()", "got.extend()"):
+                first_data, url_at = 2, 1
+            elif key == "axios" or key == "axios.request" or method == "request" and "axios" in receiver:
+                first_data, url_at = 0, -1
+            else:
+                first_data, url_at = 1, 0
+            regions = []
+            url_arg = None
+            spread_after_url = False
+            positional = 0
+            options_at = _options_position(key)
+            for lo, hi in reader.arguments(opener):
+                if lo >= hi:
+                    continue
+                if reader.is_name(lo) and reader.is_punct(lo + 1, "=") and not reader.is_punct(lo + 2, "="):
+                    name = reader.word(lo)
+                    if name in ("url", "fullurl"):
+                        url_arg = (lo + 2, hi)
+                    elif name in _DATA_KEYWORDS:
+                        regions.append((lo + 2, hi, name))
+                    continue
+                if positional == url_at or url_at < 0 and positional == 0:
+                    url_arg = (lo, hi)         # ``axios(url, config)``; a config object is no literal, and its own ``url`` replaces it below
+                if (positional == options_at or key == "axios" and positional == 1) \
+                        and reader.is_punct(lo, "{") and reader.match[lo] == hi - 1:
+                    # an options object: only the properties the client reads (its body, query
+                    # and headers) and ``url`` count; an axios config's own ``url`` names the
+                    # destination, and a spread written after it may replace it
+                    fields = _CLIENT_FIELDS[self._family(key)]
+                    last = {}              # the value a property ends with: a later one replaces an earlier one
+                    for a, b in reader.arguments(lo):
+                        if a >= b:
+                            continue
+                        if reader.is_punct(a, ".") and reader.is_punct(a + 1, "."):
+                            regions.append((a, b, "argument %d" % (positional + 1)))
+                            spread_after_url = url_at < 0 or spread_after_url
+                            continue
+                        word, value = self._property(reader, segment, a)
+                        if word is None:
+                            continue
+                        if word == "url":
+                            if url_at < 0 and positional == 0:
+                                url_arg = (value, b)
+                                spread_after_url = False
+                            last[word] = (value, b)
+                        elif word in fields:
+                            last[word] = (value, b)
+                    for word, (value, b) in last.items():
+                        regions.append((value, b, word))
+                elif positional >= first_data:
+                    regions.append((lo, hi, "argument %d" % (positional + 1)))
+                positional += 1
+            if not regions:
+                continue
+            if url_arg is not None and not spread_after_url and url_arg[1] - url_arg[0] == 1:
+                u = url_arg[0]
+                begin = reader.starts[u]
+                if reader.kinds[u] == 2 and reader.literals.get(begin) == reader.ends[u] \
+                        and _is_local_url(_literal_text(segment[begin:reader.ends[u]])):
+                    continue
+            for lo, hi, label in regions:
+                e = bisect.bisect_left(reader.env_first, lo)
+                hit_at = None
+                while e < len(reader.env_first) and reader.env_first[e] < hi:
+                    reader.work += 1
+                    need = reader.need_for(e)
+                    if need is None or lo > need:
+                        hit_at = reader.starts[reader.envs[e][0]]
+                        break
+                    e += 1
+                if hit_at is not None:
+                    findings.append((reader.starts[t], self._finding(text, offset, segment, reader.starts[t],
+                                                                      key, label, fenced)))
+                    break
+        return findings
+
+    @staticmethod
+    def _family(key):
+        """The client whose options object a call takes: fetch, got or axios."""
+        return "fetch" if key.rpartition(".")[2] == "fetch" else "got" if key.startswith("got") else "axios"
+
+    @staticmethod
+    def _property(reader, segment, a):
+        """(name, first value token) of the object property that starts at token ``a``: ``name:``,
+        ``"name":`` or ``["name"]:``; (None, None) for any other shape."""
+        if reader.is_punct(a, "[") and reader.match[a] == a + 2 and reader.kinds[a + 1] == 2 \
+                and reader.is_punct(a + 3, ":"):
+            begin = reader.starts[a + 1]
+            if reader.literals.get(begin) != reader.ends[a + 1]:
+                return None, None
+            return _literal_text(segment[begin:reader.ends[a + 1]]), a + 4
+        if reader.is_punct(a + 1, ":") and (reader.is_name(a) or reader.kinds[a] == 2):
+            if reader.is_name(a):
+                return reader.word(a), a + 2
+            begin = reader.starts[a]
+            if reader.literals.get(begin) != reader.ends[a]:
+                return None, None
+            return _literal_text(segment[begin:reader.ends[a]]), a + 2
+        return None, None
+
+    def _finding(self, text, offset, segment, at, key, label, fenced):
+        line = text.count("\n", 0, offset + at) + 1
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "severity": "low" if fenced else self.severity,
+            "channel": list(self.channel),
+            "description": self._EXAMPLE if fenced else self.description,
+            "matched_text": segment[at:at + 50],
+            "structural": True,
+            "evidence": {"call": key, "argument": label, "line": line,
+                         "shape": "fenced_example" if fenced else "environment_to_client"},
+        }
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentToHttpClient())
+
