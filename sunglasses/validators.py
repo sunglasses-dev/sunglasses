@@ -217,13 +217,14 @@ _MAX_QUOTE_DEPTH = 200
 
 
 class _Tok:
-    __slots__ = ("kind", "value", "subs", "lead")
+    __slots__ = ("kind", "value", "subs", "lead", "heredoc")
 
     def __init__(self, kind, value, subs=(), lead=False):
         self.kind = kind      # 'w' word | 'ps' process substitution | 'redir' | 'op'
         self.value = value    # word text with quotes removed; ps/command body; operator text
         self.subs = subs      # bodies of $(...) and backticks inside a word
         self.lead = lead      # a substitution is the first thing in the word
+        self.heredoc = None   # on the delimiter word of a here-document: (body, bodies of its expanded substitutions)
 
 
 _WS = re.compile(r"[ \t\r\f\v]+")
@@ -271,9 +272,8 @@ def _skip_double_quote(s, i, depth=0):
 
 
 def _balanced(s, i, nesting=0):
-    """Index just after the ``)`` that closes the ``(`` at ``s[i]``."""
-    if nesting > _MAX_QUOTE_DEPTH:
-        raise _TooDeep
+    """Index just after the ``)`` that closes the ``(`` at ``s[i]``; a quote opened inside it
+    is bounded by ``_skip_double_quote`` through ``nesting``."""
     depth = 0
     pos = i
     while True:
@@ -284,6 +284,8 @@ def _balanced(s, i, nesting=0):
         at = match.start()
         if c == "(":
             depth += 1
+            if depth > _MAX_QUOTE_DEPTH:
+                raise _TooDeep
             pos = at + 1
         elif c == ")":
             depth -= 1
@@ -419,6 +421,31 @@ def _word(s, i):
     return _Tok("w", "".join(parts), tuple(subs), lead), i
 
 
+_HEREDOC_ESCAPE_OR_OPEN = re.compile(r"\\.|\$\(|`", re.S)
+
+
+def _heredoc_substitutions(body):
+    """Bodies of the `$(...)` and backtick substitutions in the text of a here-document whose
+    delimiter was not quoted: the shell runs them, and a backslash makes the next character plain."""
+    found = []
+    i = 0
+    while True:
+        match = _HEREDOC_ESCAPE_OR_OPEN.search(body, i)
+        if match is None:
+            return found
+        at = match.start()
+        if match.group() == "$(":
+            end = _balanced(body, at + 1)
+            found.append(body[at + 2:end - 1])
+            i = end
+        elif match.group() == "`":
+            end = _closing_backtick(body, at)
+            found.append(body[at + 1:end])
+            i = end + 1
+        else:
+            i = match.end()
+
+
 def _lex(cmd, sink=None):
     """Split a command line into word / ps / redir / op tokens.
 
@@ -443,13 +470,17 @@ def _lex(cmd, sink=None):
         if c == "\n":
             toks.append(_Tok("op", "\n"))
             i += 1
-            for delim, strip in heredocs:
+            for word, strip, quoted in heredocs:
+                body = []
                 while i < n:
                     end = cmd.find("\n", i)
                     line = cmd[i:n if end < 0 else end]
                     i = n if end < 0 else end + 1
-                    if (line.lstrip("\t") if strip else line) == delim:
+                    if (line.lstrip("\t") if strip else line).rstrip("\r") == word.value:
                         break
+                    body.append(line)
+                text = "\n".join(body)
+                word.heredoc = (text, () if quoted else tuple(_heredoc_substitutions(text)))
             heredocs = []
             continue
         if c in "<>" and cmd.startswith("(", i + 1):
@@ -464,9 +495,11 @@ def _lex(cmd, sink=None):
             if redir.group().endswith("<<") or redir.group().endswith("<<-"):
                 while i < n and cmd[i] in " \t":
                     i += 1
+                start = i
                 word, i = _word(cmd, i)
                 toks.append(word)
-                heredocs.append((word.value, redir.group().endswith("<<-")))
+                quoted = any(ch in cmd[start:i] for ch in "'\"\\")
+                heredocs.append((word, redir.group().endswith("<<-"), quoted))
             continue
         op = _OP.match(cmd, i)
         if op:
@@ -1557,6 +1590,10 @@ class SettingsWithoutPrompts:
 # below are whole tokens of that name (split at `.`, `_` and `-`), so `secretsauce` is not one.
 _CREDENTIAL_TOKENS = frozenset(("credential", "credentials", "secret", "secrets", "apikey", "apikeys"))
 _CREDENTIAL_PAIRS = frozenset((("api", "key"), ("api", "keys"), ("private", "key"), ("private", "keys")))
+# A private key is known by its name alone: one of the six default SSH key file names below, a file
+# with one of the key extensions, or a `.pem` whose name holds one of the pem words. A key under
+# any other name (a custom SSH key file name, a `.pem` with none of those words) is not read as a
+# credential file.
 _PRIVATE_KEYS = frozenset(("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "id_ecdsa_sk", "id_ed25519_sk"))
 _CREDENTIAL_FILES = frozenset((".netrc", "_netrc", ".pgpass", ".npmrc", ".pypirc", ".dockercfg", ".htpasswd"))
 _KEY_EXTENSIONS = frozenset(("key", "p12", "pfx", "ppk", "jks", "keystore"))
@@ -1585,9 +1622,13 @@ _FORM_FILE = re.compile(r"[^=]*=([@<])([^;]*)")
 _URLENCODE_FILE = re.compile(r"[^=@]*@(.*)\Z", re.S)
 _PROSE_END = (":", ".", ",", ";", "!")
 _MAX_UPLOAD_FINDINGS = 50
-# The reader's budget: steps of reading (characters lexed, tokens walked, substitutions entered)
-# counted across the whole run, for a text of n characters at most this floor plus this many per
-# character. A run that would take more stops and says it did not read the rest.
+# The reader's budget, in steps and never in time: the characters of the text (the fence pass and
+# the line join), of each line, and of each substitution, wrapper and here-document body that is
+# lexed; the tokens and segments of each command walked; each look-ahead window; and each text
+# searched for an uploader name once the findings list is full. The walks over the words of one
+# command (operands, provenance, printf) are not counted on their own. A text of n characters is
+# given this floor plus this many per character; a run that would take more stops and says it
+# did not read the rest.
 _WORK_FLOOR = 4096
 _WORK_PER_CHARACTER = 64
 
@@ -1699,10 +1740,39 @@ def _upload_operands(program, args):
     return out
 
 
+def _clears_environment(args):
+    """Do the options of `env` start it from an empty environment (`-i`, `-`, `--ignore-environment`)?"""
+    takes = False
+    for arg in args:
+        if arg.kind != "w":
+            return False
+        value = arg.value
+        if takes:
+            takes = False           # the value of `-u NAME`, `-C DIR`, `-S STRING`
+            continue
+        if value == "--":
+            return False
+        if value == "-" or (value.startswith("--") and len(value) > 3 and "--ignore-environment".startswith(value)):
+            return True
+        if value.startswith("-") and not value.startswith("--"):
+            for position, ch in enumerate(value[1:], 1):
+                if ch == "i":
+                    return True
+                if ch in "uCS":
+                    takes = position == len(value) - 1
+                    break
+        elif not value.startswith("-"):
+            return False
+    return False
+
+
 def _dumps_environment(words):
-    """`env` or `printenv` alone (options allowed): the whole environment goes to the output.
-    `env` is also a wrapper word, so a command that holds no program is looked at here."""
+    """`env` or `printenv` alone (options allowed): the whole environment goes to the output,
+    unless an option clears it first. `env` is also a wrapper word, so a command that holds no
+    program is looked at here."""
     if not words or words[0].kind != "w" or _base(words[0].value) not in ("env", "printenv"):
+        return False
+    if _base(words[0].value) == "env" and _clears_environment(words[1:]):
         return False
     return all(w.kind == "w" and w.value.startswith("-") for w in words[1:])
 
@@ -1728,12 +1798,10 @@ _MARKER_WORDS = frozenset(("never", "not", "don't", "dont", "forbidden", "avoid"
 _MARKER_STRIP = " \t.,;:!?()[]'\"*_`"
 
 
-def _file_operands(name, args):
-    """The words of a reader or filter that name an input file: the values of its options are
-    not inputs, and the first operand of grep, sed and awk is the pattern or script unless
-    `-e`, `-f` or a long form of them gave it. `tr` takes no file; `-` is standard input."""
-    if name == "tr":
-        return []
+def _operand_words(name, args):
+    """(operands, whether an option gave the pattern or script): the words of a reader or filter
+    that are not options and not the values of options. The first operand of grep, sed and awk is
+    the pattern or script unless `-e`, `-f` or a long form of them gave it."""
     known = _FILTER_VALUE_OPTIONS.get(name)
     letters = _PATTERN_LETTERS.get(name, "")
     given = False
@@ -1765,11 +1833,94 @@ def _file_operands(name, args):
                     else _unlisted_option_takes_next_word(value))
             continue
         out.append(value)
+    return out, given
+
+
+def _file_operands(name, args):
+    """The words of a reader or filter that name an input file: the values of its options are
+    not inputs, and the first operand of grep, sed and awk is the pattern or script unless
+    `-e`, `-f` or a long form of them gave it. `tr` takes no file; `-` is standard input."""
+    if name == "tr":
+        return []
+    out, given = _operand_words(name, args)
     if name in _PATTERN_LETTERS and not given and out:
         out = out[1:]
     if name == "openssl" and out:
         out = out[1:]
     return out
+
+
+_QUIET_LONGS = ("--quiet", "--silent", "--count", "--files-with-matches", "--files-without-match")
+_SED_COMMANDS_THAT_WRITE_NOTHING = frozenset("dDnNgGhHxzqQ")
+
+
+def _sed_may_print(script):
+    """Can this sed script write the text it reads? `-n` turns off the automatic printing, so only
+    a `p`, `P`, `l`, `=` command or a flag of `s` that prints or writes does. Addresses, the parts
+    of `s` and `y`, and commands that only edit the pattern space write nothing; any command not
+    known to write nothing counts as one that may."""
+    i, n = 0, len(script)
+    while i < n:
+        c = script[i]
+        if c in " \t\n;{}!,$+~^0123456789":
+            i += 1
+        elif c in "/\\":
+            delim = "/" if c == "/" else script[i + 1:i + 2]
+            if not delim:
+                return True
+            i += 1 if c == "/" else 2
+            while i < n and script[i] != delim:
+                i += 2 if script[i] == "\\" else 1
+            i += 1
+        elif c in "sy":
+            delim = script[i + 1:i + 2]
+            if not delim or delim.isalnum() or delim in " \t\n\\;":
+                return True
+            i += 2
+            for _ in range(2):
+                while i < n and script[i] != delim:
+                    i += 2 if script[i] == "\\" else 1
+                i += 1
+            flags = i
+            while flags < n and script[flags] not in " \t\n;}":
+                flags += 1
+            if c == "s" and any(f in script[i:flags] for f in "pwWe"):
+                return True
+            i = flags
+        elif c in _SED_COMMANDS_THAT_WRITE_NOTHING:
+            i += 1
+        else:
+            return True
+    return False
+
+
+def _emits_nothing(name, args):
+    """Does the filter write none of the text it reads (a quiet or counting grep, a `sed -n` whose
+    script prints nothing)? Its output then carries no payload, whatever file it read."""
+    quiet = False
+    for arg in args:
+        if arg.kind != "w":
+            continue
+        value = arg.value
+        if value == "--":
+            break
+        if value.startswith("--"):
+            option = value.partition("=")[0]
+            if len(option) > 3 and any(long.startswith(option) for long in _QUIET_LONGS):
+                quiet = True
+        elif value.startswith("-") and value != "-":
+            letters = _FILTER_VALUE_OPTIONS.get(name, ("", ()))[0]
+            for ch in value[1:]:
+                if ch in letters:
+                    break
+                if (name in ("grep", "egrep", "fgrep") and ch in "qclL") or (name == "sed" and ch == "n"):
+                    quiet = True
+    if name in ("grep", "egrep", "fgrep"):
+        return quiet
+    if name == "sed" and quiet:
+        operands, given = _operand_words("sed", args)
+        return not given and bool(operands) and not _sed_may_print(operands[0])
+    return False
 
 
 def _marks(word):
@@ -1813,6 +1964,20 @@ def _warned(words, stop=None):
     return False
 
 
+def _cleared_before(words, head):
+    """Did an `env` ahead of the word ``head`` start the program from an empty environment
+    (`env -i printenv`)? Then there is nothing for it to write."""
+    for k, word in enumerate(words):
+        if word is head:
+            return False
+        if word.kind == "w" and _base(word.value) == "env":
+            rest = words[k + 1:]
+            stop = next((j for j, w in enumerate(rest) if w is head), len(rest))
+            if _clears_environment(rest[:stop]):
+                return True
+    return False
+
+
 def _output_of(segment, stdin):
     """What the segment writes to the pipe: "file" (a credential file), "environment" or None."""
     if _stdout_redirects(segment):
@@ -1824,9 +1989,11 @@ def _output_of(segment, stdin):
         return stdin if not segment.words else None
     head, args = located
     name = _base(head.value)
-    if _informational(name, args):
+    if _informational(name, args) or _emits_nothing(name, args):
         return None
     if name in ("env", "printenv"):
+        if _cleared_before(segment.words, head):
+            return None
         named = [a for a in args if a.kind == "w" and not a.value.startswith("-") and not a.value.isdigit()]
         return None if named else "environment"
     if name == "tee":
@@ -1837,14 +2004,15 @@ def _output_of(segment, stdin):
     return stdin if not operands or "-" in operands else None
 
 
-def _flows(segments, emit=None, given=None):
+def _flows(segments, emit=None, given=None, here=None):
     """(inputs, outputs): for each segment what its standard input carries and what it writes to
     the pipe, each "file", "environment" or None. One pass forward, so a source reaches an
     uploader through any number of filters; a redirection replaces the pipe, and a producer
     with a file of its own does not pass the pipe on. ``emit(segment, stdin)`` gives what a
     segment's own output carries when it writes something it was handed (`echo $(cat f)`, a
     shell running a body); ``given`` is what the whole list reads on standard input when the
-    list is itself the body of a shell that was piped into."""
+    list is itself the body of a shell that was piped into. ``here(target)`` gives what the text
+    of a here-document carries, where its delimiter was not quoted and the shell expands it."""
     ins = []
     outs = []
     carried = None
@@ -1854,6 +2022,8 @@ def _flows(segments, emit=None, given=None):
             op, target = redirect
             stdin = "file" if (op == "<" and target is not None and target.kind == "w"
                                and _credential_name(target.value)) else None
+            if op in ("<<", "<<-") and here is not None and target is not None:
+                stdin = here(target)
         elif segment.sep_before in ("|", "|&"):
             stdin = carried
         else:
@@ -1868,12 +2038,31 @@ def _flows(segments, emit=None, given=None):
     return ins, outs
 
 
-def _wrapped_text(head, args):
-    """The text a shell (`-c`) or `eval` is handed to run, or None."""
+def _heredoc_reads(target, depth, scan):
+    """What the text of a here-document carries into the program that reads it: the output of a
+    substitution that reads a credential file, where the delimiter was not quoted. A quoted
+    delimiter makes the text data; nothing in it is run or expanded."""
+    if target.kind != "w" or target.heredoc is None:
+        return None
+    for body in target.heredoc[1]:
+        found = _substitution_reads(body, depth + 1, scan)
+        if found:
+            return found
+    return None
+
+
+def _wrapped_text(head, args, segment=None):
+    """The text a shell (`-c`) or `eval` is handed to run, or None. A shell that reads its commands
+    from a here-document of its own segment runs the text of that document."""
     if _base(head.value) in _SHELLS:
         run = _run_shell(args)
         if run.mode == "inline" and run.inline is not None and run.inline.kind == "w":
             return run.inline.value
+        if run.mode == "stdin" and segment is not None:
+            redirect = _stdin_redirect(segment)
+            if redirect is not None and redirect[0] in ("<<", "<<-") and redirect[1] is not None \
+                    and redirect[1].heredoc is not None:
+                return redirect[1].heredoc[0]
         return None
     return " ".join(a.value for a in args if a.kind == "w") or None
 
@@ -1882,10 +2071,11 @@ _PRINTF_SPEC = re.compile(r"%[-+ #0']*(\*|\d*)(?:\.(\*|\d*))?[hlLjzt]*(\([^)]*\)
 
 
 def _printf_conversions(fmt):
-    """One flag per argument-consuming conversion of a `printf` format: whether it writes bytes
-    of its argument (`%s`, `%b`, `%c`, `%q`; not a number, a time, or a string cut to no
-    characters), and whether a `\\c` ended the output. ``None`` where the format cannot be
-    followed: a `*` width or precision, or a conversion that is not known."""
+    """One ``(writes, cuts)`` pair per argument-consuming conversion of a `printf` format:
+    whether it writes bytes of its argument (`%s`, `%b`, `%c`, `%q`; not a number, a time, or a
+    string cut to no characters), and whether a `\\c` in that argument ends all output (`%b`);
+    and whether a `\\c` of the format itself ended the output. ``None`` where the format cannot
+    be followed: a `*` width or precision, or a conversion that is not known."""
     flags = []
     i, size = 0, len(fmt)
     while i < size:
@@ -1908,11 +2098,11 @@ def _printf_conversions(fmt):
         if width == "*" or precision == "*":
             return None
         if conv in "sb":
-            flags.append(not (precision is not None and int(precision or 0) == 0))
+            flags.append((not (precision is not None and not precision.strip("0")), conv == "b"))
         elif conv in "cq":
-            flags.append(True)
+            flags.append((True, False))
         elif conv in "diouxXeEfFgGaA" or conv.endswith(")T"):
-            flags.append(False)
+            flags.append((False, False))
         else:
             return None
     return flags, False
@@ -1920,25 +2110,29 @@ def _printf_conversions(fmt):
 
 def _printed_words(given, scan):
     """The words `printf` writes: its format, and the arguments that a conversion prints (the
-    format is used again while arguments remain). A format that is only known once a
-    substitution has run, or that the reader cannot follow, reports the run as not inspected."""
+    format is used again while arguments remain), in order, up to the first `\\c` that stops the
+    output. A format that is only known once a substitution has run, or that the reader cannot
+    follow, reports the run as not inspected, whether or not arguments follow it."""
     fmt, args = given[0], given[1:]
-    if not args:
-        return given
     if fmt.subs:
         scan.unread = True
         return given
     parsed = _printf_conversions(fmt.value)
     if parsed is None:
         scan.unread = True
-        return given[:1]
+        return given if not args else given[:1]
+    if not args:
+        return given
     flags, stopped = parsed
-    if stopped:
-        printed = [a for a, f in zip(args, flags) if f]
-    elif flags:
-        printed = [a for k, a in enumerate(args) if flags[k % len(flags)]]
-    else:
-        printed = []
+    printed = []
+    for k, arg in enumerate(args):
+        if stopped and k >= len(flags):
+            break
+        writes, cuts = flags[k % len(flags)] if flags else (False, False)
+        if writes:
+            printed.append(arg)
+            if cuts and not arg.subs and "\\c" in arg.value:
+                break                  # `%b` of an argument that holds \c ends the output there
     return given[:1] + printed
 
 
@@ -1952,7 +2146,7 @@ def _emitted(segment, depth, scan, stdin=None):
     words = segment.words
     located = _locate(words, _WRAPPERS)
     if located is not None:
-        text = _wrapped_text(*located)
+        text = _wrapped_text(*located, segment)
         return _substitution_reads(text, depth + 1, scan, stdin) if text else None
     located = _locate(words, _PRINTERS)
     if located is None:
@@ -1980,7 +2174,8 @@ def _substitution_reads(body, depth, scan, stdin=None):
     scan.spend(len(body) + 1)
     try:
         segments = _segments(_lex(body))
-        ins, outs = _flows(segments, lambda segment, given: _emitted(segment, depth, scan, given), stdin)
+        ins, outs = _flows(segments, lambda segment, given: _emitted(segment, depth, scan, given), stdin,
+                           lambda target: _heredoc_reads(target, depth, scan))
         for index, segment in enumerate(segments):
             if segment.sep_after not in ("|", "|&") and outs[index]:
                 return outs[index]
@@ -1996,20 +2191,23 @@ class _Findings(list):
 
 
 class _Scan:
-    """Budget and state of one run: at most ``_MAX_UPLOAD_FINDINGS`` of each kind (a block, a
-    notice), so a pile of notices never hides a block, and each finding once per line."""
+    """Budget and state of one run: at most ``_MAX_UPLOAD_FINDINGS`` findings in all, each once per
+    line. When the list is full a block takes the place of a notice, so a pile of notices never
+    hides a block; a report that is left out for want of room marks the run as not fully read."""
 
     def __init__(self, soft, size=0):
         self.soft = soft
         self.fenced = False
         self.line = ""
         self.unread = False
-        self.left = {False: _MAX_UPLOAD_FINDINGS, True: _MAX_UPLOAD_FINDINGS}
+        self.notices = 0
         self.seen = set()
         self.found = []
         self.work = 0
         self.limit = _WORK_FLOOR + _WORK_PER_CHARACTER * size
         self.spent = False
+        # text that searches for the close of a substitution may read in the whole run
+        self.merge_left = min(_MERGE_BUDGET, _MERGE_PER_CHARACTER * size + _MERGE_WINDOW)
 
     def spend(self, steps):
         """Count ``steps`` of reading. The budget is a count of steps, never time: when the run
@@ -2021,17 +2219,27 @@ class _Scan:
             self.unread = True
 
     def done(self):
-        return self.spent or not (self.left[False] or self.left[True])
+        """Nothing more can be reported: the budget is spent, or the list holds only blocks."""
+        return self.spent or (len(self.found) >= _MAX_UPLOAD_FINDINGS and not self.notices)
 
     def add(self, evidence, marked):
         low = self.fenced or (self.soft and marked)
-        if not self.left[low]:
-            return
         key = (self.line, low, tuple(sorted(evidence.items())))
         if key in self.seen:
             return
         self.seen.add(key)
-        self.left[low] -= 1
+        if len(self.found) >= _MAX_UPLOAD_FINDINGS:
+            self.unread = True          # this report has no room
+            if low:
+                return
+            for position in range(len(self.found) - 1, -1, -1):
+                if self.found[position][1]:
+                    del self.found[position]
+                    self.notices -= 1
+                    break
+            else:
+                return
+        self.notices += low
         self.found.append((evidence, low))
 
 
@@ -2057,8 +2265,8 @@ def _scan_tokens(toks, depth, marked, scan):
     try:
         scan.spend(len(toks) + 1)
         segments = _segments(toks)
-        ins, _ = _flows(segments)
         scan.spend(len(segments))
+        ins, _ = _flows(segments, here=lambda target: _heredoc_reads(target, depth, scan))
         carry = False       # a warning stands across a parenthesis and along a pipeline
         for index, segment in enumerate(segments):
             if scan.done():
@@ -2088,20 +2296,25 @@ def _scan_tokens(toks, depth, marked, scan):
                         seen = seen or bool(_DOC_MARKER.search(word.value)
                                             or _DOC_MARKER.search(prev + " " + word.value))
                         prev = word.value
+                for _, target in segment.redirs:
+                    if target is not None and target.heredoc is not None:
+                        for body in target.heredoc[1]:
+                            _scan_upload_text(body, depth + 1, seen, scan)
                 located = _locate(words, _WRAPPERS)
                 if located is not None:
                     head, args = located
                     here = marked_here or _warned(words, head)
-                    text = _wrapped_text(head, args)
+                    text = _wrapped_text(head, args, segment)
                     if text:
                         _scan_upload_text(text, depth + 1, here, scan)
             else:
-                # The limit: what lies below is not read, and the run says so.
+                # The limit: what lies below is not read, and the run says so (the substitutions of a
+                # here-document are marked by the substitution reader that `_flows` runs on them).
                 for word in words:
                     if word.kind == "w" and word.subs:
                         scan.unread = True
                 located = _locate(words, _WRAPPERS)
-                if located is not None and _wrapped_text(*located):
+                if located is not None and _wrapped_text(*located, segment):
                     scan.unread = True
     except RecursionError:
         scan.unread = True
@@ -2110,6 +2323,15 @@ def _scan_tokens(toks, depth, marked, scan):
 def _names_uploader(text):
     plain = _plain(text)
     return "curl" in plain or "wget" in plain
+
+
+def _any_names_uploader(scan, texts):
+    """Does any of ``texts`` name an uploader? Each text is charged before it is searched."""
+    for text in texts:
+        scan.spend(len(text) + 1)
+        if _names_uploader(text):
+            return True
+    return False
 
 
 def _has_uploader(toks):
@@ -2146,11 +2368,14 @@ def _scan_upload_text(line, depth, marked, scan):
 
 
 _SUBSTITUTION_OPEN = re.compile(r"\$\(|`")
-# How far ahead a substitution that a line opens is searched for its close, and how much text
-# all such searches in one run may read in total.
+# A here-document operator and its delimiter word, as far as a line shows them (not `<<<`).
+_HEREDOC_OPEN = re.compile(r"(?<!<)<<(-?)[ \t]*(?:'([^'\n]*)'|\"([^\"\n]*)\"|\\?([^\s;|&<>()'\"\\]+))")
+# How far ahead a substitution that a line opens is searched for its close (a window is never
+# extended past this many characters), and how much text all such searches in one run may read.
 _MERGE_WINDOW = 8192
 _MERGE_BUDGET = 1 << 20
-# ... and, for a text of n characters, at most this many per character plus one window.
+# ... which, for a text of n characters, is at most this many per character plus one window,
+# or the amount above if that is less.
 _MERGE_PER_CHARACTER = 4
 
 
@@ -2169,17 +2394,21 @@ def _substitution_end(text, at):
 
 
 def _spanning_units(physical, scan=None):
-    """The lines of a text with every command that opens a `$(` or backtick substitution which
-    only a later line closes joined to the lines up to the close, so the reader sees
-    `curl -d "$(` / `cat .env` / `)"` as the one command it is. Only a line that names an
-    uploader is searched, and only a window ahead of it, so the cost stays bounded; a
-    substitution that does not close in the window, or that the budget for these searches no
-    longer reaches, leaves its line alone, and the reader reports that line unread because its
-    substitution never closes."""
+    """The lines of a text, with a command that opens a `$(` or backtick substitution which only a
+    later line closes joined to the lines up to the close, so the reader sees `curl -d "$(` /
+    `cat .env` / `)"` as the one command it is; and a command that opens a here-document joined to
+    the lines of the document (to the end of the text if the delimiter never comes), so the text of
+    the document is read with the command that takes it and not as commands of its own. Only a line
+    that names an uploader is searched for a substitution's close. The search looks ahead a window
+    that doubles from a few lines up to ``_MERGE_WINDOW`` characters (a line that would carry it
+    past that is not joined), each window is charged, and all the windows of one run share
+    ``scan.merge_left``. A substitution that does not close within that, or that the allowance no
+    longer reaches, leaves its line alone, and the line is then read as it stands: its substitution
+    never closes there, so the run is reported unread."""
     units = []
     count = len(physical)
-    size_of_text = sum(map(len, physical)) + count
-    budget = min(_MERGE_BUDGET, _MERGE_PER_CHARACTER * size_of_text + _MERGE_WINDOW)
+    if scan is None:
+        scan = _Scan(False, sum(map(len, physical)) + count)
     index = 0
     while index < count:
         line = physical[index]
@@ -2199,24 +2428,45 @@ def _spanning_units(physical, scan=None):
                         skip_to = end
                         continue
                     # Opens here and does not close here: look for the close a window ahead.
-                    if budget <= 0:
+                    if scan.merge_left <= 0:
                         break
                     parts = [line]
                     size = len(line)
                     tail = index
-                    while size < _MERGE_WINDOW and tail + 1 < count:
-                        tail += 1
-                        parts.append(physical[tail])
-                        size += len(physical[tail]) + 1
-                    window = "\n".join(parts)
-                    budget -= len(window)
-                    if scan is not None:
+                    ahead = 2
+                    while True:
+                        # the window grows by doubling, so a close on a near line costs a near
+                        # window and the windows tried in all cost at most twice the last one
+                        grew = False
+                        while tail + 1 < count and tail - index < ahead \
+                                and size + len(physical[tail + 1]) + 1 <= _MERGE_WINDOW:
+                            tail += 1
+                            parts.append(physical[tail])
+                            size += len(physical[tail]) + 1
+                            grew = True
+                        window = "\n".join(parts)
+                        scan.merge_left -= len(window)
                         scan.spend(len(window))
-                    end = _substitution_end(window, at)
-                    if end is not None and end > 0:
-                        last = index + window.count("\n", 0, end - 1)
+                        end = _substitution_end(window, at)
+                        if end is not None:
+                            if end > 0:
+                                last = index + window.count("\n", 0, end - 1)
+                            break
+                        if not grew or scan.merge_left <= 0:
+                            break
+                        ahead *= 2
                     break
-        units.append("\n".join(physical[index:last + 1]) if last > index else line)
+        unit = "\n".join(physical[index:last + 1]) if last > index else line
+        if "<<" in unit:
+            for opened in _HEREDOC_OPEN.finditer(unit):
+                strip, delim = opened.group(1) == "-", opened.group(2) or opened.group(3) or opened.group(4)
+                while last + 1 < count:
+                    last += 1
+                    candidate = physical[last].rstrip("\r")
+                    if (candidate.lstrip("\t") if strip else candidate) == delim:
+                        break
+            unit = "\n".join(physical[index:last + 1]) if last > index else line
+        units.append(unit)
         index = last + 1
     return units
 
@@ -2301,9 +2551,10 @@ class CredentialFileUpload:
     channel = ["message", "file", "code", "tool_output", "web_content"]
     description = ("A curl or wget command in this text reads as one that sends a credential file, "
                    "or the whole environment, to a remote address: the payload word names the file, "
-                   "reads standard input that carries it through any number of filters, or takes it "
-                   "from a substitution. In a file or message text, a command that follows a warning "
-                   "word or sits inside a fenced block is a notice, not a verdict.")
+                   "reads standard input that carries it through filters that pass it on, or takes it "
+                   "from a substitution or an expanding here-document. In a file or message text, "
+                   "a command that follows a warning word or sits inside a fenced block is a "
+                   "notice, not a verdict.")
 
     def pregate(self, text):
         return _names_uploader(text)
@@ -2312,17 +2563,18 @@ class CredentialFileUpload:
 
     @staticmethod
     def _read_pieces(text, channel, scan):
+        scan.spend(len(text) + 1)           # the pass that finds the fences
         pieces = _upload_segments(text, channel)
         for number, (segment, fenced) in enumerate(pieces):
             if scan.done():
-                scan.unread = scan.unread or any(_names_uploader(p) for p, _ in pieces[number:])
+                scan.unread = scan.unread or _any_names_uploader(scan, [p for p, _ in pieces[number:]])
                 break
             scan.fenced = fenced
             lines = _logical_lines(segment, scan)
             for position, line in enumerate(lines):
                 if scan.done():
-                    scan.unread = scan.unread or any(_names_uploader(l) for l in lines[position:]) \
-                        or any(_names_uploader(p) for p, _ in pieces[number + 1:])
+                    scan.unread = scan.unread or _any_names_uploader(scan, lines[position:]) \
+                        or _any_names_uploader(scan, [p for p, _ in pieces[number + 1:]])
                     break
                 if not _names_uploader(line):
                     continue
@@ -2333,8 +2585,10 @@ class CredentialFileUpload:
         scan = _Scan(channel in _NOTICE_CHANNELS, len(text))
         try:
             self._read_pieces(text, channel, scan)
-        except RecursionError:
-            scan.unread = True             # a stack that ran out leaves the rest of the text unread
+        except Exception:
+            # a stack that ran out, or a state the reader does not model, leaves the rest of the
+            # text unread; what was found before it stands
+            scan.unread = True
         return scan
 
     def work(self, text, channel="file"):

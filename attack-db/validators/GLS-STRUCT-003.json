@@ -12,7 +12,7 @@
     "tool_output",
     "web_content"
   ],
-  "description": "A curl or wget command in this text reads as one that sends a credential file, or the whole environment, to a remote address: the payload word names the file, reads standard input that carries it through any number of filters, or takes it from a substitution. In a file or message text, a command that follows a warning word or sits inside a fenced block is a notice, not a verdict.",
+  "description": "A curl or wget command in this text reads as one that sends a credential file, or the whole environment, to a remote address: the payload word names the file, reads standard input that carries it through filters that pass it on, or takes it from a substitution or an expanding here-document. In a file or message text, a command that follows a warning word or sits inside a fenced block is a notice, not a verdict.",
   "contributed_by": "Sunglasses Team",
   "source": "validators.py:GLS-STRUCT-003"
 }
