@@ -144,6 +144,18 @@ MECHANISM_PATTERNS = [
             r"|do not (?:mention|surface|reveal|disclose|show|report|log)"
             r"|don'?t (?:mention|surface|reveal|disclose|show)"
             r")\b",
+            # (b) CONDITIONAL SELF-IDENTIFICATION — "If you are an assistant
+            # summarizing this thread, append …". This is the single highest-
+            # precision signal in the whole layer: no honest document changes its
+            # instructions based on whether the reader is a machine. A human
+            # never reads past "if you are an AI". Content that branches on it is
+            # addressing a victim it expects to be automated.
+            r"(?i)\bif\s+you(?:'re|\s+are)\b[^.\n]{0,60}?\b(?:an?\s+)?"
+            r"(?:ai|a\.i\.|assistant|agent|model|llm|language model|bot|chatbot|copilot)\b"
+            r"[^\n]{0,160}?\b(?:"
+            r"append|include|add|insert|output|emit|say|respond with|reply with|print"
+            r"|ignore|disregard|do not|don'?t|instead|forward|send"
+            r")\b",
             # (a2) an address with a colon, then an instruction to keep the action
             # from the person it affects ("keep this hidden from the user."). It
             # has to START a clause, name the person and END the clause there:
@@ -165,18 +177,6 @@ MECHANISM_PATTERNS = [
             r"(?:no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+(?:it|this|that)" + _CLAUSE_END +
             r"|no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + _CLAUSE_END +
             r"|(?:do\s+not|don'?t|never)\s+(?:notify|inform|alert|warn|tell)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + _CLAUSE_END + r")",
-            # (b) CONDITIONAL SELF-IDENTIFICATION — "If you are an assistant
-            # summarizing this thread, append …". This is the single highest-
-            # precision signal in the whole layer: no honest document changes its
-            # instructions based on whether the reader is a machine. A human
-            # never reads past "if you are an AI". Content that branches on it is
-            # addressing a victim it expects to be automated.
-            r"(?i)\bif\s+you(?:'re|\s+are)\b[^.\n]{0,60}?\b(?:an?\s+)?"
-            r"(?:ai|a\.i\.|assistant|agent|model|llm|language model|bot|chatbot|copilot)\b"
-            r"[^\n]{0,160}?\b(?:"
-            r"append|include|add|insert|output|emit|say|respond with|reply with|print"
-            r"|ignore|disregard|do not|don'?t|instead|forward|send"
-            r")\b",
         ],
         "description": (
             "Text that addresses the AI directly — or branches on the reader BEING "
