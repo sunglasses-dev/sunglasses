@@ -141,18 +141,26 @@ MECHANISM_PATTERNS = [
             r"|do not (?:mention|surface|reveal|disclose|show|report|log)"
             r"|don'?t (?:mention|surface|reveal|disclose|show)"
             r")\b",
-            # (a2) the same address, then a quiet-keeping instruction the list
-            # above has no words for ("keep this hidden", "no need to mention it",
-            # "do not notify the owner"). The instruction has to START a clause:
-            # "I'll keep this private" is an assistant promising, not being told.
+            # (a2) the same address, then an instruction to keep the action from
+            # the person it affects ("keep this hidden from the user"). It has to
+            # START a clause and name the person: "I'll keep this private" is an
+            # assistant promising, not being told, and "keep this secret key out
+            # of source control" is about a key.
             r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*[:,\-–]\s*"
             r"(?:[^\n]{0,140}?(?:[.!?;,—–\-]\s+|\b(?:and|then|please|just|also|must|should|always)\s+))?"
-            r"(?:"
-            r"keep\s+(?:this|it|that)\s+(?:hidden|secret)\s*(?:[.!?)\]>]|-->|$)"
-            r"|(?:keep|hide)\s+(?:this|it|that)\s+(?:(?:hidden|secret|quiet|private|confidential)\s+)?from\s+(?:the\s+|your\s+)?" + _PRINCIPAL +
-            r"|no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+(?:it|this|that|about\s+(?:it|this|that)|(?:the\s+|your\s+)?" + _PRINCIPAL + r")"
-            r"|(?:do\s+not|don'?t|never)\s+(?:notify|inform|alert|warn|tell)\s+(?:the\s+|your\s+)?" + _PRINCIPAL +
-            r")",
+            r"(?:keep|hide)\s+(?:this|it|that)\s+(?:(?:hidden|secret|quiet|private|confidential)\s+)?from\s+"
+            r"(?:the\s+|your\s+)?" + _PRINCIPAL,
+            # (a3) the same address, a directive, then a soft quiet-keeping line
+            # ("no need to mention it", "do not notify the owner"). The directive
+            # must come first, in the same line and without thanks or pleasantry words: "No
+            # need to mention it" alone is how one says you're welcome, and
+            # "never notify the customer by text" alone is a support rule.
+            r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*[:,\-–]\s*"
+            r"(?:(?!thank|welcome|appreciat|glad|happy to|pleasure|anytime|no problem)[^\n]){8,140}?"
+            r"(?:[.!?;,—–\-]\s+|\b(?:and|then|please|just|also|must|should|always)\s+)"
+            r"(?:no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+"
+            r"(?:it|this|that|about\s+(?:it|this|that)|(?:the\s+|your\s+)?" + _PRINCIPAL + r")"
+            r"|(?:do\s+not|don'?t|never)\s+(?:notify|inform|alert|warn|tell)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + r")",
             # (b) CONDITIONAL SELF-IDENTIFICATION — "If you are an assistant
             # summarizing this thread, append …". This is the single highest-
             # precision signal in the whole layer: no honest document changes its
