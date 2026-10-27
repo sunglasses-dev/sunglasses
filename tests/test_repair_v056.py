@@ -642,10 +642,15 @@ def _environment_audit(pkg):
     # that there are three of them. NO_COLOR is the fourth (0.6.5, CU-M6, R284): a
     # public convention (no-color.org), read once in `cli._color_wanted`, and it
     # changes presentation bytes only, never a verdict. Anything else is still
-    # refused, and `test_an_environment_read_outside_the_four_is_still_refused`
+    # refused, and `test_an_environment_read_outside_the_allowed_set_is_still_refused`
     # holds that line.
+    #
+    # SUNGLASSES_REPORT_TOKEN is the fifth: the bearer token for the opt-in
+    # `--report-to`. It is read once, in `report_to`, and only when that flag is
+    # given; it is never stored or echoed. It is an environment variable so the
+    # token is not on the command line (process list, shell history).
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT",
-               "NO_COLOR"}
+               "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}
 
     # Names that LOOK like env vars and are not. `SUNGLASSES_WITHHELD` is the
     # JSON-RPC error message T4.R7 freezes for the proxy's client envelope, so
@@ -1186,7 +1191,7 @@ def _environment_audit(pkg):
 
 
 def test_package_reads_no_undeclared_environment_variables():
-    """The wheel may read exactly four env vars, and each is accounted for."""
+    """The wheel may read exactly the named env vars, and each is accounted for."""
     found, read_names, refusals, allowed, wire_constants = _environment_audit(
         os.path.dirname(_package_location()))
 
@@ -1243,18 +1248,18 @@ _R52_PROBES = {
 }
 
 
-def test_the_allowed_environment_reads_are_exactly_the_four_named(tmp_path):
+def test_the_allowed_environment_reads_are_exactly_the_five_named(tmp_path):
     """The set is pinned, so widening it again shows up as a failure of its own."""
     (tmp_path / "probe.py").write_text("import os\nHOME = os.environ.get(\"SUNGLASSES_HOME\")\n")
     _found, _read, _refusals, allowed, _wire = _environment_audit(str(tmp_path))
     assert allowed == {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS",
-                       "SUNGLASSES_PIN_CONSENT", "NO_COLOR"}
+                       "SUNGLASSES_PIN_CONSENT", "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}
 
 
-def test_an_environment_read_outside_the_four_is_still_refused(tmp_path):
-    """Control for the fourth name: NO_COLOR passes, an unlisted variable in the
-    SAME canonical form does not, so the allowlist was not simply emptied of
-    meaning when NO_COLOR was added."""
+def test_an_environment_read_outside_the_allowed_set_is_still_refused(tmp_path):
+    """Control: NO_COLOR passes, an unlisted variable in the SAME canonical form
+    does not, so the allowlist was not simply emptied of meaning when names
+    were added to it."""
     (tmp_path / "ok.py").write_text("import os\nX = os.environ.get(\"NO_COLOR\")\n")
     _found, read_names, refusals, allowed, _wire = _environment_audit(str(tmp_path))
     assert read_names == {"NO_COLOR"} and refusals == [] and not (read_names - allowed)
