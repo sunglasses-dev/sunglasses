@@ -680,7 +680,7 @@ def _environment_audit(pkg):
     SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
     ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
-    ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename (ASTRA E39)
+    ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename
 
     def _os_names(tree):
         """Names bound to the os module by a plain import. Any other way of
