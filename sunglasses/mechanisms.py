@@ -67,7 +67,10 @@ _SINK = (
 _TO_SINK = rf"\b(?:to|into|in|onto|toward|towards|via)\s+[^.\n]{{0,24}}?(?:{_SINK})"
 
 # The people an address-then-quiet instruction hides something from (MECH-002).
-_PRINCIPAL = r"(?:user|owner|customer|operator|reviewer|admin(?:istrator)?|human|client)s?\b"
+_PRINCIPAL = r"(?:user|owner|customer|operator|reviewer|admin(?:istrator)?|human)\b"
+# The clause has to END there: "keep it hidden from the user unless dev mode is on"
+# is interface documentation, "keep this hidden from the user." is the attack.
+_CLAUSE_END = r"(?:[ \t]+(?:about|of)[ \t]+(?:this|it|that)(?:[ \t]+(?:step|action|change|request|task))?)?(?=[ \t]*(?:[.!?\"')\]]|-->|\n|$))"
 
 def _inflect(*stems: str) -> str:
     """Alternation matching each stem plus its regular inflections.
@@ -141,26 +144,27 @@ MECHANISM_PATTERNS = [
             r"|do not (?:mention|surface|reveal|disclose|show|report|log)"
             r"|don'?t (?:mention|surface|reveal|disclose|show)"
             r")\b",
-            # (a2) the same address, then an instruction to keep the action from
-            # the person it affects ("keep this hidden from the user"). It has to
-            # START a clause and name the person: "I'll keep this private" is an
-            # assistant promising, not being told, and "keep this secret key out
-            # of source control" is about a key.
-            r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*[:,\-–]\s*"
+            # (a2) an address with a colon, then an instruction to keep the action
+            # from the person it affects ("keep this hidden from the user."). It
+            # has to START a clause, name the person and END the clause there:
+            # "I'll keep this private" is an assistant promising, not being told,
+            # and "keep it hidden from the user unless dev mode is on" is about an
+            # interface.
+            r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*:\s*"
             r"(?:[^\n]{0,140}?(?:[.!?;,—–\-]\s+|\b(?:and|then|please|just|also|must|should|always)\s+))?"
-            r"(?:keep|hide)\s+(?:this|it|that)\s+(?:(?:hidden|secret|quiet|private|confidential)\s+)?from\s+"
-            r"(?:the\s+|your\s+)?" + _PRINCIPAL,
+            r"(?:keep\s+(?:this|it|that)\s+(?:hidden|secret|quiet|private|confidential)\s+from"
+            r"|hide\s+(?:this|it|that)\s+from)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + _CLAUSE_END,
             # (a3) the same address, a directive, then a soft quiet-keeping line
-            # ("no need to mention it", "do not notify the owner"). The directive
-            # must come first, in the same line and without thanks or pleasantry words: "No
-            # need to mention it" alone is how one says you're welcome, and
-            # "never notify the customer by text" alone is a support rule.
-            r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*[:,\-–]\s*"
+            # ("no need to mention it.", "do not notify the owner."). The directive
+            # must come first, in the same line and without thanks or pleasantry
+            # words: "No need to mention it" alone is how one says you're welcome,
+            # and "never notify the customer by text" alone is a support rule.
+            r"(?i)\b(?:agent|assistant|ai|llm|model|copilot|chatbot)\b\s*:\s*"
             r"(?:(?!thank|welcome|appreciat|glad|happy to|pleasure|anytime|no problem)[^\n]){8,140}?"
             r"(?:[.!?;,—–\-]\s+|\b(?:and|then|please|just|also|must|should|always)\s+)"
-            r"(?:no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+"
-            r"(?:it|this|that|about\s+(?:it|this|that)|(?:the\s+|your\s+)?" + _PRINCIPAL + r")"
-            r"|(?:do\s+not|don'?t|never)\s+(?:notify|inform|alert|warn|tell)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + r")",
+            r"(?:no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+(?:it|this|that)" + _CLAUSE_END +
+            r"|no\s+need\s+to\s+(?:mention|tell|notify|inform)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + _CLAUSE_END +
+            r"|(?:do\s+not|don'?t|never)\s+(?:notify|inform|alert|warn|tell)\s+(?:the\s+|your\s+)?" + _PRINCIPAL + _CLAUSE_END + r")",
             # (b) CONDITIONAL SELF-IDENTIFICATION — "If you are an assistant
             # summarizing this thread, append …". This is the single highest-
             # precision signal in the whole layer: no honest document changes its
