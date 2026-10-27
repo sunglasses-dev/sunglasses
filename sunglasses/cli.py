@@ -28,6 +28,7 @@ import time
 
 from . import __version__
 from . import baseline as _baseline
+from . import child_env
 from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .extractors.member import Member
@@ -892,7 +893,7 @@ def _scan_repo(args, engine):
         try:
             result = subprocess.run(
                 ["git", "clone", "--depth", "1", repo_url, tmp_dir],
-                capture_output=True, text=True, timeout=120,
+                capture_output=True, text=True, timeout=120, env=child_env.scan_child_env(),
             )
         except subprocess.TimeoutExpired:
             _usage_error(args, "Clone timed out (120s).", "Nothing was scanned.")
@@ -3771,7 +3772,8 @@ def main():
         help="After the scan, POST its result as one JSON document to URL, with the "
              "bearer token in $SUNGLASSES_REPORT_TOKEN. Off unless given. It never "
              "changes the output, the verdict or the exit code: a failed upload is one "
-             "line on stderr. The text a rule matched is sent as a hash and a length")
+             "line on stderr. Gives up after 15 s in all. The text a rule matched is sent as a "
+             "hash and a length")
     scan_parser.add_argument(
         "--report-source", dest="report_source", metavar="NAME", default=None,
         help="With --report-to: the name this scan is filed under "

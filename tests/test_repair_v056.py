@@ -671,14 +671,16 @@ def _environment_audit(pkg):
     # once in the whole module (no parameter, lambda, local, loop or import
     # may reuse the name), and the resolved KEY is allowed. One enumerated
     # non-key use is exempt by file and form: `dict(os.environ)` in firewall.py,
-    # the environment copy handed to a spawned server. Anything else refuses.
+    # the environment copy handed to a spawned server, and in child_env.py, the copy
+    # handed to the scan's own children with the report token taken out. Anything
+    # else refuses.
     # Two of the three allowed vars are read through a named constant
     # (`_PIN_CONSENT_ENV`, `_DISABLE_ENV`); the literal scan keeps catching a
     # SUNGLASSES_* name that appears anywhere without being read.
     SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
     ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
-    ENV_COPY_SITES = {"firewall.py"}   # exact relative path inside the package, never a basename (ASTRA E39)
+    ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename (ASTRA E39)
 
     def _os_names(tree):
         """Names bound to the os module by a plain import. Any other way of
@@ -994,7 +996,7 @@ def _environment_audit(pkg):
             else:
                 refusals.append(f"{relpath}:{node.lineno} read with a key that is not a literal "
                                 f"or a once-bound module constant")
-        # The enumerated environment copy: dict(os.environ) in firewall.py only.
+        # The enumerated environment copy: dict(os.environ) in firewall.py and child_env.py only.
         if relpath in ENV_COPY_SITES:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
@@ -1254,6 +1256,21 @@ def test_the_allowed_environment_reads_are_exactly_the_five_named(tmp_path):
     _found, _read, _refusals, allowed, _wire = _environment_audit(str(tmp_path))
     assert allowed == {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS",
                        "SUNGLASSES_PIN_CONSENT", "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}
+
+
+def test_the_environment_copy_is_allowed_only_in_its_two_named_files(tmp_path):
+    """`dict(os.environ)` passes in firewall.py and child_env.py by exact path, and refuses
+    in any other file, including one of the same basename in a subfolder."""
+    probe = "import os\nENV = dict(os.environ)\n"
+    for name in ("firewall.py", "child_env.py"):
+        (tmp_path / name).write_text(probe)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert refusals == []
+    (tmp_path / "other.py").write_text(probe)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "child_env.py").write_text(probe)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert len(refusals) == 2 and any("other.py" in r for r in refusals)
 
 
 def test_an_environment_read_outside_the_allowed_set_is_still_refused(tmp_path):

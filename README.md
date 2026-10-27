@@ -628,15 +628,27 @@ variable `SUNGLASSES_REPORT_TOKEN` and sent as `Authorization: Bearer ...` to th
 is no flag for it, so it stays out of your shell history and process list. Without the variable,
 nothing is sent.
 
-What is sent is one JSON document: the scan's own `--json` object, the scanner version and
-pattern count, and a name for the source (`--report-source NAME`; by default the directory or
-repository name). The text a rule matched is replaced by its SHA-256 and length unless you add
-`--report-include-text`. Each finding also carries `line`, the line where its matched text first
-appears in the file as read, or `null` when it cannot be located (a scan of text, a format that is
-extracted before it is scanned, a file too large to read again). Paths are the ones the scan output
-already shows. `--report-include-receipts` adds the newest segment of your signed hook log, from
-its first line, with the public key that signs it; without it `receipts` is `null`. A report over
-the size limit is not sent, and the line says so.
+What is sent is one JSON document, built from a fixed list of fields: the scan's counts and
+flags, its file paths (as the scan output shows them: for a directory scan that includes the folder's own path, in `source`), and for each finding its rule id, severity, category, `line` and the
+SHA-256 and length of the text it matched; plus the scanner version, the pattern count and a name
+for the source (`--report-source NAME`; by default the directory or repository name). Every other
+field of the scan's `--json` result (a rule's name, its explanation, the other rules that matched,
+framework mappings, warning text) is left out, and a field the scan
+result gains later is not sent until it is added to that list. `--report-include-text` sends the
+matched text itself instead of its hash. `line` is the line where the matched text first appears in
+the file as read, or `null` when it cannot be located (a scan of text, a format that is extracted
+before it is scanned, a file too large to read again); the file is read again after the scan, so a
+file that changed in between can give a stale line. `--report-include-receipts` adds the newest
+segment of your signed hook log, from its first line, with the public key that signs it; without it
+`receipts` is `null`. If the log pushes the report over the size limit it is left out and the line
+says so.
+
+The upload is attempted once and given up on after 15 seconds in all (name lookup, connect, send
+and the answer together), whatever the server does; the scan's output and exit code are already
+decided by then. A report over 1 MiB, or with more than 5,000 findings, is not sent. The size is
+checked after the report is built, so building a very large scan's report uses memory in proportion
+to the scan. The scan's own child processes (the scan worker, `git` for `--repo`) are not given
+`SUNGLASSES_REPORT_TOKEN`.
 
 ### Deep Scan Setup (Audio & Video)
 

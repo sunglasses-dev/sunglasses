@@ -7,8 +7,13 @@ The contract these tests hold:
      environment and one JSON document in the frozen envelope shape.
   3. The text a rule matched is a hash and a length unless `--report-include-text`.
   4. Every failure (no token, nothing listening, a refusing server, a redirect, a URL
-     that may not carry a token) is one stderr line and the exit code is unchanged.
-  5. The token never appears in anything printed, and never goes anywhere but the URL.
+     that may not carry a token, a server that stalls or answers a byte at a time, a
+     document JSON cannot hold) is one stderr line and the exit code is unchanged. The
+     upload is abandoned after `DEADLINE_SECONDS` in all, whatever the server does.
+  5. The token never appears in anything printed, never goes anywhere but the URL, and
+     is not in the environment of anything the scan starts.
+  6. The body is built from a list of allowed fields: a field that is not on the list is
+     not sent, wherever it sits in the scan's result.
 """
 import http.server
 import json
@@ -18,6 +23,7 @@ import subprocess
 import sys
 import pathlib
 import threading
+import time
 
 import pytest
 
@@ -464,7 +470,7 @@ def test_a_log_that_is_not_a_chain_is_left_out(tmp_path):
 
 
 def test_the_envelope_is_frozen(monkeypatch):
-    """The shape both repos agree on. Change it only together with the receiving side."""
+    """The shape that is uploaded. Change it only together with whatever receives it."""
     monkeypatch.setattr(report_to, "__version__", "0.0.0-fixture")
     doc = {
         "event_id": "e1", "decision": "block", "severity": "high", "channel": "file",
@@ -489,3 +495,301 @@ def test_the_envelope_is_frozen(monkeypatch):
         {"kind": "repo", "name": "proj", "ref": None}
     assert report_to.build_envelope({}, "scan")["source"]["name"] == "unnamed"
     assert report_to.build_envelope({}, "scan")["receipts"] is None
+
+
+# ---------------------------------------------------------------- off by default
+
+_CLI_PROBE = """
+import sys
+args = sys.argv[1:]
+patch = []
+while args and args[0].startswith("--patch="):
+    patch.append(args.pop(0)[len("--patch="):])
+from sunglasses import cli
+if patch:
+    from sunglasses import report_to
+    for item in patch:
+        name, value = item.split("=")
+        setattr(report_to, name, float(value))
+sys.argv = ["sunglasses", "scan"] + args
+code = 0
+try:
+    cli.main()
+except SystemExit as stop:
+    code = stop.code
+sys.stderr.write("REPORT_TO_IMPORTED=%s\\n" % ("sunglasses.report_to" in sys.modules))
+sys.stderr.write("EXIT=%s\\n" % code)
+"""
+
+
+def _probe(args, token=TOKEN, patch=(), cwd=None):
+    env = dict(os.environ)
+    env.pop(report_to.TOKEN_ENV, None)
+    if token is not None:
+        env[report_to.TOKEN_ENV] = token
+    return subprocess.run([sys.executable, "-c", _CLI_PROBE, *[f"--patch={p}" for p in patch], *args],
+                          capture_output=True, text=True, cwd=cwd or REPO, env=env)
+
+
+@pytest.mark.parametrize("which,code", [("threat", 1), ("clean", 0), ("missing", 2)])
+def test_off_has_no_report_activity(tmp_path, which, code):
+    """Without `--report-to` nothing about reporting runs, even with a token in the
+    environment: the module is not imported and no reporter line is printed."""
+    threat, clean = _files(tmp_path)
+    target = {"threat": threat, "clean": clean, "missing": str(tmp_path / "missing.md")}[which]
+    proc = _probe(["--file", target, "--json"])
+    assert f"EXIT={code}" in proc.stderr
+    assert "REPORT_TO_IMPORTED=False" in proc.stderr
+    assert _report_lines(proc) == []
+
+
+# ---------------------------------------------------------------- the token stays in this process
+
+def test_the_scan_worker_child_is_not_given_the_token(tmp_path, monkeypatch):
+    from sunglasses import scan_worker
+    seen = tmp_path / "seen.txt"
+    probe = ("import os; open(%r, 'w').write(str('SUNGLASSES_REPORT_TOKEN' in os.environ) "
+             "+ '|' + str('PATH' in os.environ))" % str(seen))
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    # control: a child started the ordinary way does see it, so the probe can tell
+    subprocess.run([sys.executable, "-c", probe], check=True)
+    assert seen.read_text() == "True|True"
+    worker = scan_worker.ScanWorker(5, argv=[sys.executable, "-c", probe])
+    try:
+        worker.start()
+        worker._child.wait(timeout=30)
+    finally:
+        worker.close()
+    assert seen.read_text() == "False|True"
+
+
+def test_the_git_clone_child_is_not_given_the_token(tmp_path, server):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    seen = tmp_path / "seen.txt"
+    fake = bindir / "git"
+    fake.write_text('#!/bin/sh\nif [ -n "${SUNGLASSES_REPORT_TOKEN+set}" ]; then echo has > %s; '
+                    'else echo none > %s; fi\nexit 1\n' % (seen, seen))
+    fake.chmod(0o755)
+    env = dict(os.environ)
+    env[report_to.TOKEN_ENV] = TOKEN
+    env["PATH"] = f"{bindir}{os.pathsep}{env.get('PATH', '')}"
+    srv = server()
+    proc = subprocess.run([sys.executable, "-m", "sunglasses.cli", "scan", "--repo",
+                           "https://example.invalid/r.git", "--json", "--report-to", srv.url],
+                          capture_output=True, text=True, cwd=REPO, env=env)
+    assert seen.read_text().strip() == "none"
+    assert proc.returncode == 2
+
+
+def test_no_process_a_directory_scan_starts_has_the_token(tmp_path, server):
+    """Every Python process under the CLI (the scan workers) records, at start-up, whether
+    the token is in its environment. Only the CLI itself may have it."""
+    site = tmp_path / "site"
+    site.mkdir()
+    log = tmp_path / "procs.txt"
+    (site / "sitecustomize.py").write_text(
+        "import os\nwith open(%r, 'a') as h:\n    h.write('%%d %%s\\n' %% (os.getpid(), "
+        "'has' if 'SUNGLASSES_REPORT_TOKEN' in os.environ else 'none'))\n" % str(log))
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / "a.md").write_text("# notes\n\n" + INJECTION)
+    (tree / "b.md").write_text("Quarterly notes: nothing here.\n")
+    srv = server()
+    env = dict(os.environ)
+    env[report_to.TOKEN_ENV] = TOKEN
+    env["PYTHONPATH"] = f"{site}{os.pathsep}{env.get('PYTHONPATH', '')}"
+    child = subprocess.Popen([sys.executable, "-m", "sunglasses.cli", "scan", "--dir", str(tree),
+                              "--json", "--report-to", srv.url],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=REPO, env=env)
+    child.communicate(timeout=120)
+    rows = [line.split() for line in log.read_text().splitlines()]
+    others = [state for pid, state in rows if int(pid) != child.pid]
+    assert [state for pid, state in rows if int(pid) == child.pid] == ["has"]
+    assert others, "the scan started no child, so this test saw nothing"
+    assert set(others) == {"none"}
+    assert len(srv.requests) == 1
+
+
+# ---------------------------------------------------------------- the upload has a deadline
+
+class _Awkward:
+    """A listener that reads the request and then either says nothing (`drip=False`) or
+    answers one header line at a time, each well inside any socket timeout."""
+
+    def __init__(self, drip):
+        self.drip = drip
+        self.stop = threading.Event()
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(4)
+        self.sock.settimeout(0.2)
+        self.url = f"http://127.0.0.1:{self.sock.getsockname()[1]}/v1/scans"
+        self.thread = threading.Thread(target=self._serve, daemon=True)
+        self.thread.start()
+
+    def _serve(self):
+        held = []
+        while not self.stop.is_set():
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                continue
+            held.append(conn)
+            threading.Thread(target=self._talk, args=(conn,), daemon=True).start()
+        for conn in held:
+            conn.close()
+
+    def _talk(self, conn):
+        try:
+            conn.settimeout(5)
+            data = b""
+            while b"\r\n\r\n" not in data:
+                data += conn.recv(65536)
+            if self.drip:
+                conn.sendall(b"HTTP/1.1 200 OK\r\n")
+                for i in range(95):
+                    if self.stop.is_set():
+                        return
+                    conn.sendall(b"X-Pad-%d: 1\r\n" % i)
+                    time.sleep(0.1)
+                conn.sendall(b"Content-Length: 0\r\n\r\n")
+            else:
+                self.stop.wait(30)
+        except OSError:
+            pass
+
+    def close(self):
+        self.stop.set()
+        self.sock.close()
+
+
+@pytest.fixture
+def awkward():
+    made = []
+
+    def make(drip):
+        made.append(_Awkward(drip))
+        return made[-1]
+
+    yield make
+    for each in made:
+        each.close()
+
+
+_HELD = ({"event_id": "e1", "decision": "allow", "findings": []}, "scan")
+
+
+def test_a_server_that_never_answers_ends_at_the_socket_timeout(monkeypatch, capsys, awkward):
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    monkeypatch.setattr(report_to, "TIMEOUT_SECONDS", 0.5)
+    monkeypatch.setattr(report_to, "DEADLINE_SECONDS", 8)
+    srv = awkward(drip=False)
+    started = time.monotonic()
+    report_to.deliver(srv.url, _HELD)
+    elapsed = time.monotonic() - started
+    err = capsys.readouterr().err
+    assert elapsed < 4
+    assert err.count("\n") == 1 and err.startswith(f"{LINE_START} could not reach 127.0.0.1 (")
+    assert "did not finish" not in err and TOKEN not in err
+
+
+def test_a_server_that_answers_a_byte_at_a_time_cannot_hold_the_upload(monkeypatch, capsys, awkward):
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    monkeypatch.setattr(report_to, "TIMEOUT_SECONDS", 5)
+    monkeypatch.setattr(report_to, "DEADLINE_SECONDS", 1)
+    srv = awkward(drip=True)
+    started = time.monotonic()
+    report_to.deliver(srv.url, _HELD)
+    elapsed = time.monotonic() - started
+    err = capsys.readouterr().err
+    assert elapsed < 4
+    assert err.count("\n") == 1
+    assert err.startswith(f"{LINE_START} 127.0.0.1 did not finish within 1 s;")
+    assert TOKEN not in err
+
+
+def test_the_scan_exit_and_output_do_not_wait_for_a_dripping_server(tmp_path, awkward):
+    threat, _ = _files(tmp_path)
+    srv = awkward(drip=True)
+    plain = _probe(["--file", threat, "--json"])
+    started = time.monotonic()
+    sent = _probe(["--file", threat, "--json", "--report-to", srv.url],
+                  patch=["DEADLINE_SECONDS=1", "TIMEOUT_SECONDS=5"])
+    elapsed = time.monotonic() - started
+    assert "EXIT=1" in plain.stderr and "EXIT=1" in sent.stderr
+    assert _stable(json.loads(plain.stdout)) == _stable(json.loads(sent.stdout))
+    assert elapsed < 8
+    assert len(_report_lines(sent)) == 1 and "did not finish within 1 s" in sent.stderr
+
+
+def test_the_deadline_is_a_constant_longer_than_one_socket_wait():
+    assert report_to.DEADLINE_SECONDS > report_to.TIMEOUT_SECONDS
+
+
+# ---------------------------------------------------------------- the body is an allowed-field list
+
+MARK = "PRIVATE-MARKER-7f3a91"
+
+
+def _scan_with_marks():
+    finding = {"id": "GLS-PI-001", "name": MARK + "-name", "severity": "high", "category": "prompt_injection",
+               "matched_text": "ignore previous instructions", "reason": MARK + "-reason",
+               "also_matched": [MARK + "-also"], "snippet": MARK + "-snippet", "context": {"x": MARK},
+               "taxonomy": {"owasp_llm_top10": [{"id": "LLM01", "name": MARK + "-tax"}]}, "line": 3}
+    return {
+        "event_id": "e1", "decision": "block", "severity": "high", "channel": "file", "source": "notes.md",
+        "truncated": False, "bytes_scanned": 10, "inspection_complete": True, "findings_count": 1,
+        "extraction_warnings": [MARK + "-warn"], "warnings": [MARK + "-warn2"], "notes": MARK + "-notes",
+        "directory": "/Users/someone/" + MARK, "skipped": [MARK + "-skip"], "partially_read": [MARK],
+        "excluded_folders": [MARK], "findings": [finding],
+        "file_results": [{"file": "a.md", "decision": "block", "threats": 1, "preview": MARK + "-preview",
+                          "findings": [finding]}],
+        "severity_breakdown": {"high": 1, "bad": MARK}, "category_breakdown": {"prompt_injection": 1},
+    }
+
+
+@pytest.mark.parametrize("include_text", [False, True])
+def test_a_field_that_is_not_on_the_list_is_not_sent(include_text):
+    built = report_to.build_envelope(_scan_with_marks(), "dir_scan", include_text=include_text)
+    body = report_to._encode(built).decode()
+    assert MARK not in body
+    scan = built["scan"]
+    assert scan["event_id"] == "e1" and scan["findings_count"] == 1 and scan["source"] == "notes.md"
+    assert scan["severity_breakdown"] == {"high": 1}
+    assert scan["file_results"][0]["file"] == "a.md"
+    one = scan["file_results"][0]["findings"][0]
+    assert set(one) == {"id", "severity", "category", "line", "matched_text"}
+    assert (one["matched_text"] == "ignore previous instructions") is include_text
+    assert (set(one["matched_text"]) == {"sha256", "len"}) is (not include_text)
+
+
+def test_a_container_where_a_plain_value_belongs_is_dropped():
+    doc = {"event_id": {"x": MARK}, "decision": ["allow", MARK], "latency_ms": 1.5,
+           "findings": [{"id": {"a": MARK}, "severity": "low", "line": [MARK], "matched_text": 7}]}
+    scan = report_to.build_envelope(doc, "scan")["scan"]
+    assert MARK not in report_to._encode({"scan": scan}).decode()
+    assert scan["latency_ms"] == 1.5 and scan["findings"] == [{"severity": "low"}]
+
+
+def test_a_real_scan_uploads_no_rule_prose(tmp_path, server):
+    threat, _ = _files(tmp_path)
+    srv = server()
+    proc = _run(["--file", threat, "--json", "--report-to", srv.url])
+    assert proc.returncode == 1
+    scan = json.loads(srv.requests[0]["body"])["scan"]
+    for finding in scan["findings"]:
+        assert set(finding) == {"id", "severity", "category", "line", "matched_text"}
+    assert INJECTION.strip() not in srv.requests[0]["body"].decode()
+
+
+# ---------------------------------------------------------------- a document JSON cannot hold
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_a_document_json_cannot_hold_is_not_sent_and_is_one_line(monkeypatch, capsys, server, bad):
+    srv = server()
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    report_to.deliver(srv.url, ({"event_id": "e1", "latency_ms": bad, "findings": []}, "scan"))
+    err = capsys.readouterr().err
+    assert srv.requests == []
+    assert err.count("\n") == 1 and "could not build the report (ValueError); nothing sent" in err

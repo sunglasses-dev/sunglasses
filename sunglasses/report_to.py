@@ -1,18 +1,18 @@
 """Send one finished scan to a URL the user named with `--report-to`.
 
-Off unless the flag is given. When it is, the scan has already ended: its stdout,
-its verdict and its exit code are decided before anything here runs, and nothing
-here can change them. Every way the upload can fail is one line on stderr, never
-an exception, never a different exit code.
+Off unless the flag is given. When it is, the upload runs after the scan has decided its
+output and its exit code, and nothing here can change either. Every way the upload can
+fail is one line on stderr, never an exception, never a different exit code.
 
-What leaves the machine is one JSON document (`ENVELOPE_SCHEMA`): the scanner's own
-result object as the user's `--json` run prints it, wrapped with the scanner version
-and a source label. The text a rule matched is replaced by its SHA-256 and length
-unless the user also passed `--report-include-text`. Each finding also carries `line`,
-the 1-based line where its matched text first appears in the file as read, or null
-when it cannot be located (text on the command line, a format that is extracted
-before it is scanned, a file too large to read again). Paths are the ones the scan
-output already shows.
+What leaves the machine is one JSON document (`ENVELOPE_SCHEMA`) built from a fixed list
+of fields, not by blanking out the ones known to be sensitive: the scan's counts and
+flags, its file paths, and for each finding its rule id, severity, category, line and
+the SHA-256 and length of the text it matched. Every other field of the scan's result
+is left out, so a field added to that result later is not sent until it is added to the
+list here. With `--report-include-text` the matched text itself is sent in place of its
+hash. `line` is the 1-based line where the matched text first appears in the file as
+read, or null when it cannot be located (text on the command line, a format that is
+extracted before it is scanned, a file too large to read again).
 
 With `--report-include-receipts` the document also carries the newest segment of the
 user's signed hook log, from its first line, with the public key that signs it
@@ -23,7 +23,12 @@ receiver verifies the same bytes the user's own verifier does. Without the flag
 The token comes from the environment (`SUNGLASSES_REPORT_TOKEN`), never from an
 argument, so it stays out of shell history and process listings. It is sent only
 as a bearer header to the exact URL given: redirects are refused, and a token goes
-over plain http only to this machine.
+over plain http only to this machine. The scan's own child processes are not given it.
+
+Limits: one upload attempt, at most `DEADLINE_SECONDS` in all (name lookup, connect,
+send and the answer together); a report over `MAX_BODY_BYTES` or `MAX_FINDINGS` is not
+sent. The size is checked after the report is built, so building it can use memory in
+proportion to the scan.
 """
 from __future__ import annotations
 
@@ -36,6 +41,8 @@ import os
 import pathlib
 import stat
 import sys
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,7 +53,8 @@ ENVELOPE_SCHEMA = "sg-report/1"
 TOKEN_ENV = "SUNGLASSES_REPORT_TOKEN"
 MAX_BODY_BYTES = 1 << 20
 MAX_FINDINGS = 5000
-TIMEOUT_SECONDS = 10
+TIMEOUT_SECONDS = 10           # each blocking socket call
+DEADLINE_SECONDS = 15          # the whole upload, whatever the server does
 
 KIND_SCAN = "scan"
 KIND_DIR_SCAN = "dir_scan"
@@ -76,23 +84,51 @@ def _digest(text):
             "len": len(text)}
 
 
-def hide_matched_text(node):
-    """A copy of `node` in which every `matched_text` string is its digest.
+# The fields of the scan's result that are uploaded. A field not named here is not sent.
+_SCAN_FIELDS = (
+    "event_id", "decision", "severity", "channel", "source", "repo_name", "truncated",
+    "bytes_scanned", "extraction_complete", "inspection_complete", "threat_found", "is_clean",
+    "findings_count", "patterns_fired", "latency_ms", "files_scanned", "files_with_threats",
+    "files_incomplete", "files_skipped", "total_threats", "scan_time_ms", "exit_code")
+_COUNT_MAPS = ("severity_breakdown", "category_breakdown")      # {name: count}
+_FILE_FIELDS = ("file", "decision", "threats")
+_FINDING_FIELDS = ("id", "severity", "category", "line")
 
-    Walks the whole document, so the finding lists of a directory scan and its
-    top-level list are both covered, and a field added next to them later is not.
-    """
-    if isinstance(node, dict):
-        out = {}
-        for key, value in node.items():
-            if key == "matched_text" and isinstance(value, str):
-                out[key] = _digest(value)
-            else:
-                out[key] = hide_matched_text(value)
-        return out
-    if isinstance(node, list):
-        return [hide_matched_text(item) for item in node]
-    return copy.deepcopy(node)
+
+def _plain_value(value):
+    """True for the values a counter or a flag can hold: no containers, no bytes."""
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
+def _project_finding(finding, include_text):
+    out = {key: finding[key] for key in _FINDING_FIELDS
+           if key in finding and _plain_value(finding[key])}
+    text = finding.get("matched_text")
+    if isinstance(text, str):
+        out["matched_text"] = text if include_text else _digest(text)
+    return out
+
+
+def _project_findings(findings, include_text):
+    return [_project_finding(f, include_text) for f in findings or [] if isinstance(f, dict)]
+
+
+def project_scan(doc, include_text=False):
+    """The part of the scan's result that is uploaded, built from the field lists above."""
+    out = {key: doc[key] for key in _SCAN_FIELDS if key in doc and _plain_value(doc[key])}
+    for key in _COUNT_MAPS:
+        counts = doc.get(key)
+        if isinstance(counts, dict):
+            out[key] = {str(k): v for k, v in counts.items()
+                        if isinstance(v, int) and not isinstance(v, bool)}
+    if "findings" in doc:
+        out["findings"] = _project_findings(doc["findings"], include_text)
+    if "file_results" in doc:
+        out["file_results"] = [
+            {**{k: entry[k] for k in _FILE_FIELDS if k in entry and _plain_value(entry[k])},
+             "findings": _project_findings(entry.get("findings"), include_text)}
+            for entry in doc["file_results"] or [] if isinstance(entry, dict)]
+    return out
 
 
 LINE_READ_LIMIT = 4 << 20
@@ -232,7 +268,7 @@ def finding_count(doc):
 def build_envelope(doc, kind, source_name=None, include_text=False, pattern_count=None,
                    receipts=None):
     """The one document that is uploaded. `doc` is the scan's JSON object."""
-    scan = copy.deepcopy(doc) if include_text else hide_matched_text(doc)
+    scan = project_scan(doc, include_text)
     name = source_name or (doc.get("repo_name") if kind == KIND_DIR_SCAN else None) or "unnamed"
     return {
         "schema": ENVELOPE_SCHEMA,
@@ -269,8 +305,9 @@ def _target(url):
     return parsed, None
 
 
-def _post(url, parsed, body, token):
-    """None when the server accepted the document, else the one-line reason."""
+def _post_once(url, parsed, body, token):
+    """None when the server accepted the document, else the one-line reason. May block
+    for as long as a server keeps answering; `_post` is what bounds it."""
     host = _plain(parsed.hostname)
     request = urllib.request.Request(
         url, data=body, method="POST",
@@ -292,6 +329,39 @@ def _post(url, parsed, body, token):
     except Exception as err:  # URLError, timeout, TLS, reset: all one line, never the text
         return f"could not reach {host} ({type(err).__name__}); the report was not sent"
     return None if 200 <= code < 300 else f"{host} answered HTTP {code}; the report was not accepted"
+
+
+def _post(url, parsed, body, token):
+    """`_post_once`, abandoned after `DEADLINE_SECONDS` in all.
+
+    The socket timeout bounds each blocking call, not the upload: a server that answers a
+    byte at a time, or a name lookup that does not return, would hold the scan's exit for
+    as long as it likes. So the upload runs on a daemon thread and this waits for it up to
+    the deadline. When it is not done, the line says so and the upload is left behind: the
+    process is already on its way out, and the thread never writes to stdout or stderr.
+    """
+    outcome = []
+
+    def work():
+        try:
+            outcome.append(_post_once(url, parsed, body, token))
+        except Exception as err:
+            outcome.append(f"could not send ({type(err).__name__}); the report was not sent")
+
+    worker = threading.Thread(target=work, name="report-to-upload", daemon=True)
+    started = time.monotonic()
+    worker.start()
+    worker.join(DEADLINE_SECONDS)
+    if worker.is_alive():
+        waited = max(1, round(time.monotonic() - started))
+        return (f"{_plain(parsed.hostname)} did not finish within {waited} s; "
+                "the upload was given up on and the report may not have arrived")
+    return outcome[0]
+
+
+def _encode(envelope):
+    """The upload body. NaN and Infinity are not JSON; a document holding one is not sent."""
+    return json.dumps(envelope, allow_nan=False).encode("utf-8", "surrogatepass")
 
 
 def deliver(url, held, source_name=None, include_text=False, pattern_count=None,
@@ -322,11 +392,11 @@ def deliver(url, held, source_name=None, include_text=False, pattern_count=None,
             return
         receipts, why_not = read_receipts() if include_receipts else (None, None)
         envelope = build_envelope(doc, kind, source_name, include_text, pattern_count, receipts)
-        body = json.dumps(envelope).encode("utf-8", "surrogatepass")
+        body = _encode(envelope)
         if len(body) > MAX_BODY_BYTES and receipts is not None:
             receipts, why_not = None, "with them the report is over the size limit"
             envelope["receipts"] = None
-            body = json.dumps(envelope).encode("utf-8", "surrogatepass")
+            body = _encode(envelope)
         if len(body) > MAX_BODY_BYTES:
             _line(f"the report is {len(body)} bytes, over the {MAX_BODY_BYTES} limit; nothing sent")
             return

@@ -21,7 +21,6 @@
     "threat_found": true,
     "inspection_complete": true,
     "is_clean": false,
-    "extraction_warnings": [],
     "findings_count": 1,
     "patterns_fired": 1,
     "latency_ms": 1.5,
@@ -29,16 +28,12 @@
     "findings": [
       {
         "id": "GLS-PI-001",
-        "name": "Ignore previous instructions",
         "severity": "high",
         "category": "prompt_injection",
         "matched_text": {
           "sha256": "2e4221a7f996a7299dd5be2905be6c7c27f5f5bfd60cb107a1662bfaf872e862",
           "len": 28
         },
-        "reason": "r",
-        "also_matched": [],
-        "taxonomy": {},
         "line": 3
       }
     ]
