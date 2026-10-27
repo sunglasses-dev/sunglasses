@@ -1,0 +1,55 @@
+{
+  "schema": "sg-report/1",
+  "client": {
+    "version": "0.0.0-fixture",
+    "pattern_count": 7
+  },
+  "source": {
+    "kind": "host",
+    "name": "fixture-host",
+    "ref": null
+  },
+  "kind": "scan",
+  "scan": {
+    "event_id": "e1",
+    "decision": "block",
+    "severity": "high",
+    "channel": "file",
+    "truncated": false,
+    "bytes_scanned": 10,
+    "extraction_complete": true,
+    "threat_found": true,
+    "inspection_complete": true,
+    "is_clean": false,
+    "extraction_warnings": [],
+    "findings_count": 1,
+    "patterns_fired": 1,
+    "latency_ms": 1.5,
+    "source": "notes.md",
+    "findings": [
+      {
+        "id": "GLS-PI-001",
+        "name": "Ignore previous instructions",
+        "severity": "high",
+        "category": "prompt_injection",
+        "matched_text": {
+          "sha256": "2e4221a7f996a7299dd5be2905be6c7c27f5f5bfd60cb107a1662bfaf872e862",
+          "len": 28
+        },
+        "reason": "r",
+        "also_matched": [],
+        "taxonomy": {},
+        "line": 3
+      }
+    ]
+  },
+  "receipts": {
+    "chain_id": "0123456789abcdef0123456789abcdef",
+    "public_key": "abababababababababababababababababababababababababababababababab",
+    "public_key_fp": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "lines": [
+      "{\"seq\":0}\n",
+      "{\"seq\":1}\n"
+    ]
+  }
+}

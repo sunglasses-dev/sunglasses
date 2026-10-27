@@ -1289,6 +1289,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     if policy and policy["write_error"]:
         summary["is_clean"] = False
 
+    _hold_report(args, summary, "dir_scan", root=tmp_dir)
+
     if args.output == "sarif":
         # Repo mode printed the human screen under `-o sarif`. Every scan mode goes
         # through the selected serializer or the flag is a lie.
@@ -1754,6 +1756,14 @@ def _emit_scan_result(args, result, source):
     them here is the fix that keeps them from drifting apart again — and it is why
     human, JSON and SARIF cannot disagree about the same scan (Fugu gate 3).
     """
+    if getattr(args, "report_to", None):
+        held = result.to_dict()
+        held["source"] = source
+        _annotate_single_policy(args, held)
+        from_file = (getattr(args, "file", None) and source == args.file
+                     and getattr(args, "explicit_text", None) is None and not args.stdin)
+        _hold_report(args, held, "scan", path=source if from_file else None)
+
     if args.output == "sarif":
         print(json.dumps(to_sarif([result], source=source), indent=2))
         # stdout is a machine contract here; the warning goes to stderr.
@@ -1825,11 +1835,51 @@ def cmd_scan(args):
     every other can't-scan uses, never a traceback. Once one has answered, a tree scan
     reports the file it could not hand over as not inspected instead (see `_scan_tree_inner`).
     """
+    if not getattr(args, "report_to", None):
+        _scan_or_refuse(args)
+        return
+    # The scan decides its output and its exit code first and ends in `sys.exit`; the
+    # upload runs on the way out and cannot change either.
+    try:
+        _scan_or_refuse(args)
+    except SystemExit:
+        _deliver_report(args)
+        raise
+    _deliver_report(args)
+
+
+def _scan_or_refuse(args):
     from . import scan_worker
     try:
         _run_scan(args)
     except scan_worker.ScannerCouldNotStart as exc:
         _usage_error(args, f"scanner could not start: {exc}")
+
+
+def _hold_report(args, doc, kind, root=None, path=None):
+    """Keep a copy of the scan's JSON object for `--report-to`; a no-op without the flag."""
+    if not getattr(args, "report_to", None):
+        return
+    from . import report_to
+    try:
+        args.held_report = (report_to.with_lines(doc, kind, root=root, path=path), kind)
+    except Exception:
+        import copy
+        args.held_report = (copy.deepcopy(doc), kind)
+
+
+def _deliver_report(args):
+    from . import report_to
+    held = getattr(args, "held_report", None)
+    pattern_count = None
+    if held:
+        try:
+            pattern_count = SunglassesEngine().info()["patterns"]
+        except Exception:
+            pass
+    report_to.deliver(args.report_to, held, source_name=args.report_source,
+                      include_text=args.report_include_text, pattern_count=pattern_count,
+                      include_receipts=args.report_include_receipts)
 
 
 def _run_scan(args):
@@ -3716,6 +3766,23 @@ def main():
         default="human",
         help="Output format: human (default), json, or sarif (SARIF 2.1.0 for GitHub Advanced Security / CI)",
     )
+    scan_parser.add_argument(
+        "--report-to", dest="report_to", metavar="URL", default=None,
+        help="After the scan, POST its result as one JSON document to URL, with the "
+             "bearer token in $SUNGLASSES_REPORT_TOKEN. Off unless given. It never "
+             "changes the output, the verdict or the exit code: a failed upload is one "
+             "line on stderr. The text a rule matched is sent as a hash and a length")
+    scan_parser.add_argument(
+        "--report-source", dest="report_source", metavar="NAME", default=None,
+        help="With --report-to: the name this scan is filed under "
+             "(default: the repo or directory name)")
+    scan_parser.add_argument(
+        "--report-include-text", dest="report_include_text", action="store_true",
+        help="With --report-to: send the matched text itself instead of its hash")
+    scan_parser.add_argument(
+        "--report-include-receipts", dest="report_include_receipts", action="store_true",
+        help="With --report-to: also send the newest segment of your signed hook log "
+             "and its public key")
     scan_parser.set_defaults(func=cmd_scan)
 
     # check
