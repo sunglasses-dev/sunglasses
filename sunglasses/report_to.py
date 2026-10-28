@@ -23,12 +23,17 @@ receiver verifies the same bytes the user's own verifier does. Without the flag
 The token comes from the environment (`SUNGLASSES_REPORT_TOKEN`), never from an
 argument, so it stays out of shell history and process listings. It is sent only
 as a bearer header to the exact URL given: redirects are refused, and a token goes
-over plain http only to this machine. The scan runs without it in this process's environment
-(see `child_env`), so a program the scan starts does not inherit it; it is put back for the upload.
+over plain http only to this machine. While the scan runs the token is out of this process's
+environment and out of the environment this package gives the programs it starts (see
+`child_env`), so those programs are not handed a copy. That is a control on what is inherited,
+not isolation inside the process: the token stays readable from Python state, and a program
+already running before the scan began keeps what it started with. One scan at a time per process.
 
 Limits: one upload attempt, at most `DEADLINE_SECONDS` in all (name lookup, connect,
-send and the answer together). At the deadline the command stops waiting and exits; the
-attempt is abandoned, not cancelled, and ends with the process. A report over `MAX_BODY_BYTES` or `MAX_FINDINGS` is not
+send and the answer together). That bounds the time spent waiting on the network, not the
+scan. At the deadline the command stops waiting; the attempt runs on a daemon thread and is
+abandoned, not cancelled, and ends with the process, which this code assumes is the
+command line and about to exit (a long-lived caller would keep the thread). A report over `MAX_BODY_BYTES` or `MAX_FINDINGS` is not
 sent. The size is checked after the report is built, so building it can use memory in
 proportion to the scan.
 """
@@ -366,12 +371,16 @@ def _encode(envelope):
     return json.dumps(envelope, allow_nan=False).encode("utf-8", "surrogatepass")
 
 
+_FROM_ENV = object()
+
+
 def deliver(url, held, source_name=None, include_text=False, pattern_count=None,
-            include_receipts=False):
+            include_receipts=False, token=_FROM_ENV):
     """Upload what the scan held, or say in one stderr line why nothing was.
 
     `held` is `(doc, kind)` from the scan, or None when the run ended without a scan
     result (a refusal, a kind of scan this reporter does not cover). Never raises.
+    `token` is the bearer token to send; left out, it is read from the environment.
     """
     try:
         if held is None:
@@ -382,7 +391,8 @@ def deliver(url, held, source_name=None, include_text=False, pattern_count=None,
         if problem:
             _line(problem)
             return
-        token = os.environ.get(TOKEN_ENV, "").strip()
+        token = (os.environ.get(TOKEN_ENV) if token is _FROM_ENV else token) or ""
+        token = token.strip()
         if not token:
             _line(f"{TOKEN_ENV} is not set; nothing sent")
             return

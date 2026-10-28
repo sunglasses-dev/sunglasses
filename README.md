@@ -648,9 +648,14 @@ and the answer together), whatever the server does; the scan's output and exit c
 decided by then. The command stops waiting at that point and exits; a report that is already on
 its way can still reach the server, because the attempt is abandoned, not recalled. A report over 1 MiB, or with more than 5,000 findings, is not sent. The size is
 checked after the report is built, so building a very large scan's report uses memory in proportion
-to the scan. The scan runs without `SUNGLASSES_REPORT_TOKEN` in its environment, so none of the programs it
-starts (the scan worker, `git` for `--repo`, `ffmpeg` for `--deep`) inherit it; it is put back for
-the upload.
+to the scan. While the scan runs, `SUNGLASSES_REPORT_TOKEN` is out of the command's own environment and out of
+the environment it gives the programs it starts (the scan worker, `git` for `--repo`, `ffmpeg` for
+`--deep`), so they are not handed a copy; the upload uses the token the scan began with. This
+controls what those programs inherit. It is not isolation inside the process (the token is still
+held by the command itself), and a scan worker that was already running before the scan began
+keeps the environment it started with. The command supports one scan at a time per process; a
+second scan started in the same process while one is open is refused. The git and worker
+environments are stripped of the token with or without `--report-to`.
 
 ### Deep Scan Setup (Audio & Video)
 

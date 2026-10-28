@@ -1841,15 +1841,20 @@ def cmd_scan(args):
         return
     # The scan decides its output and its exit code first and ends in `sys.exit`; the
     # upload runs on the way out and cannot change either. The report token is out of this
-    # process's environment while the scan runs (see child_env), so nothing the scan starts
-    # can inherit it, and is back before the upload reads it.
+    # process's environment while the scan runs (see child_env), so a program the scan
+    # starts does not inherit it; the upload gets the token the scan began with, and the
+    # environment has it back afterwards. One scan at a time per process: a second one
+    # while this is open is refused before it changes anything.
     try:
-        with child_env.token_withheld():
-            _scan_or_refuse(args)
-    except SystemExit:
-        _deliver_report(args)
-        raise
-    _deliver_report(args)
+        with child_env.token_withheld() as token:
+            try:
+                _scan_or_refuse(args)
+            except SystemExit:
+                _deliver_report(args, token)
+                raise
+            _deliver_report(args, token)
+    except child_env.ScanOverlap as exc:
+        _usage_error(args, str(exc), "Nothing was scanned.")
 
 
 def _scan_or_refuse(args):
@@ -1872,7 +1877,7 @@ def _hold_report(args, doc, kind, root=None, path=None):
         args.held_report = (copy.deepcopy(doc), kind)
 
 
-def _deliver_report(args):
+def _deliver_report(args, token):
     from . import report_to
     held = getattr(args, "held_report", None)
     pattern_count = None
@@ -1883,7 +1888,7 @@ def _deliver_report(args):
             pass
     report_to.deliver(args.report_to, held, source_name=args.report_source,
                       include_text=args.report_include_text, pattern_count=pattern_count,
-                      include_receipts=args.report_include_receipts)
+                      include_receipts=args.report_include_receipts, token=token)
 
 
 def _run_scan(args):

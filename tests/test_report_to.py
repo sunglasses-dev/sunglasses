@@ -1,4 +1,4 @@
-"""`scan --report-to URL`: one upload after the scan, and nothing else about the scan changes.
+"""`scan --report-to URL`: one upload after the scan; the scan's output and exit code do not change.
 
 The contract these tests hold:
   1. Off unless asked. The scan's stdout, verdict and exit code are the same with and
@@ -10,9 +10,11 @@ The contract these tests hold:
      a URL that may not carry a token, a server that stalls or answers header lines one at
      a time, a document JSON cannot hold) is one stderr line and the exit code is unchanged.
      The command stops waiting after `DEADLINE_SECONDS` in all, whatever the server does.
-  5. The token never appears in anything printed, never goes anywhere but the URL, and is
-     not in the environment of the scan worker, of `git`, or of the programs a deep scan
-     of audio or video starts.
+  5. The token never appears in anything printed and never goes anywhere but the URL. It is
+     not in the environment handed to the scan worker or to `git` (each tested on its own,
+     with a control that shows the probe can see an inherited token), nor to the programs a
+     deep scan of audio or video starts. The swap is an environment-inheritance control, one
+     scan at a time per process, not isolation inside the process.
   6. The body is built from a list of allowed fields: a field that is not on the list is
      not sent, wherever it sits in the scan's result.
 """
@@ -564,7 +566,8 @@ def test_the_scan_worker_child_is_not_given_the_token(tmp_path, monkeypatch):
     assert seen.read_text() == "False|True"
 
 
-def test_the_git_clone_child_is_not_given_the_token(tmp_path, server):
+def _fake_git(tmp_path):
+    """A `git` that records whether the token is in its environment, then fails (nothing is cloned)."""
     bindir = tmp_path / "bin"
     bindir.mkdir()
     seen = tmp_path / "seen.txt"
@@ -572,6 +575,40 @@ def test_the_git_clone_child_is_not_given_the_token(tmp_path, server):
     fake.write_text('#!/bin/sh\nif [ -n "${SUNGLASSES_REPORT_TOKEN+set}" ]; then echo has > %s; '
                     'else echo none > %s; fi\nexit 1\n' % (seen, seen))
     fake.chmod(0o755)
+    return bindir, seen
+
+
+def test_the_git_probe_can_see_an_inherited_token(tmp_path):
+    """Control for the two git tests below: the same fake `git`, started with no `env=` and the
+    token exported, records `has`. Without this, `none` below could mean the probe sees nothing."""
+    bindir, seen = _fake_git(tmp_path)
+    env = dict(os.environ)
+    env[report_to.TOKEN_ENV] = TOKEN
+    subprocess.run([str(bindir / "git"), "clone"], env=env)
+    assert seen.read_text().strip() == "has"
+
+
+def test_the_clone_launch_strips_the_token_on_its_own(tmp_path, monkeypatch, capsys):
+    """`_scan_repo` called directly, with the token exported and no swap around it: the clone
+    must still be started without the token. Taking `env=child_env.scan_child_env()` off the
+    clone call makes this fail; the end-to-end test below cannot tell, because the swap
+    around the whole scan hides that."""
+    import types
+    from sunglasses import cli
+    bindir, seen = _fake_git(tmp_path)
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    args = types.SimpleNamespace(repo="https://example.invalid/r.git", json=True, output="json",
+                                 max_files=None, file_deadline=None, jobs=None, report_to=None)
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_repo(args, engine=None)
+    assert stop.value.code == 2
+    assert seen.read_text().strip() == "none"
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_the_git_clone_child_is_not_given_the_token(tmp_path, server):
+    bindir, seen = _fake_git(tmp_path)
     env = dict(os.environ)
     env[report_to.TOKEN_ENV] = TOKEN
     env["PATH"] = f"{bindir}{os.pathsep}{env.get('PATH', '')}"
@@ -665,7 +702,8 @@ def test_token_withheld_covers_a_child_that_cannot_be_given_an_env(monkeypatch):
     assert os.environ[report_to.TOKEN_ENV] == TOKEN and ask() == "True"
 
 
-def test_token_withheld_puts_the_token_back_however_the_scan_ends(monkeypatch):
+def test_token_withheld_puts_the_token_back_when_the_scan_raises(monkeypatch):
+    """Sequential endings: an exit, an interrupt and an error inside the scan."""
     from sunglasses import child_env
     monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
     for ending in (SystemExit(3), KeyboardInterrupt(), ValueError("boom")):
@@ -674,13 +712,158 @@ def test_token_withheld_puts_the_token_back_however_the_scan_ends(monkeypatch):
                 raise ending
         assert os.environ[report_to.TOKEN_ENV] == TOKEN
     monkeypatch.setenv(report_to.TOKEN_ENV, "")
-    with child_env.token_withheld():
-        assert report_to.TOKEN_ENV not in os.environ
+    with child_env.token_withheld() as held:
+        assert held == "" and report_to.TOKEN_ENV not in os.environ
     assert os.environ[report_to.TOKEN_ENV] == ""
     monkeypatch.delenv(report_to.TOKEN_ENV)
-    with child_env.token_withheld():
-        pass
+    with child_env.token_withheld() as held:
+        assert held is None
     assert report_to.TOKEN_ENV not in os.environ
+
+
+def _interrupt_entry_at(lineno):
+    """Enter `token_withheld` with a KeyboardInterrupt raised just before `lineno` of its
+    body runs (a source-line trace, the way a signal lands between two statements)."""
+    from sunglasses import child_env
+    code = child_env.token_withheld.__wrapped__.__code__
+    fired = []
+
+    def tracer(frame, event, arg):
+        if frame.f_code is not code:
+            return None
+
+        def local(frame, event, arg):
+            if event == "line" and frame.f_lineno == lineno and not fired:
+                fired.append(lineno)
+                raise KeyboardInterrupt
+            return local
+        return local
+
+    sys.settrace(tracer)
+    try:
+        with child_env.token_withheld():
+            assert not fired, "the scan body ran after an interrupt in entry"
+    except KeyboardInterrupt:
+        assert fired
+    finally:
+        sys.settrace(None)
+    return fired
+
+
+def test_an_interrupt_anywhere_in_entry_leaves_the_token_set(monkeypatch):
+    """Every statement between the call and the scan body: an interrupt there must leave the
+    token in the environment and leave the next scan able to start (the guard not taken)."""
+    import inspect
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    lines, first = inspect.getsourcelines(child_env.token_withheld.__wrapped__)
+    last = first + next(i for i, text in enumerate(lines) if text.strip().startswith("yield "))
+    pop_line = first + next(i for i, text in enumerate(lines) if "os.environ.pop" in text)
+    reached = []
+    for lineno in range(first, last + 1):
+        reached += _interrupt_entry_at(lineno)
+        assert os.environ[report_to.TOKEN_ENV] == TOKEN, f"token lost by an interrupt before line {lineno}"
+        with child_env.token_withheld():
+            pass
+        assert os.environ[report_to.TOKEN_ENV] == TOKEN
+    assert pop_line in reached, "the interrupt never landed on the line that removes the token"
+
+
+def test_overlapping_scans_are_refused_and_the_token_stays_withheld(monkeypatch):
+    from sunglasses import child_env
+    probe = "import os; print('SUNGLASSES_REPORT_TOKEN' in os.environ)"
+    ask = lambda: subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True).stdout.strip()
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    with child_env.token_withheld() as first:
+        assert first == TOKEN
+        with pytest.raises(child_env.ScanOverlap):
+            with child_env.token_withheld():
+                pytest.fail("a second scan was let in")
+        assert report_to.TOKEN_ENV not in os.environ, "the refused scan put the token back"
+        assert ask() == "False"
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_a_refused_scan_never_puts_the_token_back(monkeypatch):
+    """The race a thread can hit: a scan reads the token, the scan that owns the swap removes it,
+    and only then does the first one find it is not the owner. It must not restore what it read."""
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+
+    class Racing(list):
+        def append(self, item):
+            os.environ.pop(report_to.TOKEN_ENV, None)   # the owner's removal, mid-way through our entry
+            super().append(item)
+
+    monkeypatch.setattr(child_env, "_tickets", Racing([object()]))
+    with pytest.raises(child_env.ScanOverlap):
+        with child_env.token_withheld():
+            pytest.fail("a second scan was let in")
+    assert report_to.TOKEN_ENV not in os.environ
+
+
+def test_a_scan_in_another_thread_is_refused_and_the_token_stays_withheld(monkeypatch):
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    outcome = []
+
+    def other():
+        try:
+            with child_env.token_withheld():
+                outcome.append("entered")
+        except child_env.ScanOverlap:
+            outcome.append("refused")
+
+    with child_env.token_withheld():
+        thread = threading.Thread(target=other)
+        thread.start()
+        thread.join(10)
+        assert outcome == ["refused"]
+        assert report_to.TOKEN_ENV not in os.environ
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_cmd_scan_refuses_an_overlapping_scan_before_touching_anything(tmp_path, monkeypatch, capsys, server):
+    """Through the command itself: with one scan open in this process, a second `scan --report-to`
+    is refused (exit 2, one JSON refusal), sends nothing, and leaves the first scan's withheld
+    token alone."""
+    from sunglasses import child_env, cli
+    threat, _ = _files(tmp_path)
+    srv = server()
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    monkeypatch.setattr(sys, "argv", ["sunglasses", "scan", "--file", threat, "--json", "--report-to", srv.url])
+    with child_env.token_withheld():
+        with pytest.raises(SystemExit) as stop:
+            cli.main()
+        assert report_to.TOKEN_ENV not in os.environ
+    assert stop.value.code == 2
+    refusal = json.loads(capsys.readouterr().out)
+    assert refusal["scanned"] is False and "one scan at a time" in refusal["error"]
+    assert srv.requests == []
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_the_upload_uses_the_token_the_scan_began_with(tmp_path, monkeypatch, server):
+    """Delivery does not read the environment again: if something removes the variable while the
+    scan runs, the report still goes out with the token the scan began with."""
+    from sunglasses import cli
+    threat, _ = _files(tmp_path)
+    srv = server()
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    real = cli._scan_or_refuse
+
+    def scan_then_lose_the_variable(args):
+        try:
+            real(args)
+        finally:
+            os.environ.pop(report_to.TOKEN_ENV, None)
+
+    monkeypatch.setattr(cli, "_scan_or_refuse", scan_then_lose_the_variable)
+    monkeypatch.setattr(sys, "argv", ["sunglasses", "scan", "--file", threat, "--json", "--report-to", srv.url])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert len(srv.requests) == 1
+    assert srv.requests[0]["headers"]["Authorization"] == f"Bearer {TOKEN}"
 
 
 # ---------------------------------------------------------------- the upload has a deadline
