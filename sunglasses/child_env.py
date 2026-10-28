@@ -28,7 +28,7 @@ arrives just as the first one ends is let in after it, with the token the first 
 Putting the token back is safe to repeat, and is tried a second time if the first try raised. A
 signal (Ctrl-C) that lands inside the cleanup is held until the cleanup is finished and then
 raised again; one that lands on the line that starts the cleanup leaves the second try to do it.
-Two signals in the same instant can still defeat both.
+Two signals that land one right after the other can still defeat both.
 """
 import contextlib
 import os
