@@ -645,10 +645,12 @@ says so.
 
 The upload is attempted once and given up on after 15 seconds in all (name lookup, connect, send
 and the answer together), whatever the server does; the scan's output and exit code are already
-decided by then. A report over 1 MiB, or with more than 5,000 findings, is not sent. The size is
+decided by then. The command stops waiting at that point and exits; a report that is already on
+its way can still reach the server, because the attempt is abandoned, not recalled. A report over 1 MiB, or with more than 5,000 findings, is not sent. The size is
 checked after the report is built, so building a very large scan's report uses memory in proportion
-to the scan. The scan's own child processes (the scan worker, `git` for `--repo`) are not given
-`SUNGLASSES_REPORT_TOKEN`.
+to the scan. The scan runs without `SUNGLASSES_REPORT_TOKEN` in its environment, so none of the programs it
+starts (the scan worker, `git` for `--repo`, `ffmpeg` for `--deep`) inherit it; it is put back for
+the upload.
 
 ### Deep Scan Setup (Audio & Video)
 

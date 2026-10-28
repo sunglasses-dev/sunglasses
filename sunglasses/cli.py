@@ -1840,9 +1840,12 @@ def cmd_scan(args):
         _scan_or_refuse(args)
         return
     # The scan decides its output and its exit code first and ends in `sys.exit`; the
-    # upload runs on the way out and cannot change either.
+    # upload runs on the way out and cannot change either. The report token is out of this
+    # process's environment while the scan runs (see child_env), so nothing the scan starts
+    # can inherit it, and is back before the upload reads it.
     try:
-        _scan_or_refuse(args)
+        with child_env.token_withheld():
+            _scan_or_refuse(args)
     except SystemExit:
         _deliver_report(args)
         raise

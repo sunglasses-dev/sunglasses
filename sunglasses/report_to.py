@@ -23,10 +23,12 @@ receiver verifies the same bytes the user's own verifier does. Without the flag
 The token comes from the environment (`SUNGLASSES_REPORT_TOKEN`), never from an
 argument, so it stays out of shell history and process listings. It is sent only
 as a bearer header to the exact URL given: redirects are refused, and a token goes
-over plain http only to this machine. The scan's own child processes are not given it.
+over plain http only to this machine. The scan runs without it in this process's environment
+(see `child_env`), so a program the scan starts does not inherit it; it is put back for the upload.
 
 Limits: one upload attempt, at most `DEADLINE_SECONDS` in all (name lookup, connect,
-send and the answer together); a report over `MAX_BODY_BYTES` or `MAX_FINDINGS` is not
+send and the answer together). At the deadline the command stops waiting and exits; the
+attempt is abandoned, not cancelled, and ends with the process. A report over `MAX_BODY_BYTES` or `MAX_FINDINGS` is not
 sent. The size is checked after the report is built, so building it can use memory in
 proportion to the scan.
 """

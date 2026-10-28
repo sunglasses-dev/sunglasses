@@ -6,12 +6,13 @@ The contract these tests hold:
   2. With the flag, exactly one POST reaches the URL, with the bearer token from the
      environment and one JSON document in the frozen envelope shape.
   3. The text a rule matched is a hash and a length unless `--report-include-text`.
-  4. Every failure (no token, nothing listening, a refusing server, a redirect, a URL
-     that may not carry a token, a server that stalls or answers a byte at a time, a
-     document JSON cannot hold) is one stderr line and the exit code is unchanged. The
-     upload is abandoned after `DEADLINE_SECONDS` in all, whatever the server does.
-  5. The token never appears in anything printed, never goes anywhere but the URL, and
-     is not in the environment of anything the scan starts.
+  4. Each failure named here (no token, nothing listening, a refusing server, a redirect,
+     a URL that may not carry a token, a server that stalls or answers header lines one at
+     a time, a document JSON cannot hold) is one stderr line and the exit code is unchanged.
+     The command stops waiting after `DEADLINE_SECONDS` in all, whatever the server does.
+  5. The token never appears in anything printed, never goes anywhere but the URL, and is
+     not in the environment of the scan worker, of `git`, or of the programs a deep scan
+     of audio or video starts.
   6. The body is built from a list of allowed fields: a field that is not on the list is
      not sent, wherever it sits in the scan's result.
 """
@@ -611,6 +612,77 @@ def test_no_process_a_directory_scan_starts_has_the_token(tmp_path, server):
     assert len(srv.requests) == 1
 
 
+def _fake_media_tools(tmp_path):
+    """`ffmpeg` and `ffprobe` that record whether the token is in their environment, then fail
+    (so a deep scan stops at its first dependency probe: no model is loaded, nothing is fetched)."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    seen = tmp_path / "media_seen.txt"
+    for name in ("ffmpeg", "ffprobe"):
+        tool = bindir / name
+        tool.write_text('#!/bin/sh\nif [ -n "${SUNGLASSES_REPORT_TOKEN+set}" ]; then echo %s has >> %s; '
+                        'else echo %s none >> %s; fi\nexit 1\n' % (name, seen, name, seen))
+        tool.chmod(0o755)
+    return bindir, seen
+
+
+@pytest.mark.parametrize("suffix", [".mp3", ".mp4"])
+def test_the_programs_a_deep_scan_starts_are_not_given_the_token(tmp_path, server, suffix):
+    """A deep scan of audio or video runs in the CLI process and starts ffmpeg itself, and its
+    libraries start more. Every one of them must be started without the token. The control run
+    (no `--report-to`, same token in the environment) shows the probe can see an inherited token."""
+    bindir, seen = _fake_media_tools(tmp_path)
+    media = tmp_path / ("clip" + suffix)
+    media.write_bytes(b"\x00" * 64)
+    env = dict(os.environ)
+    env[report_to.TOKEN_ENV] = TOKEN
+    env["PATH"] = f"{bindir}{os.pathsep}{env.get('PATH', '')}"
+    srv = server()
+    control = subprocess.run([sys.executable, "-m", "sunglasses.cli", "scan", "--file", str(media), "--deep", "--json"],
+                             capture_output=True, text=True, cwd=REPO, env=env, timeout=300)
+    assert "ffmpeg has" in seen.read_text(), "the control saw no inherited token: the probe cannot tell"
+    seen.unlink()
+    reported = subprocess.run([sys.executable, "-m", "sunglasses.cli", "scan", "--file", str(media), "--deep", "--json",
+                               "--report-to", srv.url],
+                              capture_output=True, text=True, cwd=REPO, env=env, timeout=300)
+    starts = seen.read_text().split()
+    assert starts, "the deep scan started no program, so this test saw nothing"
+    assert "has" not in starts, f"a program the deep scan started had the token: {starts}"
+    assert reported.returncode == control.returncode
+
+
+def test_token_withheld_covers_a_child_that_cannot_be_given_an_env(monkeypatch):
+    """What a library does (`subprocess.run` with no `env=`) inherits this process's
+    environment, so the environment itself must not hold the token while the scan runs."""
+    from sunglasses import child_env
+    probe = "import os; print('SUNGLASSES_REPORT_TOKEN' in os.environ)"
+    ask = lambda: subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True).stdout.strip()
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    assert ask() == "True"
+    with child_env.token_withheld():
+        assert ask() == "False"
+        assert report_to.TOKEN_ENV not in os.environ
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN and ask() == "True"
+
+
+def test_token_withheld_puts_the_token_back_however_the_scan_ends(monkeypatch):
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    for ending in (SystemExit(3), KeyboardInterrupt(), ValueError("boom")):
+        with pytest.raises(type(ending)):
+            with child_env.token_withheld():
+                raise ending
+        assert os.environ[report_to.TOKEN_ENV] == TOKEN
+    monkeypatch.setenv(report_to.TOKEN_ENV, "")
+    with child_env.token_withheld():
+        assert report_to.TOKEN_ENV not in os.environ
+    assert os.environ[report_to.TOKEN_ENV] == ""
+    monkeypatch.delenv(report_to.TOKEN_ENV)
+    with child_env.token_withheld():
+        pass
+    assert report_to.TOKEN_ENV not in os.environ
+
+
 # ---------------------------------------------------------------- the upload has a deadline
 
 class _Awkward:
@@ -727,6 +799,17 @@ def test_the_deadline_is_a_constant_longer_than_one_socket_wait():
     assert report_to.DEADLINE_SECONDS > report_to.TIMEOUT_SECONDS
 
 
+def test_the_production_deadline_is_the_fifteen_seconds_the_docs_promise():
+    """The deadline tests shorten the constant, so none of them holds the shipped value. This one does,
+    and ties it to the two places that tell a user the number: the README and `scan --help`."""
+    assert report_to.DEADLINE_SECONDS == 15
+    readme = " ".join(open(os.path.join(REPO, "README.md"), encoding="utf-8").read().split())
+    assert "given up on after 15 seconds in all" in readme
+    helptext = subprocess.run([sys.executable, "-m", "sunglasses.cli", "scan", "--help"],
+                              capture_output=True, text=True, cwd=REPO, check=True).stdout
+    assert "Gives up after 15 s in all" in " ".join(helptext.split())
+
+
 # ---------------------------------------------------------------- the body is an allowed-field list
 
 MARK = "PRIVATE-MARKER-7f3a91"
@@ -736,14 +819,18 @@ def _scan_with_marks():
     finding = {"id": "GLS-PI-001", "name": MARK + "-name", "severity": "high", "category": "prompt_injection",
                "matched_text": "ignore previous instructions", "reason": MARK + "-reason",
                "also_matched": [MARK + "-also"], "snippet": MARK + "-snippet", "context": {"x": MARK},
-               "taxonomy": {"owasp_llm_top10": [{"id": "LLM01", "name": MARK + "-tax"}]}, "line": 3}
+               "taxonomy": {"owasp_llm_top10": [{"id": "LLM01", "name": MARK + "-tax"}]}, "line": 3,
+               # a field this reporter has never heard of, as a scalar, a mapping and a list: a field list
+               # that names what to REMOVE would send all three
+               "unknown_scalar": MARK + "-unknown", "unknown_nested": {"deep": MARK}, "unknown_list": [MARK]}
     return {
         "event_id": "e1", "decision": "block", "severity": "high", "channel": "file", "source": "notes.md",
         "truncated": False, "bytes_scanned": 10, "inspection_complete": True, "findings_count": 1,
         "extraction_warnings": [MARK + "-warn"], "warnings": [MARK + "-warn2"], "notes": MARK + "-notes",
         "directory": "/Users/someone/" + MARK, "skipped": [MARK + "-skip"], "partially_read": [MARK],
-        "excluded_folders": [MARK], "findings": [finding],
+        "excluded_folders": [MARK], "findings": [finding], "unknown_scalar": MARK + "-unknown-top",
         "file_results": [{"file": "a.md", "decision": "block", "threats": 1, "preview": MARK + "-preview",
+                          "unknown_scalar": MARK + "-unknown-file", "unknown_nested": {"deep": MARK},
                           "findings": [finding]}],
         "severity_breakdown": {"high": 1, "bad": MARK}, "category_breakdown": {"prompt_injection": 1},
     }
@@ -758,6 +845,11 @@ def test_a_field_that_is_not_on_the_list_is_not_sent(include_text):
     assert scan["event_id"] == "e1" and scan["findings_count"] == 1 and scan["source"] == "notes.md"
     assert scan["severity_breakdown"] == {"high": 1}
     assert scan["file_results"][0]["file"] == "a.md"
+    # the keys that leave are a subset of the lists: nothing else, at any level
+    assert set(scan["findings"][0]) <= set(report_to._FINDING_FIELDS) | {"matched_text"}
+    assert set(scan["file_results"][0]) <= set(report_to._FILE_FIELDS) | {"findings"}
+    assert set(scan["file_results"][0]["findings"][0]) <= set(report_to._FINDING_FIELDS) | {"matched_text"}
+    assert set(scan) <= set(report_to._SCAN_FIELDS) | set(report_to._COUNT_MAPS) | {"findings", "file_results"}
     one = scan["file_results"][0]["findings"][0]
     assert set(one) == {"id", "severity", "category", "line", "matched_text"}
     assert (one["matched_text"] == "ignore previous instructions") is include_text

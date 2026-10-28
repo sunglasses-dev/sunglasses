@@ -681,6 +681,11 @@ def _environment_audit(pkg):
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
     ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
     ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename
+    # The one enumerated MUTATION: child_env.py takes the report token out of this process's environment for the length of
+    # a scan and puts it back. Exactly two forms, on exactly that name:  os.environ.pop(KEY, None)  and  os.environ[KEY] = name
+    # (a plain single assignment). KEY is the token's literal or a module constant bound once. Anything else, anywhere else, refuses.
+    ENV_TOKEN_SWAP_SITES = {"child_env.py"}
+    TOKEN_NAME = "SUNGLASSES_REPORT_TOKEN"
 
     def _os_names(tree):
         """Names bound to the os module by a plain import. Any other way of
@@ -1004,6 +1009,30 @@ def _environment_audit(pkg):
                         and isinstance(node.args[0], ast.Attribute) and node.args[0].attr == "environ" \
                         and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id in os_names:
                     consumed.add(id(node.args[0]))
+        # The enumerated token swap: two exact mutation forms on the report token's name, in child_env.py only.
+        if relpath in ENV_TOKEN_SWAP_SITES:
+            swap_parents = _parents(tree)
+
+            def _environ_of(n):
+                return (isinstance(n, ast.Attribute) and n.attr == "environ"
+                        and isinstance(n.value, ast.Name) and n.value.id in os_names)
+
+            def _is_token_key(k):
+                if isinstance(k, ast.Constant):
+                    return k.value == TOKEN_NAME
+                return isinstance(k, ast.Name) and counts.get(k.id) == 1 and consts.get(k.id) == TOKEN_NAME
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "pop" \
+                        and _environ_of(node.func.value) and not node.keywords and len(node.args) == 2 \
+                        and _is_token_key(node.args[0]) and isinstance(node.args[1], ast.Constant) and node.args[1].value is None:
+                    consumed.add(id(node.func.value))
+                elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store) and _environ_of(node.value) \
+                        and _is_token_key(node.slice):
+                    par = swap_parents.get(id(node))
+                    if isinstance(par, ast.Assign) and len(par.targets) == 1 and par.targets[0] is node \
+                            and isinstance(par.value, ast.Name):
+                        consumed.add(id(node.value))
         # A computed lookup on the os module is a reader in disguise: getattr(os, ...),
         # os.__dict__[...], vars(os), or any os name passed to getattr/vars (ASTRA E33/E34).
         for node in ast.walk(tree):
@@ -1271,6 +1300,49 @@ def test_the_environment_copy_is_allowed_only_in_its_two_named_files(tmp_path):
     (tmp_path / "sub" / "child_env.py").write_text(probe)
     _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
     assert len(refusals) == 2 and any("other.py" in r for r in refusals)
+
+
+def test_the_token_swap_is_allowed_only_in_child_env_py_and_only_in_its_two_forms(tmp_path):
+    """`os.environ.pop(TOKEN, None)` and `os.environ[TOKEN] = held` pass in child_env.py by exact path.
+    The same lines refuse in any other file, in a subfolder of the same basename, and so does every
+    variation in child_env.py itself: another name, another method, an augmented or chained or
+    attribute-valued assignment, a delete, the token popped without its default, a computed key."""
+    swap = ("import os\n_TOKEN_ENV = \"SUNGLASSES_REPORT_TOKEN\"\n"
+            "held = os.environ.pop(_TOKEN_ENV, None)\n"
+            "os.environ[_TOKEN_ENV] = held\n")
+    (tmp_path / "child_env.py").write_text(swap)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert refusals == [], refusals
+    (tmp_path / "other.py").write_text(swap)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "child_env.py").write_text(swap)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert len(refusals) >= 4 and any("other.py" in r for r in refusals) and any("sub" in r for r in refusals)
+    head = "import os\n_TOKEN_ENV = \"SUNGLASSES_REPORT_TOKEN\"\n_OTHER = \"HOME\"\nheld = None\n"
+    variations = {
+        "another name popped": 'os.environ.pop(_OTHER, None)\n',
+        "another name assigned": 'os.environ[_OTHER] = held\n',
+        "pop without its default": 'os.environ.pop(_TOKEN_ENV)\n',
+        "pop with a default that is not None": 'os.environ.pop(_TOKEN_ENV, "x")\n',
+        "setdefault": 'os.environ.setdefault(_TOKEN_ENV, "x")\n',
+        "update": 'os.environ.update({_TOKEN_ENV: "x"})\n',
+        "delete": 'del os.environ[_TOKEN_ENV]\n',
+        "augmented assignment": 'os.environ[_TOKEN_ENV] += "x"\n',
+        "chained assignment": 'a = os.environ[_TOKEN_ENV] = held\n',
+        "assigned an expression": 'os.environ[_TOKEN_ENV] = held or "x"\n',
+        "assigned a literal": 'os.environ[_TOKEN_ENV] = "x"\n',
+        "putenv": 'os.putenv(_TOKEN_ENV, "x")\n',
+        "unsetenv": 'os.unsetenv(_TOKEN_ENV)\n',
+        "a computed key": 'os.environ["SUNGLASSES_REPORT_" + "TOKEN"] = held\n',
+        "a rebound constant": '_TOKEN_ENV = "HOME"\nos.environ[_TOKEN_ENV] = held\n',
+    }
+    for label, line in variations.items():
+        for stale in tmp_path.iterdir():
+            if stale.is_file():
+                stale.unlink()
+        (tmp_path / "child_env.py").write_text(head + line)
+        _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+        assert refusals, f"child_env.py: {label!r} passed the guard"
 
 
 def test_an_environment_read_outside_the_allowed_set_is_still_refused(tmp_path):
