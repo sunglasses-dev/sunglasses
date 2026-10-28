@@ -646,8 +646,10 @@ def _environment_audit(pkg):
     # holds that line.
     #
     # SUNGLASSES_REPORT_TOKEN is the fifth: the bearer token for the opt-in
-    # `--report-to`. It is read once, in `report_to`, and only when that flag is
-    # given; it is never stored or echoed. It is an environment variable so the
+    # `--report-to`. It is read once, in `child_env.token_withheld`, and only when
+    # that flag is given; the upload is handed the value it read (`report_to.deliver`
+    # reads the environment itself only for a direct call that passes none); it is
+    # never stored or echoed. It is an environment variable so the
     # token is not on the command line (process list, shell history).
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT",
                "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}

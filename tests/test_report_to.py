@@ -579,8 +579,9 @@ def _fake_git(tmp_path):
 
 
 def test_the_git_probe_can_see_an_inherited_token(tmp_path):
-    """Control for the two git tests below: the same fake `git`, started with no `env=` and the
-    token exported, records `has`. Without this, `none` below could mean the probe sees nothing."""
+    """Control for the two git tests below: the same fake `git`, started with an explicit copy of
+    this environment that still holds the token, records `has`. Without this, `none` below could
+    mean the probe sees nothing."""
     bindir, seen = _fake_git(tmp_path)
     env = dict(os.environ)
     env[report_to.TOKEN_ENV] = TOKEN
@@ -763,10 +764,190 @@ def test_an_interrupt_anywhere_in_entry_leaves_the_token_set(monkeypatch):
     for lineno in range(first, last + 1):
         reached += _interrupt_entry_at(lineno)
         assert os.environ[report_to.TOKEN_ENV] == TOKEN, f"token lost by an interrupt before line {lineno}"
+        assert child_env._tickets == [], f"a ticket was left by an interrupt before line {lineno}"
         with child_env.token_withheld():
             pass
         assert os.environ[report_to.TOKEN_ENV] == TOKEN
     assert pop_line in reached, "the interrupt never landed on the line that removes the token"
+
+
+def _interrupt_swap_once(scenario, lineno, code, also=None):
+    """Run one `token_withheld` use with one KeyboardInterrupt raised just before line `lineno`
+    of `code` first runs (a source-line trace: where a signal can land between two statements).
+    `scenario` is how the use ends: "normal", "body error", or "refused" (a scan already owns the
+    swap and this one is turned away). `also` is a second (code, line) that gets its own interrupt.
+    Returns (fired, raised)."""
+    from sunglasses import child_env
+    fired, raised, pending = [], [], [(code, lineno)] + ([also] if also else [])
+    codes = {child_env.token_withheld.__wrapped__.__code__, child_env._leave.__code__}
+
+    def tracer(frame, event, arg):
+        if frame.f_code not in codes:
+            return None
+
+        def local(frame, event, arg):
+            target = (frame.f_code, frame.f_lineno)
+            if event == "line" and target in pending:
+                pending.remove(target)
+                fired.append(frame.f_lineno)
+                raise KeyboardInterrupt
+            return local
+        return local
+
+    def use():
+        try:
+            with child_env.token_withheld():
+                if scenario == "body error":
+                    raise ValueError("boom")
+        except (KeyboardInterrupt, ValueError, child_env.ScanOverlap) as exc:
+            raised.append(type(exc).__name__)
+
+    if scenario == "refused":
+        with child_env.token_withheld():
+            sys.settrace(tracer)
+            try:
+                use()
+            finally:
+                sys.settrace(None)
+            assert report_to.TOKEN_ENV not in os.environ, "a refused use put the token back"
+            assert len(child_env._tickets) == 1, "a refused use left or took a ticket"
+    else:
+        sys.settrace(tracer)
+        try:
+            use()
+        finally:
+            sys.settrace(None)
+    return fired, raised
+
+
+def test_an_interrupt_at_any_line_of_the_swap_leaves_the_token_and_the_guard_clean(monkeypatch):
+    """Entry, the body, and every statement of the cleanup, for each way a use can end: one
+    interrupt on any executable line leaves the token in the environment and no ticket behind,
+    so the next scan starts. An interrupt inside the cleanup is held until it has finished."""
+    import dis
+    import inspect
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    swap = child_env.token_withheld.__wrapped__.__code__
+    leave = child_env._leave.__code__
+    lines = {code: sorted({n for _, n in dis.findlinestarts(code) if n is not None}) for code in (swap, leave)}
+
+    def at(code, text):
+        source, first = inspect.getsourcelines(code)
+        return first + next(i for i, t in enumerate(source) if text in t)
+
+    named = {(swap, at(swap, "os.environ.pop")): "entry pop",
+             (swap, at(swap, "_leave(ticket, held)")): "cleanup call",
+             (leave, at(leave, "os.environ[_TOKEN_ENV] = held")): "restore",
+             (leave, at(leave, "_tickets.remove(ticket)")): "unregister"}
+    ends = {"normal": [], "body error": ["ValueError"], "refused": ["ScanOverlap"]}
+    for scenario, quiet in ends.items():
+        reached = set()
+        for code in (swap, leave):
+            for lineno in lines[code]:
+                fired, raised = _interrupt_swap_once(scenario, lineno, code)
+                where = f"{scenario}, interrupt before {code.co_name}:{lineno}"
+                assert raised == (["KeyboardInterrupt"] if fired else quiet), f"{where}: {raised}"
+                if fired:
+                    reached.add(named.get((code, lineno)))
+                assert os.environ[report_to.TOKEN_ENV] == TOKEN, f"token lost: {where}"
+                assert child_env._tickets == [], f"ticket left behind: {where}"
+        if scenario != "refused":
+            assert {"entry pop", "cleanup call", "restore", "unregister"} <= reached, (scenario, reached)
+    with child_env.token_withheld():
+        pass
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_two_interrupts_one_on_the_cleanup_call_and_one_inside_the_second_try_still_leave_it_clean(monkeypatch):
+    """The first try never starts (an interrupt on the line that calls the cleanup) and the second
+    is interrupted too, while it assigns the token back. The cleanup holds that one and finishes.
+    (A line trace is switched off by CPython once it raises, so the second interrupt is the
+    assignment itself raising once.)"""
+    import inspect
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    swap = child_env.token_withheld.__wrapped__.__code__
+    source, first = inspect.getsourcelines(swap)
+    cleanup_call = first + next(i for i, t in enumerate(source) if "_leave(ticket, held)" in t)
+    real = type(os.environ).__setitem__
+    hits = []
+
+    def interrupted_once(self, key, value):
+        if key == report_to.TOKEN_ENV and not hits:
+            hits.append(key)
+            raise KeyboardInterrupt
+        real(self, key, value)
+
+    for scenario in ("normal", "body error"):
+        hits.clear()
+        monkeypatch.setattr(type(os.environ), "__setitem__", interrupted_once)
+        try:
+            fired, raised = _interrupt_swap_once(scenario, cleanup_call, swap)
+        finally:
+            monkeypatch.setattr(type(os.environ), "__setitem__", real)
+        assert fired == [cleanup_call] and hits == [report_to.TOKEN_ENV], (scenario, fired, hits)
+        assert raised == ["KeyboardInterrupt"], (scenario, raised)
+        assert os.environ[report_to.TOKEN_ENV] == TOKEN and child_env._tickets == [], scenario
+
+
+def test_a_repeated_cleanup_does_nothing_once_the_scan_was_cleaned_up(monkeypatch):
+    """The second try of the cleanup can run after the first one finished, by which time another
+    scan may own the swap. It must not put the token back into that scan's environment."""
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    ticket = object()
+    child_env._tickets.append(ticket)
+    os.environ.pop(report_to.TOKEN_ENV)
+    child_env._leave(ticket, TOKEN)
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN and child_env._tickets == []
+    with child_env.token_withheld():
+        assert report_to.TOKEN_ENV not in os.environ
+        child_env._leave(ticket, TOKEN)
+        assert report_to.TOKEN_ENV not in os.environ, "a repeat of an old cleanup put the token back"
+    assert os.environ[report_to.TOKEN_ENV] == TOKEN
+
+
+def test_a_call_that_is_first_after_the_owner_ends_reads_the_token_the_owner_put_back(monkeypatch):
+    """The thread race: B registers while A owns the swap, A ends and puts the token back, and only
+    then does B check whether it is first. B is let in (A is gone) and must read the token A put
+    back, not the "no token" it would have seen had it read before it was let in."""
+    from sunglasses import child_env
+    monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
+    owner = child_env.token_withheld()
+    assert owner.__enter__() == TOKEN and report_to.TOKEN_ENV not in os.environ
+    registered, go, outcome = threading.Event(), threading.Event(), []
+
+    class Paused(list):
+        def append(self, item):
+            super().append(item)
+            if threading.current_thread() is not threading.main_thread():
+                registered.set()
+                go.wait(10)
+
+    original = child_env._tickets
+    monkeypatch.setattr(child_env, "_tickets", Paused(original))      # a copy: the owner's end is applied to it
+
+    def other():
+        try:
+            with child_env.token_withheld() as seen:
+                outcome.append(("entered", seen, report_to.TOKEN_ENV in os.environ))
+        except child_env.ScanOverlap:
+            outcome.append(("refused",))
+
+    thread = threading.Thread(target=other)
+    try:
+        thread.start()
+        assert registered.wait(10)
+        owner.__exit__(None, None, None)
+        go.set()
+        thread.join(10)
+        assert outcome == [("entered", TOKEN, False)], outcome
+        assert os.environ[report_to.TOKEN_ENV] == TOKEN
+        assert child_env._tickets == []
+    finally:
+        go.set()
+        original.clear()         # the copy took the owner's end; the list it was copied from still holds its ticket
 
 
 def test_overlapping_scans_are_refused_and_the_token_stays_withheld(monkeypatch):

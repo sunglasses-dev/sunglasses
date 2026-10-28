@@ -19,9 +19,16 @@ Two things together, because a program can be started from two places:
     cannot be given an `env=`) does not inherit one.
 
 Supported use is one scan at a time in a process, which is what the command line does.
-A second `token_withheld()` while one is open is refused before it touches anything: two
-overlapping swaps would have the second save "no token" and the first put the real one
-back while the second scan was still running.
+A second `token_withheld()` while one is open is refused before it reads or touches the
+token: two overlapping swaps would have the second save "no token" and the first put the
+real one back while the second scan was still running. This is a registration, not a lock:
+whether a call is let in is decided by who is first on the list when it checks, so a call that
+arrives just as the first one ends is let in after it, with the token the first put back.
+
+Putting the token back is safe to repeat, and is tried a second time if the first try raised. A
+signal (Ctrl-C) that lands inside the cleanup is held until the cleanup is finished and then
+raised again; one that lands on the line that starts the cleanup leaves the second try to do it.
+Two signals in the same instant can still defeat both.
 """
 import contextlib
 import os
@@ -29,9 +36,12 @@ import os
 _TOKEN_ENV = "SUNGLASSES_REPORT_TOKEN"
 
 # Who is inside `token_withheld()`, oldest first. A scan owns the swap while its ticket is first.
-# A list append and a list remove are single steps, so a scan is never half-registered: an
-# interrupt leaves it in the list (and the `finally` takes it out) or not in it at all.
+# Appending and removing are single list steps. The token is read only after a ticket is first,
+# and put back before it is removed, so whoever becomes first next sees the token the last
+# owner restored.
 _tickets = []
+
+_LEAVE_ATTEMPTS = 8
 
 
 class ScanOverlap(RuntimeError):
@@ -45,32 +55,55 @@ def scan_child_env():
     return env
 
 
+def _leave(ticket, held):
+    """Put the token back (only for the scan that owns the swap) and take `ticket` off the list.
+
+    Safe to call again after it has finished or part way: restoring the same value twice
+    changes nothing, and once the ticket is gone a repeat does nothing, so a caller that
+    was not sure the first call ran can call it again. An exception that lands inside is
+    kept, the cleanup is tried again, and the first one is raised when it is done.
+    """
+    pending = None
+    for _ in range(_LEAVE_ATTEMPTS):
+        try:
+            if held is not None and _tickets and _tickets[0] is ticket:
+                os.environ[_TOKEN_ENV] = held
+            if ticket in _tickets:
+                _tickets.remove(ticket)
+            break
+        except BaseException as exc:
+            if pending is None:
+                pending = exc
+    if pending is not None:
+        raise pending
+
+
 @contextlib.contextmanager
 def token_withheld():
     """Run a scan with the report token out of this process's environment; put it back after.
 
     Yields the token that was set when the scan began (or None), so the caller can use it
-    for the upload without reading the environment again. The value is read before
-    anything is removed, and everything that changes state sits inside the protected
-    region, so an interrupt at any point between the call and the scan body leaves the
-    token set or puts it back, and leaves no scan registered.
+    for the upload without reading the environment again. The token is read after this
+    call is first on the list, never before, so a call that is let in always reads what
+    the call before it put back.
 
     Raises `ScanOverlap`, with the environment untouched, when another scan in this
-    process is already withholding the token.
+    process is already withholding the token. A refused call never reads, removes or
+    restores the token.
     """
-    held = os.environ.get(_TOKEN_ENV)
+    held = None
     ticket = object()
     try:
-        _tickets.append(ticket)
-        if _tickets[0] is not ticket:
-            raise ScanOverlap("another scan in this process is already running; "
-                              "--report-to supports one scan at a time per process")
-        os.environ.pop(_TOKEN_ENV, None)
-        yield held
-    finally:
         try:
-            if held is not None and _tickets and _tickets[0] is ticket:
-                os.environ[_TOKEN_ENV] = held
+            _tickets.append(ticket)
+            if _tickets[0] is not ticket:
+                raise ScanOverlap("another scan in this process is already running; "
+                                  "--report-to supports one scan at a time per process")
+            held = os.environ.get(_TOKEN_ENV)
+            os.environ.pop(_TOKEN_ENV, None)
+            yield held
         finally:
-            if ticket in _tickets:
-                _tickets.remove(ticket)
+            _leave(ticket, held)
+    except BaseException:
+        _leave(ticket, held)
+        raise

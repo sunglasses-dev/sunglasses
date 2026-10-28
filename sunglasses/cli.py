@@ -1843,8 +1843,9 @@ def cmd_scan(args):
     # upload runs on the way out and cannot change either. The report token is out of this
     # process's environment while the scan runs (see child_env), so a program the scan
     # starts does not inherit it; the upload gets the token the scan began with, and the
-    # environment has it back afterwards. One scan at a time per process: a second one
-    # while this is open is refused before it changes anything.
+    # environment has it back afterwards (see child_env for what that does and does not
+    # promise). A second flagged scan started in this process while this one is open is
+    # refused without touching the token; a scan without the flag does not take part.
     try:
         with child_env.token_withheld() as token:
             try:

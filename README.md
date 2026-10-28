@@ -654,8 +654,12 @@ the environment it gives the programs it starts (the scan worker, `git` for `--r
 controls what those programs inherit. It is not isolation inside the process (the token is still
 held by the command itself), and a scan worker that was already running before the scan began
 keeps the environment it started with. The command supports one scan at a time per process; a
-second scan started in the same process while one is open is refused. The git and worker
-environments are stripped of the token with or without `--report-to`.
+second `--report-to` scan started in the same process while one is open is refused (exit 2,
+nothing scanned) without touching the token, and a scan without the flag does not take part.
+The token is put back when the scan ends by returning, exiting or failing; a Ctrl-C that lands
+while it is being put back is held until that is done and then raised, but two interrupts in the
+same instant can still defeat it. The git and worker environments are stripped of the token with
+or without `--report-to`.
 
 ### Deep Scan Setup (Audio & Video)
 
