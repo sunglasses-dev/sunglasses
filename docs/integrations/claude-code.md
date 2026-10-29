@@ -20,8 +20,11 @@ Two limits, up front:
   `KNOWN_VERSION_GAPS.md`.
 - **It is deterministic-only.** It blocks secret material leaving in an outbound
   call, plus rules you write in `~/.sunglasses/policy.yaml`. Pattern and intent
-  matches **escalate to you** — they never auto-deny. That is a deliberate choice:
-  a heuristic that silently kills tool calls gets uninstalled by lunchtime.
+  matches are **not checked by default**. An opt-in warn lane
+  (`touch ~/.sunglasses/warn-lane`) checks them and **asks you first** — it never
+  auto-denies. It is slower, and it also asks on files that quote attack phrases.
+  Never auto-deny is a deliberate choice: a heuristic that silently kills tool
+  calls gets uninstalled by lunchtime.
 
 ## Install it — in a disposable project first
 
@@ -50,7 +53,9 @@ Real output:
     - secret material leaving in an outbound tool call
     - rules you write in ~/.sunglasses/policy.yaml
   What it never blocks
-    - pattern/intent matches. Those escalate to you, never auto-deny.
+    - pattern/intent matches. Off by default; touch ~/.sunglasses/warn-lane turns on
+      a check that asks you first and never auto-denies. It is slower, and it also
+      asks on files that quote attack phrases.
 ```
 
 Note the **self-test before the write**: it runs the hook command once and
