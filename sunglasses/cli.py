@@ -3238,10 +3238,16 @@ def cmd_pin(args):
         # detected" — a false alarm telling the user their tools were tampered
         # with when in fact nothing had been read at all. The consent gate prints
         # its own reason to stderr.
+        incomplete = getattr(args, "_pin_incomplete", False)
         if code == EXIT_THREAT:
-            print("SUNGLASSES: MCP tool descriptor drift detected — "
-                  "`sunglasses pin --check` for detail. Affected tools are blocked "
+            # One summary line even when a config file also could not be read.
+            print("SUNGLASSES: MCP tool descriptor drift detected"
+                  + (" and a config file could not be read" if incomplete else "")
+                  + " — `sunglasses pin --check` for detail. Affected tools are blocked "
                   "until you re-run `sunglasses pin`.")
+        elif incomplete:
+            print("SUNGLASSES: pin is incomplete — a config file could not be read. "
+                  "Run `sunglasses pin` to see which.")
         return code
     return _pin_run(args)
 
@@ -3250,14 +3256,37 @@ def _pin_run(args):
     import json as _json
     from .firewall import (PROBE_EMPTY, PROBE_TIMEOUT, PROBE_UNREACHABLE,
                            PROBE_UNSUPPORTED, build_pin_state, build_pins,
-                           default_config_paths, diff_pins, discover_mcp_servers,
-                           discover_plugin_servers, load_pins, sunglasses_home)
+                           default_config_paths, diff_pins, load_pins,
+                           read_mcp_configs, read_plugin_servers, sunglasses_home)
 
     # Plugins first, config files second: a project's own `.mcp.json` should be
     # able to override a plugin entry, matching how a developer expects a
     # project-local override to behave.
-    servers = {**discover_plugin_servers(), **discover_mcp_servers(default_config_paths())}
+    plugin_servers, skipped = read_plugin_servers()
+    config_servers, unreadable_configs = read_mcp_configs(default_config_paths())
+    skipped = skipped + unreadable_configs
+    servers = {**plugin_servers, **config_servers}
+
+    # A config file that cannot be read declares no servers as far as this run
+    # can tell, so the pin list below can be short without saying so. Name each
+    # file, and end in doubt (EXIT_INCOMPLETE, the "could not read part of it"
+    # code) rather than on a clean finish. Drift still outranks doubt.
+    for path, reason in skipped:
+        print(f"  {YELLOW}!{RESET} {path}: could not be read {DIM}({reason}) — "
+              f"servers declared there are NOT pinned{RESET}")
+
+    def _finish(code):
+        if not skipped:
+            return code
+        args._pin_incomplete = True
+        print(f"\n  {YELLOW}{BOLD}Incomplete:{RESET} {len(skipped)} config file(s) could "
+              f"not be read, so the servers declared there were not pinned. "
+              f"{DIM}Fix or remove them, then re-run `sunglasses pin`.{RESET}\n")
+        return code or EXIT_INCOMPLETE
+
     if not servers:
+        if skipped:
+            return _finish(0)
         print(f"\n  {DIM}No MCP servers configured. Nothing to pin.{RESET}\n")
         return 0
 
@@ -3339,10 +3368,10 @@ def _pin_run(args):
                   f"the server, then re-run `sunglasses pin` to accept.{RESET}")
             print(f"  {RED}Until you do, the firewall BLOCKS these tools.{RESET} "
                   f"{DIM}-> {state_path}{RESET}\n")
-            return 1
+            return _finish(1)
         print(f"\n  {GREEN}{BOLD}No descriptor drift.{RESET} "
               f"{DIM}{len(previous['tools'])} pinned.{RESET}\n")
-        return 0
+        return _finish(0)
 
     pins_path.parent.mkdir(parents=True, exist_ok=True)
     pins_path.write_text(_json.dumps(current, indent=2) + "\n")
@@ -3354,7 +3383,7 @@ def _pin_run(args):
     print(f"\n  {GREEN}{BOLD}Pinned {len(current['tools'])} tool descriptor(s){RESET} "
           f"{DIM}-> {pins_path}{RESET}")
     print(f"  {DIM}Run `sunglasses pin --check` to detect changes later.{RESET}\n")
-    return 0
+    return _finish(0)
 
 
 def cmd_firewall_hook(args):
