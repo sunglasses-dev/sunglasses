@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="sunglasses",
     version="0.6.14",
-    description="The input firewall for AI agents. Local-first, zero network calls, MIT.",
+    description="The input firewall for AI agents. Local-first, no network calls by default, MIT.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://sunglasses.dev",
