@@ -1270,7 +1270,7 @@ See [sunglasses.dev/thesis](https://sunglasses.dev/thesis.html) for our security
 
 ## License
 
-[MIT](LICENSE). Free forever. Use it anywhere (personal, commercial, enterprise). No restrictions.
+[MIT](LICENSE). Use it anywhere (personal, commercial, enterprise). Paid review, by scope call: [sunglasses.dev/pricing](https://sunglasses.dev/pricing).
 
 ## Links
 
