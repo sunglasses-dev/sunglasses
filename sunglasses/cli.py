@@ -1213,6 +1213,10 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
         "files_with_threats": files_with_threats,
         "files_incomplete": files_incomplete,
         "total_threats": total_threats,
+        # `total_threats` counts the findings a scan reports (what `--file` calls
+        # `findings_count`); `raw_findings` is the pattern-fire total, the sum of the
+        # per-file `threats` below. They differ when one match is reported once.
+        "raw_findings": sum(entry["threats"] for entry in file_results),
         "severity_breakdown": severity_counts,
         "category_breakdown": category_counts,
         "scan_time_ms": round(elapsed_ms, 2),
@@ -1274,6 +1278,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # duplicate of the invariant" is the exact shape the other four consumers had
     # right up until one of them drifted, so the duplicate goes too. Only the exit
     # code is this function's own.
+    from .engine import new_event_id as _new_event_id
     from .result import normalize as _normalize
     summary.update(_normalize(
         {
@@ -1283,6 +1288,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                          + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
             "channel": "file",
+            "event_id": _new_event_id(),
         },
         source=repo_url,
     ))

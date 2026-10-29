@@ -444,6 +444,12 @@ untracked ones). It does not change anything in the tree. One progress line per 
 (`[3/120]`, the time spent, the file) goes to stderr, so `-o json` and `-o sarif` still
 leave stdout as one document.
 
+The JSON summary of `scan --dir` and `--repo` carries two counts, with different jobs.
+`total_threats` is the number of findings the scan reports, the same number `--file` prints
+as `findings_count`. `raw_findings` is the number of pattern fires before that, the sum of the
+per-file `threats` in `file_results`; it can be higher. Show a user `total_threats`. Each
+directory scan also gets an `event_id`, a fresh one per run, like a file scan.
+
 Files the scan does not read are listed in `skipped` with the reason, and the scan is then
 incomplete (exit `3`, `inspection_complete: false`; a threat found elsewhere in the tree still
 exits `1`, which outranks `3`): files over 1 MB, binary types, symbolic links, a directory that
