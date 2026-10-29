@@ -22,7 +22,7 @@ Two limits, up front:
   call, plus rules you write in `~/.sunglasses/policy.yaml`. Pattern and intent
   matches are **not checked by default**. An opt-in warn lane
   (`touch ~/.sunglasses/warn-lane`) checks them and **asks you first** — it never
-  auto-denies. It is slower, and it also asks on files that quote attack phrases.
+  auto-denies. It waits for your answer, and it also asks on files that quote attack phrases.
   Never auto-deny is a deliberate choice: a heuristic that silently kills tool
   calls gets uninstalled by lunchtime.
 
@@ -54,7 +54,7 @@ Real output:
     - rules you write in ~/.sunglasses/policy.yaml
   What it never blocks
     - pattern/intent matches. Off by default; touch ~/.sunglasses/warn-lane turns on
-      a check that asks you first and never auto-denies. It is slower, and it also
+      a check that asks you first and never auto-denies. It waits for your answer, and it also
       asks on files that quote attack phrases.
 ```
 
