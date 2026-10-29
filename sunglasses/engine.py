@@ -70,12 +70,17 @@ _LEADIN_SOURCES = frozenset(
 MAX_SCAN_BYTES = 1024 * 1024
 
 
+def new_event_id() -> str:
+    """The id a scan result carries. File scans and directory scans mint it here."""
+    return str(uuid.uuid4())[:8]
+
+
 class ScanResult:
     """Result of a SUNGLASSES scan."""
 
     def __init__(self, decision: str, findings: list, raw_input: str,
                  normalized_input: str, channel: str, latency_ms: float):
-        self.event_id = str(uuid.uuid4())[:8]
+        self.event_id = new_event_id()
         self.decision = decision          # allow | block | quarantine | allow_redacted
         self.findings = findings           # list of matched patterns
         self.raw_input = raw_input[:200]   # truncated for logging

@@ -50,6 +50,7 @@ def _without_the_run_time(text, output):
     if output == "json":
         doc = json.loads(text)
         doc.pop("scan_time_ms", None)
+        doc.pop("event_id", None)  # new on every run, like the SARIF branch below
         return doc
     if output == "human":
         return re.sub(r"^.*Scan time:.*$", "", text, flags=re.M)
