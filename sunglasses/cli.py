@@ -3119,6 +3119,17 @@ def cmd_init(args):
               f"its entry from {path} or run `{where}sunglasses init{scope} --uninstall` "
               f"in a terminal.{RESET}")
 
+    on_error = getattr(args, "on_error", None)
+    if on_error:
+        from .firewall import sunglasses_home
+        marker = sunglasses_home() / "on-error"
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text(on_error + "\n")
+            print(f"  {DIM}If its secret detector fails on a credential-shaped outbound call, the hook will "
+                  f"{on_error} ({marker}).{RESET}")
+        except OSError as exc:
+            print(f"  {YELLOW}Could not write {marker}:{RESET} {exc}")
     _offer_starter_policy(args)
     print(f"\n  {DIM}{_policy_state_line()}{RESET}")
 
@@ -3867,6 +3878,15 @@ def main():
     init_parser.add_argument(
         "--fail-open", action="store_true",
         help="Leave onFailure out of the hook entry, so a hook that fails lets the tool call go ahead")
+    init_parser.add_argument(
+        "--on-error", dest="on_error", choices=["ask", "deny", "defer", "block"], default=None,
+        help="What the hook does when its own secret detector fails on an outbound call that looks "
+             "credential-shaped: ask (default), deny, defer (quiet pass-through to the host's "
+             "permission flow) or block (end the hook as a failed hook on every secret-check "
+             "fault, whether or not the call looks credential-shaped). In an unattended run "
+             "nobody can answer an ask, so the call is refused. Not measured: what the host does "
+             "with an ask when its permissions are turned off or an allow rule already covers the "
+             "call. Written to ~/.sunglasses/on-error alongside the usual init changes")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts

@@ -1034,6 +1034,18 @@ private key files are named individually and matching is boundary-aware, so
   which is the harness's contract rather than ours, and it does not establish
   that the tool call ran. It makes the gap visible instead of silent.
 
+  One more failure has its own answer: the secret check itself raising an
+  exception on an outbound call. If that call also looks credential-shaped
+  (a known key prefix followed by a long token, or a private-key line), the hook
+  asks instead of passing it through, and the question says the secret check
+  was down. In an unattended run nobody can answer the question, so the call is
+  refused. With the default setting, any other call hit by that fault passes through when its receipt can be written, with the failure in the receipt; when the receipt cannot be written the hook asks, as it does for any call it cannot record.
+  Not measured: what the host does with that question when its permissions are
+  turned off or an allow rule already covers the call.
+  `sunglasses init --on-error {ask,deny,defer,block}` writes `~/.sunglasses/on-error`
+  to change that: `deny` refuses without asking, `defer` keeps the quiet
+  pass-through, and `block` ends the hook as a failed hook on every secret-check fault, even when the receipt cannot be written.
+
   Both records depend on the write succeeding. A full disk, a read-only volume
   or a kill between the two appends leaves a file that is missing lines or ends
   mid-line, so `--verify` counts every line it cannot read, prints it with its
