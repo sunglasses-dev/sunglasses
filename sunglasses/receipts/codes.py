@@ -150,7 +150,7 @@ LIMITATIONS = {
 # class. OK is a result that holds. LIMIT is a verifier
 # that could not conclude because the caller did not supply something
 # (fingerprint, endpoint, key, session, log) or the feature is specified and not
-# built (R40), with log bytes consistent with clean. FAIL is a log whose bytes
+# built, with log bytes consistent with clean. FAIL is a log whose bytes
 # contradict or lack what they must carry. Every limit exits non-zero.
 OK, FAIL, LIMIT = "ok", "fail", "limit"
 
