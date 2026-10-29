@@ -966,8 +966,10 @@ def test_overlapping_scans_are_refused_and_the_token_stays_withheld(monkeypatch)
 
 
 def test_a_refused_scan_never_puts_the_token_back(monkeypatch):
-    """The race a thread can hit: a scan reads the token, the scan that owns the swap removes it,
-    and only then does the first one find it is not the owner. It must not restore what it read."""
+    """A refused scan leaves the environment alone. The list below stands in for the scan that owns
+    the swap: while this call registers, that owner's removal takes the token out. This call finds
+    it is not first and is refused; it does not read the token (it only reads once admitted, so a
+    removal that lands mid-entry can never be copied back) and it must not restore one."""
     from sunglasses import child_env
     monkeypatch.setenv(report_to.TOKEN_ENV, TOKEN)
 
