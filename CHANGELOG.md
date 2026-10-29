@@ -10,8 +10,10 @@ All notable changes to Sunglasses are documented here.
 - `sunglasses scan --help` and the README now say which channel carries a tool result: a tool
   result is the `api_response` channel, where the `-API` credential rules are declared, and no
   credential rule is declared on `tool_output`. Documentation only; no rule, channel list or
-  scan result changes. `tests/test_tool_result_channel_doc.py` pins the sentence to the channels
-  the rules and the proxy actually use, so a rule or a proxy mapping that moves fails the test
+  scan result changes. `tests/test_tool_result_channel_doc.py` pins the wording of those
+  clauses in the help text and the README, and three facts behind them: the proxy reads a tool
+  result as `api_response`, every `-API` credential rule is declared on `api_response`, and no
+  credential rule is declared on `tool_output`. If one of those facts changes, the test fails
   until the words are updated.
 
 ## [0.6.14] — 2026-10-26

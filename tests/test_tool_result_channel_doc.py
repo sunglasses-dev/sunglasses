@@ -4,7 +4,10 @@
 channel a tool's output is scanned under. It is not: no credential rule is declared on it. The
 MCP proxy reads a tool result as `api_response`, and the `-API` credential rules are declared
 there. The help text and the README say so, and this test compares those words with the rules
-and the proxy, so either side moving makes the test fail until the other is updated.
+and the proxy. It pins three facts: the proxy reads a tool result as `api_response`, every `-API`
+credential rule is declared on `api_response`, and no credential rule is declared on
+`tool_output`. It also pins the full wording of those clauses in the help text and the README.
+It does not pin the complete channel list of any rule.
 """
 import subprocess
 import sys
@@ -12,7 +15,16 @@ import sys
 from sunglasses.engine import SunglassesEngine
 from sunglasses.proxy import selector
 
-_SENTENCE = "A tool result is the api_response channel"
+_HELP_CLAUSES = (
+    "A tool result is the api_response channel",
+    "the credential rules for tool results are declared there",
+    "and none is declared on tool_output",
+)
+_README_CLAUSES = (
+    "A tool result is the `api_response` channel",
+    "`sunglasses scan --channel api_response` runs those rules",
+    "`--channel tool_output` runs none of the credential rules",
+)
 
 
 def _credential_rules():
@@ -20,19 +32,23 @@ def _credential_rules():
     return [p for p in engine._patterns if p["id"].startswith("GLS-SD-")]
 
 
-def test_help_text_carries_the_sentence():
+def test_help_text_carries_the_clauses():
     proc = subprocess.run(
         [sys.executable, "-m", "sunglasses", "scan", "--help"],
         capture_output=True, text=True, timeout=120,
     )
-    assert _SENTENCE in " ".join(proc.stdout.split())
+    text = " ".join(proc.stdout.split())
+    for clause in _HELP_CLAUSES:
+        assert clause in text, clause
 
 
-def test_readme_carries_the_sentence():
+def test_readme_carries_the_clauses():
     import pathlib
 
     readme = (pathlib.Path(__file__).resolve().parent.parent / "README.md").read_text()
-    assert "A tool result is the `api_response` channel" in " ".join(readme.split())
+    text = " ".join(readme.split())
+    for clause in _README_CLAUSES:
+        assert clause in text, clause
 
 
 def test_the_proxy_reads_a_tool_result_as_api_response():
