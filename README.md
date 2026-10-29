@@ -1039,7 +1039,7 @@ private key files are named individually and matching is boundary-aware, so
   (a known key prefix followed by a long token, or a private-key line), the hook
   asks instead of passing it through, and the question says the secret check
   was down. In an unattended run nobody can answer the question, so the call is
-  refused. With the default setting, any other call hit by that fault passes through when its receipt can be written, with the failure in the receipt; when the receipt cannot be written the hook asks, as it does for any call it cannot record.
+  refused. With the default setting, any other call hit by that fault passes through when its receipt can be written, with the failure in the receipt; when the receipt cannot be written the hook asks in place of the pass-through. A deny stays a deny, and a block stays a failed hook.
   Not measured: what the host does with that question when its permissions are
   turned off or an allow rule already covers the call.
   `sunglasses init --on-error {ask,deny,defer,block}` writes `~/.sunglasses/on-error`
