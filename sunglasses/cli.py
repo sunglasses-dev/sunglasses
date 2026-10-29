@@ -3120,7 +3120,9 @@ def cmd_init(args):
     print(f"    - secret material leaving in an outbound tool call")
     print(f"    - rules you write in {CYAN}~/.sunglasses/policy.yaml{RESET}")
     print(f"  {BOLD}What it never blocks{RESET}")
-    print(f"    - pattern/intent matches. Those escalate to you, never auto-deny.")
+    print(f"    - pattern/intent matches. Off by default; {CYAN}touch ~/.sunglasses/warn-lane{RESET} turns on")
+    print(f"      a check that asks you first and never auto-denies. It waits for your answer, and it also")
+    print(f"      asks on files that quote attack phrases.")
     print(f"\n  {DIM}Next: `sunglasses pin` to pin MCP tool descriptors, "
           f"`sunglasses receipts` for the audit trail.{RESET}\n")
     return 0

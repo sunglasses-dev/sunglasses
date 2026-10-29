@@ -880,7 +880,7 @@ If you meant the string, use `--text`.
 | | |
 |---|---|
 | **Deterministic facts → HARD BLOCK** | A credential in an outbound payload. A tool descriptor whose hash changed. A rule you wrote yourself. Checkable. Being wrong is a bug, not a judgement call. |
-| **Detections → escalate to you, never auto-block** | Pattern and intent matches are *probabilities*. Hard-denying on a probability is how a security tool becomes the thing that breaks your work. |
+| **Detections → ask you, never auto-block** | Pattern and intent matches are *probabilities*. Hard-denying on a probability is how a security tool becomes the thing that breaks your work. The check that asks you is the opt-in warn lane (`touch ~/.sunglasses/warn-lane`); it is off by default. |
 
 That split is enforced by tests, not by good intentions: the WARN lane is swept
 across every keyword-bearing pattern in the database and asserted to only ever
