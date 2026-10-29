@@ -37,6 +37,7 @@ import threading
 import time
 
 from . import _platform
+from . import child_env
 from .extractors.dispatch import NonRegularFile, UnreadableFile
 from .extractors.member import Member
 # Imported here, not when the child is stopped: a scan of the package's own folder must not
@@ -383,7 +384,8 @@ class ScanWorker:
                 try:
                     self._child = subprocess.Popen(
                         self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                        stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True)
+                        stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True,
+                        env=child_env.scan_child_env())
                 except (OSError, ValueError, subprocess.SubprocessError) as exc:
                     self._child = None
                     self._broken = True

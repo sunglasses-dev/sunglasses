@@ -642,10 +642,17 @@ def _environment_audit(pkg):
     # that there are three of them. NO_COLOR is the fourth (0.6.5, CU-M6, R284): a
     # public convention (no-color.org), read once in `cli._color_wanted`, and it
     # changes presentation bytes only, never a verdict. Anything else is still
-    # refused, and `test_an_environment_read_outside_the_four_is_still_refused`
+    # refused, and `test_an_environment_read_outside_the_allowed_set_is_still_refused`
     # holds that line.
+    #
+    # SUNGLASSES_REPORT_TOKEN is the fifth: the bearer token for the opt-in
+    # `--report-to`. It is read once, in `child_env.token_withheld`, and only when
+    # that flag is given; the upload is handed the value it read (`report_to.deliver`
+    # reads the environment itself only for a direct call that passes none); it is
+    # never stored or echoed. It is an environment variable so the
+    # token is not on the command line (process list, shell history).
     allowed = {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS", "SUNGLASSES_PIN_CONSENT",
-               "NO_COLOR"}
+               "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}
 
     # Names that LOOK like env vars and are not. `SUNGLASSES_WITHHELD` is the
     # JSON-RPC error message T4.R7 freezes for the proxy's client envelope, so
@@ -666,14 +673,21 @@ def _environment_audit(pkg):
     # once in the whole module (no parameter, lambda, local, loop or import
     # may reuse the name), and the resolved KEY is allowed. One enumerated
     # non-key use is exempt by file and form: `dict(os.environ)` in firewall.py,
-    # the environment copy handed to a spawned server. Anything else refuses.
+    # the environment copy handed to a spawned server, and in child_env.py, the copy
+    # handed to the scan's own children with the report token taken out. Anything
+    # else refuses.
     # Two of the three allowed vars are read through a named constant
     # (`_PIN_CONSENT_ENV`, `_DISABLE_ENV`); the literal scan keeps catching a
     # SUNGLASSES_* name that appears anywhere without being read.
     SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
     ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
-    ENV_COPY_SITES = {"firewall.py"}   # exact relative path inside the package, never a basename (ASTRA E39)
+    ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename
+    # The one enumerated MUTATION: child_env.py takes the report token out of this process's environment for the length of
+    # a scan and puts it back. Exactly two forms, on exactly that name:  os.environ.pop(KEY, None)  and  os.environ[KEY] = name
+    # (a plain single assignment). KEY is the token's literal or a module constant bound once. Anything else, anywhere else, refuses.
+    ENV_TOKEN_SWAP_SITES = {"child_env.py"}
+    TOKEN_NAME = "SUNGLASSES_REPORT_TOKEN"
 
     def _os_names(tree):
         """Names bound to the os module by a plain import. Any other way of
@@ -989,7 +1003,7 @@ def _environment_audit(pkg):
             else:
                 refusals.append(f"{relpath}:{node.lineno} read with a key that is not a literal "
                                 f"or a once-bound module constant")
-        # The enumerated environment copy: dict(os.environ) in firewall.py only.
+        # The enumerated environment copy: dict(os.environ) in firewall.py and child_env.py only.
         if relpath in ENV_COPY_SITES:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
@@ -997,6 +1011,30 @@ def _environment_audit(pkg):
                         and isinstance(node.args[0], ast.Attribute) and node.args[0].attr == "environ" \
                         and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id in os_names:
                     consumed.add(id(node.args[0]))
+        # The enumerated token swap: two exact mutation forms on the report token's name, in child_env.py only.
+        if relpath in ENV_TOKEN_SWAP_SITES:
+            swap_parents = _parents(tree)
+
+            def _environ_of(n):
+                return (isinstance(n, ast.Attribute) and n.attr == "environ"
+                        and isinstance(n.value, ast.Name) and n.value.id in os_names)
+
+            def _is_token_key(k):
+                if isinstance(k, ast.Constant):
+                    return k.value == TOKEN_NAME
+                return isinstance(k, ast.Name) and counts.get(k.id) == 1 and consts.get(k.id) == TOKEN_NAME
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "pop" \
+                        and _environ_of(node.func.value) and not node.keywords and len(node.args) == 2 \
+                        and _is_token_key(node.args[0]) and isinstance(node.args[1], ast.Constant) and node.args[1].value is None:
+                    consumed.add(id(node.func.value))
+                elif isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store) and _environ_of(node.value) \
+                        and _is_token_key(node.slice):
+                    par = swap_parents.get(id(node))
+                    if isinstance(par, ast.Assign) and len(par.targets) == 1 and par.targets[0] is node \
+                            and isinstance(par.value, ast.Name):
+                        consumed.add(id(node.value))
         # A computed lookup on the os module is a reader in disguise: getattr(os, ...),
         # os.__dict__[...], vars(os), or any os name passed to getattr/vars (ASTRA E33/E34).
         for node in ast.walk(tree):
@@ -1186,7 +1224,7 @@ def _environment_audit(pkg):
 
 
 def test_package_reads_no_undeclared_environment_variables():
-    """The wheel may read exactly four env vars, and each is accounted for."""
+    """The wheel may read exactly the named env vars, and each is accounted for."""
     found, read_names, refusals, allowed, wire_constants = _environment_audit(
         os.path.dirname(_package_location()))
 
@@ -1243,18 +1281,76 @@ _R52_PROBES = {
 }
 
 
-def test_the_allowed_environment_reads_are_exactly_the_four_named(tmp_path):
+def test_the_allowed_environment_reads_are_exactly_the_five_named(tmp_path):
     """The set is pinned, so widening it again shows up as a failure of its own."""
     (tmp_path / "probe.py").write_text("import os\nHOME = os.environ.get(\"SUNGLASSES_HOME\")\n")
     _found, _read, _refusals, allowed, _wire = _environment_audit(str(tmp_path))
     assert allowed == {"SUNGLASSES_HOME", "SUNGLASSES_DISABLE_EXTRACTORS",
-                       "SUNGLASSES_PIN_CONSENT", "NO_COLOR"}
+                       "SUNGLASSES_PIN_CONSENT", "NO_COLOR", "SUNGLASSES_REPORT_TOKEN"}
 
 
-def test_an_environment_read_outside_the_four_is_still_refused(tmp_path):
-    """Control for the fourth name: NO_COLOR passes, an unlisted variable in the
-    SAME canonical form does not, so the allowlist was not simply emptied of
-    meaning when NO_COLOR was added."""
+def test_the_environment_copy_is_allowed_only_in_its_two_named_files(tmp_path):
+    """`dict(os.environ)` passes in firewall.py and child_env.py by exact path, and refuses
+    in any other file, including one of the same basename in a subfolder."""
+    probe = "import os\nENV = dict(os.environ)\n"
+    for name in ("firewall.py", "child_env.py"):
+        (tmp_path / name).write_text(probe)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert refusals == []
+    (tmp_path / "other.py").write_text(probe)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "child_env.py").write_text(probe)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert len(refusals) == 2 and any("other.py" in r for r in refusals)
+
+
+def test_the_token_swap_is_allowed_only_in_child_env_py_and_only_in_its_two_forms(tmp_path):
+    """`os.environ.pop(TOKEN, None)` and `os.environ[TOKEN] = held` pass in child_env.py by exact path.
+    The same lines refuse in any other file, in a subfolder of the same basename, and so does every
+    variation in child_env.py itself: another name, another method, an augmented or chained or
+    attribute-valued assignment, a delete, the token popped without its default, a computed key."""
+    swap = ("import os\n_TOKEN_ENV = \"SUNGLASSES_REPORT_TOKEN\"\n"
+            "held = os.environ.pop(_TOKEN_ENV, None)\n"
+            "os.environ[_TOKEN_ENV] = held\n")
+    (tmp_path / "child_env.py").write_text(swap)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert refusals == [], refusals
+    (tmp_path / "other.py").write_text(swap)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "child_env.py").write_text(swap)
+    _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+    assert len(refusals) >= 4 and any("other.py" in r for r in refusals) and any("sub" in r for r in refusals)
+    head = "import os\n_TOKEN_ENV = \"SUNGLASSES_REPORT_TOKEN\"\n_OTHER = \"HOME\"\nheld = None\n"
+    variations = {
+        "another name popped": 'os.environ.pop(_OTHER, None)\n',
+        "another name assigned": 'os.environ[_OTHER] = held\n',
+        "pop without its default": 'os.environ.pop(_TOKEN_ENV)\n',
+        "pop with a default that is not None": 'os.environ.pop(_TOKEN_ENV, "x")\n',
+        "setdefault": 'os.environ.setdefault(_TOKEN_ENV, "x")\n',
+        "update": 'os.environ.update({_TOKEN_ENV: "x"})\n',
+        "delete": 'del os.environ[_TOKEN_ENV]\n',
+        "augmented assignment": 'os.environ[_TOKEN_ENV] += "x"\n',
+        "chained assignment": 'a = os.environ[_TOKEN_ENV] = held\n',
+        "assigned an expression": 'os.environ[_TOKEN_ENV] = held or "x"\n',
+        "assigned a literal": 'os.environ[_TOKEN_ENV] = "x"\n',
+        "putenv": 'os.putenv(_TOKEN_ENV, "x")\n',
+        "unsetenv": 'os.unsetenv(_TOKEN_ENV)\n',
+        "a computed key": 'os.environ["SUNGLASSES_REPORT_" + "TOKEN"] = held\n',
+        "a rebound constant": '_TOKEN_ENV = "HOME"\nos.environ[_TOKEN_ENV] = held\n',
+    }
+    for label, line in variations.items():
+        for stale in tmp_path.iterdir():
+            if stale.is_file():
+                stale.unlink()
+        (tmp_path / "child_env.py").write_text(head + line)
+        _found, _read, refusals, _allowed, _wire = _environment_audit(str(tmp_path))
+        assert refusals, f"child_env.py: {label!r} passed the guard"
+
+
+def test_an_environment_read_outside_the_allowed_set_is_still_refused(tmp_path):
+    """Control: NO_COLOR passes, an unlisted variable in the SAME canonical form
+    does not, so the allowlist was not simply emptied of meaning when names
+    were added to it."""
     (tmp_path / "ok.py").write_text("import os\nX = os.environ.get(\"NO_COLOR\")\n")
     _found, read_names, refusals, allowed, _wire = _environment_audit(str(tmp_path))
     assert read_names == {"NO_COLOR"} and refusals == [] and not (read_names - allowed)

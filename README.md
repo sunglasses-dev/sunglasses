@@ -330,7 +330,7 @@ It flags; it does not silently strip. Content it cannot inspect (an archive, an 
 **What it doesn't do:**
 - Doesn't touch authentication (OAuth, cookies, tokens, headers)
 - Doesn't monitor agent behavior (that's SHIELD, coming later)
-- Scans on your machine with no cloud, no API keys and no telemetry. Text, image, PDF and QR scanning needs no network. Audio and video scanning downloads the Whisper speech model the first time and reuses it after that
+- Scans on your machine with no cloud, no API keys and no telemetry. Nothing is sent anywhere unless you pass `scan --report-to` ([below](#sending-a-scan-to-a-server-you-name---report-to)). Text, image, PDF and QR scanning needs no network. Audio and video scanning downloads the Whisper speech model the first time and reuses it after that
 
 **Email screening:** A real client sends a real email. But their PC is infected, malware injected hidden attack instructions before it left. The sender doesn't know. Without SUNGLASSES, your agent follows the hidden instructions. With SUNGLASSES, `scanner.scan_email(body, attachments)` returns a scan document (the findings, the three axes, and a named list of anything it could not read) and **your code decides** whether to pass the mail on, quarantine it or ask a human. Nothing is silently rewritten or stripped: SUNGLASSES flags, you act. An attachment that needs a DEEP scan is reported as not yet inspected rather than counted as clean.
 
@@ -338,7 +338,7 @@ It flags; it does not silently strip. Content it cannot inspect (an archive, an 
 
 Tools like **Lakera Guard**, **LLM Guard**, **NVIDIA NeMo Guardrails**, and **Azure Prompt Shields** also protect AI agents from prompt injection. They're good at what they do, especially ML-based detection of novel attacks.
 
-We built SUNGLASSES for a different use case: **local-only, offline, zero-cost, no LLM needed.** Your data never leaves your machine. No API keys. No cloud calls. Works air-gapped.
+We built SUNGLASSES for a different use case: **local-only, offline, zero-cost, no LLM needed.** Your data stays on your machine unless you run `scan --report-to URL`, which sends one scan to the URL you name ([details](#sending-a-scan-to-a-server-you-name---report-to)). No API keys. No cloud calls otherwise. Works air-gapped.
 
 Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapter system** to connect with other security tools in the same pipeline. Security is layers, we're the local foundation layer.
 
@@ -612,6 +612,54 @@ with `--deep`.
 A write that fails after the scan (a destination that became unusable meanwhile, or a name or size the
 baseline cannot record) is not a start-up refusal: the report is printed, no baseline is written, and the
 exit is `1`, `3` or `2` in that order of precedence, as described above.
+
+### Sending a scan to a server you name: `--report-to`
+
+`scan --report-to URL` posts the finished scan, once, to a server you run or trust. It is off
+unless you give it. It runs after the scan has printed its output and decided its exit code, and
+it changes neither: a failed upload is one line on stderr, starting `sunglasses: --report-to:`, and
+the exit code stays what the scan made it. A run that ends without a scan result (a refusal, or an
+audio or video file) sends nothing and says so in one line. It works with `--file`, `--text`,
+`--stdin`, `--dir` and `--repo`.
+
+The URL must be `https://`; plain `http://` is accepted only for this machine (`localhost` or a
+loopback address), and a redirect is not followed. The token is read from the environment
+variable `SUNGLASSES_REPORT_TOKEN` and sent as `Authorization: Bearer ...` to that URL only. There
+is no flag for it, so it stays out of your shell history and process list. Without the variable,
+nothing is sent.
+
+What is sent is one JSON document, built from a fixed list of fields: the scan's counts and
+flags, its file paths (as the scan output shows them: for a directory scan that includes the folder's own path, in `source`), and for each finding its rule id, severity, category, `line` and the
+SHA-256 and length of the text it matched; plus the scanner version, the pattern count and a name
+for the source (`--report-source NAME`; by default the directory or repository name). Every other
+field of the scan's `--json` result (a rule's name, its explanation, the other rules that matched,
+framework mappings, warning text) is left out, and a field the scan
+result gains later is not sent until it is added to that list. `--report-include-text` sends the
+matched text itself instead of its hash. `line` is the line where the matched text first appears in
+the file as read, or `null` when it cannot be located (a scan of text, a format that is extracted
+before it is scanned, a file too large to read again); the file is read again after the scan, so a
+file that changed in between can give a stale line. `--report-include-receipts` adds the newest
+segment of your signed hook log, from its first line, with the public key that signs it; without it
+`receipts` is `null`. If the log pushes the report over the size limit it is left out and the line
+says so.
+
+The upload is attempted once and given up on after 15 seconds in all (name lookup, connect, send
+and the answer together), whatever the server does; the scan's output and exit code are already
+decided by then. The command stops waiting at that point and exits; a report that is already on
+its way can still reach the server, because the attempt is abandoned, not recalled. A report over 1 MiB, or with more than 5,000 findings, is not sent. The size is
+checked after the report is built, so building a very large scan's report uses memory in proportion
+to the scan. While the scan runs, `SUNGLASSES_REPORT_TOKEN` is out of the command's own environment and out of
+the environment it gives the programs it starts (the scan worker, `git` for `--repo`, `ffmpeg` for
+`--deep`), so they are not handed a copy; the upload uses the token the scan began with. This
+controls what those programs inherit. It is not isolation inside the process (the token is still
+held by the command itself), and a scan worker that was already running before the scan began
+keeps the environment it started with. The command supports one scan at a time per process; a
+second `--report-to` scan started in the same process while one is open is refused (exit 2,
+nothing scanned) without touching the token, and a scan without the flag does not take part.
+The token is put back when the scan ends by returning, exiting or failing; a Ctrl-C that lands
+while it is being put back is held until that is done and then raised, but two interrupts that land
+one right after the other can still defeat it. The git and worker environments are stripped of the
+token with or without `--report-to`.
 
 ### Deep Scan Setup (Audio & Video)
 
