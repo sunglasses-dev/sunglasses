@@ -254,12 +254,82 @@ def test_a_stderr_that_cannot_be_written_still_loads_the_model(fake_whisper, eve
     assert _downloads(events) == [URLS["base"]]
 
 
-def test_a_whisper_without_the_download_hook_loads_as_before(fake_whisper, events, monkeypatch):
+def _record_load(fake_whisper, events):
+    """Replace load_model so the event list shows whether the notice came before the load."""
+    def load_model(name, **kw):
+        events.append(("load", name))
+        return ("model", name)
+    fake_whisper.load_model = load_model
+
+
+def test_a_whisper_without_the_download_hook_says_so_before_it_loads(fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    del fake_whisper._download
+    _record_load(fake_whisper, events)
+    assert load_whisper_model("base") == ("model", "base")
+    assert [kind for kind, _ in events] == ["notice", "load"]
+    assert _notices(events) == ["loading whisper model base; Whisper may download it first if it is not already cached\n"]
+
+
+def test_a_whisper_without_the_model_table_says_so_before_it_loads(fake_whisper, events, monkeypatch):
+    watch(monkeypatch, events)
+    del fake_whisper._MODELS
+    _record_load(fake_whisper, events)
+    assert load_whisper_model("small") == ("model", "small")
+    assert [kind for kind, _ in events] == ["notice", "load"]
+    assert "small" in _notices(events)[0]
+
+
+def test_a_whisper_with_a_renamed_download_hook_says_so_even_for_a_cached_model(fake_whisper, events, monkeypatch):
+    """The helper cannot see the cache then, so it tries to say so before each load rather than guess."""
+    watch(monkeypatch, events)
+    fake_whisper._fetch_model = fake_whisper._download
+    del fake_whisper._download
+    (fake_whisper.cache / "base.pt").write_bytes(b"model")
+    _record_load(fake_whisper, events)
+    load_whisper_model("base")
+    load_whisper_model("base")
+    assert len(_notices(events)) == 2
+
+
+def test_a_whisper_without_the_hook_still_says_so_for_a_model_file_on_disk(
+        fake_whisper, events, tmp_path, monkeypatch):
+    """The helper cannot tell a file load from a download, so the line is not skipped."""
+    watch(monkeypatch, events)
+    del fake_whisper._download
+    del fake_whisper._MODELS
+    mine = tmp_path / "mine.pt"
+    mine.write_bytes(b"model")
+    _record_load(fake_whisper, events)
+    assert load_whisper_model(str(mine)) == ("model", str(mine))
+    assert [kind for kind, _ in events] == ["notice", "load"]
+
+
+def test_a_whisper_without_the_hook_says_so_for_a_registered_name_that_is_also_a_file(
+        fake_whisper, events, tmp_path, monkeypatch):
+    """A loader may take the registered name before the file, so a same-named file is no reason to stay quiet."""
+    watch(monkeypatch, events)
+    del fake_whisper._download
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "base").write_bytes(b"not the registered weights")
+    _record_load(fake_whisper, events)
+    assert load_whisper_model("base") == ("model", "base")
+    assert [kind for kind, _ in events] == ["notice", "load"]
+
+
+def test_a_whisper_without_the_hook_passes_an_unhashable_name_on_unchanged(fake_whisper, events, monkeypatch):
     watch(monkeypatch, events)
     del fake_whisper._download
     fake_whisper.load_model = lambda name, **kw: ("model", name)
+    assert load_whisper_model(["base"]) == ("model", ["base"])
+
+
+def test_the_fallback_notice_does_not_stop_a_load_when_stderr_is_missing(fake_whisper, events, monkeypatch):
+    monkeypatch.setattr(sys, "stderr", None)
+    del fake_whisper._download
+    _record_load(fake_whisper, events)
     assert load_whisper_model("base") == ("model", "base")
-    assert events == []
+    assert events == [("load", "base")]
 
 
 def test_a_model_name_that_is_a_file_path_loads_as_before(fake_whisper, events, monkeypatch):

@@ -1,9 +1,9 @@
-"""Load the Whisper speech model, and say so before a missing model is fetched.
+"""Load the Whisper speech model, and try to say so before a missing model is fetched.
 
 `whisper.load_model` downloads the model file when it is not in Whisper's cache
-folder. The scanner runs on your machine, so that download is announced on stderr
-before it starts. The notice covers a model file that is missing; a cached file
-that fails Whisper's own checksum is downloaded again by Whisper without it.
+folder. The scanner runs on your machine, so a missing model is announced on stderr
+before the download starts. A cached file that fails Whisper's own checksum is
+downloaded again by Whisper without a notice.
 
 The announcement is made by standing in for `whisper._download` while a model
 loads. That is a process-wide change, so loads through this helper run one at a
@@ -12,6 +12,14 @@ Those guarantees cover loads made through this helper. Code that calls
 `whisper.load_model` directly is not coordinated with it: while a helper load is
 in progress such a call uses the same stand-in, and its notice carries the helper
 load's model name.
+
+When the installed Whisper does not expose the `_download` function or the `_MODELS`
+table this helper stands in for, it cannot see whether the model file is cached. It
+then tries to print one line on stderr before each load, saying that Whisper may
+download the model first. That line is not suppressed for a name that is also a
+file on disk, because the helper cannot tell which of the two Whisper will use.
+When the table is visible and the name is not in it, the name is passed to Whisper
+unchanged and no line is printed.
 
 A missing stderr, or an OSError or ValueError while the notice is written, does
 not stop the load. The notice is not written anywhere else; there is no stdout
@@ -51,13 +59,16 @@ def _announcing_fetch(url, root, *args, **kwargs):
 
 
 def load_whisper_model(name):
-    """Return `whisper.load_model(name)`, announcing a download of a missing model."""
+    """Return `whisper.load_model(name)`, trying to announce a download of a missing model."""
     import whisper
 
     with _LOCK:
         fetch = getattr(whisper, "_download", None)
         urls = getattr(whisper, "_MODELS", None)
-        if not callable(fetch) or not isinstance(urls, dict) or name not in urls:
+        if not callable(fetch) or not isinstance(urls, dict):
+            _say(f"loading whisper model {name}; Whisper may download it first if it is not already cached")
+            return whisper.load_model(name)
+        if name not in urls:
             return whisper.load_model(name)
 
         outer = dict(_loading)
