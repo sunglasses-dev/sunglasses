@@ -1,6 +1,6 @@
 """The machine reason codes a verifier prints, and the five results it separates.
 
-ASTRA's ruling C, overruling the brief: a key commits to a PREFIX. It does not
+A key commits to a PREFIX. It does not
 prove who wrote each line. So there is no overall "clean audit trail" label
 anywhere in this package, and there is no single boolean a caller can read to
 get one. A verifier prints five independent results, and a reader who wants a
@@ -150,7 +150,7 @@ LIMITATIONS = {
 # class. OK is a result that holds. LIMIT is a verifier
 # that could not conclude because the caller did not supply something
 # (fingerprint, endpoint, key, session, log) or the feature is specified and not
-# built (R40), with log bytes consistent with clean. FAIL is a log whose bytes
+# built, with log bytes consistent with clean. FAIL is a log whose bytes
 # contradict or lack what they must carry. Every limit exits non-zero.
 OK, FAIL, LIMIT = "ok", "fail", "limit"
 
@@ -215,7 +215,7 @@ def exit_code(results: dict, strict: bool = False) -> int:
 
 def exit_for(code: str, strict: bool = False) -> int:
     """The exit for one code standing alone, not one of the five results
-    (NO_LOG, T9 ruling 53), derived from its class the way exit_code is. An
+    (NO_LOG), derived from its class the way exit_code is. An
     unknown code exits 1."""
     tag = CLASS.get(code, FAIL)
     if tag == OK:
@@ -231,8 +231,8 @@ def strict_exit_code(results: dict) -> int:
 
 
 def combine_exits(*exits) -> int:
-    """One exit for several verdicts: the key, a legacy log, every chain
-    (T9 ruling 50). Any failure wins, then a usage error, then any limit. Not
+    """One exit for several verdicts: the key, a legacy log, every chain.
+    Any failure wins, then a usage error, then any limit. Not
     max(), which would let a limit (3) outrank a failure (1). A value outside
     the table is a failure."""
     if any(e not in (EXIT_OK, EXIT_USAGE, EXIT_LIMIT) for e in exits):
