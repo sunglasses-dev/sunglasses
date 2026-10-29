@@ -172,7 +172,10 @@ the rule, the bytes inspected and the rule ids that fired:
 ```
 
 - **A credential in a tool RESULT is withheld from your client.** The `-API`
-  rules are the tool-result channel.
+  rules are the tool-result channel. A tool result is the `api_response` channel:
+  from the shell, `sunglasses scan --channel api_response` runs those rules, and
+  `--channel tool_output` runs none of the credential rules. A test pins this
+  sentence to the channels the rules declare.
 - **`GLS-SD-010` is line-anchored, and that is a limit in every channel.** It
   matches an assignment at the start of a line, so a `KEY=value` that is
   indented by any whitespace, or sits inside a JSON string, or sits behind a

@@ -3771,7 +3771,10 @@ def main():
                              choices=list(SunglassesEngine.DOCUMENTED_CHANNELS),
                              help="Where the content came from, not what the attack is. "
                                   "Patterns are scoped by channel, so this changes which "
-                                  "rules apply (default: message)")
+                                  "rules apply (default: message). A tool result is the "
+                                  "api_response channel: the credential rules for tool "
+                                  "results are declared there, and none is declared on "
+                                  "tool_output")
     # `--d` has always been the unique abbreviation of --deep; adding --dir made it
     # ambiguous (usage error). Spell it out so the old command keeps its meaning.
     scan_parser.add_argument("--deep", "--d", dest="deep", action="store_true",
