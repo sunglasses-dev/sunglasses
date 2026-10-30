@@ -307,4 +307,4 @@ def test_pin_help_lists_the_exit_codes(tmp_path):
     assert "0  done, no drift (may mean nothing was read or pinned)" in lines
     assert "1  drift or no usable pins file (--check), or an error" in lines
     assert "2  consent refused, or a usage error" in lines
-    assert "3  a config file could not be read, nothing else failed" in lines
+    assert "3  a config file could not be read" in lines
