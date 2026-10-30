@@ -77,6 +77,35 @@ def folder_text(folder):
     return folder if folder.isprintable() else "(a folder whose name has control characters)"
 
 
+def other_folders(root, command_stem, here, limit=3):
+    """Folders, other than `here`, that hold an approval for the same command and arguments.
+
+    Read only. Printable folder names only, and at most `limit` of them: this feeds a line on
+    the proxy's own stderr, which a person reads.
+    """
+    if not command_stem:
+        return []
+    found = []
+    try:
+        paths = sorted((pathlib.Path(root) / "approvals").glob("*.json"))
+    except OSError:
+        return []
+    for path in paths:
+        try:
+            record = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        if not isinstance(record, dict) or record.get("command_stem") != command_stem:
+            continue
+        folder = record.get("folder")
+        if (isinstance(folder, str) and folder.isprintable() and folder != here
+                and folder not in found):
+            found.append(folder)
+        if len(found) >= limit:
+            break
+    return found
+
+
 def approval_rows(root):
     """Every approval under `root`, read only: server, folder, snapshot and tool count.
 
@@ -112,9 +141,12 @@ def approval_rows(root):
 class Store:
     """The record on disk, the state it implies, and the activation gate."""
 
-    def __init__(self, root, *, server_id):
+    def __init__(self, root, *, server_id, command_stem=None):
         self.root = pathlib.Path(root)
         self.server_id = server_id
+        # The identity without its folder: the same server started from another folder shares
+        # it, which is how a refusal can say "approved, but from over there".
+        self.command_stem = command_stem
         self.pending_snapshot = None
         self.approvals = self.root / "approvals"
         self.captures = self.root / "captures"
@@ -142,6 +174,8 @@ class Store:
         say which one. The folder is not part of the sha a human approves.
         """
         payload = {**payload, "folder": os.getcwd()}
+        if self.command_stem:
+            payload["command_stem"] = self.command_stem
         (self.captures / f"{self.server_id}.{snapshot_sha256}.json").write_text(
             json.dumps(payload, sort_keys=True))
         # REMEMBERED so a refusal can name it. `proxy approve` needs this sha,
@@ -201,6 +235,8 @@ class Store:
         }
         if isinstance(stored.get("folder"), str):
             record["folder"] = stored["folder"]
+        if isinstance(stored.get("command_stem"), str):
+            record["command_stem"] = stored["command_stem"]
         with self._lock:
             self._path.write_text(json.dumps(record, sort_keys=True))
             # contract row 5.1 and T505. The record names which descriptors a human

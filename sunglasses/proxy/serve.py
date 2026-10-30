@@ -116,7 +116,7 @@ def install_records_home(override=None):
     return state_root(override).parent
 
 
-def approval_notice(stderr, root=None):
+def approval_notice(stderr, root=None, command_stem=None):
     """The one line a person needs when a server's tools are withheld.
 
     It is the same command `sunglasses proxy approve` documents, with the two
@@ -153,6 +153,20 @@ def approval_notice(stderr, root=None):
             "them. At a terminal, run: sunglasses proxy approve "
             f"{server_id} --snapshot {snapshot_sha256}{tail} "
             f"(it shows the tools and asks before approving){where}\n")
+        # An approval is bound to the folder the server is started from. Say which folder this
+        # is, and where an approval for the same command already exists, so a run from the
+        # wrong folder reads as that and not as a server with no tools. Our stderr only: the
+        # reply the agent gets is unchanged.
+        here = os.getcwd()
+        stderr.write(
+            "sunglasses proxy: an approval is bound to the folder the server is started "
+            f"from; this run is in {approvals.folder_text(here)}\n")
+        elsewhere = approvals.other_folders(state_root(root), command_stem, here)
+        if elsewhere:
+            stderr.write(
+                "sunglasses proxy: this server is already approved from "
+                + ", ".join(elsewhere)
+                + "; start it from there, or approve again from this folder\n")
         stderr.flush()
     return notice
 
@@ -170,8 +184,9 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     decorative.
     """
     identity = _identity(upstream_argv)
+    stem = _command_stem(upstream_argv)
     if store is None:
-        store = approvals.Store(state_root(root), server_id=identity)
+        store = approvals.Store(state_root(root), server_id=identity, command_stem=stem)
     # contract row 2.6's channel. Without it the route refuses a tools/list rather than
     # forwarding it, which is correct but useless: this is what lets the proxy
     # run its own list and therefore what lets a human ever approve a server.
@@ -185,7 +200,7 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
                            upstream_write=upstream_write,
                            client_write=client_write, approvals=store,
                            control=channel, server_identity=identity,
-                           approval_notice=(approval_notice(stderr, root)
+                           approval_notice=(approval_notice(stderr, root, stem)
                                             if stderr is not None else None),
                            **extra)
     except BaseException as error:
@@ -659,6 +674,12 @@ def _exit_code(session, child):
     except subprocess.TimeoutExpired:
         code = None
     return EXIT_OK if code in (None, 0) else int(code)
+
+
+def _command_stem(upstream_argv):
+    """`_identity` without the folder: the command and its arguments only."""
+    material = "\x00".join([os.path.realpath(upstream_argv[0])] + list(upstream_argv[1:]))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:32]
 
 
 def _identity(upstream_argv):

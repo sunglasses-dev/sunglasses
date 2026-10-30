@@ -124,3 +124,77 @@ def test_the_human_doctor_report_prints_the_approvals_block(tmp_path, capsys):
         doctor.render = real
     out = capsys.readouterr().out
     assert "Approvals" in out and "folder /work/proj" in out and "3 tool(s)" in out
+
+
+# --- the proxy's own stderr notice (the agent-facing reply stays as it was) ---------------
+
+from sunglasses.proxy import envelope, serve
+
+ARGV = ["/bin/echo", "server"]
+
+
+def _notice(root, folder):
+    err = io.StringIO()
+    old = os.getcwd()
+    os.makedirs(folder, exist_ok=True)
+    os.chdir(folder)
+    try:
+        serve.approval_notice(err, root, serve._command_stem(ARGV))("i" * 32, SHA)
+    finally:
+        os.chdir(old)
+    return err.getvalue()
+
+
+def _approved_from(root, folder):
+    os.makedirs(folder, exist_ok=True)
+    old = os.getcwd()
+    os.chdir(folder)
+    try:
+        sid = serve._identity(ARGV)
+        approvals.Store(root, server_id=sid, command_stem=serve._command_stem(ARGV)).capture(
+            SHA, {"sha256": SHA, "tools_by_name": TOOLS})
+    finally:
+        os.chdir(old)
+    _approve(root, sid)
+
+
+def test_the_stem_is_the_identity_without_the_folder(tmp_path):
+    old = os.getcwd()
+    ids = []
+    for name in ("a", "b"):
+        (tmp_path / name).mkdir()
+        os.chdir(tmp_path / name)
+        ids.append(serve._identity(ARGV))
+    os.chdir(old)
+    assert ids[0] != ids[1]
+    assert serve._command_stem(ARGV) == serve._command_stem(ARGV)
+
+
+def test_the_notice_names_the_folder_this_run_is_in(tmp_path):
+    text = _notice(tmp_path / "root", tmp_path / "here")
+    assert "bound to the folder the server is started from" in text and "here" in text
+    assert "already approved from" not in text
+
+
+def test_the_notice_names_the_folder_that_holds_an_approval_for_the_same_command(tmp_path):
+    root = tmp_path / "root"
+    _approved_from(root, tmp_path / "there")
+    text = _notice(root, tmp_path / "here")
+    line = next(l for l in text.splitlines() if "already approved from" in l)
+    assert "there" in line and "approve again from this folder" in line
+
+
+def test_a_different_command_is_not_reported_as_approved_elsewhere(tmp_path):
+    root = tmp_path / "root"
+    _approved_from(root, tmp_path / "there")
+    err = io.StringIO()
+    serve.approval_notice(err, root, serve._command_stem(["/bin/echo", "other"]))("i" * 32, SHA)
+    assert "already approved from" not in err.getvalue()
+
+
+def test_the_agent_facing_envelope_has_no_folder_in_it():
+    body = envelope.withheld(request_id=1, reason_code="APPROVAL_REQUIRED", rule="S4",
+                             accepted=False, status="not_run", inspection_complete=False,
+                             inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
+                             server_id="s" * 32, snapshot_sha256=SHA, folder="/work/secret")
+    assert "folder" not in json.dumps(body) and "/work/secret" not in json.dumps(body)
