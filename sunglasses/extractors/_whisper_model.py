@@ -1,9 +1,10 @@
 """Load the Whisper speech model, and try to say so before a missing model is fetched.
 
 `whisper.load_model` downloads the model file when it is not in Whisper's cache
-folder. The scanner runs on your machine, so a missing model is announced on stderr
-before the download starts. A cached file that fails Whisper's own checksum is
-downloaded again by Whisper without a notice.
+folder. The scanner runs on your machine, so a notice is attempted (best effort, on
+stderr) before the download starts. When the helper can see Whisper's download
+function, a cached file that fails Whisper's own checksum is downloaded again by
+Whisper without a notice. When it cannot, the notice is tried on every load.
 
 The announcement is made by standing in for `whisper._download` while a model
 loads. That is a process-wide change, so loads through this helper run one at a
@@ -18,8 +19,8 @@ table this helper stands in for, it cannot see whether the model file is cached.
 then tries to print one line on stderr before each load, saying that Whisper may
 download the model first. That line is not suppressed for a name that is also a
 file on disk, because the helper cannot tell which of the two Whisper will use.
-When the table is visible and the name is not in it, the name is passed to Whisper
-unchanged and no line is printed.
+A name that is not in the table is passed to Whisper unchanged, with no line
+printed, only when both the download function and the table are usable.
 
 A missing stderr, or an OSError or ValueError while the notice is written, does
 not stop the load. The notice is not written anywhere else; there is no stdout
@@ -59,7 +60,7 @@ def _announcing_fetch(url, root, *args, **kwargs):
 
 
 def load_whisper_model(name):
-    """Return `whisper.load_model(name)`, trying to announce a download of a missing model."""
+    """Return `whisper.load_model(name)`, trying to print a notice before a missing model is downloaded."""
     import whisper
 
     with _LOCK:
