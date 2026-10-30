@@ -118,12 +118,21 @@ def test_internal_crash_defers_and_confesses(home, monkeypatch):
         "evaluate no longer calls egress_secret_hits — repoint this fault"
     monkeypatch.setattr(firewall, "egress_secret_hits", boom)
 
-    out = firewall.run_hook(json.dumps(LEAK))
-    assert out == {}  # no opinion on the wire; the confession lives in the receipt
+    # An outbound call with nothing credential-shaped in it: no opinion on the
+    # wire; the confession lives in the receipt, which names the exception's
+    # TYPE only (its text could hold the very material the detector was reading).
+    benign = {**LEAK, "tool_input": {"command": "curl https://example.com/status"}}
+    out = firewall.run_hook(json.dumps(benign))
+    assert out == {}
 
     last = _receipts(home)[-1]
     assert last["lane"] == "error"
-    assert "synthetic detector explosion" in last.get("error", "")
+    assert "RuntimeError" in last.get("error", "")
+    assert "synthetic detector explosion" not in last.get("error", "")
+
+    # The same fault on a credential-shaped call asks (tests/test_firewall_secret_lane_down.py).
+    leaked = firewall.run_hook(json.dumps(LEAK))["hookSpecificOutput"]
+    assert leaked["permissionDecision"] == "ask"
 
 
 def test_corrupt_policy_file_asks_and_confesses_rather_than_blocking(home):

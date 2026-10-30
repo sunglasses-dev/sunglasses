@@ -34,7 +34,10 @@ Design constraints (all load-bearing):
   * Fail-open, but CONFESS. A crashed firewall must not brick the agent; it
     must also not silently vanish. Errors return `defer` — on the wire an empty
     `{}`, the documented "no opinion" that falls through to Claude Code's own
-    permission flow — and write a receipt saying the firewall failed.
+    permission flow — and write a receipt saying the firewall failed. One
+    exception: when the secret detector itself is the control that failed on an
+    outbound call that looks credential-shaped, the hook asks (see
+    `SecretLaneDown`).
   * FP rate 0 on the clean corpus before this lane is allowed to deny anything.
     A guard that greps a bare pattern shoots healthy agents (Jul 22 2026).
 """
@@ -1870,6 +1873,133 @@ _TOO_DEEP = Decision(
     f"Flatten the input and retry.")
 
 
+# ── SECRET LANE DOWN ────────────────────────────────────────────────────────
+# The secret detector is the one control that needs no configuration. A crash
+# inside it would land on the generic fail-open (`defer`, an empty `{}`) and send
+# a call that might carry a credential to the host's own permission flow with
+# only a receipt to say so. Everything below runs only on that fault.
+
+_SECRET_DOWN_RULE = "GLS-FW-SECRET-DOWN"
+_ON_ERROR_WORDS = ("ask", "deny", "defer", "block")
+# A format character the detector's own invisible-character handling would strip.
+# Written out here so the fallback shares no code with it.
+_FALLBACK_INVISIBLE = {ord(c): None for c in (
+    "\u00ad\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e"
+    "\u2060\u2061\u2062\u2063\u2064\u2066\u2067\u2068\u2069\ufeff")}
+_FALLBACK_TOKEN = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+_FALLBACK_PREFIXES = tuple(sorted(
+    {p for r in SECRET_RULES for p in r.prefixes}, key=len, reverse=True))
+
+
+class SecretLaneDown(Exception):
+    """The secret detector itself raised on this call. Not a verdict: `evaluate`
+    hands it to `run_hook_ex`, which decides what to do about a dead control that
+    was about to clear a call. Carries only the cause, never the text scanned."""
+
+    def __init__(self, cause):
+        super().__init__(type(cause).__name__)
+        self.cause = cause
+
+
+def _has_repeated_run(token: str, n: int = 8) -> bool:
+    """A run of `n` identical characters: how documentation spells a placeholder."""
+    run = 0
+    prev = ""
+    for ch in token:
+        run = run + 1 if ch == prev else 1
+        prev = ch
+        if run >= n:
+            return True
+    return False
+
+
+def _secret_shaped_candidate(text: str) -> bool:
+    """Looser than the real detector, on purpose, and only ever used when that
+    detector is down: a known credential prefix, at a word boundary, followed by
+    at least 12 token characters that are not a placeholder run or a published
+    canary; or a PEM private-key line. Plain `str.find`, no regex, no shared code
+    with the failing control. A false positive is an ask with the default setting (a refusal in an unattended run, and with `deny`)."""
+    text = text.translate(_FALLBACK_INVISIBLE)
+    if "PRIVATE KEY-----" in text:
+        return True
+    for pre in _FALLBACK_PREFIXES:
+        i = text.find(pre)
+        while i != -1:
+            j = i + len(pre)
+            k = j
+            while k < len(text) and text[k] in _FALLBACK_TOKEN:
+                k += 1
+            if ((i == 0 or not text[i - 1].isalnum()) and k - j >= 12
+                    and not _has_repeated_run(text[j:k])
+                    and text[i:k] not in KNOWN_PUBLIC_CANARIES):
+                return True
+            i = text.find(pre, i + 1)
+    return False
+
+
+def _read_on_error(home) -> str:
+    """`<home>/on-error`: one word, ask (default) | deny | defer | block. A marker
+    file beside `warn-lane`, not a policy.yaml key, because the policy is one of
+    the controls that can be down. Unreadable or unknown -> ask."""
+    try:
+        with open(home / "on-error", "r", encoding="utf-8") as fh:
+            raw = fh.read(65)
+    except Exception:  # noqa: BLE001
+        return "ask"
+    if len(raw) > 64:
+        return "ask"  # a marker is one short word; anything longer is not one
+    word = raw.strip().lower()
+    return word if word in _ON_ERROR_WORDS else "ask"
+
+
+def _internal_error_decision() -> "Decision":
+    return Decision(
+        "defer", "error", "GLS-FW-ERROR",
+        "SUNGLASSES firewall: internal error, deferring to normal permission "
+        "flow. This tool call was NOT checked. See ~/.sunglasses/receipts/.",
+    )
+
+
+def _secret_lane_down(payload: dict, home, down: "SecretLaneDown") -> "tuple":
+    """(decision, error, error_types, extras, exit_reason) for a call the secret
+    detector could not check. Never raises. `exit_reason` is set only for the
+    `block` word, where `main` ends the process as a hook failure."""
+    cause = down.cause
+    error = f"secret detector failed: {type(cause).__name__}"
+    error_types = (type(cause).__name__,)
+    word = _read_on_error(home)
+    extras = {"secret_lane_down": True, "on_error": word}
+    tool_name = payload.get("tool_name") or ""
+    tool_input = payload.get("tool_input") or {}
+    candidate = False
+    try:
+        candidate = bool(is_egress_tool(tool_name, tool_input)
+                         and _secret_shaped_candidate(egress_surface_text(tool_name, tool_input)))
+        extras["candidate"] = candidate
+    except Exception:  # noqa: BLE001 — the fallback failing leaves the generic defer
+        extras["candidate_scan_failed"] = True
+    if word == "block":
+        return (Decision("defer", "error", _SECRET_DOWN_RULE,
+                         "SUNGLASSES firewall: the secret detector failed on this "
+                         "call, so nothing was checked (on-error is block)."),
+                error, error_types, extras, "SECRET_LANE_DOWN")
+    if candidate and word in ("ask", "deny"):
+        if word == "ask":
+            decision = Decision(
+                "ask", "error", _SECRET_DOWN_RULE,
+                "SUNGLASSES firewall: the secret detector failed on this call, "
+                "which may carry credential material. Approve only if you would "
+                "have approved it unchecked.")
+        else:
+            decision = Decision(
+                "deny", "error", _SECRET_DOWN_RULE,
+                "SUNGLASSES firewall: the secret detector failed on this call, "
+                "which looks credential-shaped, so it was refused (on-error is deny).")
+        return decision, error, error_types, extras, None
+    return _internal_error_decision(), error, error_types, extras, None
+
+
 def evaluate(payload: dict, home=None) -> "tuple":
     """Run the deterministic lane over one PreToolUse payload.
 
@@ -1899,7 +2029,10 @@ def evaluate(payload: dict, home=None) -> "tuple":
                 None, {"skipped_event": event})
 
     # Checks that need zero configuration run first and unconditionally.
-    hits, cleared = egress_secret_hits(tool_name, tool_input)
+    try:
+        hits, cleared = egress_secret_hits(tool_name, tool_input)
+    except Exception as exc:  # noqa: BLE001 — see SecretLaneDown
+        raise SecretLaneDown(exc) from exc
     if cleared:
         # Rides in extras so it reaches the terminal record whatever decides
         # this call: a canary cleared on a call that is then denied for some
@@ -2055,7 +2188,10 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     normal permission flow). One that main answered with an `ask` (valid JSON
     that is not an object) is still an `ask`, with no failure.
 
-    Every other failure mode lands on `defer`: fall through to Claude Code's own
+    The one exception is a secret detector that itself raised on an outbound call
+    carrying a credential-shaped string: that asks (default; `~/.sunglasses/on-error`
+    can say deny, defer or block). Every other failure mode lands on `defer`: fall
+    through to Claude Code's own
     permission flow (emitted as `{}` — see Decision.to_hook_output for why it
     must never be a literal "defer" on the wire). `defer` rather than `allow` is
     deliberate — a crashed firewall must not silently grant something the harness
@@ -2067,6 +2203,7 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     home = home or sunglasses_home()
     started = _time.perf_counter()
     payload, decision, error, extras = {}, None, None, {}
+    exit_reason = None
 
     # RED 5 — LIFECYCLE RECORDS.
     #
@@ -2145,14 +2282,12 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
         else:
             decision, error, extras = evaluate(payload, home=home)
             error_types = getattr(error, "types", ())
+    except SecretLaneDown as down:
+        decision, error, error_types, extras, exit_reason = _secret_lane_down(payload, home, down)
     except Exception as exc:  # noqa: BLE001 — fail-open is the whole point
         error = f"{type(exc).__name__}: {exc}"
         error_types = (type(exc).__name__,)
-        decision = Decision(
-            "defer", "error", "GLS-FW-ERROR",
-            "SUNGLASSES firewall: internal error, deferring to normal permission "
-            "flow. This tool call was NOT checked. See ~/.sunglasses/receipts/.",
-        )
+        decision = _internal_error_decision()
 
     if error:
         # A control was down on this call. `lane` keeps saying which lane actually
@@ -2192,9 +2327,13 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
 
     # Still the malformed `defer` (not an ask, whether chosen or forced by a
     # down audit trail): the caller ends the process with a hook failure.
-    return (decision.to_hook_output(),
-            malformed if (decision.rule_id == _MALFORMED_RULE
-                          and decision.action == "defer") else None)
+    reason = (malformed if (decision.rule_id == _MALFORMED_RULE
+                            and decision.action == "defer") else None)
+    if exit_reason:
+        # `block` ends the hook as a failure even when the audit trail is down
+        # and the decision above was turned into an ask.
+        reason = exit_reason
+    return decision.to_hook_output(), reason
 
 
 def _receipts_unwritable(decision, error, receipts, exc):
@@ -2845,9 +2984,14 @@ def main(argv=None) -> int:
         # the install's `onFailure` decides (block refuses; otherwise the
         # normal permission flow). Exit 1, never 2: 2 would refuse even for an
         # install that chose to continue.
-        _sys.stderr.write(
-            f"SUNGLASSES firewall: hook input was not a readable tool call "
-            f"({malformed}); nothing was checked.\n")
+        if malformed == "SECRET_LANE_DOWN":
+            _sys.stderr.write(
+                "SUNGLASSES firewall: the secret detector failed on this call and "
+                "~/.sunglasses/on-error is block; nothing was checked.\n")
+        else:
+            _sys.stderr.write(
+                f"SUNGLASSES firewall: hook input was not a readable tool call "
+                f"({malformed}); nothing was checked.\n")
         return 1
     _sys.stdout.write(_json.dumps(out))
     return 0
