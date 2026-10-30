@@ -3876,10 +3876,11 @@ def main():
     pin_parser = subparsers.add_parser(
         "pin", help="Pin MCP tool descriptors (SHA-256) and detect later changes",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Exit codes: 0 every config file was read and the pins were written or matched; "
-               "1 drift, even when a file was also unreadable;\n"
-               "2 consent refused; 3 a config file could not be read "
-               "(named with its reason; its servers are not pinned).")
+        epilog="Exit codes:\n"
+               "  0  pins written or matched\n"
+               "  1  drift, or no usable pins file under --check\n"
+               "  2  consent refused, or a usage error\n"
+               "  3  a config file could not be read")
     pin_parser.add_argument(
         "--check", action="store_true",
         help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")

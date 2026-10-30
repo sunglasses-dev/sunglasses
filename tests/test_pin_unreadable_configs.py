@@ -303,7 +303,8 @@ def test_a_clean_run_has_no_doubt_line(tmp_path):
 def test_pin_help_lists_the_exit_codes(tmp_path):
     proc = _cli(["pin", "--help"], tmp_path)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    text = " ".join(proc.stdout.split())
-    assert "Exit codes: 0 every config file was read" in text
-    assert "1 drift, even when a file was also unreadable" in text
-    assert "3 a config file could not be read" in text
+    lines = [ln.strip() for ln in proc.stdout.splitlines()]
+    assert "0  pins written or matched" in lines
+    assert "1  drift, or no usable pins file under --check" in lines
+    assert "2  consent refused, or a usage error" in lines
+    assert "3  a config file could not be read" in lines
