@@ -1114,65 +1114,121 @@ def _looks_like_server_map(data) -> bool:
     )
 
 
-def discover_mcp_servers(paths) -> dict:
-    """Collect server declarations from config files. Unreadable files are
-    skipped, not fatal: one malformed config must not hide every other server.
+_ABSENT = object()
+
+
+def _load_config_json(path):
+    """Read one JSON config file. Returns (data, None) when it parsed,
+    (None, _ABSENT) when there is no such file, and (None, reason) when the file
+    is there and cannot be used. A missing file is the normal case and says
+    nothing; every other failure carries a short reason that never quotes the
+    file, because configs hold tokens."""
+    import json as _json
+    try:
+        text = path.read_text()
+    except (FileNotFoundError, NotADirectoryError):
+        return None, _ABSENT
+    except IsADirectoryError:
+        return None, "is a directory, not a file"
+    except PermissionError:
+        return None, "permission denied"
+    except UnicodeDecodeError:
+        return None, "not valid UTF-8 text"
+    except OSError as exc:
+        return None, exc.strerror or type(exc).__name__
+    try:
+        return _json.loads(text), None
+    except RecursionError:
+        return None, "nested too deeply to read"
+    except ValueError as exc:
+        where = f" at line {exc.lineno}" if hasattr(exc, "lineno") else ""
+        return None, f"not valid JSON{where}"
+
+
+def read_mcp_configs(paths) -> tuple:
+    """Collect server declarations from config files, and say which files could
+    not be used. Returns (servers, skipped); skipped is a list of
+    (path, reason).
+
+    One unreadable file must not hide every other server, so it is skipped, but
+    never silently: a short server list read as a complete one is a coverage
+    claim nothing backs. A missing file is not skipped, it is absent. A file
+    that parses to an object declaring no servers is not skipped either:
+    `~/.claude.json` is full of unrelated settings.
 
     Accepts BOTH shapes — `{"mcpServers": {...}}` and the bare `{"<name>": {...}}`
     that plugin `.mcp.json` files use. Requiring the wrapper was a silent
     coverage hole, not a validation win.
     """
-    import json as _json
     import pathlib
     servers: dict = {}
+    skipped: list = []
     for path in paths:
         path = pathlib.Path(path)
-        if not path.exists():
+        data, reason = _load_config_json(path)
+        if reason is _ABSENT:
             continue
-        try:
-            data = _json.loads(path.read_text())
-        except (ValueError, OSError):
+        if reason is not None:
+            skipped.append((str(path), reason))
             continue
-        if isinstance(data, dict) and isinstance(data.get("mcpServers"), dict):
+        if not isinstance(data, dict):
+            skipped.append((str(path), f"top level is a {type(data).__name__}, expected an object"))
+        elif "mcpServers" in data and not isinstance(data["mcpServers"], dict):
+            skipped.append((str(path), f"mcpServers is a {type(data['mcpServers']).__name__}, expected an object"))
+        elif isinstance(data.get("mcpServers"), dict):
             servers.update(data["mcpServers"])
         elif _looks_like_server_map(data):
             servers.update(data)
-    return servers
+    return servers, skipped
 
 
-def plugin_mcp_paths(installed_plugins_path=None) -> list:
-    """Every installed plugin's `.mcp.json`, from the install manifest.
+def discover_mcp_servers(paths) -> dict:
+    """The servers declared in these config files; see `read_mcp_configs` for the
+    files that could not be used."""
+    return read_mcp_configs(paths)[0]
+
+
+def plugin_mcp_paths(installed_plugins_path=None, skipped=None) -> list:
+    """Every installed plugin's `.mcp.json` path, from the install manifest (the file may not exist).
 
     Read from the manifest rather than globbing the plugin cache on purpose: the
     cache also holds marketplace checkouts that are NOT installed, and pinning a
     server the user does not actually run is noise that makes the coverage line
     lie in the other direction.
+
+    A manifest that is there but cannot be used is appended to `skipped` as
+    (path, reason) when a list is given.
     """
-    import json as _json
     import pathlib
     path = pathlib.Path(installed_plugins_path or
                         (pathlib.Path.home() / ".claude/plugins/installed_plugins.json"))
-    if not path.exists():
+    data, reason = _load_config_json(path)
+    if reason is _ABSENT:
         return []
-    try:
-        data = _json.loads(path.read_text())
-    except (ValueError, OSError):
+    if reason is None and not isinstance(data, dict):
+        reason = f"top level is a {type(data).__name__}, expected an object"
+    if reason is not None:
+        if skipped is not None:
+            skipped.append((str(path), reason))
         return []
     out = []
-    for plugin_id, entries in (data.get("plugins") or {}).items():
+    plugins = data.get("plugins") or {}
+    for plugin_id, entries in (plugins.items() if isinstance(plugins, dict) else []):
         plugin_name = str(plugin_id).split("@", 1)[0]
         for entry in entries if isinstance(entries, list) else []:
             install = (entry or {}).get("installPath")
             if not install:
                 continue
-            candidate = pathlib.Path(install) / ".mcp.json"
-            if candidate.exists():
-                out.append((plugin_name, candidate))
+            # No existence check here: on an install folder the user cannot read it
+            # answers "absent" for a file that is there. The reader tells absent
+            # (silent) from unreadable (named).
+            out.append((plugin_name, pathlib.Path(install) / ".mcp.json"))
     return out
 
 
-def discover_plugin_servers(installed_plugins_path=None) -> dict:
-    """Plugin-declared MCP servers, keyed the way the HOOK will see them.
+def read_plugin_servers(installed_plugins_path=None) -> tuple:
+    """Plugin-declared MCP servers, keyed the way the HOOK will see them, plus
+    the (path, reason) of every plugin config that could not be used.
 
     The namespacing is the whole point. A plugin server's tools arrive at the
     hook as `mcp__plugin_<plugin>_<server>__<tool>` (verified against a live
@@ -1181,10 +1237,18 @@ def discover_plugin_servers(installed_plugins_path=None) -> dict:
     theatre, which is worse than the gap it appears to close.
     """
     servers: dict = {}
-    for plugin_name, path in plugin_mcp_paths(installed_plugins_path):
-        for name, config in discover_mcp_servers([path]).items():
+    skipped: list = []
+    for plugin_name, path in plugin_mcp_paths(installed_plugins_path, skipped):
+        found, bad = read_mcp_configs([path])
+        skipped.extend(bad)
+        for name, config in found.items():
             servers[f"plugin_{plugin_name}_{name}"] = config
-    return servers
+    return servers, skipped
+
+
+def discover_plugin_servers(installed_plugins_path=None) -> dict:
+    """The plugin servers alone; see `read_plugin_servers` for the unreadable files."""
+    return read_plugin_servers(installed_plugins_path)[0]
 
 
 def build_pins(servers: dict, _lister=None) -> dict:
