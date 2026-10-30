@@ -3912,10 +3912,9 @@ def main():
         help="What the hook does when its own secret detector fails on an outbound call that looks "
              "credential-shaped: ask (default), deny, defer (quiet pass-through to the host's "
              "permission flow) or block (end the hook as a failed hook on every secret-check "
-             "fault, whether or not the call looks credential-shaped). In an unattended run "
-             "nobody can answer an ask, so the call is refused. Not measured: what the host does "
-             "with an ask when its permissions are turned off or an allow rule already covers the "
-             "call. Written to ~/.sunglasses/on-error alongside the usual init changes")
+             "fault, whether or not the call looks credential-shaped). Not measured: what the host does "
+             "with an ask in an unattended run, when its permissions are turned off, or when an allow rule "
+             "already covers the call. Written to ~/.sunglasses/on-error alongside the usual init changes")
     init_parser.set_defaults(func=cmd_init)
 
     # receipts
