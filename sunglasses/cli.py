@@ -3874,7 +3874,12 @@ def main():
 
     # pin
     pin_parser = subparsers.add_parser(
-        "pin", help="Pin MCP tool descriptors (SHA-256) and detect later changes")
+        "pin", help="Pin MCP tool descriptors (SHA-256) and detect later changes",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exit codes: 0 every config file was read and the pins were written or matched; "
+               "1 drift, even when a file was also unreadable;\n"
+               "2 consent refused; 3 a config file could not be read "
+               "(named with its reason; its servers are not pinned).")
     pin_parser.add_argument(
         "--check", action="store_true",
         help="Compare live descriptors against the pins; exit 1 on drift. Read-only.")

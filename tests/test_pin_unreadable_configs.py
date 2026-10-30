@@ -298,3 +298,12 @@ def test_a_clean_run_has_no_doubt_line(tmp_path):
     proc = _cli(["pin"], home, cwd=str(project))
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "Incomplete" not in proc.stdout
+
+
+def test_pin_help_lists_the_exit_codes(tmp_path):
+    proc = _cli(["pin", "--help"], tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    text = " ".join(proc.stdout.split())
+    assert "Exit codes: 0 every config file was read" in text
+    assert "1 drift, even when a file was also unreadable" in text
+    assert "3 a config file could not be read" in text

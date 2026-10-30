@@ -879,6 +879,11 @@ and a one-line notice on stderr instead of starting your servers. Nothing in
 `sunglasses init` creates those jobs (it wires the firewall hook and nothing
 else), so if you have one, you wrote it, and it is yours to update.
 
+**Upgrading to v0.6.16:** `sunglasses pin` and `sunglasses pin --check` exit 0 when every config file was read and
+the pins were written or matched, 1 on drift, even when a file was also unreadable, 2 when consent was refused, and 3 when a config file could not be read. That file is
+named on stdout with its reason, the servers declared in it are not pinned, and the other servers are still
+pinned. Earlier versions exited 0 in that case, so a script that tests for exit 0 should expect 3.
+
 Also new in v0.5.6: a single positional argument that looks like a path and does
 not exist is a usage error (exit 2) rather than text to scan. `sunglasses scan
 ./missing.txt` used to scan the 15-character *string* and report a clean pass.
