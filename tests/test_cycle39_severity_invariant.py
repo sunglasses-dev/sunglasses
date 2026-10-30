@@ -1,5 +1,5 @@
 """
-Cycle-39 severity-aggregation invariant (SOL directive §6, 2026-07-11).
+Cycle-39 severity-aggregation invariant (severity-aggregation directive §6, 2026-07-11).
 ======================================================================
 PraisonAI failure mode: a prompt injection classified HIGH must NOT pass merely
 because fewer than three detector families matched. The decision must key on the

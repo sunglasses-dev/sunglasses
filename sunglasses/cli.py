@@ -1761,7 +1761,7 @@ def _emit_scan_result(args, result, source):
     json branch, the deep-scan branch and the media-without-deep branch each decided
     this for themselves, and two of them got it wrong in different ways. Funnelling
     them here is the fix that keeps them from drifting apart again — and it is why
-    human, JSON and SARIF cannot disagree about the same scan (Fugu gate 3).
+    human, JSON and SARIF cannot disagree about the same scan (review gate 3).
     """
     if getattr(args, "report_to", None):
         held = result.to_dict()
