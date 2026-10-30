@@ -298,3 +298,13 @@ def test_a_clean_run_has_no_doubt_line(tmp_path):
     proc = _cli(["pin"], home, cwd=str(project))
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "Incomplete" not in proc.stdout
+
+
+def test_pin_help_lists_the_exit_codes(tmp_path):
+    proc = _cli(["pin", "--help"], tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    lines = [ln.strip() for ln in proc.stdout.splitlines()]
+    assert "0  done, no drift (may mean nothing was read or pinned)" in lines
+    assert "1  drift or no usable pins file (--check), or an error" in lines
+    assert "2  consent refused, or a usage error" in lines
+    assert "3  a config file could not be read" in lines
