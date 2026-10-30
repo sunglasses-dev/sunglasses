@@ -2,14 +2,15 @@
 
 `whisper.load_model` downloads the model file when it is not in Whisper's cache
 folder. The scanner runs on your machine, so a notice is attempted (best effort, on
-stderr) before the download starts. When the helper can see Whisper's download
-function, a cached file that fails Whisper's own checksum is downloaded again by
-Whisper without a notice. When it cannot, the notice is tried on every load.
+stderr) before the download starts. When the helper can see both the download
+function and the model table, and the name is in that table, a cached file that
+fails Whisper's own checksum is downloaded again by Whisper without a notice;
+otherwise the notice is tried on every load.
 
 The announcement is made by standing in for `whisper._download` while a model
 loads. That is a process-wide change, so loads through this helper run one at a
 time, and the original function is put back when the outermost helper load ends.
-Those guarantees cover loads made through this helper. Code that calls
+Those rules cover loads made through this helper. Code that calls
 `whisper.load_model` directly is not coordinated with it: while a helper load is
 in progress such a call uses the same stand-in, and its notice carries the helper
 load's model name.
