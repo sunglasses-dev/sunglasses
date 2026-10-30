@@ -1038,10 +1038,9 @@ private key files are named individually and matching is boundary-aware, so
   exception on an outbound call. If that call also looks credential-shaped
   (a known key prefix followed by a long token, or a private-key line), the hook
   asks instead of passing it through, and the question says the secret check
-  was down. In an unattended run nobody can answer the question, so the call is
-  refused. With the default setting, any other call hit by that fault passes through when its receipt can be written, with the failure in the receipt; when the receipt cannot be written the hook asks in place of the pass-through. A deny stays a deny, and a block stays a failed hook.
-  Not measured: what the host does with that question when its permissions are
-  turned off or an allow rule already covers the call.
+  was down. With the default setting, any other call hit by that fault passes through when its receipt can be written, with the failure in the receipt; when the receipt cannot be written the hook asks in place of the pass-through. A deny stays a deny, and a block stays a failed hook.
+  Not measured: what the host does with that question in an unattended run, when its permissions are
+  turned off, or when an allow rule already covers the call.
   `sunglasses init --on-error {ask,deny,defer,block}` writes `~/.sunglasses/on-error`
   to change that: `deny` refuses without asking, `defer` keeps the quiet
   pass-through, and `block` ends the hook as a failed hook on every secret-check fault, even when the receipt cannot be written.

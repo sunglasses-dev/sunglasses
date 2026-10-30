@@ -258,21 +258,21 @@ def test_init_rejects_an_unknown_on_error_word(tmp_path):
     assert proc.returncode != 0 and not marker.exists()
 
 
-# 7. the README says what this does, including the unattended refusal
+# 7. the README says what this does, and leaves the unattended host behaviour as not measured
 def test_readme_describes_the_secret_lane_down_answer():
     from pathlib import Path
     text = " ".join((Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8").split())
     assert "the secret check itself raising an exception on an outbound call" in text
     assert "the question says the secret check was down" in text
-    assert "In an unattended run nobody can answer the question, so the call is refused." in text
+    assert "nobody can answer the question" not in text
     assert "sunglasses init --on-error {ask,deny,defer,block}" in text
     assert "~/.sunglasses/on-error" in text
     assert "even when the receipt cannot be written" in text
     assert "when the receipt cannot be written the hook asks" in text
-    assert "Not measured: what the host does with that question when its permissions are turned off or an allow rule already covers the call." in text
+    assert "Not measured: what the host does with that question in an unattended run, when its permissions are turned off, or when an allow rule already covers the call." in text
 
 
-def test_init_help_carries_the_unattended_and_unmeasured_lines():
+def test_init_help_leaves_the_unattended_host_behaviour_as_not_measured():
     import os
     import subprocess
     import sys
@@ -282,5 +282,5 @@ def test_init_help_carries_the_unattended_and_unmeasured_lines():
                           env={**os.environ, "COLUMNS": "400",
                                "PYTHONPATH": str(Path(__file__).parent.parent)})
     text = " ".join(proc.stdout.split())
-    assert "nobody can answer an ask, so the call is refused" in text
-    assert "Not measured: what the host does with an ask when its permissions are turned off or an allow rule already covers the call" in text
+    assert "nobody can answer an ask" not in text
+    assert "Not measured: what the host does with an ask in an unattended run, when its permissions are turned off, or when an allow rule already covers the call" in text

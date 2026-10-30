@@ -1983,7 +1983,7 @@ def _secret_shaped_candidate(text: str) -> bool:
     detector is down: a known credential prefix, at a word boundary, followed by
     at least 12 token characters that are not a placeholder run or a published
     canary; or a PEM private-key line. Plain `str.find`, no regex, no shared code
-    with the failing control. A false positive is an ask with the default setting (a refusal in an unattended run, and with `deny`)."""
+    with the failing control. A false positive is an ask with the default setting, and a refusal with `deny`."""
     text = text.translate(_FALLBACK_INVISIBLE)
     if "PRIVATE KEY-----" in text:
         return True
