@@ -271,11 +271,23 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         _record_refusal(log, "STATE_IO_ERROR")
         return EXIT_FAULT
 
-    child = subprocess.Popen(
-        upstream_argv,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True)
+    try:
+        child = subprocess.Popen(
+            upstream_argv,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True)
+    except (OSError, ValueError) as failure:
+        # The log is open and no server is running: say what failed, write the
+        # refusal down, and end the run like the other refusals above. The
+        # class and never the message, which can carry the command's own text.
+        text, escaped = receipts.shown_path(upstream_argv[0])
+        stderr.write(f"sunglasses proxy: the server could not be started, so "
+                     f"nothing was started ({type(failure).__name__}). Fix it: "
+                     f"make {text} a program you can run."
+                     f"{receipts.ESCAPED_NOTE if escaped else ''}\n")
+        _record_refusal(log, "CONFIG_IO_ERROR")
+        return EXIT_FAULT
     # From here every way out stops the server's group. The teardown below runs
     # once the session threads have started, so a raise between the spawn and them
     # would orphan the child unless it is stopped here.

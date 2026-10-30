@@ -384,7 +384,17 @@ class Log:
             # OPENED NOW, not on the first event. A log created lazily cannot
             # record a failure that happens before it, which is exactly the
             # window R1 is closing by saying "opened before the first frame".
-            self._handle = self.path.open("a", encoding="utf-8")
+            try:
+                self._handle = self.path.open("a", encoding="utf-8")
+            except OSError as cause:
+                text, escaped = shown_path(self.path)
+                folder, folder_escaped = shown_path(self.root)
+                raise ReceiptIOError(
+                    f"the receipt log {text} cannot be opened "
+                    f"({type(cause).__name__}). Fix it: make {folder} a "
+                    f"directory you can write to, chmod 700"
+                    f"{ESCAPED_NOTE if escaped or folder_escaped else ''}"
+                ) from None
         self._write_row(dict(header or {}), kind="HEADER")
 
     # ── writing ─────────────────────────────────────────────────────────────
