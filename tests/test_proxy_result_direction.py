@@ -268,7 +268,7 @@ def test_notifications_message_now_reaches_the_client(tmp_path):
     T2.R12's row could never execute. That was written down here as a measured
     contract conflict rather than repaired on my own authority.
 
-    ASTRA's C10 ruled the same way and the repair landed on the core, so the
+    review's C10 ruled the same way and the repair landed on the core, so the
     row is reachable now: the notification is inspected on api_response and a
     clean one is forwarded. The assertion is inverted and the history is kept,
     because a test that quietly changed sides would leave nobody able to tell

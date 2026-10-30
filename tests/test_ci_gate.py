@@ -1,5 +1,5 @@
 """
-Guards for the CI gate split (2026-09-10; ASTRA round-1 NO-GO applied).
+Guards for the CI gate split (2026-09-10; the reviewer round-1 NO-GO applied).
 
 Two things are protected here, and both were shown breakable by text-grep
 guards in review:
@@ -8,7 +8,7 @@ guards in review:
   2. .github/workflows/pattern-integrity.yml — loaded as YAML and checked
      SEMANTICALLY: every trigger, job, condition and command that the merge
      rule depends on. `check_workflow()` returns a list of problems so the
-     same checker can be run against mutated documents; ASTRA's four
+     same checker can be run against mutated documents; the reviewer's four
      round-1 mutations are negative controls below and must each FAIL it.
 PyYAML is a declared dev extra (setup.py) so this collects in CI.
 """
@@ -50,9 +50,9 @@ FAST_IGNORES = {"tests/test_v056_matrix.py", "tests/test_repair_v056.py",
 
 # Approved executable template for the classify job's decide step. Specified
 # here, independently of the workflow file, so the guard compares the file to
-# the contract rather than to itself (ASTRA round 3, R3-1).
+# the contract rather than to itself (the reviewer round 3, R3-1).
 CANONICAL_DECIDE_RUN = 'if [ "$EVENT" != "pull_request" ]; then\n  echo "full=true  # event=$EVENT: not a pull request, the matrix always runs"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\n# Judge with the classifier from the protected branch, never with the\n# copy inside the PR under judgement (T8 review, 2026-09-10): a PR\n# that edits scripts/ci_classify.py must not be able to classify\n# itself as documentation. actions/checkout with fetch-depth: 0 makes\n# origin/main available. If main has no classifier yet, fail to FULL.\nif ! git show origin/main:scripts/ci_classify.py > "$RUNNER_TEMP/ci_classify.py" 2>/dev/null; then\n  echo "full=true  # origin/main has no scripts/ci_classify.py; defaulting to FULL"\n  echo "full=true" >> "$GITHUB_OUTPUT"\n  exit 0\nfi\npython "$RUNNER_TEMP/ci_classify.py" --base "$BASE" --head "$HEAD"\n'
-# Approved shape of the coverage job (ASTRA round 3, R3-2): one plain shell
+# Approved shape of the coverage job (the reviewer round 3, R3-2): one plain shell
 # step, no step-level env/shell/if/with, job env = exactly the four bindings.
 # The integrity matrix's full-suite command, pinned as ONE exact string so
 # nothing positional can be smuggled in beside it.
@@ -108,9 +108,9 @@ def test_classifier_docs_only_is_not_full(paths):
 @pytest.mark.parametrize("paths", [
     [],                                              # empty change list → full
     ["README.md", "sunglasses/patterns.py"],         # mixed
-    ["docs/reader.py"],                              # ASTRA F1: executable under docs/
+    ["docs/reader.py"],                              # review F1: executable under docs/
     ["docs/example.sh"],
-    [".github/ISSUE_TEMPLATE/run.py"],               # ASTRA F1: non-template file type
+    [".github/ISSUE_TEMPLATE/run.py"],               # review F1: non-template file type
     ["tests/repo_ladder_corpus/x/README.md"],        # protected markdown fixture
     ["demo/sixty-seconds.sh"],                       # code strangers are told to run
     [".github/CODEOWNERS"],                          # ownership policy = full review
@@ -257,7 +257,7 @@ def check_workflow(doc) -> list[str]:
         elif "github.event_name == 'pull_request'" not in cip:
             p.append(f"cancel-in-progress must be pull-request-only, got {cip!r}")
 
-    # --- ASTRA round 2: data bindings, required execution, exact suite scope ---
+    # --- the reviewer round 2: data bindings, required execution, exact suite scope ---
     # Bindings: the classifier's decision must flow through unbroken references.
     if (classify.get("outputs") or {}).get("full") != "${{ steps.decide.outputs.full }}":
         p.append("classify.outputs.full is not bound to steps.decide.outputs.full")
@@ -371,7 +371,7 @@ def test_fast_lane_receipt_and_preflight_match_the_matrix():
     assert "qr-injection.png" in fr and "qr-ordinary.png" in fr
 
 
-# ---------------------------------------------- ASTRA round-1 negative controls
+# ---------------------------------------------- the reviewer round-1 negative controls
 
 def _mutate(fn):
     doc = _load(); fn(doc); return doc
@@ -452,7 +452,7 @@ def test_control_coverage_rule_weakened():
 
 
 def test_control_coverage_accepts_cancelled_or_skipped_matrix():
-    """T8 review: job results are success/failure/cancelled/skipped and always()
+    """A reviewer review: job results are success/failure/cancelled/skipped and always()
     runs coverage for all of them, so the matrix check must be strict equality
     with 'success' — '!= failure' would pass a cancelled matrix."""
     def m(d):
@@ -490,7 +490,7 @@ def _expected(classify, full, fast, integrity):
 
 def _run_script_file(body, env, cwd=None, timeout=10):
     """Execute a `run:` body the way the ubuntu runner does: written to a file,
-    invoked as `bash -e <file>` (NOT `bash -c`, whose $0 differs — ASTRA R4-1)."""
+    invoked as `bash -e <file>` (NOT `bash -c`, whose $0 differs — review R4-1)."""
     import tempfile
     with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as fh:
         fh.write(body); path = fh.name
@@ -534,7 +534,7 @@ def test_control_coverage_premature_exit_zero():
     assert coverage_truth_table_holds(doc)
 
 
-# --------------------------------------- ASTRA round-2 negative controls (7)
+# --------------------------------------- the reviewer round-2 negative controls (7)
 
 def test_control_classifier_output_constant_false():
     def m(d): d["jobs"]["classify"]["outputs"]["full"] = "false"
@@ -718,7 +718,7 @@ def decide_behaviour_holds(doc, tmp_path) -> list[str]:
     """Execute the decide step's ACTUAL body (file mode, like the runner) in a
     scratch clone whose origin/main carries the real classifier, and check what
     it emits to GITHUB_OUTPUT — including when the PR's OWN copy of the
-    classifier is tampered with (T8 review) and when main has no classifier."""
+    classifier is tampered with (a reviewer review) and when main has no classifier."""
     body = _decide_step(doc)["run"]
     bad = []
     repo, base, docs, code = _scratch_pr_repo(tmp_path / "honest")
@@ -731,7 +731,7 @@ def decide_behaviour_holds(doc, tmp_path) -> list[str]:
         rc, lines = _run_decide(body, tmp_path, repo, event, b, h, tag)
         if rc != 0 or lines != want:
             bad.append(f"{tag}: rc={rc} output={lines} (expected {want})")
-    # T8 control: the PR replaces scripts/ci_classify.py with one that always says docs.
+    # A reviewer control: the PR replaces scripts/ci_classify.py with one that always says docs.
     # The step must still say full=true for a CODE change because it judges with main's copy.
     (repo / "scripts" / "ci_classify.py").write_text(
         'import os\nprint("full=false  # tampered")\n'
@@ -756,7 +756,7 @@ def test_decide_step_body_is_the_approved_template_and_behaves(tmp_path):
 
 
 def test_control_classifier_premature_false(tmp_path):
-    """ASTRA R3-1: keep every original line, but write full=false and exit first."""
+    """review R3-1: keep every original line, but write full=false and exit first."""
     def m(d):
         st = _decide_step(d)
         st["run"] = 'echo "full=false" >> "$GITHUB_OUTPUT"\nexit 0\n' + st["run"]
@@ -766,7 +766,7 @@ def test_control_classifier_premature_false(tmp_path):
 
 
 def test_control_coverage_step_env_override():
-    """ASTRA R3-2: a step-level env overrides the job bindings on GitHub."""
+    """review R3-2: a step-level env overrides the job bindings on GitHub."""
     def m(d): d["jobs"]["coverage"]["steps"][0]["env"] = {"FULL": "false"}
     doc = _mutate(m)
     assert check_workflow(doc)
@@ -784,7 +784,7 @@ def test_coverage_body_is_the_approved_template():
 
 
 def test_control_coverage_file_mode_success():
-    """ASTRA R4-1: a body that succeeds early only when run from a script file
+    """review R4-1: a body that succeeds early only when run from a script file
     ($0 is an existing file under `bash -e {0}`, not under `bash -c`)."""
     def m(d):
         st = d["jobs"]["coverage"]["steps"][0]
@@ -804,7 +804,7 @@ def test_run_script_file_is_file_mode():
 
 
 def test_control_decide_uses_pr_copy_of_classifier(tmp_path):
-    """T8 finding: judging with `python scripts/ci_classify.py` runs the PR's own copy."""
+    """A reviewer finding: judging with `python scripts/ci_classify.py` runs the PR's own copy."""
     def m(d):
         st = _decide_step(d)
         st["run"] = st["run"].replace('python "$RUNNER_TEMP/ci_classify.py"', "python scripts/ci_classify.py")

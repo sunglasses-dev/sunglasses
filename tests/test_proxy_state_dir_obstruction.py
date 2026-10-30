@@ -9,7 +9,7 @@ its group only wraps the session, and the session never began. An unlistable
 `captures/` does not crash at all; the proxy's own capture write fails and the
 client is told the SERVER was malformed.
 
-Three properties, each a red before the fix (T11 R-SIB2, probe
+Three properties, each a red before the fix (a reviewer R-SIB2, probe
 warroom/RSIB_PROBE_a6cb9ede.txt, measured on main 30e0bd6):
 * the refusal is a sentence that names the path, never a traceback;
 * the upstream is reaped on every exit path, a crash included;
@@ -248,7 +248,7 @@ def test_a_capture_that_cannot_be_written_is_not_blamed_on_the_server(
                          ids=["captures-0000", "control-none"])
 def test_every_request_read_before_the_close_is_answered(
         tmp_path, which, linger):
-    """Gate per R66 (pending T9, A recommended). A close answers every id the
+    """Gate per R66 (pending a reviewer, A recommended). A close answers every id the
     proxy READ and forwards nothing after it; a request still unread in the
     pipe is not read (serve._drain_client stops on any close, as it does for
     the receipt fault). So the tripping list is answered with the proxy's own
@@ -276,7 +276,7 @@ def test_every_request_read_before_the_close_is_answered(
 @needs_modes
 @pytest.mark.parametrize("linger", [False, True], ids=["echo", "linger"])
 def test_a_capture_that_cannot_be_written_exits_nonzero(tmp_path, linger):
-    """T8.R14: a fault is nonzero always. Today the lingering run exits 0
+    """Contract row R14: a fault is nonzero always. Today the lingering run exits 0
     with no reason recorded."""
     state = _obstruct(tmp_path, "captures", "0000")
     try:
@@ -289,7 +289,7 @@ def test_a_capture_that_cannot_be_written_exits_nonzero(tmp_path, linger):
 @needs_modes
 @pytest.mark.parametrize("linger", [False, True], ids=["echo", "linger"])
 def test_the_receipt_names_the_capture_fault(tmp_path, linger):
-    """T9 ruling 64: the session closes on the proxy's own cause, and the run
+    """A reviewer ruling 64: the session closes on the proxy's own cause, and the run
     log says which, so a reader of the receipt is not left to guess."""
     state = _obstruct(tmp_path, "captures", "0000")
     try:
@@ -387,7 +387,7 @@ def test_control_approve_writes_the_record(tmp_path):
     assert (state / "approvals" / "s.json").exists()
 
 
-# ── A CALL THAT MEETS THE FAULT FIRST (T9 ruling 123 (b), 2026-09-26) ─────
+# ── A CALL THAT MEETS THE FAULT FIRST (a reviewer ruling 123 (b), 2026-09-26) ─────
 # `_activate_once` is the only activation a tools/call ever gets, and its
 # STATE_IO_ERROR branch is what `_approval_reason` reads. Dropping that branch
 # survived every row above (on 01463eb and on the reviewed 2ce7811 alike): a

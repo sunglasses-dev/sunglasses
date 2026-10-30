@@ -9,7 +9,7 @@ this is that half:
     install  ->  $SUNGLASSES_HOME/proxy/installs   (an environment variable)
     proxy    ->  ~/.sunglasses/proxy               (an argument, never a variable)
 
-The ruling (T9, 2026-09-20) is that the approval store stays an ARGUMENT, and
+The ruling (a reviewer, 2026-09-20) is that the approval store stays an ARGUMENT, and
 install does not gain a `--state-root`: a path chosen at config-write time is
 the same hole one layer up. So the disagreement resolves on install's side --
 its records and locks move under `serve.state_root()`, and `SUNGLASSES_HOME`
@@ -146,7 +146,7 @@ def test_the_root_follows_state_root_when_state_root_moves(monkeypatch,
                                                           tmp_path):
     """EQUALITY IS NOT DERIVATION, and the row below only proves equality.
 
-    ASTRA made this exact point reviewing the first version of this file: two
+    The reviewer made this exact point reviewing the first version of this file: two
     paths that match today also match if the second one is a hardcoded literal
     that happens to agree, and the row cannot tell those apart. So this one
     MOVES `state_root()` to a sentinel and requires the record paths to follow

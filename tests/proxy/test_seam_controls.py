@@ -36,7 +36,7 @@ def test_MS01_refusal_admission_same_id(tmp_path,origin):
 def test_MS02_withhold_close(tmp_path,point):
  s,rt,out=build(tmp_path);hit=[]
  if point=='take':
-  # R-168-R13/(5), ASTRA OW08. THE HOOK FOLLOWS THE CALL. This drove the close
+  # R-168-R13/(5), the reviewer OW08. THE HOOK FOLLOWS THE CALL. This drove the close
   # from take_obligation, which _withhold stopped calling when round 12 folded
   # the two sets, so the hook never fired and this row passed against nothing
   # while the file's 52-pass total never moved. It hooks the call _withhold

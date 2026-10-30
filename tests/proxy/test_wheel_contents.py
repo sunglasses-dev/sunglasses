@@ -1,6 +1,6 @@
 """C7. The shipped artifact contains the things R1 spawns.
 
-D3, narrowed by T9 on 2026-09-15: no new files and no MANIFEST change, because
+D3, narrowed by a reviewer on 2026-09-15: no new files and no MANIFEST change, because
 a `.py` module inside a package already ships. What was missing is the GATE --
 the assertion that it actually did, made against the BUILT WHEEL rather than
 against the tree.
@@ -47,7 +47,7 @@ pytestmark = pytest.mark.network
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
 # What `python -m sunglasses.proxy` needs in order to exist at all, and what
-# T10.R1's self test spawns. Named explicitly rather than globbed: a glob over
+# contract row R1's self test spawns. Named explicitly rather than globbed: a glob over
 # the wheel would pass on whatever happens to be in it.
 REQUIRED_MEMBERS = (
     "sunglasses/proxy/__main__.py",
@@ -79,7 +79,7 @@ def wheel_members(tmp_path_factory):
         ".git", "build", "dist", "*.egg-info", "__pycache__", ".pytest_cache"))
     out = tmp_path_factory.mktemp("wheel")
     build = subprocess.run(
-        # BUILD ISOLATION IS BACK ON (T9 ruling, 2026-09-18). With
+        # BUILD ISOLATION IS BACK ON (a reviewer ruling, 2026-09-18). With
         # `--no-build-isolation` pip must find the backend in the CURRENT
         # environment, and on the runner it cannot: `BackendUnavailable: Cannot
         # import 'setuptools.build_meta'`. Metadata preparation finished `done`

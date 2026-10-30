@@ -1,5 +1,5 @@
 """test_receipts_proxy_bounds.py — a proxy row fits its line by construction
-(#172, T9 ruling 41 part 1).
+(#172, a reviewer ruling 41 part 1).
 
 rule_ids come from matches on attacker input. When a row over the wire's
 bounds was refused, the proxy kept the failure and refused every later row, so
@@ -94,7 +94,7 @@ def test_the_control_256_matches_are_kept_whole_with_no_count(home):
 
 
 def test_256_real_ids_are_all_kept(home):
-    """T9 ruling 43 part 1. Real catalog ids are at most 21 characters, and
+    """A reviewer ruling 43 part 1. Real catalog ids are at most 21 characters, and
     256 of them fit the 6 KiB budget whole: the budget never cuts a real scan
     short of the count bound."""
     ids = [f"GLS-PROMPTINJ-XY-{n:04d}" for n in range(256)]

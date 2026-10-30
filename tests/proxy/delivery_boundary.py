@@ -3,7 +3,7 @@ Notification: branch containing notification_supported; initialize: branch whose
 condition calls expected_method; ordinary response: yield directly in the loop.
 Missing/ambiguous sites are instrument errors, never behavioral mutation kills.
 
-Vendored at the #178 round-2 rebase. ASTRA wrote it for round 9 and it lived in
+Vendored at the #178 round-2 rebase. The reviewer wrote it for round 9 and it lived in
 a review directory, so the three controls that import it could not be collected
 here -- which is how RC34, RC35 and RC36 came to be absent from the archive
 while everyone believed they ran. Bytes recovered from the round-9 transcript,

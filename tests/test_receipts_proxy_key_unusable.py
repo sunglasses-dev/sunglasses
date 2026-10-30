@@ -1,5 +1,5 @@
 """test_receipts_proxy_key_unusable.py — the proxy with a key it cannot use
-stops, and says why (#172, T9 RULINGS 21 and 24b(a)).
+stops, and says why (#172, a reviewer RULINGS 21 and 24b(a)).
 
 A key means the user opted in, for the proxy as for the hook. A key that cannot
 sign is the receipt failure the proxy already has (RECEIPT_IO_ERROR): nothing is

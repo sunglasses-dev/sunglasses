@@ -4,7 +4,7 @@ import pytest
 from sunglasses.proxy import framing
 from sunglasses.proxy.session import Cause, Session, Settled
 
-# CI. The fixtures were read from ASTRA's review directory in /private/tmp,
+# CI. The fixtures were read from the reviewer's review directory in /private/tmp,
 # which exists on one Mac and nowhere else, so CI failed 67 times with
 # FileNotFoundError and zero product signal. They are vendored beside this
 # file, byte-identical (252 files, verified by a full recursive diff). This

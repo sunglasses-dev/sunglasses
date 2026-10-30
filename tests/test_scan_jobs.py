@@ -467,7 +467,7 @@ def test_a_file_handed_to_an_aborted_worker_starts_no_child(rig):
 
 
 def test_abort_while_a_read_is_being_prepared_does_not_bring_a_child_back(rig, monkeypatch):
-    """The window ASTRA reproduced: the previous file ran out its deadline, the next read is still
+    """The window the reviewer reproduced: the previous file ran out its deadline, the next read is still
     building its request, the pool closes, and the read goes on to start a new child."""
     from sunglasses import scan_worker
     worker = scan_worker.ScanWorker(120, argv=[sys.executable, "-c", _SILENT_CHILD], startup_s=10)

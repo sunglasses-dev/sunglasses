@@ -5,7 +5,7 @@ Round 1 shipped 11/11 and then failed 24 of 48 independent property controls.
 The reason is written here rather than in a commit nobody re-reads: those
 mutations were chosen by reading the implementation, so each one asked whether
 the code did what it already did. This battery is rebuilt from the CONTRACT
-rows and from every control ASTRA's review found failing, so a row can fail.
+rows and from every control the reviewer's review found failing, so a row can fail.
 
 Two standing rules this file enforces on itself:
 
@@ -102,7 +102,7 @@ SUITE = "tests/proxy/test_doctor_reconciled.py tests/proxy/test_doctor_selftest.
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
-    # ── Round 2. ASTRA's three blockers, one mutation per fix ─────────────
+    # ── Round 2. The reviewer's three blockers, one mutation per fix ─────────────
     ('R2-ABSENCE', 'a source we cannot read is reported absent instead of named',
      '        except OSError:\n            unreadable.append(str(path))\n            continue',
      '        except OSError:\n            continue',

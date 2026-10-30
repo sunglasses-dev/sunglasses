@@ -5,7 +5,7 @@ Round 1 shipped 11/11 and then failed 24 of 48 independent property controls.
 The reason is written here rather than in a commit nobody re-reads: those
 mutations were chosen by reading the implementation, so each one asked whether
 the code did what it already did. This battery is rebuilt from the CONTRACT
-rows and from every control ASTRA's review found failing, so a row can fail.
+rows and from every control the reviewer's review found failing, so a row can fail.
 
 Two standing rules this file enforces on itself:
 
@@ -383,7 +383,7 @@ MUTATIONS = [
      '    if retained_path.is_symlink():',
      '    if False:',
      'test_uninstall_refuses_when_the_canonical_retained_path_is_a_symlink'),
-    # ── Round 5. ASTRA's four families, one mutation per new guard ─────────
+    # ── Round 5. The reviewer's four families, one mutation per new guard ─────────
     ('R5-STRANDED', 'an unreadable completed record masks a valid journal',
      '        if pending_path.exists():\n            return _recover_from_journal(target, name, pending_path, home=home)\n        raise\n',
      '        if False:\n            return _recover_from_journal(target, name, pending_path, home=home)\n        raise\n',
@@ -404,7 +404,7 @@ MUTATIONS = [
      '    if not isinstance(record["entry_existed"], bool):',
      '    if False:',
      'test_uninstall_refuses_a_record_whose_entry_existed_is_not_a_bool'),
-    # ── Round 6. ASTRA's two recovery races, one mutation per guard ────────
+    # ── Round 6. The reviewer's two recovery races, one mutation per guard ────────
     ('R6-CLAIMED', 'cleanup deletes retained bytes another record still claims',
      '        if q.with_suffix(".json").exists():',
      '        if False:',

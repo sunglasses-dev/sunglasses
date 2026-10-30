@@ -5,7 +5,7 @@ every lone surrogate became `?` before hashing. `{"cmd": "x\\ud800"}`,
 `{"cmd": "x\\ud801"}` and `{"cmd": "x?"}` -- three different inputs -- got one
 digest, and a receipt that names an input by its digest named the wrong one.
 
-The repair (T9 ruling, 2026-09-23): encode strictly. An input that cannot be
+The repair (a reviewer ruling, 2026-09-23): encode strictly. An input that cannot be
 encoded gets `input_sha256: null` and `input_sha256_reason: "unencodable"`;
 an encodable input is hashed exactly as before, byte for byte.
 

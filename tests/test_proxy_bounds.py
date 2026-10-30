@@ -1,4 +1,4 @@
-"""T8's bounds table, specified from the rows before the module exists.
+"""A reviewer's bounds table, specified from the rows before the module exists.
 
 Fourteen rows, and the ones that bite are not the numbers. A bound is three
 decisions and only the first is the value: what the limit IS, whether it is

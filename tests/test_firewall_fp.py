@@ -387,7 +387,7 @@ REAL_KEYS_CARRYING_A_PLACEHOLDER_WORD = [
 
 @pytest.mark.parametrize("key", REAL_KEYS_CARRYING_A_PLACEHOLDER_WORD)
 def test_a_real_key_is_not_a_placeholder_because_it_contains_a_word(key):
-    """The three T9 reproduced on main b7e33c2. Each is a well-formed AWS key
+    """The three a reviewer reproduced on main b7e33c2. Each is a well-formed AWS key
     id; each was cleared as not-live because of four characters inside it."""
     assert not is_placeholder(key), (
         f"{key} was cleared as a placeholder on a substring; a live key of "
@@ -489,7 +489,7 @@ def test_a_trivially_short_segment_does_not_clear_the_whole_token(token):
 # The first fix replaced "the token CONTAINS a placeholder word" with "the token
 # contains a placeholder SEGMENT", and that is the same decision moved up one
 # level: a real token with separators carries such a segment by accident exactly
-# as an AWS id carried HERE. T9 executed the branch rather than reading it and
+# as an AWS id carried HERE. A reviewer executed the branch rather than reading it and
 # produced these two.
 #
 # The rule is the sentence that was already written and not followed: a
@@ -537,7 +537,7 @@ def test_a_token_that_is_all_filler_after_its_prefix_still_clears(token):
 
     ROUND 3 CHANGED ONE OF THESE ROWS, and it is a narrowing, so it is stated
     rather than quietly edited: the second token used to be `sk_test_` + filler
-    and now uses `sk_live_`. No shipped rule owns `sk_test_` -- ASTRA measured
+    and now uses `sk_live_`. No shipped rule owns `sk_test_` -- the reviewer measured
     zero raw matches for it (R2-05) -- and after this round a literal that no
     rule declares is not format, it is just the first thing in the string. The
     guard therefore no longer CLEARS such a token, which is the safe direction
@@ -606,10 +606,10 @@ def test_a_one_character_body_is_not_filler(token):
     assert not is_placeholder(token)
 
 
-# ═══ ROUND 3 — ASTRA's blocking controls on the placeholder guard ════════════
+# ═══ ROUND 3 — the reviewer's blocking controls on the placeholder guard ════════════
 #
 # Round 2 moved the decision from a substring to a segment and then to the whole
-# material, and ASTRA's independent review (PR #173, head 525b698) found the
+# material, and the reviewer's independent review (PR #173, head 525b698) found the
 # same defect one level further out, twice. Both are lost DENIALS on live
 # material, not false positives, so they are written here as public controls
 # through `check_egress_secrets` rather than as helper assertions: a helper
@@ -626,7 +626,7 @@ def test_a_one_character_body_is_not_filler(token):
 #        character. Word comparison needs the lowercase form; shape comparison
 #        needs the material exactly as it arrived.
 #
-# Constructions are ASTRA's, reproduced from its probe rather than invented, so
+# Constructions are the reviewer's, reproduced from its probe rather than invented, so
 # a green row here is the same measurement its review made.
 
 _ROUND3_WRAPPERS = {
@@ -673,7 +673,7 @@ _PREFIX_ATTACK_UNSEPARATED = [
 @pytest.mark.parametrize("control,family", _PREFIX_ATTACK_UNSEPARATED,
                          ids=[c for c, _ in _PREFIX_ATTACK_UNSEPARATED])
 def test_a_foreign_prefix_inside_the_body_does_not_clear_the_token(control, family):
-    """ASTRA PREFIX-01/02/03/05/06 (blocking) and PREFIX-04 (already passing).
+    """REVIEW PREFIX-01/02/03/05/06 (blocking) and PREFIX-04 (already passing).
 
     Each token is one provider's wrapper, then the AWS temporary-key prefix,
     then 36 q characters. The foreign prefix is body material for these
@@ -696,7 +696,7 @@ _PREFIX_ATTACK_SEGMENTS = [
 @pytest.mark.parametrize("control,family", _PREFIX_ATTACK_SEGMENTS,
                          ids=[c for c, _ in _PREFIX_ATTACK_SEGMENTS])
 def test_other_formats_words_in_the_body_are_material_not_format(control, family):
-    """ASTRA PREFIX-07 to PREFIX-10 (blocking).
+    """REVIEW PREFIX-07 to PREFIX-10 (blocking).
 
     The body joins an ascending run and four words that are OTHER providers'
     format literals — none of them the matched rule's leading grammar — and
@@ -713,7 +713,7 @@ def test_other_formats_words_in_the_body_are_material_not_format(control, family
 
 
 def test_a_second_format_literal_is_not_stripped_inside_one_segment():
-    """ASTRA PREFIX-04's useful half, kept as its own row: the defect is not
+    """REVIEW PREFIX-04's useful half, kept as its own row: the defect is not
     unlimited recursive stripping. One format literal comes off the front of
     the token and nothing else, so a foreign prefix sitting immediately inside
     a Google body is still material even though `AIza` was consumed."""
@@ -736,7 +736,7 @@ def test_the_same_attack_with_a_separator_is_also_material():
     ("unknown" + "-" + "5678", False),
 ])
 def test_a_prefix_word_with_no_credential_format_claims_nothing(token, expected):
-    """ASTRA PREFIX-11 and PREFIX-12. Neither token has a credential format at
+    """REVIEW PREFIX-11 and PREFIX-12. Neither token has a credential format at
     all, so neither is a statement that material is fake. PREFIX-11 cleared
     before this round purely because `proj` was in a global set; a format
     literal only means anything as the leading grammar of the rule that
@@ -754,8 +754,8 @@ _CASE_CONTROLS = [("CASE-01", "GITHUB"), ("CASE-02", "STRIPE_LIVE"),
 @pytest.mark.parametrize("control,family", _CASE_CONTROLS,
                          ids=[c for c, _ in _CASE_CONTROLS])
 def test_mixed_case_material_is_not_a_run_of_one_character(control, family):
-    """ASTRA CASE-01 to CASE-06 (blocking). Forty independent draws from `q`
-    and `Q`, ASTRA's exact deterministic generator. The raw body holds two
+    """REVIEW CASE-01 to CASE-06 (blocking). Forty independent draws from `q`
+    and `Q`, the reviewer's exact deterministic generator. The raw body holds two
     distinct characters and is not an ascending run, so it is material; only
     after whole-token lowercasing does it read as a run of one character."""
     import random
@@ -780,7 +780,7 @@ def _hook_terminal_record(token, home):
     matched -- so it could not see a second rule matching the same span and
     denying what the first one cleared. A helper cannot observe a collision
     between two rules; only the whole lane can. This is the same correction
-    ASTRA made in R2-02, one turn later and in the other direction.
+    the reviewer made in R2-02, one turn later and in the other direction.
     """
     import json
     from sunglasses.firewall import run_hook, starter_policy_text
@@ -805,7 +805,7 @@ def test_same_case_filler_still_clears_after_the_case_repair(family, filler, tmp
     Uppercase filler is filler: the repair separates word comparison from shape
     comparison, and does not make the shape test prefer lowercase.
 
-    ASTRA's FILLER-01-LOWER and FILLER-01-UPPER are the `sk-ant-` rows here,
+    The reviewer's FILLER-01-LOWER and FILLER-01-UPPER are the `sk-ant-` rows here,
     and they were the two that showed the round-3 defect: the Anthropic rule
     owns that token and clears it, then the OpenAI rule matches the SAME span,
     consumes its shorter `sk-` literal, reads the rest of the Anthropic format
@@ -818,7 +818,7 @@ def test_same_case_filler_still_clears_after_the_case_repair(family, filler, tmp
 
 
 def test_the_owner_of_a_span_decides_it_and_a_broader_rule_does_not_reopen_it(tmp_path):
-    """ASTRA README-07-1, its exact bytes: `sk-ant-` and forty x characters.
+    """REVIEW README-07-1, its exact bytes: `sk-ant-` and forty x characters.
 
     Two rules match the whole token. Ownership goes to the LONGEST leading
     literal at the front, because that is the rule whose format actually
@@ -835,7 +835,7 @@ def test_the_owner_of_a_span_decides_it_and_a_broader_rule_does_not_reopen_it(tm
 
 
 def test_a_separated_foreign_prefix_still_denies_through_the_hook(tmp_path):
-    """ASTRA's PREFIX-SEP-SLACK, replacing my round-3 neighbour, which asserted
+    """The reviewer's PREFIX-SEP-SLACK, replacing my round-3 neighbour, which asserted
     the HELPER on a GitHub token that had no full rule match -- so it measured
     the guard without measuring the firewall. Same idea, real format, public
     boundary: the foreign prefix is its own SEGMENT and is still material."""
@@ -865,7 +865,7 @@ def test_an_ascending_run_in_capitals_is_still_filler():
 def test_a_helper_clearance_with_no_rule_match_is_a_coverage_limit(token):
     """CORRECTION to round 2's closure claim, which counted these as leaks.
 
-    ASTRA measured both at ZERO raw rule matches: the shipped Stripe live rule
+    The reviewer measured both at ZERO raw rule matches: the shipped Stripe live rule
     accepts alphanumerics only, so an underscore-delimited body never matched
     it, and there is no Stripe TEST rule at all. `is_placeholder` may say what
     it likes about a string no rule detects — nothing was cleared, because
@@ -889,7 +889,7 @@ _FROZEN_PLACEHOLDER_WORDS = (
 
 
 def test_the_word_list_is_frozen_so_a_generated_test_cannot_vanish_with_it():
-    """ASTRA §6. The per-word tests parametrize over the PRODUCT's tuple, so
+    """The reviewer §6. The per-word tests parametrize over the PRODUCT's tuple, so
     deleting a word deletes its own test case in the same commit and the suite
     stays green while the vocabulary shrinks. The expectation is written down
     here instead; changing the vocabulary is then a two-file decision with a
@@ -900,7 +900,7 @@ def test_the_word_list_is_frozen_so_a_generated_test_cannot_vanish_with_it():
 # ── R2: a cleared canary is an audited event ─────────────────────────────────
 
 def test_a_cleared_canary_reaches_the_terminal_receipt(tmp_path):
-    """ASTRA control C01 (blocking).
+    """The reviewer control C01 (blocking).
 
     The allowlist ruling that put AWS's documentation key in
     KNOWN_PUBLIC_CANARIES was accepted WITH an audit requirement: a hit that is

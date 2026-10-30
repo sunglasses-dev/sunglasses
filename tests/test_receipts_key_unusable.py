@@ -1,5 +1,5 @@
 """test_receipts_key_unusable.py — a key that exists but cannot sign is a
-receipt failure, never a quiet return to unsigned rows (T9 RULING 21).
+receipt failure, never a quiet return to unsigned rows (a reviewer RULING 21).
 
 The user opted into a signed chain with an explicit `receipts init`. If the key
 then cannot be used (a mode that exposes it, the receipts extra removed, a file

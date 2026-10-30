@@ -1,4 +1,4 @@
-"""ASTRA receipts172-ef0463b r3, item 3, and T9 ruling 56. A directory nobody
+"""The reviewer receipts172-ef0463b r3, item 3, and a reviewer ruling 56. A directory nobody
 can list is not an empty directory.
 
 The opt-in decision found the hook chain's segments with `Path.glob`, and
@@ -93,7 +93,7 @@ def _decision(out):
     return spec.get("permissionDecision"), spec.get("permissionDecisionReason", "")
 
 
-# ── the ASTRA sequence, at the real entry point ──────────────────────────────
+# ── the reviewer sequence, at the real entry point ──────────────────────────────
 
 @pytest.mark.parametrize("mode", MODES)
 def test_a_deleted_key_under_an_unlistable_chain_dir_asks_and_writes_nothing_unsigned(
@@ -150,7 +150,7 @@ def _chain_bytes(home):
 
 
 def test_receipts_off_on_an_unlistable_key_dir_refuses_by_name(home, unlistable):
-    """T10's escape review: `receipts off` caught OSError and ValueError, and
+    """A reviewer's escape review: `receipts off` caught OSError and ValueError, and
     KeyUnusable is neither, so it died on a raw traceback. At 42a5bfd the same
     case said "Signing is off", appended an UNSIGNED off row and left the key
     unretired. It refuses, names the cause, and changes nothing."""

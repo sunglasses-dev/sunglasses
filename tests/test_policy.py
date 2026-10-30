@@ -1,7 +1,7 @@
 """
 test_policy.py — THE POLICY LAYER (verdict redesign, Jul 17 2026).
 
-Born from the Patient Zero interview + Fugu's architecture doc + the Anthropic
+Born from the Patient Zero interview + the architecture doc + the vendor
 comparison: the engine REPORTS findings; a single policy layer decides the
 action per surface and mode; BLOCK is only shown where we actually block model
 input.

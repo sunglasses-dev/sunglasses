@@ -1,4 +1,4 @@
-"""The verifier half of ruling 56, ruled in as T9 ruling 57. `sunglasses receipts --verify`
+"""The verifier half of ruling 56, ruled in as a reviewer ruling 57. `sunglasses receipts --verify`
 decided what logs exist with `Path.glob`, which swallows PermissionError, so
 a signed log under a directory nobody can list read as NO_LOG, "no receipts",
 and without --strict exited 3, the exit of a healthy chain with a limit. An
@@ -296,7 +296,7 @@ STRAYS = [pytest.param("notes.txt", "file", id="notes_txt"),
 def test_the_control_a_stray_under_the_proxy_receipts_is_still_ignored(home, proxy_run,
                                                                       name, kind, strict):
     """A name that is not a run id is not a log: the two healthy logs read.
-    A run's unchained `<run id>.jsonl` is a log since T9 ruling 60, named as
+    A run's unchained `<run id>.jsonl` is a log since a reviewer ruling 60, named as
     LOG_UNCHAINED (tests/test_receipts_log_missing_and_run_jsonl.py)."""
     stray = proxy_run.parent / name
     stray.mkdir() if kind == "dir" else stray.write_bytes(b"not a log\n")

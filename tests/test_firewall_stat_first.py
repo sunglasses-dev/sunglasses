@@ -1,5 +1,5 @@
 """
-test_firewall_stat_first.py — ONLY "NOTHING IS THERE" IS ABSENT (T9 ruling 59, Q4).
+test_firewall_stat_first.py — ONLY "NOTHING IS THERE" IS ABSENT (a reviewer ruling 59, Q4).
 
 The three loaders the hook reads on every call (policy.yaml, pins.json,
 pin_state.json) each asked `Path.exists()` first and treated False as "never

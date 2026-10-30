@@ -1,6 +1,6 @@
 """install -> first call -> approve at a terminal -> forwarded, as rows.
 
-These are T8's proxy-enforcement transcripts and T10's install measurement,
+These are a reviewer's proxy-enforcement transcripts and a reviewer's install measurement,
 turned into rows that run. Both existed only as prose in warroom notes and were
 reproducible only by hand, which is how the two halves disagreed for a day
 without anyone noticing: the mediator was measured through `-m` and `install`
@@ -151,7 +151,7 @@ def test_approval_from_the_payloads_ids_opens_the_route(wrapped):
 
 
 def test_a_credential_in_the_result_is_withheld_after_approval(tmp_path):
-    """T8's response-direction row, and the control the others need.
+    """A reviewer's response-direction row, and the control the others need.
 
     Without it, every row above is satisfied by a proxy that forwards
     everything once approved. The refusal here must be PROHIBITED_CONTENT and

@@ -122,7 +122,7 @@ def test_vendor_examples_block_and_that_is_the_disclosed_limit(engine, rule_id):
 # the parent has it") would restate the implementation in the test, so a change
 # to either would move both and the check would agree with itself forever.
 #
-# ASTRA's R-B1, 2026-09-14: the subset assertion below permitted deleting a
+# The reviewer's R-B1, 2026-09-14: the subset assertion below permitted deleting a
 # declared channel, and 14 of 30 mutants survived because of it. Removing
 # `agent_input` from all eight flips 8/8 public engine fixtures from block to
 # allow and loses 14 secret findings, so a narrowed sibling is a real coverage

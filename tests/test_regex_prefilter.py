@@ -196,7 +196,7 @@ def test_every_regex_survives_requirement_extraction(engine):
 
 
 # ---------------------------------------------------------------------------
-# ASTRA REVIEW 2026-09-10 — NO GO on 6012832. Seven of these lost a finding
+# REVIEW 2026-09-10 — NO GO on 6012832. Seven of these lost a finding
 # through the public engine: baseline blocked, candidate came back clean.
 #
 # Two defects, and the second is the one worth remembering. U1 was a repeat of
@@ -249,7 +249,7 @@ def test_no_requirement_is_ever_derived_from_a_non_ascii_literal():
 
 
 # ---------------------------------------------------------------------------
-# MUTATION RESISTANCE — ASTRA, second review of this branch.
+# MUTATION RESISTANCE — the reviewer, second review of this branch.
 #
 # He did not argue with the tests above, he MUTATED the code: forced step 3 to
 # skip every regex, and all 41 of them still passed while 25 real public-engine

@@ -8,7 +8,7 @@ gates patterns by channel (engine.py), and the indirect-injection PI patterns th
 catch these attacks were scoped to message/file/web_content but NOT `tool_output`
 — so an injection arriving inside a tool result was never scanned by them.
 
-Team decision (FUGU + SOL + Fable, unanimous): a prompt injection is still a prompt
+Team decision (unanimous): a prompt injection is still a prompt
 injection when it rides in through a tool result. `channel` records provenance;
 `category` records mechanism; the two are independent. So indirect/external-content
 PI patterns whose mechanism is carrier-independent were extended to `tool_output`.
@@ -21,7 +21,7 @@ This gate locks in BOTH halves:
      resemble injection language. We assert the six added patterns do not fire on
      a benign tool-output corpus (guards against a later over-broad expansion).
 
-NOTE (integrity, per SOL/FUGU): GLS-PI-INFO is literally derived from the AgentDojo
+NOTE (integrity, per review): GLS-PI-INFO is literally derived from the AgentDojo
 `important_instructions` template. Its passing here is a KNOWN-ATTACK regression, not
 evidence of generalization to unseen attacks — keep a held-out suite for that claim.
 """

@@ -25,7 +25,7 @@ them is a strict ratchet: when one stops firing, the row fails until it is
 taken off the list. KNOWN_MISSES is the same ratchet for two attacks the
 narrowing lets through.
 
-THE CORPUS below is T10's, written for this finding in the shape real MCP
+THE CORPUS below is a reviewer's, written for this finding in the shape real MCP
 servers describe their tools, copied from none. The attack fixtures are the
 rule's own validation set (2026-06-02), copied verbatim.
 """

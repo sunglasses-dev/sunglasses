@@ -124,7 +124,7 @@ def _verdict(text):
 
 
 def test_the_shared_engine_answers_the_same_in_either_order():
-    """T10's statelessness shape, applied to the tool paths.
+    """A reviewer's statelessness shape, applied to the tool paths.
 
     Identical findings is evidence; the REORDERED rerun is the proof we can
     afford. One engine serves every call, so no call may change what a later

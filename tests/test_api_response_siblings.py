@@ -519,7 +519,7 @@ def test_a_reviewer_marker_row_fires_through_the_cli():
 # The full receipt is wider than a suite should be: 11,219 frozen round-9
 # inputs by seven channels, 78,533 paired public cells and 134,628 paired
 # `_eval_regex` calls, 0 diffs on decision, severity, finding ids, matched_text
-# and untruncated `match.span()`, plus ASTRA's 13 timing documents at 27 KB and
+# and untruncated `match.span()`, plus the reviewer's 13 timing documents at 27 KB and
 # 1 MiB with every sha256 checked. It is saved beside this branch as
 # `warroom/R13_ANCHORED_RECEIPT_2026-09-13.txt`. What runs HERE is the same
 # comparison over this file's own committed rows, which is fast enough to keep.

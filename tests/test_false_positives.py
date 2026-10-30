@@ -31,7 +31,7 @@ import os
 _DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "attack-db", "attacks")
 
 
-from fp_corpus_data import CLEAN_CORPUS  # decoupled single source (Jun 12 T8)
+from fp_corpus_data import CLEAN_CORPUS  # decoupled single source (Jun 12 a reviewer)
 
 # ── ATTACK CANARIES — must STILL block. Guards against "fixing" FPs by ────────
 #    deleting real detection.

@@ -270,7 +270,7 @@ def test_Q12_reverse_request_cannot_retire_client_item():
                     'method': 'sampling/createMessage', 'params': {}})
     crossed = [f for f in session.read_upstream(reverse) if f]
 
-    # `pump.Session.events` is the public seam (T10's second read): it observes
+    # `pump.Session.events` is the public seam (a reviewer's second read): it observes
     # the EVENT and not the settlement, so this still cannot pass for the EOF
     # teardown's reasons, and a failure prints the whole ordered sequence.
     assert any(e['kind'] == 'UPSTREAM_REQUEST_REFUSED' for e in session.events), (
@@ -295,7 +295,7 @@ def test_Q12_reverse_request_cannot_retire_client_item():
 # The requirement is NOT lost: `pump.deliver_response` closes MALFORMED_UPSTREAM
 # on a shape mismatch and on a response for an id that is not pending.
 #
-# WHAT I FIRST WROTE HERE WAS WRONG, and T10 measured it rather than reading it:
+# WHAT I FIRST WROTE HERE WAS WRONG, and a reviewer measured it rather than reading it:
 # "tests/proxy/test_round3_edges.py drives `_shape_matches`". Both references
 # there wrap the function as a PAUSE POINT for the RC09 real-pipe race -- the
 # wrapper calls the original and returns the real verdict, so it is invoked, but
@@ -307,7 +307,7 @@ def test_Q12_reverse_request_cannot_retire_client_item():
 # for and, at the framing layer, could never have been.
 
 def test_Q13R_a_result_that_does_not_fit_its_request_closes_the_session():
-    """pump.py's shape close, which nothing in the tree asserted (T10, 9-16).
+    """pump.py's shape close, which nothing in the tree asserted (a reviewer, 9-16).
 
     `tools/call` must be answered with a result object carrying `content`. An
     empty object is the milder-looking spelling of the same fault and the more
@@ -340,7 +340,7 @@ def test_Q13R_a_result_that_does_not_fit_its_request_closes_the_session():
     # sentence that tells them apart never reaches a receipt -- `_close` takes a
     # `detail` and drops it. So the discriminator here is the pair of sessions:
     # same id, same method, same pending state, one answer well formed and one
-    # not. Reported to T9/T10 rather than fixed in a tests-only PR.
+    # not. Reported to the reviewers rather than fixed in a tests-only PR.
 
 
 def test_Q14_v3_unknown_api_settlement_refuses_without_correlation_change():

@@ -1,12 +1,12 @@
 """test_receipts_proxy_control_chars.py — a peer's control character or lone
-surrogate does not switch the audit off (#172, the off switch left after T9
-ruling 41, flagged to T9 as R43 item 2).
+surrogate does not switch the audit off (#172, the off switch left after a reviewer
+ruling 41, flagged to a reviewer as R43 item 2).
 
 The wire refuses a string holding a control character or a lone surrogate:
 there is no one canonical byte form for it. The proxy writes strings a peer
 chose (a server's name, the methods it advertises, a reason it gave), so a
 peer that puts `\\x00`, `\\n` or a lone `\\udc80` in one got its row refused,
-and the proxy kept the refusal and refused every later row. T9 ruling 43 part
+and the proxy kept the refusal and refused every later row. A reviewer ruling 43 part
 2: a receipt is never refused for what the peer sent. A control character
 becomes its JSON escape as text (`\\u0000`), so a newline can never split a
 record in two; a lone surrogate becomes U+FFFD; `sanitized` counts the

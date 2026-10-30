@@ -1,15 +1,15 @@
-"""R-168-R12. One marker, applied from outside so ASTRA's file stays verbatim.
+"""R-168-R12. One marker, applied from outside so the reviewer's file stays verbatim.
 
 `test_list_crossings.py` is his `list_crossings.py` byte-for-byte (sha256
 checkable), and LC02 is RED on it -- but LC02 is red on b707bf2 and on cf294f5
-too, so it is not a regression from this round, and T9's R-168-R12 adopted
+too, so it is not a regression from this round, and a reviewer's R-168-R12 adopted
 LC01, LC03, GA01 and GA02 as the acceptance and NOT LC02.
 
 It is marked here rather than edited out of his file, and marked STRICT, so it
 stays visible and turns into a demand the moment somebody makes it pass.
 LC02 asks whether a completed list's id may be admitted again from inside the
 client sink; its first assertion is `admitted == [True]` and the reuse is
-currently rejected. Whether that is a defect or the intended rule is T9's to
+currently rejected. Whether that is a defect or the intended rule is a reviewer's to
 rule, and it is disclosed in the body rather than hidden behind a passing suite.
 """
 import pytest

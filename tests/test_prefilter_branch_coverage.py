@@ -490,7 +490,7 @@ def test_the_in_process_report_is_the_same_report():
 def test_control_an_empty_allowlist_excuses_nothing(monkeypatch, tmp_path):
     """`_excused_ids` answers from the allowlist. Round 12 never asked it.
 
-    This is the assertion ASTRA's `return {"GLS-PI-013-API"}` has to get past.
+    This is the assertion the reviewer's `return {"GLS-PI-013-API"}` has to get past.
     """
     _allowlist(monkeypatch, {}, tmp_path)
     assert _excused_ids() == set()

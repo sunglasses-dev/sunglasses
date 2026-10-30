@@ -129,7 +129,7 @@ def test_one_fault_one_kind_wherever_the_code_is_standing():
         # serve.py's two reader threads, the upstream's `_drain` and the
         # client's `_drain_client`: a Route method raised and nothing reads that
         # side any more. The detail names the direction and the class; the kind
-        # names the fault once (T9 ruling R69).
+        # names the fault once (a reviewer ruling R69).
         "READER_FAILED": 2,
     }
     for kind, sites in shared.items():

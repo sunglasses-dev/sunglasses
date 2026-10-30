@@ -148,7 +148,7 @@ def test_the_alias_is_collected_once_the_refusal_clears(
     assert not _names(again, alias), again
 
 
-# R76 fold (T9 ruling 81 (3)). `_collect_discharged_notes` returned `retained`
+# R76 fold (a reviewer ruling 81 (3)). `_collect_discharged_notes` returned `retained`
 # BEFORE assigning it when it was handed no held name, and recovery hands it
 # exactly that for a note `_read_note` refuses but `_reclaim_one` accepts: one
 # with a valid `held` and `sha256` and no `owner`. The bytes went back and the

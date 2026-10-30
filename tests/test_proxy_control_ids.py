@@ -2,11 +2,11 @@
 
 T2.R6 says the proxy RE-LISTS in its own id namespace and T6.R6 says its
 control traffic uses `sg-<uuid>`. That is not a style rule. One client
-`tools/list` becomes up to sixty four proxy requests under T8.R13, and the
+`tools/list` becomes up to sixty four proxy requests under contract row R13, and the
 client's single id can answer exactly one of them, so the proxy has to own ids
 of its own or it cannot page a tool list at all.
 
-T9 approved this on 2026-09-14 as designed, and the approval names three things
+A reviewer approved this on 2026-09-14 as designed, and the approval names three things
 it must not become. Those three are the acceptance and each has a mutation that
 must go red:
 

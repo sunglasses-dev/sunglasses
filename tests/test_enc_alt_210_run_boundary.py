@@ -34,7 +34,7 @@ BOUNDARY = r"(?<![A-Za-z0-9+/])"
 def _shipped_regex():
     """The rule's regex AS SHIPPED, read from PATTERNS at call time.
 
-    R2/F2 (T10, second reader). Round 1 held two local string literals and
+    R2/F2 (a reviewer, second reader). Round 1 held two local string literals and
     compared them to each other, tied to the product only by "this lookbehind
     appears somewhere in the rule". Two fossils pass their own differential
     forever, and the guard stayed green while the text sat in any rule in the
@@ -126,7 +126,7 @@ def test_the_boundary_changes_no_span():
 def unbounded_engine():
     """The SAME engine with ONE edit: the boundary removed from this rule.
 
-    R2/F1 (T10, second reader). Round 1 compared the shipped engine against the
+    R2/F1 (a reviewer, second reader). Round 1 compared the shipped engine against the
     number 402 in its own docstring, so the row was a regression pin wearing a
     differential's name: a mis-measured 402 would have been pinned forever and
     nothing would ever have caught it. Both sides are now EXECUTED over the

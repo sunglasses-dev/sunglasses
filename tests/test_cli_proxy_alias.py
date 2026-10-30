@@ -1,6 +1,6 @@
 """`sunglasses proxy …`, the product surface for 0.6.0 beta.
 
-T9 approved this on 2026-09-14 as its own commit and as the one change outside
+A reviewer approved this on 2026-09-14 as its own commit and as the one change outside
 `sunglasses/proxy/`. It is an alias and nothing more: everything it does lives
 in `sunglasses.proxy.commands`, so the CLI gains a door and no behaviour.
 
@@ -32,7 +32,7 @@ def test_the_alias_and_the_module_are_the_same_program(tmp_path):
     """Same input, same exit code, same bytes. If they ever differ, one of them
     is the real product and nobody knows which.
 
-    This drove `doctor` until R-DOCTOR-OWNER moved that command to T10's lane.
+    This drove `doctor` until R-DOCTOR-OWNER moved that command to a reviewer's lane.
     The property is about the DISPATCH being one program, not about which
     subcommand is dispatched, so it now drives the usage path: the reply is
     produced by the same code either way and its exit code is a number a script

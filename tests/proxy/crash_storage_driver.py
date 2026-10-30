@@ -1,6 +1,6 @@
 """Inject a real SIGKILL into one phase of an install, including the TEMP write.
 
-ASTRA's `crash_matrix_driver.py` hooks `Path.write_text` and `Path.write_bytes`
+The reviewer's `crash_matrix_driver.py` hooks `Path.write_text` and `Path.write_bytes`
 keyed on the record filenames. That works while the writes go through `Path`,
 and this row deliberately moves them to `os.open`/`os.write`/`os.replace` so a
 symlink cannot be followed and a partial record cannot be published. Keeping

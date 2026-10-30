@@ -2,13 +2,13 @@
 test_receipts_chain_cli.py — `sunglasses receipts init` and `--verify` over
 signed chains (#172).
 
-T9 RULING 11: the chain IS the log when enabled. With the extra missing, or
+A reviewer RULING 11: the chain IS the log when enabled. With the extra missing, or
 before the user has run `receipts init`, nothing changes for an existing
 install, and `--verify` names a legacy log LOG_UNCHAINED, a limit, never a
-failure (T9 ruling 60). The key is made only by an explicit `receipts init`,
+failure (a reviewer ruling 60). The key is made only by an explicit `receipts init`,
 never on a first write.
 
-T9 RULING 15: one chain per log, each verified alone with its own five results.
+A reviewer RULING 15: one chain per log, each verified alone with its own five results.
 The key that sits beside a log gives portability, not trust: it is reported
 KEY_UNTRUSTED unless the user supplies a fingerprint obtained elsewhere.
 
@@ -154,7 +154,7 @@ def test_a_sealed_hook_chain_prints_its_five_results(home):
     assert "lifecycle: LIFECYCLE_COMPLETE" in out
     # The key beside the log is portability, not trust, and the extent is
     # unknown without a retained endpoint: an unknown is not a pass. Both are
-    # input the caller did not supply, so a limit: exit 3 (T9 ruling 48).
+    # input the caller did not supply, so a limit: exit 3 (a reviewer ruling 48).
     assert "key_trust: KEY_UNTRUSTED" in out
     assert "expected_endpoint: HISTORY_EXTENT_UNKNOWN" in out
     assert code == 3

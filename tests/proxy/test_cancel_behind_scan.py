@@ -1,4 +1,4 @@
-"""PRODUCT FINDING #7 (T10, 2026-09-23): a cancel that arrives while ITS OWN
+"""PRODUCT FINDING #7 (a reviewer, 2026-09-23): a cancel that arrives while ITS OWN
 request is being scanned does not stop that request reaching the server.
 
 Measured through serve's own reader loops (gauntlet/boundary/gen2/
@@ -14,7 +14,7 @@ until the test has already written the cancel into the client's pipe. The
 proxy is still HOLDING the request at that moment, so a correct proxy honours
 the cancel: never forwards, answers REQUEST_CANCELLED once, delivers no result.
 
-RED on main 35f04ce. The fix PR removes the xfail line below (T8 did, in 170e17d on
+RED on main 35f04ce. The fix PR removes the xfail line below (a reviewer did, in 170e17d on
 feat/cancel-wins-before-forward, where it is green 3/3 alone).
 """
 import json
@@ -44,7 +44,7 @@ def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_pa
         return inspection.scan(params, channel=channel, binding=binding,
                                content_bytes=content_bytes)
 
-    # WARM-UP IS A SPEED-UP ONLY (T8, 170e17d). The row no longer depends on it:
+    # WARM-UP IS A SPEED-UP ONLY (a reviewer, 170e17d). The row no longer depends on it:
     # the wait below is gated on the client's reply, not on a clock.
     if not os.environ.get("CANCEL_ROW_COLD"):
         inspection.default_engine()
@@ -83,7 +83,7 @@ def test_a_cancel_that_arrives_during_its_requests_scan_stops_the_forward(tmp_pa
     # os.write on a pipe is unbuffered: when it returns, the cancel is in the
     # kernel's pipe buffer, readable by the client reader. THEN the scan may end.
     cancel_written.set()
-    # EVENT-GATED, not timed (T9, 9-23): wait for the client's ONE reply to id 1,
+    # EVENT-GATED, not timed (a reviewer, 9-23): wait for the client's ONE reply to id 1,
     # whatever it is, before closing anything. A fixed sleep here raced the
     # engine's cold build (~1.5 s): upstream EOF closed the session
     # MALFORMED_UPSTREAM first and the row went red for the wrong reason.

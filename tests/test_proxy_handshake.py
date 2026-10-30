@@ -116,7 +116,7 @@ def test_the_supported_set_is_the_one_the_row_names():
         # advertises the `logging` capability, notifications/message is the
         # only wire message that capability produces, and leaving it out
         # advertised something that could never carry anything while making
-        # T2.R12's row unreachable. ASTRA's C10 rules the same way.
+        # T2.R12's row unreachable. review's C10 rules the same way.
         "notifications/message",
         "notifications/progress", "notifications/roots/list_changed",
         "notifications/tools/list_changed",

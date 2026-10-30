@@ -184,7 +184,7 @@ def test_the_refusal_never_carries_the_payload_it_refused(tmp_path):
     assert secret not in client.bytes.decode()
 
 
-# ── T9.R2 · the receipt is durable before the bytes move ─────────────────
+# ── contract row R2 · the receipt is durable before the bytes move ─────────────────
 
 def test_nothing_is_released_when_the_release_cannot_be_recorded(tmp_path):
     """R4. A clean-looking session with no evidence behind it is worse than a
@@ -385,7 +385,7 @@ def test_the_binding_is_bound_to_this_frame_and_not_to_a_constant(tmp_path):
 
 
 def test_nothing_is_scanned_once_the_log_has_stopped(tmp_path):
-    """T9.R4. Work that cannot be recorded does not start. A route that carries
+    """Contract row R4. Work that cannot be recorded does not start. A route that carries
     on scanning after the log failed spends a worker on a message whose
     outcome it has already lost the ability to write down."""
     engine, upstream, client, scans = _route(tmp_path)
@@ -432,7 +432,7 @@ def test_the_default_route_forwards_an_ordinary_call_untouched(tmp_path):
 # ── AR09: the content bound is a bound on content, not on a direction ──────
 
 def test_a_client_call_over_the_content_bound_is_refused(route_fixture=None):
-    """AR09, T8.R2. The bound was applied to results and not to calls, so the
+    """AR09, contract row R2. The bound was applied to results and not to calls, so the
     limit that exists to stop an unbounded scan was reachable by sending the
     bytes the other way."""
     from sunglasses.proxy import bounds, selector

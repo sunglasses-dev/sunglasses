@@ -1,5 +1,5 @@
 """The receipts wheel carries the spec and the vectors, and not the tests or
-the vector generator (T9 ruling 47, outsider rehearsal gaps G1 and G2).
+the vector generator (a reviewer ruling 47, outsider rehearsal gaps G1 and G2).
 
 The 10-3 claim is that `pip install "sunglasses[receipts]"` verifies a fixture
 receipt. At 5480cdd the wheel carried neither WIRE_SPEC.md nor VECTORS.json, so

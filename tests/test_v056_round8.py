@@ -1,4 +1,4 @@
-"""v0.5.6 round 8 — the two acceptance states ASTRA's NO-GO #7 named as MISSING.
+"""v0.5.6 round 8 — the two acceptance states the reviewer's NO-GO #7 named as MISSING.
 
 Round 7 passed a 512-case gate while the product was falsely clean, because the
 acceptance set had no case that could tell a correct frame walk from an aliased

@@ -226,7 +226,7 @@ def test_a_clean_paired_file_is_still_clean(home):
            '{"kind":"in_flight","eval_id":"x","ts":"t","tool_name":"Bash"}\n'
            '{"kind":"decision","eval_id":"x"}\n')
     code, out = _verify(home)
-    # A day file carries no chain: LOG_UNCHAINED, a limit (T9 ruling 60).
+    # A day file carries no chain: LOG_UNCHAINED, a limit (a reviewer ruling 60).
     assert code == 3 and "No orphans" in out and "LOG_UNCHAINED" in out, out
 
 
@@ -353,7 +353,7 @@ def test_control_reading_the_whole_file_at_once_brings_the_crash_back():
 
 
 # ── round 4: a preview may not repaint the display it is evidence for ────────
-# ASTRA R3-1. Round 3 removed the quoting on the malformed-JSON branch because
+# review R3-1. Round 3 removed the quoting on the malformed-JSON branch because
 # "raw already carries its own quoting" — true of the decode branch, which
 # builds a byte preview, and false of this one, which stored the decoded line as
 # it stood. So a receipts line that is valid UTF-8 and invalid JSON reached the
@@ -370,7 +370,7 @@ import unicodedata as _unicodedata
 
 _SGR = _re.compile(rb"\x1b\[[0-9;]*m")
 
-# The exact controls ASTRA replayed through a persisted receipt.
+# The exact controls the reviewer replayed through a persisted receipt.
 _RECEIPT_CONTROLS = (
     ("NUL", b"\x00"),
     ("screen erase ESC [2J", b"\x1b[2J"),
@@ -530,7 +530,7 @@ def _orphan(eval_id, tool="Bash"):
 
 
 def test_a_valid_row_cannot_repaint_the_orphan_report(home):
-    """ASTRA's raw eval_id, as a valid JSON row beside a clean pair."""
+    """The reviewer's raw eval_id, as a valid JSON row beside a clean pair."""
     started, decided = _pair()
     _write_bytes_file(home, "2026-09-12.jsonl",
                       (started + "\n" + decided + "\n"

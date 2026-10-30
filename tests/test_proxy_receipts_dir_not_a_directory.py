@@ -1,6 +1,6 @@
 """
 test_proxy_receipts_dir_not_a_directory.py — THE PROXY NAMES WHAT STANDS WHERE
-ITS RECEIPTS DIRECTORY BELONGS (T9 ruling 63 (b)).
+ITS RECEIPTS DIRECTORY BELONGS (a reviewer ruling 63 (b)).
 
 The proxy makes `<state root>/receipts` before anything else. When a regular
 file, a dangling symlink or a symlink to a file stands at that path, or at the

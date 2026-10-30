@@ -6,8 +6,7 @@ the host's own permission flow, a receipt, and nothing on screen. That is the
 right answer for a dead pin lane and the wrong one for a dead secret lane on a
 call that may carry a credential.
 
-Now, on that fault only: an outbound call that looks credential-shaped ASKS (an
-unattended headless run refuses an `ask`), and the question says which control
+Now, on that fault only: an outbound call that looks credential-shaped ASKS, and the question says which control
 died. Every other call gets the generic `{}` plus a confession in the receipt.
 `~/.sunglasses/on-error` picks ask (default) / deny / defer / block.
 

@@ -1,6 +1,6 @@
 """Regression tests for the 4 dogfood bugs found May 27, 2026.
 
-AZ + Cava both confessed they had never used sunglasses themselves in 50+ days
+The maintainers found they had never used sunglasses themselves in 50+ days
 of shipping it. First real dogfood found 4 bugs in v0.2.51. These tests lock
 those doors so the bugs cannot return.
 
@@ -161,7 +161,7 @@ def test_short_v_flag_also_works():
 # real attacks.
 # ---------------------------------------------------------------------------
 def test_benign_pr_review_prompt_passes_clean():
-    """Cava's exact bug — must not flag benign developer help requests."""
+    """The reported bug — must not flag benign developer help requests."""
     engine = SunglassesEngine()
     benign_prompts = [
         "Please summarize this pull request and suggest tests.",

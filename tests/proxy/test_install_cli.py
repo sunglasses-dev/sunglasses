@@ -1,4 +1,4 @@
-"""T10.R4/R5 at the CLI, through a real subprocess.
+"""Contract rows R4/R5 at the CLI, through a real subprocess.
 
 Exit codes follow AGENTS.md: 0 clean · 1 threat · 2 usage or operational error ·
 3 incomplete inspection, and `0` and `3` must never collapse into each other.
@@ -223,7 +223,7 @@ def test_uninstall_without_a_record_exits_2_and_does_not_mutate(project, tmp_pat
 def test_install_exits_2_when_it_cannot_proceed_at_all(tmp_path, pkg_present):
     """Renamed from "on an unreadable config", which it did not prove.
 
-    ASTRA: on round 3 install refused at artifact resolution BEFORE it ever
+    The reviewer: on round 3 install refused at artifact resolution BEFORE it ever
     read the config, so a green result here was never evidence about
     config-read handling, and the docstring said so rather than fixing it.
 
@@ -264,7 +264,7 @@ def test_install_accepts_an_explicit_config_path(tmp_path):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 7. ASTRA's R6_CHECK_RENAME_GAP, reshaped so the stimulus survives and
+# Round 7. review's R6_CHECK_RENAME_GAP, reshaped so the stimulus survives and
 # the instrument does not deadlock.
 #
 # His row puts the racing install INSIDE our critical section and requires it to

@@ -1,4 +1,4 @@
-"""test_receipts_closed_keys.py — the keys of a signed row are OURS (#172, T9
+"""test_receipts_closed_keys.py — the keys of a signed row are OURS (#172, a reviewer
 ruling 44).
 
 R43 escaped a control character in a peer's string. Applied to an object's

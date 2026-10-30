@@ -2,7 +2,7 @@
 test_receipts_hook_chain.py — the hook writes its signed log once the user has
 a key (#172).
 
-T9 RULING 11 Q1: the chain IS the log when enabled; with no key the legacy path
+A reviewer RULING 11 Q1: the chain IS the log when enabled; with no key the legacy path
 is unchanged, and it does not even import the signing code. Q3: a chained row
 carries the error's class name, never its message; the legacy row keeps its
 message. RULING 15: each call seals its own rows; a call that dies leaves its
