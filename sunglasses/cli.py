@@ -205,14 +205,37 @@ def _is_first_party_output_dir(rel):
     return name in _FIRST_PARTY_OUTPUT_DIRS or name.endswith('.egg-info') or name == 'egg-info'
 
 
-def _holds_files(path):
-    """True when the folder, or one below it, holds at least one entry that is not a folder.
+class _ExcludedFolders(list):
+    """The folders the walk did not enter, plus which of ours it could not prove empty."""
 
-    Looks, never reads, never follows a link out of the tree.
+    def __init__(self):
+        super().__init__()
+        self.unproven = set()
+
+
+def _output_folder_unproven(repo_dir, parts, root_fd, idents):
+    """True unless the folder, and every folder below it, is PROVEN to hold nothing.
+
+    Looks, never reads. It goes through the same held root and no-follow opens as the walk
+    (`_list_dir`), and each folder it goes through is checked against the (device, inode) the
+    walk saw, so a folder swapped for a link after the listing is not followed. A file, a link,
+    a special file, or a folder that cannot be listed counts as content: if emptiness cannot
+    be shown, the folder was not inspected.
     """
-    for _root, _dirs, names in os.walk(path, followlinks=False):
-        if names:
+    pending = [parts]
+    while pending:
+        here = pending.pop()
+        try:
+            entries = _list_dir(repo_dir, here, root_fd, idents)
+        except OSError:
             return True
+        for name, st in entries:
+            if isinstance(st, OSError) or not stat.S_ISDIR(st.st_mode):
+                return True
+            child = here + (name,)
+            if idents is not None:
+                idents[child] = _ident(st)
+            pending.append(child)
     return False
 
 
@@ -486,6 +509,12 @@ def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, sk
                     # is a folder of content the walk did not enter, so it is named.
                     if excluded is not None and (name != '.git' or len(child) > 1):
                         excluded.append(rel)
+                        unproven = getattr(excluded, "unproven", None)
+                        if unproven is not None and _is_first_party_output_dir(rel):
+                            if idents is not None:
+                                idents[child] = _ident(st)
+                            if _output_folder_unproven(repo_dir, child, root_fd, idents):
+                                unproven.add(rel)
                 else:
                     if idents is not None:
                         idents[child] = _ident(st)
@@ -1027,7 +1056,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # through the same path as `--file` instead of falling through to the human screen.
     repo_results = []
 
-    excluded_folders = []
+    excluded_folders = _ExcludedFolders()
     idents = {}
     walked, walker_skips = _walk_repo_files_with_skips(
         tmp_dir, excluded=excluded_folders,
@@ -1272,9 +1301,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # Our own output/cache folders that held files were not read, so the scan is not complete.
     # Dependency and VCS folders stay named and counted, verdict unchanged.
     folder_gaps = [
-        (rel, "first-party output/cache folder holding files, not entered — not inspected")
+        (rel, "first-party output/cache folder, not entered and not shown empty — not inspected")
         for rel in excluded_folders
-        if _is_first_party_output_dir(rel) and _holds_files(os.path.join(tmp_dir, rel))]
+        if rel in excluded_folders.unproven]
     gap_names = {rel for rel, _reason in folder_gaps}
     summary["folders_excluded_with_files"] = len(folder_gaps)
     summary["excluded_not_inspected"] = [{"folder": f, "reason": r} for f, r in folder_gaps]

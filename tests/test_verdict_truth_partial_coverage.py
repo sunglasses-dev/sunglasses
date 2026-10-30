@@ -223,3 +223,80 @@ def test_tool_cache_is_counted_on_its_own_and_verdict_unchanged(tmp_path, name):
     doc = json.loads(out)
     assert code == 0 and doc["decision"] == "allow"
     assert doc["excluded_tool_cache_folders"] == 1 and doc["excluded_dependency_folders"] == 0
+
+
+# --- a folder of ours that cannot be shown empty is not empty ------------------------------
+
+_needs_user = pytest.mark.skipif(
+    os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+    reason="needs a folder the current user cannot open")
+
+
+@_needs_user
+def test_an_unreadable_output_folder_is_a_gap(tmp_path):
+    (tmp_path / "ok.md").write_text("hello\n")
+    build = tmp_path / "build"
+    build.mkdir()
+    build.chmod(0)
+    try:
+        code, out = _scan(tmp_path, "--dir", str(tmp_path), "--json")
+    finally:
+        build.chmod(0o755)
+    doc = json.loads(out)
+    assert code == 3 and doc["decision"] == NOT_INSPECTED
+    assert doc["folders_excluded_with_files"] == 1
+
+
+@_needs_user
+def test_an_unreadable_folder_below_an_output_folder_is_a_gap(tmp_path):
+    (tmp_path / "ok.md").write_text("hello\n")
+    inner = tmp_path / "dist" / "inner"
+    inner.mkdir(parents=True)
+    inner.chmod(0)
+    try:
+        code, out = _scan(tmp_path, "--dir", str(tmp_path), "--json")
+    finally:
+        inner.chmod(0o755)
+    doc = json.loads(out)
+    assert code == 3 and doc["decision"] == NOT_INSPECTED
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlinks need privileges on Windows")
+def test_an_output_folder_holding_only_a_link_to_a_folder_is_a_gap(tmp_path):
+    (tmp_path / "ok.md").write_text("hello\n")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "lnk").symlink_to(elsewhere)
+    code, out = _scan(tmp_path, "--dir", str(tmp_path / "build" / ".."), "--json")
+    doc = json.loads(out)
+    assert code == 3 and doc["decision"] == NOT_INSPECTED
+    assert doc["folders_excluded_with_files"] == 1
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlinks need privileges on Windows")
+def test_replaced_output_folder_is_not_followed(tmp_path, monkeypatch):
+    from argparse import Namespace
+    from sunglasses import cli
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "ok.md").write_text("hello\n")
+    (root / "build").mkdir()
+    real = cli._list_dir
+    swapped = []
+
+    def swap_then_list(top, parts, *a, **kw):
+        if tuple(parts) == ("build",) and not swapped:
+            swapped.append(True)
+            (root / "build").rmdir()
+            (root / "build").symlink_to(outside)
+        return real(top, parts, *a, **kw)
+
+    monkeypatch.setattr(cli, "_list_dir", swap_then_list)
+    args = Namespace(json=True, output="json", verbose=False, max_files=None,
+                     directory=str(root), skip_lockfiles=False, channel="file")
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(args, cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    assert swapped and stop.value.code == 3
