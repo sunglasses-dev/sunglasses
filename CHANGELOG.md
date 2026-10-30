@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The published scan-speed figures are re-measured on the released 0.6.16 wheel and carry how they were measured. On an Apple M3 Max the median scan takes 1.5 ms for a short input and 3.8 ms for a typical attack string, and a document of about 8 KB takes 134 ms (about 54 KB/s). The earlier figures dated from August 30; `stats/current.json` now has a `scan_speed_provenance` line naming the date, the wheel, the machine and the corpus (77 documents), and the three-run median is kept.
+
 ## [0.6.16] — 2026-10-30
 
 ### Added
