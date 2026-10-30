@@ -220,8 +220,12 @@ def _output_folder_unproven(repo_dir, parts, root_fd, idents):
     (`_list_dir`), and each folder it goes through is checked against the (device, inode) the
     walk saw, so a folder swapped for a link after the listing is not followed. A file, a link,
     a special file, or a folder that cannot be listed counts as content: if emptiness cannot
-    be shown, the folder was not inspected.
+    be shown, the folder was not inspected. Where the platform has no descriptor-relative
+    opens there is no way to pin a folder to the one the walk saw, so nothing is listed and
+    the folder is not inspected.
     """
+    if not _FD_SAFE:
+        return True
     pending = [parts]
     while pending:
         here = pending.pop()

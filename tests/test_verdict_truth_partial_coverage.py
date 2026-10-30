@@ -300,3 +300,60 @@ def test_replaced_output_folder_is_not_followed(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as stop:
         cli._scan_tree(args, cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
     assert swapped and stop.value.code == 3
+
+
+def _scan_tree_exit(cli, root):
+    from argparse import Namespace
+    args = Namespace(json=True, output="json", verbose=False, max_files=None,
+                     directory=str(root), skip_lockfiles=False, channel="file")
+    with pytest.raises(SystemExit) as stop:
+        cli._scan_tree(args, cli.SunglassesEngine(), str(root), source=str(root), kind="directory")
+    return stop.value.code
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlinks need privileges on Windows")
+@pytest.mark.parametrize("swap", ["directory_replacement", "ancestor_link"])
+def test_without_descriptor_opens_an_output_folder_is_not_called_empty(tmp_path, monkeypatch, swap):
+    """Where no folder can be pinned to the one the walk saw, emptiness cannot be shown."""
+    from sunglasses import cli
+    outside = tmp_path / "outside"
+    (outside / "build").mkdir(parents=True)
+    root = tmp_path / "root"
+    (root / "pkg" / "build").mkdir(parents=True)
+    (root / "ok.md").write_text("hello\n")
+    monkeypatch.setattr(cli, "_FD_SAFE", False)
+    listed = []
+    real_scandir = os.scandir
+
+    def watching_scandir(path="."):
+        listed.append(str(path))
+        return real_scandir(path)
+
+    real = cli._list_dir
+    done = []
+
+    def swap_then_list(top, parts, *a, **kw):
+        if tuple(parts) == ("pkg", "build") and not done:
+            done.append(True)
+            if swap == "ancestor_link":
+                (root / "pkg" / "build").rmdir()
+                (root / "pkg").rmdir()
+                (root / "pkg").symlink_to(outside)
+            else:
+                (root / "pkg" / "build").rmdir()
+                (root / "pkg" / "build").mkdir()
+        return real(top, parts, *a, **kw)
+
+    monkeypatch.setattr(cli, "_list_dir", swap_then_list)
+    monkeypatch.setattr(os, "scandir", watching_scandir)
+    code = _scan_tree_exit(cli, root)
+    assert code == 3
+    assert not [p for p in listed if str(outside) in p]
+
+
+def test_without_descriptor_opens_an_empty_output_folder_is_not_inspected(tmp_path, monkeypatch):
+    from sunglasses import cli
+    (tmp_path / "build").mkdir()
+    (tmp_path / "ok.md").write_text("hello\n")
+    monkeypatch.setattr(cli, "_FD_SAFE", False)
+    assert _scan_tree_exit(cli, tmp_path) == 3
