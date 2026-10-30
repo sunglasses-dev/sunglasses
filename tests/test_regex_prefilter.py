@@ -196,7 +196,7 @@ def test_every_regex_survives_requirement_extraction(engine):
 
 
 # ---------------------------------------------------------------------------
-# REVIEW REVIEW 2026-09-10 — NO GO on 6012832. Seven of these lost a finding
+# REVIEW 2026-09-10 — NO GO on 6012832. Seven of these lost a finding
 # through the public engine: baseline blocked, candidate came back clean.
 #
 # Two defects, and the second is the one worth remembering. U1 was a repeat of

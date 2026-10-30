@@ -1,4 +1,4 @@
-"""A reviewer.R2/R3 — the doctor, reconciled onto `sunglasses.install`.
+"""Contract rows R2/R3 — the doctor, reconciled onto `sunglasses.install`.
 
 Starting material is a reviewer's `doctor.py` from #168 745849a, credited: `aggregate`,
 `process_exit_code`, `self_test_valid`, `run`/`render` and the constants are
@@ -31,7 +31,7 @@ import pytest
 from sunglasses import install as inst
 from sunglasses.proxy import doctor
 
-# All THREE controls, because a reviewer.R1 requires skipped_invocation too and a run
+# All THREE controls, because contract row R1 requires skipped_invocation too and a run
 # missing one is void. Supplying two was correct before that was pinned.
 _CONTROLS = {c: "FAIL" for c in doctor.REQUIRED_CONTROLS}
 _PASSING = {c: "PASS" for c in doctor.SELF_TEST_CHECKS}

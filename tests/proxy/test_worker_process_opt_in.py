@@ -1,4 +1,4 @@
-"""`--worker process`: the scan runs in a child where a reviewer.R4 and a reviewer.R7 hold.
+"""`--worker process`: the scan runs in a child where contract row R4 and contract row R7 hold.
 
 Opt-in. The default is the in-process path that shipped, and the first rows
 prove the default is not merely equivalent but the SAME call.

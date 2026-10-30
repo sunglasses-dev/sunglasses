@@ -47,7 +47,7 @@ pytestmark = pytest.mark.network
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
 # What `python -m sunglasses.proxy` needs in order to exist at all, and what
-# A reviewer.R1's self test spawns. Named explicitly rather than globbed: a glob over
+# contract row R1's self test spawns. Named explicitly rather than globbed: a glob over
 # the wheel would pass on whatever happens to be in it.
 REQUIRED_MEMBERS = (
     "sunglasses/proxy/__main__.py",

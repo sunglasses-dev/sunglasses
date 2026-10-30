@@ -1,6 +1,6 @@
-"""A reviewer.R12 and T7.R2's process mechanics, from the rows, before the code.
+"""Contract row R12 and T7.R2's process mechanics, from the rows, before the code.
 
-  A reviewer.R12  process groups for upstream and workers; kill and reap the group EVEN
+  Contract row R12  process groups for upstream and workers; kill and reap the group EVEN
           WHEN THE LEADER EXITED.
   T7.R2   SIGTERM then SIGKILL the upstream process group and every worker
           group, descendants included.
@@ -58,7 +58,7 @@ supervisor = pytest.importorskip(
 def _leader_with_child(marker):
     """A leader that spawns a long-lived grandchild and then EXITS.
 
-    This is the shape a reviewer.R12 names. The grandchild writes a marker file so the
+    This is the shape contract row R12 names. The grandchild writes a marker file so the
     test can see it ran, and sleeps long enough that its survival would be
     unambiguous.
     """
@@ -91,7 +91,7 @@ def _alive(pid):
 
 
 def test_a_group_is_killed_even_after_its_leader_has_exited(tmp_path):
-    """A reviewer.R12's clause, with a real descendant behind a real exited leader."""
+    """Contract row R12's clause, with a real descendant behind a real exited leader."""
     marker = str(tmp_path / "grandchild.pid")
     leader = _leader_with_child(marker)
     leader.wait(timeout=10)
@@ -159,7 +159,7 @@ def test_a_cooperative_process_gets_the_chance_to_exit_on_sigterm():
 
 
 def test_the_group_is_reaped_so_nothing_is_left_a_zombie():
-    """A reviewer.R12 says kill AND reap. An unreaped child is a zombie for as long as
+    """Contract row R12 says kill AND reap. An unreaped child is a zombie for as long as
     the proxy lives, and a long session accumulates them."""
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"],
                              start_new_session=True)

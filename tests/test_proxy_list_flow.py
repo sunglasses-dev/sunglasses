@@ -6,7 +6,7 @@ piece that makes it a product.
 
 The shape is the one T2.R6 describes and it is not obvious the first time. A
 client `tools/list` is NOT forwarded. The proxy issues its OWN list in its own
-id namespace, pages it to a terminal page under a reviewer.R13, scans every page, and
+id namespace, pages it to a terminal page under contract row R13, scans every page, and
 only then decides what the client is allowed to see. The client's single
 request is answered once, at the end, with one result.
 
@@ -189,7 +189,7 @@ def test_descriptors_carrying_an_injection_are_not_delivered(tmp_path):
     assert "result" not in client.messages()[0]
 
 
-# ── a reviewer.R13 · a list that will not end ────────────────────────────────────
+# ── contract row R13 · a list that will not end ────────────────────────────────────
 
 def test_a_server_that_never_stops_paging_withholds_rather_than_hangs(tmp_path):
     engine, _upstream, client, _store = _engine(
@@ -216,7 +216,7 @@ def test_without_a_control_channel_the_list_is_refused_not_forwarded(tmp_path):
 
 def test_a_server_that_stops_answering_gives_no_page_at_all(tmp_path):
     """A timeout is not an empty page. Reading it as one completes a snapshot
-    out of a list that never finished arriving, and a reviewer.R13's whole point is
+    out of a list that never finished arriving, and contract row R13's whole point is
     that a prefix is a different document rather than a shorter one."""
     engine, _upstream, _client, _store = _engine(tmp_path, [_page(["echo"])])
     engine.control.deadline_ms = 50

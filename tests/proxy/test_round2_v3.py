@@ -340,7 +340,7 @@ def test_Q13R_a_result_that_does_not_fit_its_request_closes_the_session():
     # sentence that tells them apart never reaches a receipt -- `_close` takes a
     # `detail` and drops it. So the discriminator here is the pair of sessions:
     # same id, same method, same pending state, one answer well formed and one
-    # not. Reported to a reviewer/a reviewer rather than fixed in a tests-only PR.
+    # not. Reported to the reviewers rather than fixed in a tests-only PR.
 
 
 def test_Q14_v3_unknown_api_settlement_refuses_without_correlation_change():

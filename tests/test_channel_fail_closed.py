@@ -53,7 +53,7 @@ def test_matched_text_never_crosses_view_boundary(engine):
 
 
 def test_matrix_every_valid_channel_detects_canonical_injection(engine):
-    """Fugu's gate (Aug-18): 'valid channel' is a stronger trust promise than
+    """Review gate (Aug-18): 'valid channel' is a stronger trust promise than
     'unknown channel'. A user selecting any channel the package exposes must
     never get clean reassurance on an obvious injection. Sparse channels are
     aliased to their canonical provenance (CHANNEL_ALIASES) to keep this true."""

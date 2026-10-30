@@ -1,4 +1,4 @@
-"""A reviewer.R1 — the self-test's decision logic, and R-DOCTOR-R3b's DEADLINE class.
+"""Contract row R1 — the self-test's decision logic, and R-DOCTOR-R3b's DEADLINE class.
 
 What these pin is the part that is pure and decidable today. The live spawn of
 `python -m sunglasses.proxy` against the bundled echo server needs

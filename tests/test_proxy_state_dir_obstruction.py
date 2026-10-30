@@ -276,7 +276,7 @@ def test_every_request_read_before_the_close_is_answered(
 @needs_modes
 @pytest.mark.parametrize("linger", [False, True], ids=["echo", "linger"])
 def test_a_capture_that_cannot_be_written_exits_nonzero(tmp_path, linger):
-    """A reviewer.R14: a fault is nonzero always. Today the lingering run exits 0
+    """Contract row R14: a fault is nonzero always. Today the lingering run exits 0
     with no reason recorded."""
     state = _obstruct(tmp_path, "captures", "0000")
     try:

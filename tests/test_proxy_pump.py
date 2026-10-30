@@ -294,7 +294,7 @@ def test_an_integer_id_and_a_float_id_do_not_collide():
         "answering the integer id also retired the float id")
 
 
-# ── T7.R1 + a reviewer.R12: the exit is a PROCESS fact, never an inactivity guess ──
+# ── T7.R1 + contract row R12: the exit is a PROCESS fact, never an inactivity guess ──
 
 def test_an_upstream_exit_with_pending_calls_closes_even_though_the_pipe_stays_open():
     """The F21 shape, driven through the handle the contract requires.
@@ -912,7 +912,7 @@ def test_a_clean_upstream_exit_of_zero_stays_zero():
 # ── AR10, AR11: the deadlines, which the table stated and nobody asked ─────
 
 def test_a_server_that_never_answers_does_not_hold_the_session_for_ever():
-    """AR11, a reviewer.R5. `bounds.check_deadline` held this number since the slice
+    """AR11, contract row R5. `bounds.check_deadline` held this number since the slice
     that wrote it and nothing asked it anything, so a server could keep a
     request open as long as it liked. A mediator that can be made to wait
     indefinitely can be taken out of the path by doing nothing at all."""
@@ -956,7 +956,7 @@ def test_a_server_answering_inside_the_deadline_is_not_disturbed():
 
 
 def test_a_frame_that_never_finishes_arriving_is_a_deadline():
-    """AR10, a reviewer.R3. A server that sends half a frame and stops is not slow, it
+    """AR10, contract row R3. A server that sends half a frame and stops is not slow, it
     is holding the pipe open, and the reader is blocked in a read that will
     never return."""
     from sunglasses.proxy import bounds

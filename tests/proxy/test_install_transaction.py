@@ -1,6 +1,6 @@
-"""A reviewer.R4/R5/R6 — the install transaction over an MCP config file.
+"""Contract rows R4/R5/R6 — the install transaction over an MCP config file.
 
-Contract: GATE3_CONTRACT_v5_2026-09-13.md, rows a reviewer.R4, a reviewer.R5, a reviewer.R6, plus
+Contract: GATE3_CONTRACT_v5_2026-09-13.md, rows R4, R5, R6, plus
 the two rules a reviewer adopted from the 2026-09-15 design note: install REFUSES when
 it cannot resolve the artifact it is about to wire, and every assertion re-reads
 bytes from disk rather than the object we serialised.

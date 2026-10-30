@@ -1,4 +1,4 @@
-"""A reviewer.R4/R5 at the CLI, through a real subprocess.
+"""Contract rows R4/R5 at the CLI, through a real subprocess.
 
 Exit codes follow AGENTS.md: 0 clean · 1 threat · 2 usage or operational error ·
 3 incomplete inspection, and `0` and `3` must never collapse into each other.

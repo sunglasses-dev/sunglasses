@@ -1,4 +1,4 @@
-"""A reviewer.R6, the admission bound, as its own subject.
+"""Contract row R6, the admission bound, as its own subject.
 
 The contract table says `in-flight held messages + pending forwarded requests
 (outstanding correlations) / queued bytes | 8 / 16 MiB | S3 OVERLOADED on the
@@ -264,7 +264,7 @@ def test_the_upstream_origin_has_a_bound_of_its_own():
     refuse. Read as round 1 read it, upstream was UNBOUNDED, which is worse: a
     server could open correlations for ever. Each origin is bounded separately
     at the same figure, so neither can spend the other's window and neither is
-    free. The contract copy carries this as the reviewer.R6 origin scope note (v5.2).
+    free. The contract copy carries this as contract row R6 origin scope note (v5.2).
     """
     session = pump.Session()
     assert _fill(session, bounds.OUTSTANDING, origin="upstream")
@@ -826,7 +826,7 @@ def test_a_locally_claimed_answer_still_counts_against_the_bound(tmp_path):
     refused attempts parked at their writers counted ZERO, and a ninth request
     was admitted with nine debts owed. Round 4 refused that ninth in the same
     window, so this is the bound going backwards, not a pre-existing gap --
-    and a reviewer.R6 names in-flight held messages explicitly.
+    and contract row R6 names in-flight held messages explicitly.
     """
     entered, release, failures = threading.Condition(), threading.Event(), []
     arrived = [0]

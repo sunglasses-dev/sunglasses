@@ -348,7 +348,7 @@ def test_self_attack_shapes_still_deny(name, command):
 
 
 # ---------------------------------------------------------------------------
-# REVIEW REVIEW 2026-09-10 — nine shapes he EXECUTED against the second cut of
+# REVIEW 2026-09-10 — nine shapes he EXECUTED against the second cut of
 # the parser. Each one really ran under bash 3.2 and really created a marker
 # inside the blocked directory while the candidate hook deferred. They are the
 # reason Bash is no longer narrowed at all, and they are kept here so that any

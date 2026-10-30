@@ -21,7 +21,7 @@ This gate locks in BOTH halves:
      resemble injection language. We assert the six added patterns do not fire on
      a benign tool-output corpus (guards against a later over-broad expansion).
 
-NOTE (integrity, per SOL/FUGU): GLS-PI-INFO is literally derived from the AgentDojo
+NOTE (integrity, per review): GLS-PI-INFO is literally derived from the AgentDojo
 `important_instructions` template. Its passing here is a KNOWN-ATTACK regression, not
 evidence of generalization to unseen attacks — keep a held-out suite for that claim.
 """

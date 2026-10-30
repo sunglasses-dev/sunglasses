@@ -27,7 +27,7 @@ import pytest
 # SUNGLASSES_TEST_ROOT to a neutral directory so that `python -m sunglasses`
 # resolves to the installed package instead of the working copy sitting on
 # sys.path via cwd. Test-only: this variable does not exist inside the package
-# and cannot change any security behaviour (Fugu's constraint - no env var in
+# and cannot change any security behaviour (review constraint - no env var in
 # the released wheel may weaken a verdict).
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_ROOT = os.environ.get("SUNGLASSES_TEST_ROOT") or REPO_ROOT
@@ -450,7 +450,7 @@ def test_output_json_alias_emits_json(bundle):
     ("opaque.zip", EXIT_INCOMPLETE),
 ])
 def test_human_json_and_sarif_tell_the_same_story(bundle, target, expected):
-    """Fugu gate 3: three renderings, one truth. Same exit code from each."""
+    """Review gate 3: three renderings, one truth. Same exit code from each."""
     path = str(bundle / target)
     human = _run([sys.executable, "-m", "sunglasses"], "--file", path)
     as_json = _run([sys.executable, "-m", "sunglasses"], "--file", path, "--json")
@@ -560,7 +560,7 @@ def test_mcp_never_reports_zero_threats_on_an_incomplete_read():
 
 
 # ==========================================================================
-# 7. Env vars may not weaken a verdict (Fugu final constraint)
+# 7. Env vars may not weaken a verdict (final review constraint)
 # ==========================================================================
 
 def test_disable_extractors_can_never_produce_a_clean_exit(bundle):
@@ -580,7 +580,7 @@ def test_disable_extractors_can_never_produce_a_clean_exit(bundle):
 
 
 def test_disable_extractors_can_only_make_a_result_more_conservative(bundle, tmp_path):
-    """The invariant Fugu asked for, stated so it is actually testable.
+    """The invariant the review asked for, stated so it is actually testable.
 
     The literal request was "prove it can never yield exit 0". Taken at face
     value that would require a PLAIN TEXT file to become INCOMPLETE when the

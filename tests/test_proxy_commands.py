@@ -1,7 +1,7 @@
 """The commands, specified before they exist.
 
-A reviewer.R4 and a reviewer.R5 are written as commands: `install <name> -- <argv>` and
-`uninstall <name>`. A reviewer.R3 is a report with three lines and an exit code, which
+Contract row R4 and contract row R5 are written as commands: `install <name> -- <argv>` and
+`uninstall <name>`. Contract row R3 is a report with three lines and an exit code, which
 only means something to somebody who can run it. None of that was reachable.
 `sunglasses/install.py` owns install, uninstall and classify (R-DOCTOR-OWNER,
 2026-09-15); the rows that drove this lane's second implementation moved out
