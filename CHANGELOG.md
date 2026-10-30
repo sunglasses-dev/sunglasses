@@ -5,7 +5,47 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.15] — 2026-10-29
+
+### Added
+
+- `sunglasses scan --report-to URL` sends one summary of a finished scan to the URL you name. It works
+  with `--file`, `--text`, `--stdin`, `--dir` and `--repo`. Without the flag nothing is sent. The
+  upload runs after the scan has printed its output and decided its exit code, and changes neither;
+  a failed upload is one stderr line starting `sunglasses: --report-to:`. The token is read from
+  `SUNGLASSES_REPORT_TOKEN` and sent as `Authorization: Bearer` to that URL only; there is no flag
+  for it, and without the variable nothing is sent. The URL must be `https://`, or `http://` for
+  this machine only; a redirect is not followed and a URL carrying a user or password is refused.
+  The document is built from lists of allowed fields: per scan the event id, decision, severity,
+  channel, source, counts, coverage flags and the two breakdown maps; per file the path, decision
+  and threat count; per finding the rule id, severity, category, `line` (or `null`) and the matched
+  text as its SHA-256 and length, or the text itself with `--report-include-text`. It also carries
+  the scanner version, the pattern count and a source name (`--report-source`).
+  `--report-include-receipts` adds the newest segment of the signed hook log with its public key;
+  otherwise `receipts` is `null`. Paths, rule ids and the keys of the two breakdown maps are sent
+  as they are, so the allowed fields are not a filter for private content. While the scan runs the
+  token is out of the environment handed to the programs the scan starts (the scan worker, `git`
+  for `--repo`, `ffmpeg` for `--deep`); that controls what is inherited and is not isolation inside
+  the process. The command stops waiting for the upload after 15 seconds in all, and a report over
+  1 MiB or with more than 5,000 findings is not sent. A run that ends without a scan result sends
+  nothing and says so in one line. `tests/test_report_to.py` runs the command against a local fake
+  HTTP server; behavior against a real remote server, a real TLS peer and real socket timeouts is
+  not tested. The README gains a section on the flag, and its two sentences that said nothing
+  leaves your machine now name it. (#512)
+
 ### Changed
+
+- `sunglasses scan --dir` and `--repo` with `-o json` print a summary that now names both counts.
+  `total_threats` is the number of findings the scan reports (the same number `--file` prints as
+  `findings_count`); the new `raw_findings` is the sum of the per-file `threats` in `file_results`,
+  which count pattern fires before that step and can be higher for the same file. The README
+  paragraph on `scan --dir` describes both. No existing field changes meaning or position; exit
+  codes, the human screen and SARIF output are unchanged. (#515)
+
+- `sunglasses init` and the Claude Code integration doc no longer say pattern and intent matches
+  always escalate to you. They say the check is off by default, `touch ~/.sunglasses/warn-lane`
+  turns it on, it asks and never denies, and it also asks on files that quote attack phrases. Text
+  only; no hook or detection change. (#516)
 
 - `sunglasses scan --help` and the README now say which channel carries a tool result: a tool
   result is the `api_response` channel, where the `-API` credential rules are declared, and no
@@ -14,7 +54,32 @@ All notable changes to Sunglasses are documented here.
   clauses in the help text and the README, and three facts behind them: the proxy reads a tool
   result as `api_response`, every `-API` credential rule is declared on `api_response`, and no
   credential rule is declared on `tool_output`. If one of those facts changes, the test fails
-  until the words are updated.
+  until the words are updated. (#518)
+
+- The README's license line keeps the MIT link and points to sunglasses.dev/pricing for the paid
+  review; the license itself is unchanged. `ROADMAP.md` is new: it says what does not change for
+  the free scanner, what is ongoing and planned, and the two paid offers. Documentation only; no
+  code. (#514)
+
+- The README, the plugin README and the package summaries in `setup.py` and `server.json` no
+  longer say the scanner makes no network calls at all. They name the two paths that do:
+  `scan --report-to URL` sends that scan's result to the URL you name, and the optional audio
+  extra downloads its Whisper model when a scan needs it and no intact copy is cached. The
+  package summaries now say the scanner uses no network by default. Documentation only; no
+  code change. (#523)
+
+### Fixed
+
+- A directory or repo scan's JSON carried `event_id: ""` while a file scan carried an id. It now
+  carries a fresh id per run, made by the same function a file scan's result uses. (#515)
+
+### Internal
+
+- Tests only: the docstring of `test_a_refused_scan_never_puts_the_token_back` in
+  `tests/test_report_to.py` now describes the fixture it uses: it stands in for the owner's removal
+  landing while a second call registers, and the refused call neither reads nor restores the
+  token. Comment text only; no test body changes. (#517)
+- Three docstrings and one comment in `sunglasses/receipts/codes.py` no longer cite internal review notes by name; the reason each states stays: the module docstring says a key commits to the part of a log it covers and does not prove who wrote each line; `exit_for` derives the exit from the code's class; `combine_exits` lets any failure win, then a usage error, then any limit. Comment text only: the module parses to the same syntax tree once docstrings are blanked. (#520)
 
 ## [0.6.14] — 2026-10-26
 
