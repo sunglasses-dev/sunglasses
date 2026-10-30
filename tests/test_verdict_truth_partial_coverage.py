@@ -178,6 +178,8 @@ def test_empty_first_party_folder_changes_nothing(tmp_path):
     doc = json.loads(out)
     assert code == 0 and doc["decision"] == "allow"
     assert doc["folders_excluded_with_files"] == 0
+    # An empty folder of our own is neither a gap nor a dependency.
+    assert doc["excluded_dependency_folders"] == 0 and doc["excluded_tool_cache_folders"] == 0
 
 
 def test_compiled_file_in_scope_is_a_skipped_file(tmp_path):
@@ -199,7 +201,7 @@ def test_text_verdict_prints_both_counts(tmp_path):
     (tmp_path / "node_modules" / "b.js").write_text("x\n")
     _code, out = _scan(tmp_path, "--dir", str(tmp_path))
     line = next(l for l in out.splitlines() if "Not inspected:" in l)
-    assert "0 files, 1 folders" in line and "1 dependency/VCS folders" in line
+    assert "0 files, 1 folders" in line and "1 dependency/VCS, 0 tool-cache folders" in line
     assert "NOT_INSPECTED" in out
 
 
@@ -210,3 +212,14 @@ def test_finding_in_scope_still_blocks_beside_a_folder_gap(tmp_path):
     code, out = _scan(tmp_path, "--dir", str(tmp_path), "--json")
     doc = json.loads(out)
     assert code == 1 and doc["decision"] != NOT_INSPECTED and doc["threat_found"] is True
+
+
+@pytest.mark.parametrize("name", [".mypy_cache", ".pytest_cache"])
+def test_tool_cache_is_counted_on_its_own_and_verdict_unchanged(tmp_path, name):
+    (tmp_path / "ok.md").write_text("hello\n")
+    (tmp_path / name).mkdir()
+    (tmp_path / name / "x.json").write_text("{}\n")
+    code, out = _scan(tmp_path, "--dir", str(tmp_path), "--json")
+    doc = json.loads(out)
+    assert code == 0 and doc["decision"] == "allow"
+    assert doc["excluded_tool_cache_folders"] == 1 and doc["excluded_dependency_folders"] == 0

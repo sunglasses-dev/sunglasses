@@ -5,6 +5,11 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- `scan --dir`, `scan --repo` and `scan --file` now put the word `not_inspected` in `decision` when part of the input was not read: an archive or compiled file, a file that could not be opened, or a build or cache folder of the project (`__pycache__`, `build`, `dist`, `coverage`, `.next`, `.nuxt`, `*.egg-info`) that held files. They used to print `allow` beside `inspection_complete: false` and exit 3. The exit code is unchanged. The text report prints `Decision: NOT_INSPECTED` and a `Not inspected:` line with the file and folder counts. The JSON gains `files_not_inspected`, `folders_excluded_with_files`, `excluded_not_inspected`, `excluded_dependency_folders` and `excluded_tool_cache_folders`. Dependency, version-control and tool-cache folders (`node_modules`, `.venv`, `venv`, `vendor`, `.tox`, a nested `.git`, `.mypy_cache`, `.pytest_cache`) are still named and counted, and still leave the verdict unchanged.
+- Contract note: `decision` has a new value in every scan document. A consumer that tests `decision == "allow"` now fails closed, as intended. A consumer that tests `decision != "allow"` will treat `not_inspected` as a threat, so read `threat_found` for that. A local Python project with a `__pycache__` that holds `.pyc` files now exits 3; that is the intended behaviour, not a regression. The engine's own `ScanResult.decision` does not change, and a finding still reports `block`.
+
 ## [0.6.16] — 2026-10-30
 
 ### Added

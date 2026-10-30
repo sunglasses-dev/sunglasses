@@ -196,6 +196,8 @@ _SKIP_DIRS = {
 # name in `_SKIP_DIRS` is somebody else's code or version-control state (a dependency tree, a
 # virtualenv, a nested `.git`): named in `excluded_folders` and counted, verdict unchanged.
 _FIRST_PARTY_OUTPUT_DIRS = {'__pycache__', 'build', 'dist', 'coverage', '.next', '.nuxt'}
+# Tool caches hold nothing an agent reads: named and counted on their own line, verdict unchanged.
+_TOOL_CACHE_DIRS = {'.mypy_cache', '.pytest_cache'}
 
 
 def _is_first_party_output_dir(rel):
@@ -1276,8 +1278,13 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     gap_names = {rel for rel, _reason in folder_gaps}
     summary["folders_excluded_with_files"] = len(folder_gaps)
     summary["excluded_not_inspected"] = [{"folder": f, "reason": r} for f, r in folder_gaps]
-    summary["excluded_dependency_folders"] = sum(
-        1 for rel in excluded_folders if rel not in gap_names)
+    # The rest of the named folders, by what they are. An empty folder of our own is neither.
+    _named = [rel for rel in excluded_folders if rel not in gap_names
+              and not _is_first_party_output_dir(rel)]
+    n_tool_cache = sum(1 for rel in _named if os.path.basename(rel) in _TOOL_CACHE_DIRS)
+    n_dependency = len(_named) - n_tool_cache
+    summary["excluded_dependency_folders"] = n_dependency
+    summary["excluded_tool_cache_folders"] = n_tool_cache
     incomplete = bool(files_incomplete or unread_skips or folder_gaps or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
@@ -1403,11 +1410,12 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}{RESET}")
         if len(folder_gaps) > 10:
             print(f"    {DIM}... and {len(folder_gaps) - 10} more{RESET}")
-    dependency_named = [name for name in excluded_folders if name not in gap_names]
+    dependency_named = [name for name in excluded_folders if name not in gap_names
+                        and not _is_first_party_output_dir(name)]
     if dependency_named:
         shown = ", ".join(_printable(name) for name in dependency_named[:10])
         more = f" and {len(dependency_named) - 10} more" if len(dependency_named) > 10 else ""
-        print(f"  {DIM}Folders not entered (dependency/VCS): {shown}{more}{RESET}")
+        print(f"  {DIM}Folders not entered (dependency/VCS/tool cache): {shown}{more}{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
@@ -1416,7 +1424,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
     print(f"  Not inspected:   {BOLD}{len(walker_skips) + len(partially_read)}{RESET} files, "
           f"{BOLD}{len(folder_gaps)}{RESET} folders  "
-          f"{DIM}(+ {len(dependency_named)} dependency/VCS folders named, not entered){RESET}")
+          f"{DIM}(+ {n_dependency} dependency/VCS, {n_tool_cache} tool-cache folders named, "
+          f"not entered){RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
     print(f"  Decision:        {BOLD}{str(summary['decision']).upper()}{RESET}")
     if policy:
