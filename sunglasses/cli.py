@@ -4471,7 +4471,17 @@ def cmd_doctor(args, _run=None):
     else:
         print(f"  {DIM}No server entries found.{RESET}")
 
-    print()
+    if rendered.get("approvals"):
+        print(f"  {BOLD}Approvals{RESET}  {DIM}(each is bound to the folder the server was "
+              f"started from){RESET}")
+        for row in rendered["approvals"]:
+            if row["state"] == "UNREADABLE":
+                print(f"    {YELLOW}UNREADABLE{RESET} {row['server']}")
+                continue
+            tools = "?" if row["tools"] is None else row["tools"]
+            print(f"    {GREEN}APPROVED{RESET}   {row['server']}  {tools} tool(s)  "
+                  f"{DIM}folder {_printable(row['folder'])}{RESET}")
+        print()
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
     # was tried and nothing failed. Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is

@@ -70,6 +70,45 @@ def _valid_sha(value):
             and all(c in _HEX for c in value))
 
 
+def folder_text(folder):
+    """A folder as a line may print it: never a name with a control character in it."""
+    if not isinstance(folder, str) or not folder:
+        return "unknown (recorded before folders were kept)"
+    return folder if folder.isprintable() else "(a folder whose name has control characters)"
+
+
+def approval_rows(root):
+    """Every approval under `root`, read only: server, folder, snapshot and tool count.
+
+    Looks and never writes or creates anything, and a record it cannot read becomes a row that
+    says so rather than disappearing, so a listing never reads as "no approvals" over a
+    directory it could not open.
+    """
+    directory = pathlib.Path(root) / "approvals"
+    try:
+        paths = sorted(directory.glob("*.json"))
+    except OSError:
+        return []
+    rows = []
+    for path in paths:
+        server = path.stem[:12]
+        try:
+            record = json.loads(path.read_text())
+            if not isinstance(record, dict):
+                raise ValueError
+        except (OSError, ValueError):
+            rows.append({"server": server, "state": "UNREADABLE", "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
+        tools = record.get("tools")
+        snapshot = record.get("snapshot_sha256")
+        rows.append({"server": server, "state": "APPROVED",
+                     "folder": folder_text(record.get("folder")),
+                     "snapshot": snapshot[:12] if isinstance(snapshot, str) else None,
+                     "tools": len(tools) if isinstance(tools, dict) else None})
+    return rows
+
+
 class Store:
     """The record on disk, the state it implies, and the activation gate."""
 
@@ -96,7 +135,13 @@ class Store:
         return self.approvals / f"{self.server_id}.json"
 
     def capture(self, snapshot_sha256, payload):
-        """The capture the human is shown. Approval quotes this sha."""
+        """The capture the human is shown. Approval quotes this sha.
+
+        It also records the folder the proxy was started from, because the server identity
+        includes it: an approval is bound to that folder, and `proxy approve` and `doctor`
+        say which one. The folder is not part of the sha a human approves.
+        """
+        payload = {**payload, "folder": os.getcwd()}
         (self.captures / f"{self.server_id}.{snapshot_sha256}.json").write_text(
             json.dumps(payload, sort_keys=True))
         # REMEMBERED so a refusal can name it. `proxy approve` needs this sha,
@@ -154,6 +199,8 @@ class Store:
             # empty tool list is a true statement about a server with no tools.
             "tools": stored.get("tools_by_name") or {},
         }
+        if isinstance(stored.get("folder"), str):
+            record["folder"] = stored["folder"]
         with self._lock:
             self._path.write_text(json.dumps(record, sort_keys=True))
             # contract row 5.1 and T505. The record names which descriptors a human
