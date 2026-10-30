@@ -122,7 +122,7 @@ def test_the_dropped_notification_is_recorded_with_its_invalidation_cause(tmp_pa
 
     Observed on the core's event list, which is where the OTHER two
     NOTIFICATION_DROPPED emits already go -- following the established path
-    rather than inventing a second one. OPEN QUESTION for T9, raised rather
+    rather than inventing a second one. OPEN QUESTION for a reviewer, raised rather
     than decided quietly: `NOTIFICATION_DROPPED` is also in `receipts.py`'s
     frozen kind allowlist, which suggests it is meant to reach the durable
     jsonl too. If so, all three emits move together, and that is a change to
@@ -168,7 +168,7 @@ def test_the_dropped_notification_reaches_the_receipt_file(tmp_path):
 
     A previous version of this idea wrote through `receipts.Log` DIRECTLY and
     passed, which proved the Log CAN carry a field and never that the product
-    DOES. ASTRA then measured the native path: `Session._emit` appends to an
+    DOES. The reviewer then measured the native path: `Session._emit` appends to an
     in-memory list, nothing drains it, and the field reached disk 0 times in
     20. So this row constructs NO transport of its own. It drives the product
     -- an invalidated session, a notification arriving -- and then reads the

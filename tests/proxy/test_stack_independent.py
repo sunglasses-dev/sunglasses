@@ -242,7 +242,7 @@ def test_T903_receipt_values_are_validated_not_only_field_names(tmp_path,field):
     finally:log.close()
 
 
-# R-T903-1 (T9, 2026-09-14 10:24). `id_token` is the MINTED grammar now, and
+# R-T903-1 (a reviewer, 2026-09-14 10:24). `id_token` is the MINTED grammar now, and
 # this control writes `id_token='review'`, so it is split the way R-RC03-1 split
 # RC03: the line that is withdrawn becomes a strict xfail tripwire, and the
 # substantive assertion -- an append IO failure produces a Stop instead of

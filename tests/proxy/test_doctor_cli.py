@@ -220,12 +220,12 @@ def test_help_documents_the_exit_ladder():
 
 
 # ---------------------------------------------------------------------------
-# 5. F1 — ASTRA round 1, 2026-09-21: an explicitly empty --config
+# 5. F1 — the reviewer round 1, 2026-09-21: an explicitly empty --config
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("empty", ["", "--config="])
 def test_an_explicitly_empty_config_never_falls_back_to_home_discovery(tmp_path, empty):
-    """ASTRA F1, reproduced before it was fixed.
+    """review F1, reproduced before it was fixed.
 
     `if args.config:` treats an empty string as an omitted option, so
     `sunglasses doctor --config ""` returned byte-identical JSON to the bare
@@ -264,7 +264,7 @@ def test_the_control_a_real_path_still_scopes_and_a_real_default_still_discovers
 def test_install_and_uninstall_refuse_an_empty_config_too(tmp_path):
     """F1's class, found on the WRITE path by grepping for the idiom.
 
-    ASTRA reported F1 against `doctor`, which only reads. `_install_config_path`
+    The reviewer reported F1 against `doctor`, which only reads. `_install_config_path`
     carried the same `args.config if args.config else <default>`, so
     `sunglasses install <name> --config ""` resolved to `./.mcp.json` and EDITED
     a file the operator never named. Same one-line defect, a worse verb.

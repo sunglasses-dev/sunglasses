@@ -40,7 +40,7 @@ def test_an_item_is_settled_once_and_a_second_attempt_raises():
 def test_a_second_teardown_settles_nothing_new_and_redelivers_the_batch():
     """Settling happens once. DELIVERING the answers may happen again.
 
-    This asserted that a repeat teardown returns `{}`. ASTRA's review showed
+    This asserted that a repeat teardown returns `{}`. The reviewer's review showed
     what that costs: the supervisor ran before the batch was returned, so a
     supervisor that raised took the only copy of the answers with it, and the
     retry reported nothing to deliver while every item was already settled.
@@ -254,7 +254,7 @@ def test_the_receipt_shows_the_teardown_and_what_it_settled():
     # SESSION_TORN_DOWN rather than UPSTREAM_CLOSED, because this teardown was
     # given no supervisor. Claiming the upstream closed when nothing supervised
     # the processes puts a false sentence in the evidence while a child may
-    # still be running, which is ASTRA's F14.
+    # still be running, which is review's F14.
     assert kinds == ["CAUSE_RECORDED", "TEARDOWN", "SETTLED",
                      "SESSION_TORN_DOWN"]
     assert session.events[-1]["settled"] == 1
@@ -263,8 +263,8 @@ def test_the_receipt_shows_the_teardown_and_what_it_settled():
     assert stamps == sorted(stamps)
 
 
-# ── the origin distinction, T9's ruling of 2026-09-13 ──────────────────────
-# ASTRA's C03 and his Q14 make the identical call and require opposite outcomes.
+# ── the origin distinction, a reviewer's ruling of 2026-09-13 ──────────────────────
+# review's C03 and his Q14 make the identical call and require opposite outcomes.
 # They are both right about different things, and the API could not tell them
 # apart because it had no way to say where a settlement came from.
 #

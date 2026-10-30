@@ -92,7 +92,7 @@ def _only_keys(obj, where, required=(), optional=()):
 def _rpc_id(value, where):
     """The id of a reply, as an int, or a refusal.
 
-    ASTRA round 3: `id` was never examined, so an initialize reply carrying
+    The reviewer round 3: `id` was never examined, so an initialize reply carrying
     `true` or `1.5` correlated to request 1 in a plain dict. JSON-RPC ids are a
     number or a string; `True` is neither (Python's isinstance(True, int) is the
     trap), and 1.5 is a different number from the 1 we sent. 1.0 IS the number 1
@@ -174,7 +174,7 @@ def parse_replies(stdout):
 def _channel_list(value, where):
     """A channel vocabulary is an ARRAY OF STRINGS or it is not a vocabulary.
 
-    ASTRA round 1: a dict in place of the array passed both comparisons, because
+    The reviewer round 1: a dict in place of the array passed both comparisons, because
     `set()` of a dict silently yields its keys and the type is discarded.
     """
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
@@ -217,7 +217,7 @@ def _channel_enum(prop, where):
     """
     _only_keys(prop, f"{where}: channel property",
                required=("enum",), optional=("type",) + tuple(_SCHEMA_ANNOTATIONS))
-    # ROUND 6, ASTRA: `{"type": ["string", "null"], "enum": [...nine strings...]}`
+    # ROUND 6, the reviewer: `{"type": ["string", "null"], "enum": [...nine strings...]}`
     # was refused and should not have been. `type` and `enum` are CONJUNCTIVE, so
     # a union containing null admits no null while the enum holds only strings --
     # the schema describes exactly the nine. Round 4 accepted two spellings by
@@ -250,7 +250,7 @@ def _input_schema_channel(schema, where):
     """The channel property, from an inputSchema that constrains it NOWHERE ELSE.
 
     ROUND 6, and it is the defect this whole file exists for arriving one layer
-    above where anyone was looking. ASTRA's wire kept the nine-value enum on the
+    above where anyone was looking. The reviewer's wire kept the nine-value enum on the
     property AND the nine in scanner_info, and added to the CONTAINING schema:
 
         "allOf": [{"properties": {"channel": {"enum": ["message"]}}}]
@@ -417,7 +417,7 @@ def read_surfaces(stdout):
     """Both published channel vocabularies, read from one server's stdout.
 
     THE WHOLE READING PATH IS THIS ONE FUNCTION, and it exists because of
-    ASTRA's round-3 finding: every helper below was unit-tested, and swapping
+    the reviewer's round-3 finding: every helper below was unit-tested, and swapping
     the FIXTURE's single call to the schema reader for a raw enum read left
     33/33 green while a known-defective wire went back to passing. The repairs
     were proven; their presence in the path that actually runs was not.
@@ -502,7 +502,7 @@ def test_valid_channels_is_the_contract_plus_exactly_the_named_aliases():
 
 
 # ── REJECTION CONTROLS ────────────────────────────────────────────────────────
-# The wire shapes ASTRA used to make the two assertions above falsely green.
+# The wire shapes the reviewer used to make the two assertions above falsely green.
 # These drive `parse_replies` / `_channel_list` directly rather than a
 # subprocess: the defect was never in the server, it was in what this file
 # accepted from one, and a control that has to boot a server to say so is a
@@ -669,12 +669,12 @@ def test_a_channel_schema_outside_the_one_accepted_shape_is_refused(name, prop):
 
 @pytest.mark.parametrize("name,prop", [
     ("type string with an enum", {"type": "string", "enum": ["message", "file"]}),
-    # ASTRA round 3, false kill 1: an enum of strings with no `type` is valid
+    # The reviewer round 3, false kill 1: an enum of strings with no `type` is valid
     # JSON Schema and permits exactly those strings.
     ("no type at all, the enum alone", {"enum": ["message", "file"]}),
-    # ASTRA round 3, false kill 2: the singleton type array is the same type.
+    # The reviewer round 3, false kill 2: the singleton type array is the same type.
     ("the singleton type array", {"type": ["string"], "enum": ["message", "file"]}),
-    # ASTRA round 6: type and enum are CONJUNCTIVE, so a union carrying null
+    # The reviewer round 6: type and enum are CONJUNCTIVE, so a union carrying null
     # admits no null while the enum holds only strings. Refusing it was the
     # round-3 false-kill mistake in a third costume -- accepting the spellings I
     # had met rather than asking whether the type permits strings.
@@ -805,7 +805,7 @@ def test_the_two_readers_compose_on_a_well_formed_pair():
     """The fixture's whole path, off the wire, with no server booted.
 
     Each reader above is proven alone. This proves they are the ones the fixture
-    actually calls on a good wire -- the connection ASTRA showed could be cut in
+    actually calls on a good wire -- the connection the reviewer showed could be cut in
     round 3 without a single named control going red.
     """
     wire = "\n".join([
@@ -823,7 +823,7 @@ def test_the_two_readers_compose_on_a_well_formed_pair():
 
 
 # ── THE CONNECTION CONTROL ───────────────────────────────────────────────────
-# ASTRA, round 3: "direct helper controls prove less than a bounded full-fixture
+# The reviewer, round 3: "direct helper controls prove less than a bounded full-fixture
 # control: they establish helper behavior, but do not prove the fixture invokes
 # it." Swapping ONE call in the fixture left all 33 tests green and made a
 # known-defective wire pass again.
@@ -878,7 +878,7 @@ _NINE = list(SunglassesEngine.DOCUMENTED_CHANNELS)
                     {"type": "text", "text": json.dumps({"channels": _NINE})}])),
     ("the tools reply answered twice", _wire() + "\n" + _wire().splitlines()[0]),
     ("an id that is boolean true", _wire(list_id=True)),
-    # ROUND 6, ASTRA'S WIRE, kept verbatim in shape. The property still
+    # ROUND 6, the reviewer'S WIRE, kept verbatim in shape. The property still
     # advertises nine and scanner_info still publishes nine, so both equality
     # assertions pass; the containing schema narrows the channel to one value in
     # `allOf`, and a schema-obeying client can send only `message`. The reader

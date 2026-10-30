@@ -8,9 +8,9 @@ ROOT=Path(__file__).resolve().parents[1]
 FIX=Path(__file__).resolve().parent / 'fixtures/pr164_f43781b'
 
 
-# ── R-W03-2 (T9, 2026-09-14) ────────────────────────────────────────────────
+# ── R-W03-2 (a reviewer, 2026-09-14) ────────────────────────────────────────────────
 # The empty-output clause is WITHDRAWN on the seventeen controls that carried
-# it, the same shape ASTRA withdrew for W03 at 03:24. It was written when a
+# it, the same shape the reviewer withdrew for W03 at 03:24. It was written when a
 # fault yielded nothing because the refusal did not exist yet; T6.R1 and C07
 # now require exactly one typed refusal on these paths, so silence here is
 # F15's hang.
@@ -154,7 +154,7 @@ def _w03_run(tmp_path):
     return got,s,ident,exited
 
 def test_W03_G2_22_actual_child_exit_pending(tmp_path):
-    # ASTRA withdrew this one's empty-output assertion himself at 03:24; the
+    # The reviewer withdrew this one's empty-output assertion himself at 03:24; the
     # three substantive assertions below are the ones he said still stand, and
     # C01 in test_round5.py is the corrected control.
     _got,s,ident,exited=_w03_run(tmp_path)

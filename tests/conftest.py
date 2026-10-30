@@ -53,13 +53,13 @@ def pytest_report_header(config):
             "contain origin/main is not evidence about what CI will run"]
 
 
-# ASTRA's artifact controls (tests/proxy/test_artifact_review.py) read their
+# The reviewer's artifact controls (tests/proxy/test_artifact_review.py) read their
 # payload specimens out of the review layout, `tests/stack/tests/...`, so that
 # path is a symlink back to this suite's own file. Collecting it twice is an
 # import-file-mismatch, and the controls are vendored unchanged, so the
 # directory is skipped here rather than the control being edited.
 # `stack/` is that, and `source/` is the same shape: the review layout resolves
-# this suite's sources at the paths ASTRA's controls were written against.
+# this suite's sources at the paths the reviewer's controls were written against.
 #
 # Both are TRACKED, as per-FILE symlinks rather than a directory symlink. That
 # matters twice. A directory symlink pointing back at its own parent is a cycle
@@ -101,7 +101,7 @@ if _ROOT not in _os.environ.get("PYTHONPATH", "").split(_os.pathsep):
 #
 # The proxy's state root is not a variable at all: it is ~/.sunglasses/proxy,
 # from $HOME (serve.state_root), and `receipts` names every run log there
-# (T9 ruling 60). So $HOME is the test's own too. PYTHONUSERBASE keeps a
+# (a reviewer ruling 60). So $HOME is the test's own too. PYTHONUSERBASE keeps a
 # dependency installed with `pip --user` importable under the new $HOME.
 import pytest as _pytest
 import site as _site

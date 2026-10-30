@@ -68,7 +68,7 @@ def test_the_admitted_record_carries_origin_to_disk(tmp_path):
         "the field this record already carried must still be there")
 
 
-# ── ASTRA r1 on 8d21e5d: an explicit null origin walked past the check ──────
+# ── the reviewer r1 on 8d21e5d: an explicit null origin walked past the check ──────
 # `_check_value` returned on `None` BEFORE it reached the origin branch, and the
 # row above this comment used to list None as a GOOD origin -- the test agreed
 # with the hole. An omitted field and a field supplied as None are different

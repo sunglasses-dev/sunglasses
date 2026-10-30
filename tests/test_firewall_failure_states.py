@@ -622,7 +622,7 @@ def test_a_fifo_policy_answers_in_a_separate_process_within_a_second(home):
 
 # ═══ COST — the guard has to ANSWER, and a big document is not an excuse ═════
 #
-# ASTRA's round-4 blocker on #173, and the shape is the one this file exists
+# The reviewer's round-4 blocker on #173, and the shape is the one this file exists
 # for: a hook that misses the harness deadline FAILS OPEN, in silence, with no
 # terminal receipt. The ownership rule added in round 4 asked "does anything
 # else contain me?" by walking the whole match list for every occurrence, so a
@@ -638,7 +638,7 @@ _COST_TOKENS = 16000
 
 
 def _cost_document(count=_COST_TOKENS, unique=False):
-    """`count` credential-shaped tokens, ASTRA's shape: an Anthropic prefix and
+    """`count` credential-shaped tokens, the reviewer's shape: a vendor key prefix and
     a 40-character q/Q body, which is material rather than filler and is also
     the overlap case -- two rules match every one of them."""
     import random as _random
@@ -664,7 +664,7 @@ def _denied(out):
 
 @pytest.mark.parametrize("unique", [False, True], ids=["COST-16000", "COST-16000-UNIQUE"])
 def test_a_document_of_16000_credentials_is_answered_inside_the_shipped_deadline(home, unique):
-    """Both of ASTRA's blocking controls.
+    """Both of the reviewer's blocking controls.
 
     The assertion is the DEADLINE, not a stopwatch reading: `_hook_subprocess`
     raises TimeoutExpired if the process has to be killed, which is exactly the

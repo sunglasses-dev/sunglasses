@@ -1,6 +1,6 @@
 """
 test_receipts_exit_classes.py — every reason code is ok, fail or limit, and the
-exit code is derived from that tag (T9 rulings 46 and 48).
+exit code is derived from that tag (a reviewer rulings 46 and 48).
 
 0 means every result is ok. 1 means at least one result is a failure. 3 means
 no failure and at least one limit: the verifier could not conclude because the
@@ -11,9 +11,9 @@ A code with no tag is a code whose exit nobody decided, so the enumeration test
 goes red the moment one is added to CODES without a class, and a result that is
 not a known code at all exits 1. The eight limits are named here one by one,
 so moving a code between classes is a red too. NO_LOG, the seventh, is a
-`--verify` that found nothing on disk to verify (T9 ruling 53). LOG_UNCHAINED,
+`--verify` that found nothing on disk to verify (a reviewer ruling 53). LOG_UNCHAINED,
 the eighth, is a log the home walk found with no chain and nothing to say it
-should have one (T9 ruling 60).
+should have one (a reviewer ruling 60).
 """
 import json
 import os
@@ -121,7 +121,7 @@ KIND = {"KEY_UNTRUSTED": "key_trust", "HISTORY_EXTENT_UNKNOWN": "expected_endpoi
     ("UNKNOWN_FIELD", 1, 1),
 ] + [(code, "limit", 1) for code in sorted(LIMITS)])
 def test_the_exit_table(code, default, strict):
-    # The limit exit is one constant (T11): a ruling that moves it moves here.
+    # The limit exit is one constant (a reviewer): a ruling that moves it moves here.
     default = codes.EXIT_LIMIT if default == "limit" else default
     results = dict(PASSING) if code is None else dict(
         PASSING, **{KIND.get(code, "lifecycle"): code})
@@ -222,7 +222,7 @@ def test_the_cli_exits_3_on_a_limit_and_1_under_strict(tmp_path):
     assert code == 2, out
 
 
-# ── T9 ruling 53: nothing on disk is a limit, a listing is not a verdict ─────
+# ── a reviewer ruling 53: nothing on disk is a limit, a listing is not a verdict ─────
 
 @pytest.mark.parametrize("code,default,strict", [
     ("KEY_TRUSTED", 0, 0), ("NO_LOG", 3, 1), ("SEQUENCE_GAP", 1, 1),
@@ -273,7 +273,7 @@ def _vector_log(tmp_path, vector="17", name="hook"):
 
 
 def test_a_segment_checked_alone_under_a_confirmed_log_says_so(tmp_path):
-    """T9 ruling 53 (O1), display only. Each segment is checked alone, with no
+    """A reviewer ruling 53 (O1), display only. Each segment is checked alone, with no
     endpoint; under a log whose endpoint is confirmed that is not an unknown
     extent, and printing HISTORY_EXTENT_UNKNOWN there reads as a contradiction.
     The exit and the segment's own result are unchanged."""

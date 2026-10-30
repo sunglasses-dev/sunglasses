@@ -19,7 +19,7 @@ def test_G2_15_reverse_request_gets_upstream_response(tmp_path):
   assert (tmp_path/'ready').exists()
   assert (tmp_path/'received.bin').read_bytes()==req
   time.sleep(.3)
-  # R-W03-2 (T9, 2026-09-14). `assert not out` moved to its own strict xfail
+  # R-W03-2 (a reviewer, 2026-09-14). `assert not out` moved to its own strict xfail
   # below. This peer's last two statements are readline() then a write, so it
   # EXITS the instant we answer the reverse request, T7.R1 fires on the still
   # pending client request, and T6.R1 owes that client exactly one answer. The

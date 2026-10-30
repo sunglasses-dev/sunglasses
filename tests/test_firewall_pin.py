@@ -282,7 +282,7 @@ def test_tofu_reason_states_the_limitation_out_loud():
     assert "sunglasses pin" in decision.reason
 
 
-# ── receipts must confess which mode ran (T9 rail #3) ───────────────────────
+# ── receipts must confess which mode ran (a reviewer rail #3) ───────────────────────
 
 def test_receipt_records_pin_source(tmp_path, monkeypatch):
     from sunglasses import firewall

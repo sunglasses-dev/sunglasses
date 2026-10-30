@@ -1,11 +1,11 @@
-"""test_receipts_proxy_chain.py — the proxy writes its own chain (#172, T8's
+"""test_receipts_proxy_chain.py — the proxy writes its own chain (#172, a reviewer's
 proxy wiring). Red first, from WIRE_SPEC's proxy rows only.
 
 Every assertion names the WIRE_SPEC line it comes from
 (sunglasses/receipts/WIRE_SPEC.md at 0a49b76). Where the spec says nothing,
 nothing is asserted here: the directory a proxy chain lives in, the condition
-that turns it on, and the shape of a legacy log without a key are T8's to pick
-and T11's to rule, so the chain is FOUND by its segments and its producer,
+that turns it on, and the shape of a legacy log without a key are a reviewer's to pick
+and a reviewer's to rule, so the chain is FOUND by its segments and its producer,
 never by a path this file made up.
 
 Layout is the shipped default and nothing else: the user's home holds the key,

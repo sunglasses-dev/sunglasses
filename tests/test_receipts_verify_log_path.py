@@ -1,6 +1,6 @@
 """
 test_receipts_verify_log_path.py — `receipts --verify --log PATH` verifies a
-log someone else sent, and never reads the verifier's own home (T9 ruling 47,
+log someone else sent, and never reads the verifier's own home (a reviewer ruling 47,
 outsider rehearsal gap G3; exits per ruling 48).
 
 At 5480cdd `--verify` read only `$SUNGLASSES_HOME/receipts` and the proxy state

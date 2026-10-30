@@ -660,7 +660,7 @@ def _environment_audit(pkg):
     # than being read from anywhere.
     wire_constants = {"SUNGLASSES_WITHHELD"}
 
-    # MECHANISM (2026-09-14, after ASTRA's rounds 2-4 kept constructing reader
+    # MECHANISM (2026-09-14, after review rounds 2-4 kept constructing reader
     # shapes a resolver had not imagined: aliased keys, aliased readers,
     # annotated and tuple-unpacked aliases, wrappers, lambdas, shadowing).
     # A resolver that follows aliases enumerates what it recognises and passes
@@ -681,7 +681,7 @@ def _environment_audit(pkg):
     # SUNGLASSES_* name that appears anywhere without being read.
     SENSITIVE = {"environ", "getenv", "putenv", "unsetenv"}
     SENSITIVE_RE = re.compile(r"\b(environ|getenv|putenv|unsetenv)\b")
-    ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (ASTRA E41/E42)
+    ENV_METHODS = {"get"}   # pop/setdefault MUTATE the environment; they are not reads and refuse (review E41/E42)
     ENV_COPY_SITES = {"firewall.py", "child_env.py"}   # exact relative path inside the package, never a basename
     # The one enumerated MUTATION: child_env.py takes the report token out of this process's environment for the length of
     # a scan and puts it back. Exactly two forms, on exactly that name:  os.environ.pop(KEY, None)  and  os.environ[KEY] = name
@@ -788,7 +788,7 @@ def _environment_audit(pkg):
                 yield node, node.left, {id(node.comparators[0])}
 
 
-    # ROUND 6 (ASTRA E45-E51, 2026-09-14): all seven survivors either COMPUTED
+    # ROUND 6 (review E45-E51, 2026-09-14): all seven survivors either COMPUTED
     # a name at runtime ('get' + 'env'), ALIASED the thing that computes it
     # (reader = getattr / vars), reached the module through a mapping
     # (module.__dict__[...], vars(os)[...], globals()['K'] = ...), or produced
@@ -810,7 +810,7 @@ def _environment_audit(pkg):
     #   R4 namespace and module introspection refuses everywhere: globals(),
     #      locals(), vars(), .__dict__, .__getattribute__, .__getattr__,
     #      .__builtins__, .__globals__, sys.modules[...].
-    # ROUND 8 (ASTRA E63-E67): the survivors reached the same two things through a
+    # ROUND 8 (review E63-E67): the survivors reached the same two things through a
     # different door: `builtins.getattr(...)` (an attribute of the builtins module,
     # invisible to a rule that only looks at the bare name), the os module as a
     # RE-EXPORT of another module (`tempfile._os`, `subprocess.os`), `sys.modules`
@@ -820,8 +820,8 @@ def _environment_audit(pkg):
     #      (`<anything>.getattr`, `<anything>.import_module`, ...) is refused unless
     #      it is the callee of a direct call with literal arguments; as a value it
     #      refuses; `import builtins` and `__builtins__` refuse outright;
-    # ROUND 9 (ASTRA E68-E80). Two rules were REMOVED at round 8 for "having no
-    # red of their own"; ASTRA then constructed the reds (E73-E77: the os module
+    # ROUND 9 (review E68-E80). Two rules were REMOVED at round 8 for "having no
+    # red of their own"; the review then constructed the reds (E73-E77: the os module
     # obtained as a VALUE with no read at all, which the guard must also refuse)
     # and eight readers that reach the attribute-protocol exemption with a MODULE
     # as the receiver: a class whose __getattr__ calls getattr(self, name) is
@@ -833,7 +833,7 @@ def _environment_audit(pkg):
     #   R7 an attribute named modules on ANY base refuses (red: E76);
     #   R8 a dunder method reached OUTSIDE the protocol takes a literal name: an
     #      explicit `.__getattr__(x, NAME)` call, or a call through a name bound
-    #      to a dunder (`read = __getattr__`, ASTRA's allowed A10 does this
+    #      to a dunder (`read = __getattr__`, the allowed case A10 does this
     #      benignly), must pass a string literal as the name, so the sensitive
     #      literals die on the token rule and the computed ones die here; a
     #      dunder named as a string refuses; a class deriving from a module type
@@ -846,7 +846,7 @@ def _environment_audit(pkg):
     #      spec_from_file_location, spec_from_loader, get_code, get_source, and
     #      the importlib.machinery / importlib.util / importlib.abc names
     #      (red: E78, E80). getattr_static joins the named lookups.
-    # ROUND 10 (ASTRA N01-N10, 2026-09-15). The ten survivors named the same
+    # ROUND 10 (review N01-N10, 2026-09-15). The ten survivors named the same
     # refused things by a spelling the rules above did not look at: the os
     # re-export as a FROM-IMPORT (`from random import _os as m`), the module
     # table as a from-import (`from sys import modules`), a module type under an
@@ -926,7 +926,7 @@ def _environment_audit(pkg):
         return False
 
     def _own_literal_slots(attr, parents):
-        """R11 (ASTRA N09/N10): `<x>.__slots__` is an enumerated iterable ONLY when
+        """R11 (review N09/N10): `<x>.__slots__` is an enumerated iterable ONLY when
         x is `self` and the ENCLOSING class's own body binds __slots__ exactly once
         to a literal tuple/list of non-sensitive strings. Any other `.__slots__` is
         a runtime value this guard cannot read, and refuses."""
@@ -1036,7 +1036,7 @@ def _environment_audit(pkg):
                             and isinstance(par.value, ast.Name):
                         consumed.add(id(node.value))
         # A computed lookup on the os module is a reader in disguise: getattr(os, ...),
-        # os.__dict__[...], vars(os), or any os name passed to getattr/vars (ASTRA E33/E34).
+        # os.__dict__[...], vars(os), or any os name passed to getattr/vars (review E33/E34).
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in {"getattr", "vars"} \
                     and node.args and isinstance(node.args[0], ast.Name) and node.args[0].id in os_names:
@@ -1080,7 +1080,7 @@ def _environment_audit(pkg):
                         if not (isinstance(a, ast.Constant) and isinstance(a.value, str)):
                             refusals.append(f"{relpath}:{node.lineno} {fname} with a computed name (R3)")
                             break
-                        # R52 (T11 probe, 2026-09-24): a literal is a PATH, and every segment of it is
+                        # R52 (probe, 2026-09-24): a literal is a PATH, and every segment of it is
                         # a name. `attrgetter("os.environ")(pathlib)` walked to the environment
                         # through a literal no rule split, since only import_module/__import__ checked
                         # a segment, and only the first. Every segment of every named lookup's
@@ -1144,7 +1144,7 @@ def _environment_audit(pkg):
             if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) and node.value.attr == "modules" \
                     and isinstance(node.value.value, ast.Name) and node.value.value.id == "sys":
                 refusals.append(f"{relpath}:{node.lineno} sys.modules lookup (R4)")
-            # ROUND 10 (ASTRA N01-N10): the same refused things under another spelling.
+            # ROUND 10 (review N01-N10): the same refused things under another spelling.
             # R6: the os module may enter a module ONLY as `import os` (with or without an alias)
             if isinstance(node, ast.Import) and any(a.name.split(".")[0] in OS_REEXPORTS - {"os"} for a in node.names):
                 refusals.append(f"{relpath}:{node.lineno} import of an os re-export module; only `import os` may name it (R6)")
@@ -1247,7 +1247,7 @@ def test_package_reads_no_undeclared_environment_variables():
         f"environment; the exemption is not true")
 
 
-# R52 (T11 probe on main dd3dedd, 2026-09-24). Each probe is one module, audited
+# R52 (probe on main dd3dedd, 2026-09-24). Each probe is one module, audited
 # on its own. `True` = the guard must refuse it; a probe held to the dotted-path
 # rule must be refused BY that rule, so its mutant has a red of its own.
 _R52_PATH_RULE = "names a refused attribute"
@@ -1661,7 +1661,7 @@ def fake_mcp_config(tmp_path, monkeypatch):
 # Each test now gets a throwaway cwd and HOME holding one synthetic server, so the
 # consent path is what is under test.
 #
-# The synthetic command WRITES A MARKER FILE (ASTRA: `/bin/false` proves nothing --
+# The synthetic command WRITES A MARKER FILE (review: `/bin/false` proves nothing --
 # a command that fails and a command that never ran are indistinguishable from the
 # outside). Refusal is proven by the marker's ABSENCE: if `pin` ever regressed into
 # spawning what it claimed to decline, the marker would exist.
@@ -1675,7 +1675,7 @@ def _isolated_pin_home(tmp_path):
     root.mkdir(parents=True, exist_ok=True)
     home.mkdir(parents=True, exist_ok=True)
     marker = root / _MARKER_NAME
-    # ASTRA: the marker command must be one that DEMONSTRABLY works, or its
+    # Review: the marker command must be one that DEMONSTRABLY works, or its
     # absence proves nothing -- a command that failed to resolve and a command
     # that never ran are the same empty directory. No shell, no PATH lookup, no
     # quoting: the interpreter running these tests, with the path as its own argv
@@ -1893,7 +1893,7 @@ def test_json_carries_both_axes_when_a_truncated_scan_finds_something(oversized)
 
 
 # ==========================================================================
-# 12. Repo mode (T9 spot-check, both must-fixes)
+# 12. Repo mode (spot-check, both must-fixes)
 #
 # `--repo` is a scan surface like any other, and it had its own versions of
 # every bug in this release: an operational failure answering with a threat
@@ -1989,7 +1989,7 @@ def test_repo_with_nothing_inspectable_is_not_clean(tmp_path):
 
 
 # ==========================================================================
-# ASTRA RERUN (2026-09-06) — R1..R4. Every case here reproduced a real defect
+# REVIEW RERUN (2026-09-06) — R1..R4. Every case here reproduced a real defect
 # on 42da838 before it was fixed; the trip evidence is in each docstring.
 # ==========================================================================
 
@@ -2311,7 +2311,7 @@ def test_r4_repo_mode_honours_sarif(tmp_path):
 def test_r4_repo_sarif_carries_incompleteness(tmp_path):
     """A repo SARIF with results:[] must not read as "scanned, nothing there".
 
-    T9 caught this after the first R4 fix: the deep path set
+    A reviewer caught this after the first R4 fix: the deep path set
     properties.inspectionComplete, repo mode did not, so a repo whose only
     interesting file could not be read emitted an empty results array with no
     indication that anything had been skipped.
@@ -2352,7 +2352,7 @@ def test_r4_deep_media_honours_sarif(tmp_path):
 
 
 # ==========================================================================
-# ROUND 6 — ASTRA's fifth review (H1, H2, H3, H5).
+# ROUND 6 — the fifth review (H1, H2, H3, H5).
 #
 # One shared theme, and it is worth stating once because all four are the same
 # mistake wearing different clothes: a component of the file was not read, and
@@ -2585,7 +2585,7 @@ def test_h2_absent_exif_stays_clean_and_complete():
 
 
 def test_h2_an_unrelated_pillow_warning_is_not_reported_as_corrupt_metadata():
-    """ASTRA asked for this boundary explicitly.
+    """The review asked for this boundary explicitly.
 
     Pillow emits unrelated warnings (`unclosed file`, resource notes). A scanner
     that rebrands every stray warning as corrupt metadata is one whose warnings
@@ -2676,7 +2676,7 @@ def test_h3_a_legitimate_replacement_character_is_not_reported_as_damage():
 
 
 def test_h3_utf16_loss_counts_measured_spans_not_replacement_characters():
-    """Round 7 (ASTRA I5a) REPLACES the round-6 version of this test.
+    """Round 7 (review I5a) REPLACES the round-6 version of this test.
 
     Round 6 asserted the UTF-16 message said "units", not "bytes" — and that was
     the wrong contract. Renaming a count does not make it a measurement: the number
@@ -2761,7 +2761,7 @@ def _frame_reader_offenders(source: str, filename: str = "<src>"):
     """Every `Image.open` whose ENCLOSING function neither walks frames, seeks,
     delegates to a walker, nor declares itself frame-0-only.
 
-    v0.5.6 round 7 (ASTRA I4.2). The round-6 guard sliced 4,000 characters after a
+    v0.5.6 round 7 (review I4.2). The round-6 guard sliced 4,000 characters after a
     `\n    def ` found by `rfind` and searched that blob. Two things were wrong: the
     window ran past the end of the function and could pick up the NEXT method's
     `FRAME 0 ONLY — UNUSED` annotation, so a reader could be certified by its
@@ -3028,7 +3028,7 @@ def test_the_opener_guards_reject_a_caller_that_does_not_walk_and_a_stray_seek()
 
 
 def test_the_frame_reader_guard_rejects_a_frame_zero_only_reader():
-    """The test that proves the guard. ASTRA I4.2 asked for exactly this.
+    """The test that proves the guard. Review item I4.2 asked for exactly this.
 
     A guard nobody has watched fail is a guard nobody has tested. Two mutations,
     both of which the round-6 guard ACCEPTED:

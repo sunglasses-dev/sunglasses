@@ -1,5 +1,5 @@
 """test_doctor_key_unusable.py — the doctor names a signing key that cannot
-sign (T9 RULING 21 b, doctor's half).
+sign (a reviewer RULING 21 b, doctor's half).
 
 Signing on and the key unusable means every wrapped route's proxy refuses to
 start (R24b a) and every hook call asks (R21 a). The doctor is where a user

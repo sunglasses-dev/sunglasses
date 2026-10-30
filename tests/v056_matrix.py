@@ -4,7 +4,7 @@ Rounds 1 and 2 of this repair fixed the surfaces a reviewer happened to sample,
 and round 2's review found the same defect in the next five samples. So round 3
 stopped sampling and enumerated the space instead.
 
-ROUND 4 rewrites this module after ASTRA's third review, which accepted the table
+ROUND 4 rewrites this module after the reviewer's third review, which accepted the table
 as regression data and rejected it as a completeness argument. Three things were
 wrong, and all three are the same mistake in different clothes -- a DECLARATION
 was standing in for an ASSERTION:
@@ -17,7 +17,7 @@ was standing in for an ASSERTION:
      surface with no row buys you.
   2. N/A used as a coverage argument. Five reasons claimed a state was IMPOSSIBLE
      when it was merely untested (deep truncation, deep parser failure, repo
-     unreadability). ASTRA produced runtime counterexamples for three and a source
+     unreadability). The reviewer produced runtime counterexamples for three and a source
      mechanism for two. Those five are now asserted. The N/A that survive are
      narrower, and each says what KIND of claim it is.
   3. States that existed and were not enumerated: a non-regular input (FIFO), a
@@ -85,7 +85,7 @@ OUTCOMES = {
 
 
 # What KIND of claim an N/A reason is. Declared, never inferred: the round-3
-# reasons ASTRA rejected all read like impossibility claims and were really "we
+# reasons the reviewer rejected all read like impossibility claims and were really "we
 # did not test this", and no amount of reading the prose separates those two --
 # only saying which one you are making does. Anything not on this list is not a
 # reason, it is a shrug.
@@ -98,7 +98,7 @@ NA_CLAIMS = {
     # a-FIFO argument (true of git, and silent about symlinks). Deleting them
     # rather than leaving them empty is this module's own rule: an unused kind is
     # a slot the next unexamined reason gets quietly filed under.
-    # true of THIS MACHINE, not of the software. ASTRA accepted the ARG_MAX
+    # true of THIS MACHINE, not of the software. The reviewer accepted the ARG_MAX
     # reason only on these terms, so the limit travels with the cell.
     "host": "true of this host's limits, not of the software",
 }
@@ -113,7 +113,7 @@ class NotApplicable:
     points at this surface's signature or source, a ``format`` claim at the format
     spec, a ``host`` claim says HOST-SCOPED out loud.
 
-    ASTRA rejected five round-3 reasons for claiming a state was IMPOSSIBLE when it
+    The reviewer rejected five round-3 reasons for claiming a state was IMPOSSIBLE when it
     was merely untested. Those five are asserted cells now, and this field exists so
     the same slippage cannot be smuggled back in as confident prose.
     """
@@ -138,7 +138,7 @@ class NotApplicable:
 class Alias:
     """Asserted, but its input is the same input another state already describes.
 
-    ASTRA: "Aliased string partial-finding states can be represented by
+    The reviewer: "Aliased string partial-finding states can be represented by
     `truncated_finding`, but should be labeled aliases rather than nonexistent
     states." So the cell RUNS -- the alias target's input is fed to this surface
     and the outcome asserted -- and the label keeps it from being counted as an
@@ -173,7 +173,7 @@ STATES = [
     ("empty",             "empty", "a VALID input of this format that legitimately "
                                    "carries no content (0-byte text file, blank image, "
                                    "silent audio) -- read in full, nothing there"),
-    # --- round 5: the three mechanisms ASTRA's NO-GO #4 found, as their own
+    # --- round 5: the three mechanisms the reviewer's NO-GO #4 found, as their own
     # states. Each one is a way to lose a COMPONENT of a file while the file as a
     # whole still parses -- which is why none of the previous states caught them:
     # nothing failed, something was simply never looked at.
@@ -224,7 +224,7 @@ SURFACES = [
     ("lib_conv_video",      "lib", "`extractors.video.scan_video()`", ("dict",)),
     # library -- the normalizer boundary itself
     ("lib_normalize",       "lib", "`result.normalize()`",          ("dict",)),
-    # ASTRA: the exported fold is exercised only through its wrappers. It is the
+    # The reviewer: the exported fold is exercised only through its wrappers. It is the
     # single place child coverage is combined, so "covered indirectly" is exactly
     # the argument round 4 stopped accepting for everything else.
     ("lib_aggregate",       "lib", "`result.aggregate()`",          ("dict",)),
@@ -244,7 +244,7 @@ NOTES = {}
 
 # A wrapper surface must produce the same document as what it wraps. The test runs
 # BOTH and compares the canonical axes -- an equivalence that is claimed rather
-# than executed is the thing ASTRA refused to sign.
+# than executed is the thing the reviewer refused to sign.
 EQUIVALENCE = {}
 
 
@@ -327,7 +327,7 @@ def _file_surface(extra=None):
         # are live on any surface that takes a path.
         "later_component": "threat",               # frame 2 fires; every frame inspected
         "byte_metadata": "threat",                 # XPComment decodes and fires
-        # ROUND 6 -- ASTRA H4 REJECTED this N/A, and he was right. The claim was
+        # ROUND 6 -- review H4 REJECTED this N/A, and he was right. The claim was
         # "no external converter process runs on this path". Image routing shells
         # out to TESSERACT, on every surface that takes a path. An exit-7 stub
         # first on PATH reaches the CLI, real MCP and seven library surfaces, and
@@ -352,7 +352,7 @@ def _file_surface(extra=None):
 _row("cli_file", _file_surface())
 
 # `scan <path>` -- the positional leg, which auto-promotes an existing path to a
-# file scan. ASTRA listed it as a missing surface; it is a wrapper, so it is
+# file scan. The reviewer listed it as a missing surface; it is a wrapper, so it is
 # asserted AND compared against `--file` on the same input.
 _row("cli_positional", _file_surface({
     "missing": "operational",   # path-shaped and absent -> usage error, not a scan
@@ -383,7 +383,7 @@ _row("cli_stdin", _text_surface({
     "incomplete_clean": "incomplete",
     "truncated_finding": "threat_incomplete",
     # The one text surface that owns a byte->text boundary, which is why the
-    # `undecodable` state exists at all (ASTRA F5).
+    # `undecodable` state exists at all (review F5).
     "undecodable": "operational",
     "empty": "clean",
 }))
@@ -392,14 +392,14 @@ _row("cli_repo", {
     "clean": "clean", "finding": "threat",
     "incomplete_clean": "incomplete",
     "incomplete_finding": "threat_incomplete",
-    # ASTRA REJECTED the round-3 N/A here and supplied the counterexample: a
+    # REVIEW REJECTED the round-3 N/A here and supplied the counterexample: a
     # committed SYMLINK to a mode-000 target survives a fresh clone. Asserted now.
     "unreadable": "incomplete",
     "missing": "operational",                  # clone failure
     "missing_dependency": "incomplete",        # a media file in the tree
     "truncated_finding": "incomplete",
     "corrupt_parser_fail": "incomplete",
-    # ASTRA: the storage argument overlooks SYMLINK RESOLUTION. Git cannot store a
+    # The reviewer: the storage argument overlooks SYMLINK RESOLUTION. Git cannot store a
     # FIFO, which is true and was the whole reason -- but it stores a symlink
     # happily, and a committed symlink whose target is a FIFO survives a clone and
     # puts a non-regular file in the walker's path. The reason was right about git
@@ -413,7 +413,7 @@ _row("cli_repo", {
     # so on this surface both image mechanisms are named skips, not findings.
     "later_component": "incomplete",
     "byte_metadata": "incomplete",
-    # ROUND 6 (ASTRA H4). Reachable here too, and the CONTAINER is the reason:
+    # ROUND 6 (review H4). Reachable here too, and the CONTAINER is the reason:
     # `_BINARY_EXTENSIONS` declines .jpg/.gif outright, which is why both image
     # mechanisms above are named skips on this surface -- but `.tiff` is NOT in
     # that set, so a committed TIFF IS routed to the image extractor and the
@@ -462,11 +462,11 @@ _row("cli_deep", {
     "incomplete_finding": "threat_incomplete",
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",
-    # ASTRA REJECTED the round-3 N/A: the transcript producer has no cap, so a
+    # REVIEW REJECTED the round-3 N/A: the transcript producer has no cap, so a
     # transcript longer than the engine's 1 MiB cap truncates the CHILD, and the
     # deep aggregate used to drop that. Asserted now, at the DEFAULT cap.
     "truncated_finding": "threat_incomplete",
-    # ASTRA REJECTED the round-3 N/A ("indistinguishable from a missing decoder").
+    # REVIEW REJECTED the round-3 N/A ("indistinguishable from a missing decoder").
     # A decoder CAN fail after its dependencies load, and the handler for that
     # already exists at extractors/audio.py `_transcribe`'s except branch. The
     # seam raises from inside that handler's try, so the mapping is executed.
@@ -479,9 +479,9 @@ _row("cli_deep", {
         "it is asserted under that alias rather than declared impossible"),
     "empty": "clean",                          # decoder ran, produced no speech
     # The deep path is the one that shells out, so this is where a converter's
-    # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
+    # exit status can be ignored -- review's G3, asserted through the same seam.
     "converter_failed": "incomplete",
-    # ROUND 6 -- ASTRA H4 REJECTED this "single-component" premise. A container
+    # ROUND 6 -- review H4 REJECTED this "single-component" premise. A container
     # here can carry SEVERAL SUBTITLE TRACKS, and `_extract_subtitles` iterates
     # them and labels each `subtitle:<lang>`. A real two-track mkv puts the
     # finding on the SECOND track. The reason described the one-track fixture I
@@ -540,7 +540,7 @@ _row("lib_scan_email", _file_surface({
     "unreadable": "incomplete",
     "missing": "incomplete",
     "nonregular": "incomplete",
-    "missing_dependency": "incomplete",        # <- ASTRA R1: the deferred attachment
+    "missing_dependency": "incomplete",        # <- review R1: the deferred attachment
 }))
 NOTES[("lib_scan_email", "unreadable")] = (
     "DELIBERATE DIVERGENCE from the file surfaces. `scan_fast` raises operational "
@@ -555,16 +555,16 @@ _row("lib_scan_deep", {
     "incomplete_finding": "threat_incomplete",
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",
-    "truncated_finding": "threat_incomplete",  # <- ASTRA REJECT of the round-3 N/A
-    "corrupt_parser_fail": "incomplete",       # <- ASTRA REJECT of the round-3 N/A
+    "truncated_finding": "threat_incomplete",  # <- REVIEW REJECT of the round-3 N/A
+    "corrupt_parser_fail": "incomplete",       # <- REVIEW REJECT of the round-3 N/A
     "nonregular": "operational",
     "undecodable": Alias("corrupt_parser_fail",
                          "see cli_deep: the same `_transcribe` except branch"),
     "empty": "clean",
     # The deep path is the one that shells out, so this is where a converter's
-    # exit status can be ignored -- ASTRA's G3, asserted through the same seam.
+    # exit status can be ignored -- review's G3, asserted through the same seam.
     "converter_failed": "incomplete",
-    # ROUND 6 -- ASTRA H4 REJECTED this "single-component" premise. A container
+    # ROUND 6 -- review H4 REJECTED this "single-component" premise. A container
     # here can carry SEVERAL SUBTITLE TRACKS, and `_extract_subtitles` iterates
     # them and labels each `subtitle:<lang>`. A real two-track mkv puts the
     # finding on the SECOND track. The reason described the one-track fixture I
@@ -581,7 +581,7 @@ _row("lib_scan_deep", {
 #
 # `scan_fast` routes everything through extractors.dispatch, so nothing in the
 # package calls these. They are still public methods on the public scanner class,
-# the brief retains them as supported API, and ASTRA cited their repair as release
+# the brief retains them as supported API, and the reviewer cited their repair as release
 # evidence -- which is exactly why they get rows. `_scan_image_fast` was carrying
 # a live false clean (F2) that no CLI path could have exposed.
 # =========================================================================
@@ -597,17 +597,17 @@ _row("lib_helper_image", {
     "incomplete_clean": "incomplete",          # OCR unavailable, nothing else found
     "incomplete_finding": "threat_incomplete", # OCR unavailable, EXIF still fires
     "unreadable": "operational", "missing": "operational",
-    "missing_dependency": "incomplete",        # <- ASTRA F2: was complete/clean
+    "missing_dependency": "incomplete",        # <- review F2: was complete/clean
     "truncated_finding": "threat_incomplete",
     "corrupt_parser_fail": "incomplete",       # PNG header, not a PNG
     "nonregular": "operational",
-    # ASTRA G2 split: the OUTER format decodes fine here -- what does not is the
+    # review G2 split: the OUTER format decodes fine here -- what does not is the
     # EMBEDDED text inside it, which round 5 made a real, reachable state.
     "undecodable": "threat_incomplete",
     "empty": "clean",                          # a valid blank image: decoded, no text
-    "later_component": "threat",               # ASTRA G1: frame 2 carries it
-    "byte_metadata": "threat",                 # ASTRA G2: XPComment decodes
-    # ROUND 6 (ASTRA H4): Tesseract PRESENT but FAILING, which is a different
+    "later_component": "threat",               # review G1: frame 2 carries it
+    "byte_metadata": "threat",                 # review G2: XPComment decodes
+    # ROUND 6 (review H4): Tesseract PRESENT but FAILING, which is a different
     # state from Tesseract ABSENT (`missing_dependency` above). The process runs
     # and returns nonzero, and a nonzero exit must not be read as "this image has
     # no text" -- the same false-success shape the audio path was repaired for.
@@ -617,7 +617,7 @@ _row("lib_helper_image", {
 _row("lib_helper_pdf", {
     "clean": "clean", "finding": "threat",
     "incomplete_clean": "incomplete",
-    "incomplete_finding": "threat_incomplete", # <- ASTRA F4: the annotation fixture
+    "incomplete_finding": "threat_incomplete", # <- review F4: the annotation fixture
     "unreadable": "operational", "missing": "operational",
     "missing_dependency": "incomplete",        # PyPDF2 absent
     "truncated_finding": "threat_incomplete",
@@ -626,7 +626,7 @@ _row("lib_helper_pdf", {
     "undecodable": _HELPER_WRONG_TYPE,
     "empty": "clean",                          # a valid PDF with a blank page
     "later_component": "threat",               # the finding on page 2
-    # ROUND 6 (ASTRA H4): rejected, and correctly. PyPDF2 returns a document
+    # ROUND 6 (review H4): rejected, and correctly. PyPDF2 returns a document
     # `/Title` as a byte string carrying its own encoding, so a UTF-16BE title
     # IS a byte-valued metadata field on this surface. Measured: it decodes,
     # fires and the scan stays complete. The old reason described the PDFs I had
@@ -641,7 +641,7 @@ _row("lib_helper_pdf", {
 _row("lib_helper_text", _file_surface({
     "missing_dependency": _HELPER_WRONG_TYPE,
     "corrupt_parser_fail": _HELPER_WRONG_TYPE,
-    # ASTRA: reachable with an ordinary file over the DEFAULT cap -- truncation is
+    # The reviewer: reachable with an ordinary file over the DEFAULT cap -- truncation is
     # a way to lose coverage that needs no extractor at all, so calling it
     # "wrong type for this helper" was answering a different question.
     "incomplete_clean": "incomplete",
@@ -666,7 +666,7 @@ _row("lib_helper_text", _file_surface({
 # =========================================================================
 # library -- the five public extractor convenience functions
 #
-# ASTRA: "distinct aggregates cannot inherit coverage by name." Before round 4
+# The reviewer: "distinct aggregates cannot inherit coverage by name." Before round 4
 # each of these built its OWN per-source dictionary and dropped the child's
 # truncation and extraction failures; they are now the same `result.aggregate()`
 # call, so they get rows AND an equivalence assertion against the shared path.
@@ -714,36 +714,36 @@ def _conv_row(name, extra=None):
 
 _conv_row("lib_conv_image", {
     # Both image mechanisms are this surface's, and its `undecodable` is the
-    # EMBEDDED-text one ASTRA asked us to split out from outer-format failure.
+    # EMBEDDED-text one the reviewer asked us to split out from outer-format failure.
     "later_component": "threat",
     "byte_metadata": "threat",
     "undecodable": "threat_incomplete",
-    # ROUND 6 (ASTRA H4): the convenience function reaches the same failing
+    # ROUND 6 (review H4): the convenience function reaches the same failing
     # Tesseract the helper does.
     "converter_failed": "threat_incomplete",
 })
 _conv_row("lib_conv_pdf", {
     "later_component": "threat",               # the finding on page 2
-    # ROUND 6 (ASTRA H4): the two PDF byte-metadata N/As were rejected. PyPDF2
+    # ROUND 6 (review H4): the two PDF byte-metadata N/As were rejected. PyPDF2
     # hands back a document `/Title` as a byte string that needs its own
     # decoding, and a UTF-16 one decodes, fires and stays complete -- so the
     # state exists on this surface and the claim "no field arrives as bytes" was
     # about the fixtures, not about the parser.
     "byte_metadata": "threat",
 })
-# ROUND 6 (ASTRA H4): audio has its OWN converter. `_extract_metadata` runs
+# ROUND 6 (review H4): audio has its OWN converter. `_extract_metadata` runs
 # ffprobe and CHECKS its return code, so "no external converter process runs"
 # was wrong here for a second, independent reason -- and the round-5 note below
 # claiming video was "the only surface" that shells out was wrong three times
 # over. The cell runs on the same transcription seam the other audio states use
-# (this environment has no Whisper, exactly as ASTRA's did); the real ffprobe
+# (this environment has no Whisper, exactly as the reviewer's did); the real ffprobe
 # mechanism is asserted directly in `test_h4_audio_metadata_has_its_own_...`.
 _conv_row("lib_conv_audio", {
     "converter_failed": "incomplete",
 })
 _conv_row("lib_conv_video", {
     "converter_failed": "incomplete",
-    # ROUND 6 (ASTRA H4): the third rejected single-component premise. Real mkv,
+    # ROUND 6 (review H4): the third rejected single-component premise. Real mkv,
     # real ffprobe, real per-track conversion; only Whisper is seamed, and the
     # finding comes from the SECOND subtitle track, not from speech.
     "later_component": "threat",
@@ -758,7 +758,7 @@ _conv_row("lib_conv_qr", {
     "later_component": "threat",
     "incomplete_clean": "incomplete",
     # My round-4 reason said "exactly one content source". That was simply WRONG:
-    # an image can carry SEVERAL symbols, and ASTRA's mixed fixture decodes two --
+    # an image can carry SEVERAL symbols, and the reviewer's mixed fixture decodes two --
     # so one symbol can fire while another is lost, which is the state itself. I
     # inferred the premise from the extractor's shape instead of decoding an image
     # with two symbols in it, which is the move this whole review keeps punishing.
@@ -878,9 +878,9 @@ _row("mcp_scan_file_false", _file_surface())
 _row("mcp_scan_file_true", _file_surface())
 
 # The real transport. In-process handler tests cannot catch a framing, encoding or
-# serialization bug between the handler and the client, and ASTRA's F3 (a FIFO
+# serialization bug between the handler and the client, and review's F3 (a FIFO
 # stalling the server before it answered) was only visible over the wire.
-# ASTRA sent all twelve states over real JSON-RPC and got replies. The round-4
+# The reviewer sent all twelve states over real JSON-RPC and got replies. The round-4
 # reason ("the stdio leg exists to prove the TRANSPORT carries the document")
 # described the coverage we had CHOSEN, not an impossibility -- and his sentence
 # for it is the one to keep: "the product's replies need not be wrong for this

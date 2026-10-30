@@ -22,7 +22,7 @@ import pytest
 
 from sunglasses.patterns import PATTERNS
 
-# T9's v2 expression. v1 matched CVE ids such as CVE-2026-45033 through its date
+# A reviewer's v2 expression. v1 matched CVE ids such as CVE-2026-45033 through its date
 # clause, so the date shape here must not be preceded by `CVE-` or by a digit.
 HYGIENE = re.compile(
     r"(?i)(?<!CVE-)(?<!\d)20\d{2}[-_]\d{2}[-_]\d{2}(?!\d)"

@@ -110,7 +110,7 @@ def test_the_bash_false_positive_is_still_open_and_that_is_recorded():
 
     A Bash command whose text only NAMES a blocked path is still denied. Two
     attempts to subtract quoted heredoc bodies before asking the path question
-    both let real operations through (ASTRA executed nine of them on 09-10), so
+    both let real operations through (the reviewer executed nine of them on 09-10), so
     Bash is judged on all of its text until a real grammar exists. This test
     exists so the gap is a recorded contract rather than a silent one: when the
     Bash lane is repaired, this test is what fails and gets rewritten.
@@ -142,7 +142,7 @@ def test_clean_corpus_through_a_write_body_is_never_a_policy_denial():
 def test_clean_corpus_through_a_bash_command_is_never_a_policy_denial():
     """Background control only.
 
-    ASTRA's receipt correction, 09-10: no clean corpus document contains a
+    The reviewer's receipt correction, 09-10: no clean corpus document contains a
     policy-relevant path, so this cannot demonstrate the mention/touch
     distinction. It shows the lane does not fire on ordinary documents. The
     self-referential fixtures below are what actually carry the evidence.
@@ -170,7 +170,7 @@ def test_our_own_documentation_is_in_the_corpus_shape():
 
 # ---------------------------------------------------------------------------
 # PRESERVED BEHAVIOUR — narrowing the surface must not quietly drop any of the
-# properties the lane already had. ASTRA's acceptance list names these four.
+# properties the lane already had. The reviewer's acceptance list names these four.
 # ---------------------------------------------------------------------------
 HOME_POLICY = {"blocked_paths": ["~/.p1a-fixture-creds"]}
 
@@ -220,7 +220,7 @@ def test_empty_and_missing_inputs_do_not_crash():
 
 # ---------------------------------------------------------------------------
 # END TO END — the PUBLIC hook, in a disposable project, with harmless marker
-# operations. ASTRA's acceptance requires proving that allowed work actually
+# operations. The reviewer's acceptance requires proving that allowed work actually
 # proceeds and denied work actually does not execute, not merely that a
 # function returned a verdict.
 # ---------------------------------------------------------------------------
@@ -285,10 +285,10 @@ def test_public_hook_denies_writing_to_a_blocked_path_and_the_work_does_not_happ
 
 
 # ---------------------------------------------------------------------------
-# T9 REVIEW 2026-09-10 — three commands that ACT on a protected path while the
+# A reviewer REVIEW 2026-09-10 — three commands that ACT on a protected path while the
 # first cut of the heredoc parser returned zero paths for them. Every one is a
 # case of the parser NARROWING when it had not actually established anything:
-# the exact failure ASTRA's third NO GO condition names. Written to fail first.
+# the exact failure the reviewer's third NO GO condition names. Written to fail first.
 # ---------------------------------------------------------------------------
 VAULT_POLICY = {"blocked_paths": ["~/.p1a-fixture-vault"]}
 
@@ -318,7 +318,7 @@ def test_review_bypasses_still_deny(name, command):
 
 
 # ---------------------------------------------------------------------------
-# SELF ATTACK — shapes tried against the hardened parser after the T9 review,
+# SELF ATTACK — shapes tried against the hardened parser after the reviewer review,
 # looking for a fourth bypass. None of these narrowed anything away. Kept as
 # regressions so a future simplification of the parser has to face them.
 # ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ def test_self_attack_shapes_still_deny(name, command):
 
 
 # ---------------------------------------------------------------------------
-# ASTRA REVIEW 2026-09-10 — nine shapes he EXECUTED against the second cut of
+# REVIEW REVIEW 2026-09-10 — nine shapes he EXECUTED against the second cut of
 # the parser. Each one really ran under bash 3.2 and really created a marker
 # inside the blocked directory while the candidate hook deferred. They are the
 # reason Bash is no longer narrowed at all, and they are kept here so that any
@@ -393,7 +393,7 @@ def test_astra_executed_bypasses_deny(name, command):
 def test_a_quoted_heredoc_body_carried_through_a_pipeline_is_not_proved_prose():
     """The case that looked like the allow side and was not.
 
-    Until ASTRA executed R1, this asserted that a quoted body carried through a
+    Until the reviewer executed R1, this asserted that a quoted body carried through a
     pipeline is prose. `<<'EOF' | tee` is; `<<'DOC' | bash` is a program, and
     the two are not distinguishable by the quoting. Judging the whole command
     denies both, which costs a false positive on the first and refuses to guess

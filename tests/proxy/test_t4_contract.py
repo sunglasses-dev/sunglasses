@@ -1,11 +1,11 @@
-"""T4 contract checkpoints ASTRA found failing on 36e4c9b (#178 round 1).
+"""T4 contract checkpoints the reviewer found failing on 36e4c9b (#178 round 1).
 
 Vendored as COLLECTED tests rather than left in a review directory, for the
 reason the round gates were moved here: a control nothing runs protects
 nothing. Each row names its contract line and the defect it caught, because
 "AT09 fails" tells the next reader nothing a year from now.
 
-The shapes are ASTRA's, reproduced from its rows; the wiring is ours.
+The shapes are the reviewer's, reproduced from its rows; the wiring is ours.
 """
 import types
 

@@ -1,6 +1,6 @@
 """The bundled echo server, specified before it exists.
 
-T10.R1's self test spawns the installed artifact against this, and T12.R1
+A reviewer.R1's self test spawns the installed artifact against this, and T12.R1
 requires the acceptance runs to go through real pipes and real upstreams rather
 than a mock that agrees with us. So this is a small MCP stdio server whose only
 interesting property is that it is REAL: a separate process, its own stdin and

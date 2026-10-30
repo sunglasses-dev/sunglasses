@@ -1,6 +1,6 @@
 """RC10, vendored at the #178 round-2 rebase.
 
-ASTRA's original named control for RC10 was scripts/test_closed_admission_control.py
+The reviewer's original named control for RC10 was scripts/test_closed_admission_control.py
 in a review directory, and it was absent from this archive -- counted as green in
 prior rounds on the strength of a run nobody here could repeat. Bytes recovered
 from the round transcript that created it, unchanged.

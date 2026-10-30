@@ -247,7 +247,7 @@ def _qualified(tree):
 def _os_names(tree):
     """Every name bound to the os module, however it was imported.
 
-    R13-ALIASES (ASTRA round 12, `R12_AUDIT_NEW_SHAPES[os_alias]`). `import os
+    R13-ALIASES (the reviewer round 12, `R12_AUDIT_NEW_SHAPES[os_alias]`). `import os
     as anything` gives the same syscalls a different label, and an audit that
     matches the label `os` sees none of them.
     """
@@ -325,7 +325,7 @@ def _is_mutation(node, aliases, os_names):
 def main():
     src = SOURCE.read_text(encoding="utf-8")
     tree = ast.parse(src)
-    # R13-SITE-IDENTITY (ASTRA round 12,
+    # R13-SITE-IDENTITY (the reviewer round 12,
     # `R12_AUDIT_NEW_SHAPES[qualified_site_relocation]`). A site is named by its
     # FULL dotted path, not by the innermost function's bare name. Round 12's
     # version computed the path and then threw it away, keying on the bare name

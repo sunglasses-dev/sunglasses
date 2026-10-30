@@ -1,6 +1,6 @@
 """RC34, RC35 and RC36, vendored at the #178 round-2 rebase.
 
-ASTRA wrote these for round 9 and they lived in a review directory, so they
+The reviewer wrote these for round 9 and they lived in a review directory, so they
 were never collected from this repository: three notification-boundary controls
 that every round since has counted as green on the strength of a run nobody
 here could repeat. Bytes recovered from the round-9 transcript rather than

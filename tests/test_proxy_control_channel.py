@@ -7,7 +7,7 @@ and waits for the answer the reader drops in.
 It is the only place in the proxy where one thread waits on another, so the two
 rules it lives by are both about not becoming a deadlock.
 
-It NEVER waits forever. T8.R13 bounds the whole list at ten seconds and a
+It NEVER waits forever. A reviewer.R13 bounds the whole list at ten seconds and a
 server that simply stops answering must not hold the thread serving the
 client's call, so every wait has a deadline and a miss is a fault with a name
 rather than a hang.

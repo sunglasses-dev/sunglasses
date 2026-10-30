@@ -1,6 +1,6 @@
 """T5: who may approve, what activation requires, and what a change invalidates.
 
-Specified from the rows before the implementation, and from ASTRA's G2-06,
+Specified from the rows before the implementation, and from review's G2-06,
 G2-18 and G2-19 fixtures where they exist.
 
 T5.R3's activation invariant is the row that decides this slice. Four conditions,
@@ -149,7 +149,7 @@ def test_an_approved_call_needs_the_tool_and_its_descriptor_sha(store):
 
 
 def test_a_tool_the_record_never_named_is_never_pinned(store, tmp_path):
-    """Invariant 2 of the approving-pins ruling (T9, 09-14 08:34).
+    """Invariant 2 of the approving-pins ruling (a reviewer, 09-14 08:34).
 
     Approving pins the descriptors, and a pin is what makes `check_pin` read
     clean. So a pin written for a tool the approval record does NOT name opens

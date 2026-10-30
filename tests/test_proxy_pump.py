@@ -1,7 +1,7 @@
 """The pump, specified from the contract rows BEFORE it exists.
 
 Written this way deliberately. Three review rounds on the session core cost
-ASTRA three passes, and the cause was the same each time: I wrote the tests my
+the reviewer three passes, and the cause was the same each time: I wrote the tests my
 implementation suggested, so they agreed with it. A test file written from the
 rows, against a module that does not exist yet, cannot agree with an
 implementation by construction, because there is nothing to agree with.
@@ -184,14 +184,14 @@ def test_a_response_whose_shape_does_not_match_the_request_is_refused():
     assert session.closed_with() == ("MALFORMED_UPSTREAM", "S5")
 
 
-# ── the same rows, on ASTRA's actual fixture bytes ─────────────────────────
+# ── the same rows, on the reviewer's actual fixture bytes ─────────────────────────
 # The tests above use frames built here. These read the seeds themselves, so the
 # claim "the pump covers what Q12 and Q13 asked for" is checked against the
 # bytes those checks read rather than against an analogue I wrote.
 
 import pathlib
 
-# CI. These were read from ASTRA's review directory in /private/tmp, which
+# CI. These were read from the reviewer's review directory in /private/tmp, which
 # exists on one Mac and nowhere else. The `skipif` meant the rows did not fail
 # in CI, they SKIPPED -- which is worse than the FileNotFoundError the controls
 # produced, because a skip is silent and these are the checks that read the
@@ -206,7 +206,7 @@ fixtures = pytest.mark.skipif(not FIX.exists(),
 def test_G2_10_invalid_result_shape_is_refused_by_the_pump():
     """Q13's first case, at the boundary where the ruling puts it.
 
-    `parse_frame` cannot reject this alone and ASTRA said so: the frame is well
+    `parse_frame` cannot reject this alone and the reviewer said so: the frame is well
     formed JSON-RPC and only the REQUEST it answers makes its shape wrong. The
     pump knows the pending method, so it can.
     """
@@ -294,7 +294,7 @@ def test_an_integer_id_and_a_float_id_do_not_collide():
         "answering the integer id also retired the float id")
 
 
-# ── T7.R1 + T8.R12: the exit is a PROCESS fact, never an inactivity guess ──
+# ── T7.R1 + a reviewer.R12: the exit is a PROCESS fact, never an inactivity guess ──
 
 def test_an_upstream_exit_with_pending_calls_closes_even_though_the_pipe_stays_open():
     """The F21 shape, driven through the handle the contract requires.
@@ -409,10 +409,10 @@ import os      # noqa: E402
 import signal  # noqa: E402
 
 
-# ── RC11 to RC13: the halves ASTRA's controls do not reach ─────────────────
+# ── RC11 to RC13: the halves the reviewer's controls do not reach ─────────────────
 #
 # Each of these four was written because a mutation SURVIVED the round-4
-# controls. They are the positive and defensive halves that ASTRA's fixtures,
+# controls. They are the positive and defensive halves that the reviewer's fixtures,
 # which aim at the reported symptom, do not cover.
 
 @pytest.mark.parametrize("member,value", [
@@ -510,7 +510,7 @@ def test_the_settling_record_does_not_outlive_the_settlement():
 
 # ── RC14 and RC17: the record's lifetime, and whose handoff it is ──────────
 #
-# ASTRA's round-5 controls cover the reader path and the watcher. Everything
+# The reviewer's round-5 controls cover the reader path and the watcher. Everything
 # below was written because a mutation SURVIVED them: the obligation's owner,
 # admission reading the record, and the close that pays it.
 
@@ -527,7 +527,7 @@ def test_the_record_survives_until_the_frame_is_handed_over():
     assert session.admit_request(41, method="tools/call", origin="client")
     frames = session.read_upstream(wire(response(41)))
     next(frames)
-    # ASTRA's RC19b settles what this instant MEANS, and it is not what I wrote
+    # The reviewer's RC19b settles what this instant MEANS, and it is not what I wrote
     # here first. `next()` RETURNING is the delivery: the consumer has the
     # frame. So at this point the obligation is discharged and the id is free,
     # and my original assertion -- that `_settling` was still occupied here --
@@ -780,9 +780,9 @@ def test_a_refusal_cannot_happen_while_the_session_is_open():
 
 
 def test_a_handoff_for_another_generations_record_faults_the_session():
-    """RC25/RC26, the handoff half, ruled as a TRIPWIRE (T9, 2026-09-14).
+    """RC25/RC26, the handoff half, ruled as a TRIPWIRE (a reviewer, 2026-09-14).
 
-    `_retire_record`'s ownership check is pinned by ASTRA's round-7 gate: remove
+    `_retire_record`'s ownership check is pinned by the reviewer's round-7 gate: remove
     it and two rows go red. The same check inside `_handoff` is NOT reachable
     from the production path -- admission refuses an identity while the record
     sits in `_settling`, and creation and handoff both happen inside that
@@ -912,7 +912,7 @@ def test_a_clean_upstream_exit_of_zero_stays_zero():
 # ── AR10, AR11: the deadlines, which the table stated and nobody asked ─────
 
 def test_a_server_that_never_answers_does_not_hold_the_session_for_ever():
-    """AR11, T8.R5. `bounds.check_deadline` held this number since the slice
+    """AR11, a reviewer.R5. `bounds.check_deadline` held this number since the slice
     that wrote it and nothing asked it anything, so a server could keep a
     request open as long as it liked. A mediator that can be made to wait
     indefinitely can be taken out of the path by doing nothing at all."""
@@ -956,7 +956,7 @@ def test_a_server_answering_inside_the_deadline_is_not_disturbed():
 
 
 def test_a_frame_that_never_finishes_arriving_is_a_deadline():
-    """AR10, T8.R3. A server that sends half a frame and stops is not slow, it
+    """AR10, a reviewer.R3. A server that sends half a frame and stops is not slow, it
     is holding the pipe open, and the reader is blocked in a read that will
     never return."""
     from sunglasses.proxy import bounds
@@ -1012,7 +1012,7 @@ def test_a_settled_request_no_longer_counts_against_the_response_deadline():
 
 def test_the_refusal_signature_is_the_three_the_row_names(): 
     """A reviewer wraps this method to audit what crosses the boundary, and
-    seventeen of ASTRA's v6 controls do exactly that with the three arguments
+    seventeen of the reviewer's v6 controls do exactly that with the three arguments
     T4.R7 names. Threading a fourth through it broke all seventeen at once, on
     a TypeError, before a single assertion ran -- a change to how we carry an
     internal value taking out an entire control set.
@@ -1071,7 +1071,7 @@ def test_a_refusal_names_the_item_s_own_budget_not_the_session_s():
 
 # ── RC20 and AR10: the deadline stamp belongs under the admission lock ──────
 #
-# Written at the #168 rebase (T9 ruling, 2026-09-14). RC20 put admission's test
+# Written at the #168 rebase (a reviewer ruling, 2026-09-14). RC20 put admission's test
 # and insert under one lock so nothing can move an entry between deciding and
 # recording. AR10 added `_admitted_at` as a third table that the same insert
 # writes, and the rebase had to decide whether it goes inside the lock or after

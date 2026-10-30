@@ -1,4 +1,4 @@
-"""The deferred half of ASTRA's round-4 F1/F3 (R-177-R5a): a completed record
+"""The deferred half of the reviewer's round-4 F1/F3 (R-177-R5a): a completed record
 that cannot be half-published, and retained storage that cannot be written
 through a symlink.
 

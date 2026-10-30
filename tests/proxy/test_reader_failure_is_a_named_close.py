@@ -1,11 +1,11 @@
-"""A reader that dies closes the session BY NAME (T9 ruling R69, 0.6.1).
+"""A reader that dies closes the session BY NAME (a reviewer ruling R69, 0.6.1).
 
 serve.py runs the two directions as threads, `_drain` for the upstream and
 `_drain_client` for the client, and both ended in `except Exception: pass`. So
 an exception out of the Route ended the thread, `done` was set, and the main
 thread tore the session down as if it had ended cleanly: SESSION_TORN_DOWN
 with reason_code null and rule null, exit status 0, and a client whose request
-had been read and forwarded never answered (T8 probe 2026-09-25 at b276d38f,
+had been read and forwarded never answered (a reviewer probe 2026-09-25 at b276d38f,
 both readers).
 
 The ruling. Each drain closes the session with SCAN_EXCEPTION under S3 and one
@@ -14,7 +14,7 @@ names the exception CLASS and never its message, since the message can carry
 peer bytes. Ids read before the close are answered (R66), nothing is forwarded
 after it, and the process exits nonzero.
 
-T9 ruling 70. Only an ADMITTED id is owed a refusal. A frame that raises
+A reviewer ruling 70. Only an ADMITTED id is owed a refusal. A frame that raises
 before admission has an "id" the parser never finished trusting, so answering
 it would branch on a value the attacker wrote; that frame gets the named close
 instead, said to the client on the wire as the null id error before its pipe

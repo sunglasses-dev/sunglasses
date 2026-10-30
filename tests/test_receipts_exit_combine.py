@@ -1,6 +1,6 @@
 """
 test_receipts_exit_combine.py — one combiner for every verdict `receipts
---verify` prints (T9 ruling 50, C5).
+--verify` prints (a reviewer ruling 50, C5).
 
 At 5480cdd the key verdict was assigned, then overwritten by the legacy
 lifecycle verdict: a key that cannot sign plus a clean legacy day exited 0.
@@ -71,7 +71,7 @@ def test_a_broken_key_is_not_cleared_by_a_clean_legacy_day(home):
 
 
 def test_the_control_a_clean_legacy_day_with_a_usable_key_is_the_limit(home):
-    """A clean day is LOG_UNCHAINED, exit 3 (T9 ruling 60): no failure."""
+    """A clean day is LOG_UNCHAINED, exit 3 (a reviewer ruling 60): no failure."""
     _legacy(home)
     code, out = _cli(home, "--verify")
     assert "KEY_UNUSABLE" not in out, out

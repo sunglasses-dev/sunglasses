@@ -3,7 +3,7 @@
 Everything else in this lane is a unit that can be handed a fixture. This is
 `python -m sunglasses.proxy -- <server>`: a real process, a real MCP server as
 a real child in its own process group, and the bytes between them going through
-real pipes. T12.R1 asks for exactly that, and T10.R1's self test has nothing to
+real pipes. T12.R1 asks for exactly that, and a reviewer.R1's self test has nothing to
 spawn until it exists.
 
 The assertions are ingress readings taken on the far side. The echo server
@@ -229,7 +229,7 @@ def test_ping_round_trips_untouched(tmp_path):
 
 
 def test_a_receipt_log_is_written_and_verifies(tmp_path):
-    """T9.R5. An unverifiable log is not evidence, and a session that produced
+    """A reviewer.R5. An unverifiable log is not evidence, and a session that produced
     no log at all did its work with nothing written down."""
     from sunglasses.proxy import receipts
 
@@ -247,7 +247,7 @@ def test_the_proxy_exits_cleanly_when_the_client_goes_away(tmp_path):
 
 
 def test_nothing_is_run_without_an_upstream_to_supervise(tmp_path):
-    """T8.R12. Strict mode refuses rather than running unsupervised, because a
+    """A reviewer.R12. Strict mode refuses rather than running unsupervised, because a
     proxy that cannot observe its server dying cannot settle what it owes."""
     proc = subprocess.run([sys.executable, "-m", "sunglasses.proxy"],
                           input=b"", capture_output=True, timeout=30)
@@ -284,7 +284,7 @@ def test_the_gate_wired_in_is_the_real_approval_store(tmp_path):
 
 
 def test_the_server_runs_in_its_own_process_group(tmp_path):
-    """T8.R12. The group is what teardown kills, descendants included. A child
+    """A reviewer.R12. The group is what teardown kills, descendants included. A child
     sharing our group means a kill aimed at the server hits this process too,
     so the proxy would have to choose between killing nothing and killing
     itself."""
@@ -295,7 +295,7 @@ def test_the_server_runs_in_its_own_process_group(tmp_path):
 
 
 def test_a_protocol_fault_exits_nonzero(tmp_path):
-    """T8.R14. A fault is nonzero always. A proxy that tears a session down
+    """A reviewer.R14. A fault is nonzero always. A proxy that tears a session down
     for a malformed frame and then exits zero tells its supervisor the session
     ended normally, and nothing upstream of it ever learns otherwise."""
     proc, _replies, _arrived = _run(
@@ -403,7 +403,7 @@ def test_a_client_that_ends_on_a_frame_boundary_is_not_a_fault():
 # ── AR13: the write stall, and the flush that was the deadlock ─────────────
 
 def test_the_watchdog_ends_a_write_that_has_stalled():
-    """AR13, T8.R9. A client that stops reading makes our write block for ever
+    """AR13, a reviewer.R9. A client that stops reading makes our write block for ever
     on a full pipe, and the mediator then holds a frame it cannot deliver and a
     server it cannot drain. The check cannot live at the write, because the
     write is where we are stuck."""

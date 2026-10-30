@@ -6,7 +6,7 @@ same defect in the next five samples. So the acceptance criterion is no longer
 "these cases pass", it is "every surface, crossed with every input state,
 produces a consistent document".
 
-ROUND 4. ASTRA's third review accepted the table as regression data and refused
+ROUND 4. The reviewer's third review accepted the table as regression data and refused
 it as a completeness argument, on three grounds this module has to answer:
 
   * "Declaration generation does not prove execution or assertions." The table
@@ -132,7 +132,7 @@ def space(tmp_path_factory):
 
     # ---- round 4 states ----
     # not a regular file. A read-only FIFO with no writer BLOCKS on open, which is
-    # the whole point (ASTRA F3): the refusal must come from stat, not from a read.
+    # the whole point (review F3): the refusal must come from stat, not from a read.
     f["fifo"] = root / "pipe"
     os.mkfifo(str(f["fifo"]))
     f["directory"] = root / "adir"
@@ -208,7 +208,7 @@ def _build_image_fixtures(root, f):
     f["qr_clean"] = os.path.join(here, "qr-ordinary.png")
     f["qr_finding"] = os.path.join(here, "qr-injection.png")
 
-    # ASTRA's round-4 fixtures, committed. These are HIS files, byte for byte,
+    # The reviewer's round-4 fixtures, committed. These are HIS files, byte for byte,
     # not my reconstruction of them: a fixture I rebuild from his description is
     # a fixture that agrees with my reading of the report, which is the thing
     # under review. The 1.3 MB multi-page TIFF is the one exception -- it is
@@ -247,7 +247,7 @@ def _build_image_fixtures(root, f):
                + list(f["containers"])):
         assert os.path.exists(_p), f"missing committed fixture: {_p}"
 
-    # A multi-page TIFF whose ImageDescription lives ONLY on page 2. T9 reasoned
+    # A multi-page TIFF whose ImageDescription lives ONLY on page 2. A reviewer reasoned
     # this one out of the source and could not build a fixture for it; per-page
     # tags do work, via `encoderinfo` on each appended image rather than the
     # shared `tiffinfo=`. It was a live false clean: exit 0, complete, clean.
@@ -274,11 +274,11 @@ def _build_image_fixtures(root, f):
     f["over_cap_clean"].write_text("benign filler. " * 90000)
     assert f["over_cap_clean"].stat().st_size > CAP
 
-    # ROUND 6 (ASTRA H4). A REAL failing external converter, not a seam.
+    # ROUND 6 (review H4). A REAL failing external converter, not a seam.
     #
     # Round 5 declared `converter_failed` impossible on every path surface --
     # "no external converter process runs on this path" -- and that claim was
-    # simply false: image routing shells out to Tesseract. ASTRA reached it with
+    # simply false: image routing shells out to Tesseract. The reviewer reached it with
     # an exit-7 stub on PATH through the CLI, real MCP and seven library
     # surfaces. A false impossibility is worse than a missing test, because the
     # grid publishes it as a reason nobody needs to look again.
@@ -297,7 +297,7 @@ def _build_image_fixtures(root, f):
     # The input for that state: a file whose OCR component dies while a metadata
     # component still carries the instruction. That is what makes it a COMPONENT
     # failure -- the product must keep the finding AND report the lost coverage,
-    # which is exactly the behaviour ASTRA observed and the grid never asserted.
+    # which is exactly the behaviour the reviewer observed and the grid never asserted.
     f["converter_failed_image"] = f["byte_meta_control"]
 
     # Two QR symbols in ONE image: one ordinary, one carrying the instruction.
@@ -314,7 +314,7 @@ def _build_image_fixtures(root, f):
 
 
 def _build_pdf_fixtures(root, f):
-    """Real PDFs, including ASTRA's F4 shape: a valid document whose annotation
+    """Real PDFs, including review's F4 shape: a valid document whose annotation
     array holds one malformed element BEFORE an instruction-bearing one."""
     def pdf(name, annots=None, page_text=None):
         objs = []
@@ -359,7 +359,7 @@ def _build_pdf_fixtures(root, f):
             b"<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (%s) >>"
             % INJECTION.encode(),
         ],
-        # ASTRA's fixture shape: element 0 is a STRING, not a dictionary. Round 3
+        # The reviewer's fixture shape: element 0 is a STRING, not a dictionary. Round 3
         # abandoned the whole loop on it and never reached element 1.
         "pdf-annot-partial.pdf": [
             b"<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (%s) >>"
@@ -387,7 +387,7 @@ def _build_pdf_fixtures(root, f):
     # Over the engine cap through a REAL extractor: the annotation carries the
     # instruction first and then more than 1 MiB of filler, so PyPDF2 hands the
     # engine a string that truncates. `scan_pdf` used to drop the child's
-    # `truncated` flag on the floor here (the PDF half of ASTRA's F1).
+    # `truncated` flag on the floor here (the PDF half of review's F1).
     _EXTRA["pdf-big.pdf"] = [
         b"<< /Type /Annot /Subtype /Text /Rect [0 0 10 10] /Contents (%s) >>"
         % (INJECTION + " " + ("filler " * 160000)).encode(),
@@ -395,7 +395,7 @@ def _build_pdf_fixtures(root, f):
     f["pdf_truncated_finding"] = write("pdf-big.pdf", annots=b"[5 0 R]")
     assert f["pdf_truncated_finding"].stat().st_size > CAP
 
-    # ROUND 6 (ASTRA H4). The two PDF `byte_metadata` N/As said this surface
+    # ROUND 6 (review H4). The two PDF `byte_metadata` N/As said this surface
     # "parses no document metadata block, so no field arrives as bytes". PyPDF2
     # returns `/Title` as a byte string carrying its OWN encoding, and a UTF-16BE
     # title is exactly the byte-valued metadata state. Hand-built rather than
@@ -434,7 +434,7 @@ def _build_media_fixtures(root, f):
         w.writeframes(b"\x00\x00" * 16000)
     f["wav"] = p
 
-    # ROUND 6 (ASTRA H4). Three N/As claimed deep/video inputs have "a single
+    # ROUND 6 (review H4). Three N/As claimed deep/video inputs have "a single
     # component ... no second frame, page or TRACK". The code iterates subtitle
     # streams and labels each `subtitle:<lang>`, so a second track is exactly the
     # later component those cells denied. Built with REAL ffmpeg: the premise
@@ -488,7 +488,7 @@ def repos(tmp_path_factory):
     over_cap = "lorem ipsum " * 95000
 
     def _symlink_to_locked(root):
-        """ASTRA's counterexample to the round-3 `cli_repo/unreadable` N/A: git
+        """The reviewer's counterexample to the round-3 `cli_repo/unreadable` N/A: git
         cannot store a mode-000 file's permissions, but it CAN store a symlink,
         and the symlink survives a fresh clone pointing at an unreadable target."""
         target = base / "locked-outside.txt"
@@ -552,11 +552,11 @@ def repos(tmp_path_factory):
         # so those never reach an extractor through `--repo` (which is why the two
         # image mechanisms above are named skips here). `.tiff` is NOT in that set,
         # so it IS routed to the image extractor -- which is exactly the
-        # "repository TIFF routing follows the inspected route" ASTRA cited. The
+        # "repository TIFF routing follows the inspected route" the reviewer cited. The
         # container choice is the whole reason this cell is reachable.
         "converter_failed": make("convfail", {"ok.md": "notes\n"}, extra=_commit_fixture(
             "meta.tiff", "tiff_description")),
-        # ASTRA's counterexample to my `storage` claim: git cannot store a FIFO,
+        # The reviewer's counterexample to my `storage` claim: git cannot store a FIFO,
         # which is true -- but it stores a SYMLINK, and a symlink to a FIFO
         # survives a clone and puts a non-regular file in the walker's path. The
         # reason was right about git and wrong about the state.
@@ -879,13 +879,13 @@ _SEAM = {
     "finding":            ([["transcript", INJECTION]], [], "texts"),
     "incomplete_clean":   ([["metadata", ORDINARY]], ["Transcription failed for this file."], "texts"),
     "incomplete_finding": ([["metadata", INJECTION]], ["Transcription failed for this file."], "texts"),
-    # ASTRA's F1 / his REJECT of the round-3 N/A: a transcript longer than the
+    # review's F1 / his REJECT of the round-3 N/A: a transcript longer than the
     # engine's DEFAULT cap. The cap is not configured down; the child truncates.
     "truncated_finding":  ([["transcript", INJECTION + " " + _OVER_CAP]], [], "texts"),
-    # ASTRA's REJECT of the "indistinguishable from a missing decoder" N/A.
+    # The reviewer's REJECT of the "indistinguishable from a missing decoder" N/A.
     "corrupt_parser_fail": ([], [], "decoder_error"),
     "empty":              ([], [], "texts"),
-    # ASTRA G3: ffmpeg exits nonzero (or writes nothing) converting a subtitle
+    # review G3: ffmpeg exits nonzero (or writes nothing) converting a subtitle
     # track, so a component never became text. The seam reports it exactly as the
     # product does -- a named track and lost coverage -- while the ordinary audio
     # and metadata sources still arrive, which is what makes it a COMPONENT loss
@@ -957,7 +957,7 @@ def _file_for(state, space, surface=None):
         "nonregular": space["fifo"],
         "undecodable": space["undecodable_file"],
         "empty": space["empty_file"],
-        # round 5: the three component-loss mechanisms, on ASTRA's own fixtures
+        # round 5: the three component-loss mechanisms, on the reviewer's own fixtures
         "later_component": space["frames_finding"],
         "byte_metadata": space["byte_meta_finding"],
         # only the deep surfaces declare this state; every path surface calls it
@@ -970,7 +970,7 @@ def _file_for(state, space, surface=None):
 def _failed_converter_env(space):
     """PATH with the exit-7 stubs FIRST. No product switch, no monkeypatched
     internals: the scanner runs the same `tesseract` lookup it always runs and
-    gets a process that fails, which is precisely how ASTRA reached it."""
+    gets a process that fails, which is precisely how the reviewer reached it."""
     return {"PATH": space["failed_converter_bin"] + os.pathsep + os.environ["PATH"]}
 
 
@@ -1067,7 +1067,7 @@ def _one_json_doc(stdout, where):
 
 # --- the human outcome line ------------------------------------------------
 #
-# ASTRA replaced human stdout in the partial+finding cell with "CLEAN. All
+# The reviewer replaced human stdout in the partial+finding cell with "CLEAN. All
 # content was inspected.", erased stderr, and the round-3 test still passed --
 # because its human branch checked exit and traceback and then `continue`d.
 # These are the sentences a human actually reads, so these are what is asserted.
@@ -1117,7 +1117,7 @@ def _rendered_a_finding(out: str) -> bool:
 def _banner_names_its_scope(both: str) -> bool:
     """Does the coverage banner actually say WHAT went unread?
 
-    v0.5.6 round 5 (ASTRA G4). The banner alone passed the round-4 assertion, so a
+    v0.5.6 round 5 (review G4). The banner alone passed the round-4 assertion, so a
     renderer that printed `INCOMPLETE SCAN` and then nothing would have been
     accepted -- which is a header promising a list and delivering none. The
     warning lines are the part a human acts on, so the banner is only evidence if
@@ -1198,7 +1198,7 @@ def _assert_human(stdout, stderr, outcome, where):
         return
 
     if outcome == "threat_incomplete":
-        # The cell this release exists for, and the cell ASTRA mutated.
+        # The cell this release exists for, and the cell the reviewer mutated.
         assert _rendered_a_finding(out), (
             f"{where}: threat+incomplete did not render the finding line\n{out[:400]}")
         assert _COVERAGE_SENTENCE in both, (
@@ -1383,7 +1383,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             "converter_failed": space["converter_failed_image"],
             # the EMBEDDED-text undecodable state, split from outer-format
             # failure: the GIF itself parses, its comment bytes do not, and the
-            # readable part still fires (ASTRA G2's `partial-comment.gif`).
+            # readable part still fires (review G2's `partial-comment.gif`).
             "undecodable": space["embedded_partial"],
         }[state]
         if state == "converter_failed":
@@ -1393,7 +1393,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
                                + os.environ["PATH"])
         elif state in ("incomplete_clean", "incomplete_finding"):
-            # The REAL mechanism ASTRA used for F2, with no seam at all: Tesseract
+            # The REAL mechanism the reviewer used for F2, with no seam at all: Tesseract
             # simply is not on PATH, so `pytesseract` raises TesseractNotFoundError
             # at run time while pyzbar (a linked library) keeps decoding. The
             # instruction in these fixtures lives in a PNG text chunk, so a finding
@@ -1423,7 +1423,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
         doc = (scanner._scan_image_fast(path) if surface == "lib_helper_image"
                else scan_image(path, engine=engine))
         if state in ("incomplete_clean", "incomplete_finding"):
-            # ASTRA, Gate C: an unrelated extraction failure must not be able to
+            # The reviewer, Gate C: an unrelated extraction failure must not be able to
             # satisfy this cell. The loss has to be the missing-Tesseract one we
             # induced, the EXIF component has to have been read anyway, and for
             # `incomplete_finding` the finding that does NOT depend on OCR has to
@@ -1504,7 +1504,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
 
     if surface in ("lib_conv_audio", "lib_conv_video"):
         if surface == "lib_conv_video" and state == "later_component":
-            # ROUND 6 (ASTRA H4): a REAL second subtitle track, through the real
+            # ROUND 6 (review H4): a REAL second subtitle track, through the real
             # container and the real per-track conversion.
             from sunglasses.extractors import video as video_mod
             real_cls = video_mod.VideoExtractor
@@ -1556,9 +1556,9 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
     # --- generic file surfaces
     path = _file_for(state, space, surface)
     if state == "converter_failed" and surface not in ("lib_conv_audio", "lib_scan_deep"):
-        # ROUND 6 (ASTRA H4). The round-5 grid said no external converter runs on
+        # ROUND 6 (review H4). The round-5 grid said no external converter runs on
         # these surfaces. Every one of them routes an image to the extractor that
-        # shells out to Tesseract, so the state is reached the same way ASTRA
+        # shells out to Tesseract, so the state is reached the same way the reviewer
         # reached it -- a failing process on PATH, no product switch.
         monkeypatch.setenv("PATH", space["failed_converter_bin"] + os.pathsep
                            + os.environ["PATH"])
@@ -1599,7 +1599,7 @@ def _lib_call(surface, state, space, scanner, engine, monkeypatch):
             # The library twin of the `cli_deep` subprocess seam, and for the same
             # reason: a real silent MP3 carries no speech, so most of these states
             # cannot be driven through a real decoder. Declaring them N/A was the
-            # round-3 move ASTRA rejected -- a state we cannot currently produce is
+            # round-3 move the reviewer rejected -- a state we cannot currently produce is
             # not a state that cannot exist. Only the transcriber is replaced.
             return _with_media_seam("lib_conv_audio", state, monkeypatch,
                                     lambda: scanner.scan_deep(path))
@@ -1643,7 +1643,7 @@ class _MediaSeam:
     It exists because a real 1-second silent WAV cannot be driven into most of
     these states -- there is no speech in it to carry a finding, and no way to
     make Whisper truncate without a transcript longer than the engine cap. The
-    alternative was to declare those cells N/A, which is exactly the move ASTRA
+    alternative was to declare those cells N/A, which is exactly the move the reviewer
     rejected: a state we cannot currently produce is not a state that cannot exist.
     """
 
@@ -1658,7 +1658,7 @@ class _MediaSeam:
         "truncated_finding":   ([("speech", INJECTION + " " + _OVER_CAP)], []),
         "corrupt_parser_fail": ([], ["Audio not transcribed (RuntimeError: corrupt stream)."]),
         "empty":               ([], []),
-        # ASTRA G3: the ordinary sources still arrive; only the converted
+        # review G3: the ordinary sources still arrive; only the converted
         # component is missing, which is what makes it a COMPONENT loss.
         "converter_failed":    ([("metadata:title", ORDINARY)],
                                 ["Subtitle track 0 (eng) not converted (ffmpeg exit 1, "
@@ -1680,7 +1680,7 @@ class _RealTrackSeam:
     multi-track routing, because the tracks would be my list rather than
     ffmpeg's. Here the container, ffprobe, the per-track conversion and the
     labels are all REAL; the speech seam stands in for Whisper exactly as it does
-    for G3, and no live ASR result is claimed. That is ASTRA's own method.
+    for G3, and no live ASR result is claimed. That is the reviewer's own method.
     """
 
     def __init__(self, real_cls):
@@ -1813,9 +1813,9 @@ def test_every_metadata_container_is_read(space):
     assert page2["inspection_complete"] is True
 
 
-# ROUND 6 (ASTRA H4). The container table grows its THIRD DIMENSION.
+# ROUND 6 (review H4). The container table grows its THIRD DIMENSION.
 #
-# The round-5 table had one VALID example per container, and ASTRA's objection is
+# The round-5 table had one VALID example per container, and the reviewer's objection is
 # the sharpest sentence of this review: "one valid encoding example per container
 # does not cover valid text plus a bad byte, corrupt substructures, or QR on a
 # later frame. Those missing distinctions explain H1-H3." All three blockers lived
@@ -1840,7 +1840,7 @@ _CARRIERS = {
 def _write_carrier(path, carrier, bad_byte=False, later_frame=False):
     """Build one container variant with Pillow's REAL writers.
 
-    v0.5.6 round 7 (ASTRA I4.1). The round-6 version built an `ordinary` first-page
+    v0.5.6 round 7 (review I4.1). The round-6 version built an `ordinary` first-page
     EXIF object AND NEVER USED IT: it passed the finding-bearing `exif=` to
     `save_all`, which applies one EXIF block to BOTH pages. So all three
     "later-frame" fixtures carried the instruction on page 0 as well, and the tests
@@ -1927,7 +1927,7 @@ def test_container_dimension_valid_text_plus_one_bad_byte(carrier, tmp_path):
 def test_container_dimension_later_frame(carrier, tmp_path):
     """(iii) The instruction on a LATER PAGE of the same container.
 
-    Round 7 (ASTRA I4.1): the PREMISE is measured first. Round 6's version of this
+    Round 7 (review I4.1): the PREMISE is measured first. Round 6's version of this
     test passed against a frame-0-only reader because its fixture carried the
     finding on both pages, so it proved nothing about later frames at all.
     """
@@ -1955,7 +1955,7 @@ def test_container_dimension_later_frame_fails_for_a_frame_zero_only_reader(
         carrier, tmp_path, monkeypatch):
     """The mutation that proves the test above can fail.
 
-    ASTRA I4.1: an assertion that survives a deliberately broken reader is not
+    review I4.1: an assertion that survives a deliberately broken reader is not
     evidence. Replace the metadata walk with a frame-0-only reader and the
     later-page finding MUST disappear. If this test ever goes green, the fixture
     has stopped isolating the finding and the cell above is worthless again.
@@ -1984,7 +1984,7 @@ def test_container_dimension_corrupt_substructure_uses_real_fixtures():
     writers NORMALISE a damaged block away on save (a short IFD handed to
     `Image.save(exif=...)` comes back as no EXIF container at all, measured), so
     a synthetic corrupt substructure cannot be built through the public API --
-    it needs per-format byte surgery on the encoded file. ASTRA's `short-ifd.jpg`
+    it needs per-format byte surgery on the encoded file. The reviewer's `short-ifd.jpg`
     and `far-ifd.jpg` ARE that surgery, done by the reviewer, so the EXIF/JPEG
     family is asserted on his real files (see `test_h2_*` in
     tests/test_repair_v056.py). The other containers' corrupt-substructure
@@ -2004,7 +2004,7 @@ def test_container_dimension_corrupt_substructure_uses_real_fixtures():
 
 
 def test_normalize_refuses_input_it_does_not_understand():
-    """Round-4 hardening, from ASTRA's API observation.
+    """Round-4 hardening, from the reviewer's API observation.
 
     `getattr(obj, ..., default)` meant `normalize(None)` and `normalize(object())`
     came back complete AND CLEAN: every axis defaulted to the optimistic value
@@ -2104,7 +2104,7 @@ def test_mcp_scan_text_separates_a_missing_argument_from_empty_content():
 # the generated tests -- MCP over the REAL stdio transport
 #
 # In-process handler tests cannot catch a framing, encoding or serialization bug
-# between the handler and the client, and ASTRA's F3 -- a FIFO stalling the
+# between the handler and the client, and review's F3 -- a FIFO stalling the
 # server before it answered anything -- was only ever visible over the wire.
 # =========================================================================
 
@@ -2128,7 +2128,7 @@ def test_mcp_stdio_cell(surface, state, outcome, space):
         # this cell scans a real PNG and finds nothing to report.
         env["SUNGLASSES_DISABLE_EXTRACTORS"] = "1"
     if state == "converter_failed":
-        # ROUND 6: over the real wire too. ASTRA reached the failing converter
+        # ROUND 6: over the real wire too. The reviewer reached the failing converter
         # through stdio MCP, which the round-5 grid also called impossible.
         env["PATH"] = space["failed_converter_bin"] + os.pathsep + env["PATH"]
     proc = subprocess.run(
@@ -2158,7 +2158,7 @@ def test_mcp_stdio_cell(surface, state, outcome, space):
 # =========================================================================
 # THE TEST THAT PROVES THE TESTS
 #
-# ASTRA: "replace only human stdout in the supplied partial+finding deep cell
+# The reviewer: "replace only human stdout in the supplied partial+finding deep cell
 # with `CLEAN. All content was inspected.` and erase stderr; leave exit status
 # and JSON/SARIF untouched. The supplied cell test still passes."
 #
@@ -2240,7 +2240,7 @@ _MUTATIONS = [
      "incomplete", "human", 3,
      "\n  SCAN COMPLETE\n  Files NOT inspected: 1\n"
      "  No threats found in the inspected scope.\n", ""),
-    # --- round 5, ASTRA G4: both of these PASSED the round-4 assertion.
+    # --- round 5, review G4: both of these PASSED the round-4 assertion.
     ("incomplete/human: banner_without_named_scope — the header names nothing",
      "incomplete", "human", 3,
      "\n  INCOMPLETE (1.0ms)\n  No findings in the inspected scope.\n"
@@ -2354,7 +2354,7 @@ def test_the_matrix_has_no_undeclared_or_silently_dropped_cells():
 
 
 def test_no_cell_is_silently_skipped():
-    """ASTRA: "Four library-deep cells are skipped in favor of CLI seams."
+    """The reviewer: "Four library-deep cells are skipped in favor of CLI seams."
 
     A skip in a grid reads exactly like a pass. Every non-N/A cell must appear in
     exactly one generated parametrisation, and no test in this module may call
@@ -2384,7 +2384,7 @@ def test_no_cell_is_silently_skipped():
 
 
 def test_every_na_reason_states_what_kind_of_claim_it_is():
-    """ASTRA rejected five round-3 N/A reasons for claiming a state was IMPOSSIBLE
+    """The reviewer rejected five round-3 N/A reasons for claiming a state was IMPOSSIBLE
     when it was merely untested. No amount of reading the prose separates those two
     -- only DECLARING which argument you are making does -- so every surviving N/A
     carries a `claim` kind from a fixed vocabulary, and the reason has to

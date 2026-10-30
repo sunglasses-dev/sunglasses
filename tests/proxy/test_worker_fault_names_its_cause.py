@@ -83,7 +83,7 @@ def test_a_value_outside_the_vocabulary_RAISES(bad):
 
 def test_each_cause_SURVIVES_TO_DISK_as_its_own_value(tmp_path):
     """STORAGE ONLY, and it was never more: this row hands the three labels to
-    `Log.event` itself and so bypasses both route handlers. ASTRA r1 showed the
+    `Log.event` itself and so bypasses both route handlers. The reviewer r1 showed the
     route overwrote all three with `schema_invalid` while this row stayed green.
     The rows that prove EMISSION are the route rows at the bottom of the file.
 
@@ -109,7 +109,7 @@ def test_each_cause_SURVIVES_TO_DISK_as_its_own_value(tmp_path):
 
 
 
-# ── THROUGH THE ROUTE, read back from DISK (ASTRA r1 on ccee55d, NO GO) ──────
+# ── THROUGH THE ROUTE, read back from DISK (the reviewer r1 on ccee55d, NO GO) ──────
 # The rows above build faults and write labels. None of them crossed the route,
 # and the route is where all three causes were overwritten with schema_invalid:
 # every fault this process builds is `accepted=False`, `worker.validate` refuses
@@ -215,7 +215,7 @@ def test_the_route_records_the_cause_it_was_given(tmp_path, name, direction):
 
 @pytest.mark.parametrize("direction", ["request", "response"])
 def test_three_causes_read_back_from_disk_as_THREE(tmp_path, direction):
-    """ASTRA's table. A presence check passes when all three collapse to one."""
+    """The reviewer's table. A presence check passes when all three collapse to one."""
     drive = _drive_request if direction == "request" else _drive_response
     got = {name: drive(tmp_path / name, CASES[name][0])[0].get("detector_status")
            for name in ("crashed", "malformed_output", "schema_invalid")}

@@ -1,4 +1,4 @@
-"""T9 rulings 59 and 60, the two 0.6.1 design rows left for after the freeze.
+"""A reviewer rulings 59 and 60, the two 0.6.1 design rows left for after the freeze.
 
 Q2. An opted-in home whose hook chain lost its segments read NO_LOG, exit 3,
 the same as a home that never wrote: the verifier could not tell a wiped log
@@ -459,7 +459,7 @@ def test_control_the_marker_vector_with_one_signature_byte_flipped_fails_signed(
 # again, and that is the only retry. (b) An unmarked log (one begun before the
 # marker existed) is marked only when it opens a new segment after a segment
 # on disk. (c) Under --verify, hook segments with no marker are LOG_UNMARKED, a
-# limit, never a failure. T9: a retry at a fresh genesis would launder a wipe
+# limit, never a failure. A reviewer: a retry at a fresh genesis would launder a wipe
 # made while the chain was unmarked.
 
 _LEAK_KEY = "AK" + "IA" + "3XQ7NRLDPZK2WYVB"
@@ -548,7 +548,7 @@ _CAUSE = {"eacces": "Permission denied", "enospc-create": os.strerror(errno.ENOS
 
 @pytest.mark.parametrize("how", _FAULTS)
 def test_the_ask_names_the_cause_not_only_the_marker(tmp_path, monkeypatch, how):
-    """T9 ruling 64 (a): the ask names why, so the reader knows what to fix."""
+    """A reviewer ruling 64 (a): the ask names why, so the reader knows what to fix."""
     home = _keyed(tmp_path)
     undo = _fault(monkeypatch, home, how)
     try:
@@ -571,7 +571,7 @@ def _real_hook(home, payload):
 @pytest.mark.skipif(os.geteuid() == 0, reason="root writes a 0500 dir")
 @pytest.mark.parametrize("unmarked", [False, True], ids=["fresh", "upgrader"])
 def test_the_real_hook_exits_zero_asking_and_the_next_call_retries(tmp_path, request, unmarked):
-    """T9 ruling 64 (a), end to end: exit 0 with the named ask, no segment,
+    """A reviewer ruling 64 (a), end to end: exit 0 with the named ask, no segment,
     no marker; then the same entry, with keys/ writable again, marks the log.
     Both at a fresh genesis and for a log begun before the marker existed.
     The named reason is what separates this ask from the hook's belt, which

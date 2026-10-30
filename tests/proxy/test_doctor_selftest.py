@@ -1,4 +1,4 @@
-"""T10.R1 — the self-test's decision logic, and R-DOCTOR-R3b's DEADLINE class.
+"""A reviewer.R1 — the self-test's decision logic, and R-DOCTOR-R3b's DEADLINE class.
 
 What these pin is the part that is pure and decidable today. The live spawn of
 `python -m sunglasses.proxy` against the bundled echo server needs
@@ -36,7 +36,7 @@ def test_all_checks_pass_and_all_controls_fail_is_the_only_valid_run():
 @pytest.mark.parametrize("control", ["constant_allow", "constant_deny",
                                      "skipped_invocation"])
 def test_a_control_that_passes_voids_the_whole_run(control):
-    """T8's rule, kept verbatim: a control reporting PASS means the checks
+    """A reviewer's rule, kept verbatim: a control reporting PASS means the checks
     agreed with something that always says the same thing, which is worth
     exactly as much as running nothing."""
     c = dict(CONTROLS_OK); c[control] = "PASS"
@@ -96,7 +96,7 @@ def test_the_report_prints_measured_beside_bound(tmp_path):
 
     THIS ROW USED TO TEST THE FORMATTER ALONE, and that is why it passed while
     `deadline_line` was called by nothing, `Report` carried no measured figure
-    and `render` emitted neither the measurement nor the bound. ASTRA's
+    and `render` emitted neither the measurement nor the bound. The reviewer's
     test_F2 found it by walking the AST for a caller. A control that exercises
     a helper proves the helper; it says nothing about whether the product ever
     reaches it, which is the same lesson as every other one this PR earned. It
@@ -148,7 +148,7 @@ def test_a_check_verdict_carrying_an_exception_string_is_dropped():
     assert d._safe_checks(leaked) == {}
 
 
-# ─────────────────────── R-DOCTOR-R3c · absent is not failed (T9, 2026-09-21)
+# ─────────────────────── R-DOCTOR-R3c · absent is not failed (a reviewer, 2026-09-21)
 #
 # The defect these pin, measured on 164bca7 before the fix: the seam returns
 # `(False, {})` on every build that has no live self-test, `judge_self_test({},

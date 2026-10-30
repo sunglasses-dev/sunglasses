@@ -1,20 +1,20 @@
-"""T9's receipts, specified from the rows before the module exists.
+"""A reviewer's receipts, specified from the rows before the module exists.
 
 Two clauses carry the weight and both are about ORDER rather than content.
 
-T9.R2: RELEASE_AUTHORIZED is fsync'd BEFORE the first original byte leaves.
+A reviewer.R2: RELEASE_AUTHORIZED is fsync'd BEFORE the first original byte leaves.
 A receipt written after the bytes are gone is a description of something that
 already happened and cannot be relied on: a crash between the release and the
 write leaves a payload delivered and no record that it was. The whole value of
 an audit trail is that the record exists BEFORE the irreversible act, so the
 ordering is the property, not the field.
 
-T9.R4: an append or fsync failure after HOLD_ENTERED stops everything. Once the
+A reviewer.R4: an append or fsync failure after HOLD_ENTERED stops everything. Once the
 log cannot be written, the proxy can no longer honestly say what it did, and
 continuing to mediate while unable to record is the failure mode that leaves an
 operator with a clean-looking session and no evidence.
 
-T9.R3 is a never-list, so it is tested by trying to push each forbidden thing
+A reviewer.R3 is a never-list, so it is tested by trying to push each forbidden thing
 through and requiring it absent, in the same shape as the envelope tests.
 """
 import json
@@ -35,7 +35,7 @@ def log(tmp_path):
                                 "catalog_version": "1", "contract_version": "5.1"})
 
 
-# ── T9.R1: the header, and one ordered writer ─────────────────────────────
+# ── a reviewer.R1: the header, and one ordered writer ─────────────────────────────
 
 def test_the_header_is_the_first_line_and_carries_the_six_fields(log):
     log.close()
@@ -97,7 +97,7 @@ def test_one_writer_means_concurrent_events_do_not_interleave(log):
     assert len([x for x in lines if '"ADMITTED"' in x]) == 200
 
 
-# ── T9.R2: the ordering that makes the record worth having ────────────────
+# ── a reviewer.R2: the ordering that makes the record worth having ────────────────
 
 def test_release_is_authorised_and_fsynced_before_any_original_byte(log):
     """The property is the ORDER. A receipt written after the bytes are gone
@@ -131,7 +131,7 @@ def test_a_failed_fsync_means_the_bytes_never_leave(log):
     assert released == [], "the payload was released after the receipt failed"
 
 
-# ── T9.R3: the never-list ─────────────────────────────────────────────────
+# ── a reviewer.R3: the never-list ─────────────────────────────────────────────────
 
 @pytest.mark.parametrize("field,value", [
     ("payload", SECRET),
@@ -168,7 +168,7 @@ def test_only_allowlisted_event_kinds_are_written(log):
         log.event("SOMETHING_I_INVENTED", id_token=token())
 
 
-# ── T9.R4: a log that cannot be written stops the session ─────────────────
+# ── a reviewer.R4: a log that cannot be written stops the session ─────────────────
 
 def test_a_write_failure_after_hold_stops_admission_and_release(log):
     log.event("HOLD_ENTERED", id_token=token())
@@ -202,7 +202,7 @@ def test_prior_forwarded_state_is_recorded_unknown_not_guessed(log):
     assert outcome.prior_state == "UNKNOWN"
 
 
-# ── T9.R5: the verifier, and what it does NOT claim ───────────────────────
+# ── a reviewer.R5: the verifier, and what it does NOT claim ───────────────────────
 
 def test_a_well_formed_log_verifies(log):
     """T905. The terminal event is part of being well formed now. A log that
@@ -268,7 +268,7 @@ def test_an_invented_event_kind_is_rejected_on_an_otherwise_complete_log(tmp_pat
 
     The log here is complete in every other way -- header, an admitted item
     settled, a terminal event -- so the ONLY thing wrong with it is the invented
-    kind. ASTRA's fixture for this row has no terminal event either, so the
+    kind. The reviewer's fixture for this row has no terminal event either, so the
     completion check rejects it first and the kind check is never reached;
     the mutation that deleted the kind check survived his control and this one
     kills it.

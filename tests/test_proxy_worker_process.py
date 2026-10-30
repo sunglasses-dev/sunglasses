@@ -1,7 +1,7 @@
 """T4.R1's worker as a REAL CHILD, specified before it exists.
 
-Today the engine runs in the proxy's own process, which means T8.R4's kill on
-deadline and T8.R7's stdout bound have nothing to apply to: a scan that hangs
+Today the engine runs in the proxy's own process, which means a reviewer.R4's kill on
+deadline and a reviewer.R7's stdout bound have nothing to apply to: a scan that hangs
 stalls the session and a scan that floods has nothing stopping it. Nothing is
 released by either, so the direction was always safe, but "safe because the
 thing it protects against cannot be stopped" is not a bound, it is a hope.
@@ -9,7 +9,7 @@ thing it protects against cannot be stopped" is not a bound, it is a hope.
 Three properties, and all three are about a scan that misbehaves rather than
 one that works.
 
-THE DEADLINE IS A KILL, not a wait that gives up. A worker past T8.R4 is still
+THE DEADLINE IS A KILL, not a wait that gives up. A worker past a reviewer.R4 is still
 holding a CPU and a pipe, and a runner that stops reading and returns leaves it
 running for as long as it likes. The group is signalled, the grace passes, and
 the group is signalled again, the same shape serve.py already uses on the
@@ -140,7 +140,7 @@ def the_clock_starts_when_the_child_is_up(monkeypatch):
     return arm
 
 
-# ── T8.R4 · the deadline is a kill ───────────────────────────────────────
+# ── a reviewer.R4 · the deadline is a kill ───────────────────────────────────────
 
 def test_a_worker_past_the_deadline_is_killed_and_not_merely_abandoned(
         tmp_path, fails_rather_than_hangs,
@@ -177,7 +177,7 @@ def test_a_worker_past_the_deadline_is_killed_and_not_merely_abandoned(
 
 def test_a_worker_that_ignores_sigterm_is_killed_anyway(
         tmp_path, the_clock_starts_when_the_child_is_up):
-    """T8.R4's grace is a grace, not a promise. TERM alone leaves anything that
+    """A reviewer.R4's grace is a grace, not a promise. TERM alone leaves anything that
     traps it running for ever."""
     # The marker is written AFTER the handler, so the TERM this row sends
     # always meets a child that ignores it and only the KILL can end it.
@@ -221,7 +221,7 @@ def test_the_deadline_is_the_named_number(
     assert out["status"] == expected
 
 
-# ── T8.R7 · the stdout bound is enforced while reading ───────────────────
+# ── a reviewer.R7 · the stdout bound is enforced while reading ───────────────────
 
 def test_a_flooding_worker_is_stopped_rather_than_read_to_the_end(
         tmp_path, fails_rather_than_hangs,
@@ -297,7 +297,7 @@ def test_a_quiet_worker_past_its_deadline_reports_deadline_not_the_stdout_bound(
     # running -- the flood row stayed GREEN and this row went red.
     #
     # WHAT THIS ROW IS NOT: the only thing that catches that collapse. The same
-    # mutation also reddens three T8.R4 rows, and saying otherwise would be a
+    # mutation also reddens three a reviewer.R4 rows, and saying otherwise would be a
     # claim the measurement refutes. What it is, is the only row that produces
     # `deadline` through THIS call shape -- same binding, same
     # stdout_limit=200_000, only the child differs -- so it is what keeps the
@@ -402,7 +402,7 @@ def test_a_fault_never_carries_the_childs_own_words():
 
 
 def test_the_worker_runs_in_its_own_process_group(tmp_path):
-    """T8.R12, and the reason the kill is safe to send.
+    """A reviewer.R12, and the reason the kill is safe to send.
 
     `stop_group` signals a GROUP. If the child shared ours, the deadline kill
     would land on the proxy itself, so this property is what makes every other
@@ -421,7 +421,7 @@ def test_the_worker_runs_in_its_own_process_group(tmp_path):
         "the worker shares our group, so its deadline kill would hit us"
 
 
-# ── EOF IS NOT EXIT (T8 2026-09-23, measured before it was fixed) ────────
+# ── EOF IS NOT EXIT (a reviewer 2026-09-23, measured before it was fixed) ────────
 # `run()` decided "timed out" as `reader.is_alive() or child.poll() is None`.
 # The reader finishes at stdout EOF, and a child that has closed stdout is not
 # yet a child that has exited -- interpreter teardown sits between the two. So
@@ -458,7 +458,7 @@ def test_a_child_that_closes_stdout_and_then_hangs_is_still_a_deadline(
         tmp_path, the_clock_starts_when_the_child_is_up):
     """The other direction. Waiting for the exit must stay inside the SAME
     budget: a child that answers and then never leaves is still running at
-    the deadline, and T8.R4 says that child is killed and reported."""
+    the deadline, and a reviewer.R4 says that child is killed and reported."""
     marker = tmp_path / "pid"
     stays = _script(
         f"import os,sys,time;open({str(marker)!r},'w').write(str(os.getpid()));"
@@ -495,7 +495,7 @@ def test_a_flood_is_still_stopped_at_once_not_after_the_budget():
     assert waited < 3.0, f"a flood took {waited:.2f}s -- it waited on the budget"
 
 
-# ── DELIVERY IS INSIDE THE DEADLINE (ASTRA worker-design r1, R1) ─────────
+# ── DELIVERY IS INSIDE THE DEADLINE (the reviewer worker-design r1, R1) ─────────
 # `run()` wrote the whole payload to the child's stdin and only THEN started
 # the clock. A child that stops draining stdin, handed an admitted payload
 # larger than the pipe, held the parent inside that write for as long as it

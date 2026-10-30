@@ -33,7 +33,7 @@ def test_RC02_reader_close_with_buffered_line_retains_refusal():
  assert len(out)==1
  assert json.loads(out[0])['error']['data']['reason_code']=='MALFORMED_UPSTREAM'
 
-# R-RC03-1 (T9, 2026-09-14 10:00). This control asserted the refusal data by
+# R-RC03-1 (a reviewer, 2026-09-14 10:00). This control asserted the refusal data by
 # EQUALITY against two members, which contradicts T410 and T4.R7's ten. The
 # ruling is that the ten win, and RC03 is SPLIT IN PLACE rather than edited
 # away: the substantive assertions below are unchanged and live, the equality

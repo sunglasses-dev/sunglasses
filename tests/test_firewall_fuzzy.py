@@ -4,8 +4,8 @@ test_firewall_fuzzy.py — the WARN lane (P5).
 This is the lane that must never be allowed to grow teeth. The pattern engine is
 good, and that is precisely the temptation: a critical-severity match *feels*
 like grounds to block. It is not. It is a probability, and hard-denying on a
-probability is detection through the side door — the exact move AZ and Fable
-locked out when they set the v0.4 rule.
+probability is detection through the side door — the exact move the
+v0.4 rule locked out.
 
 So the tests here are mostly about what this lane is forbidden to do, plus the
 two measurements that decided it ships OFF by default:

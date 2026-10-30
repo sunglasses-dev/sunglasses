@@ -1,6 +1,6 @@
-"""T10.R2/R3 — the doctor, reconciled onto `sunglasses.install`.
+"""A reviewer.R2/R3 — the doctor, reconciled onto `sunglasses.install`.
 
-Starting material is T8's `doctor.py` from #168 745849a, credited: `aggregate`,
+Starting material is a reviewer's `doctor.py` from #168 745849a, credited: `aggregate`,
 `process_exit_code`, `self_test_valid`, `run`/`render` and the constants are
 his, and the three rules I am not re-deriving are his too (every control that
 ran must have FAILED or the run is void · a failed self-test is exit 1 whatever
@@ -31,7 +31,7 @@ import pytest
 from sunglasses import install as inst
 from sunglasses.proxy import doctor
 
-# All THREE controls, because T10.R1 requires skipped_invocation too and a run
+# All THREE controls, because a reviewer.R1 requires skipped_invocation too and a run
 # missing one is void. Supplying two was correct before that was pinned.
 _CONTROLS = {c: "FAIL" for c in doctor.REQUIRED_CONTROLS}
 _PASSING = {c: "PASS" for c in doctor.SELF_TEST_CHECKS}
@@ -99,7 +99,7 @@ def test_the_doctor_and_install_never_disagree(cfg, home, artifact):
 # ─────────────────────────────────── 2 · one artifact identity
 
 def test_artifact_identity_is_the_proxy_entry_point_not_the_interpreter(artifact):
-    """T8's version returned `sys.executable` and hashed the interpreter. Every
+    """A reviewer's version returned `sys.executable` and hashed the interpreter. Every
     wrapper on the machine runs under some python, so hashing the interpreter
     makes the hash half of "path AND hash" agree with anything that shares a
     python. The identity is the artifact `install` wires, and its hash is that
@@ -178,7 +178,7 @@ def test_a_clean_direct_inventory_is_still_3_not_2(cfg, artifact):
 
 
 def test_a_failed_self_test_outranks_an_unreadable_source(tmp_path, artifact):
-    """Precedence 1 > 2 > 3 > 0. T8's rule, kept: an instrument that failed has
+    """Precedence 1 > 2 > 3 > 0. A reviewer's rule, kept: an instrument that failed has
     no standing to report on anything else."""
     p = tmp_path / ".mcp.json"
     p.write_bytes(b"{ not json")
@@ -192,7 +192,7 @@ def test_a_failed_self_test_outranks_an_unreadable_source(tmp_path, artifact):
 def test_the_doctor_defines_no_second_classifier():
     """R-DOCTOR-OWNER, as a test rather than an intention.
 
-    The reconciliation wired `read_sources` to `install.classify` and left T8's
+    The reconciliation wired `read_sources` to `install.classify` and left a reviewer's
     original `classify` sitting in the module, unreachable from inside it but
     perfectly reachable as `doctor.classify(...)` from outside — with a
     DIFFERENT signature, which is the disagreement the ruling exists to prevent.
@@ -212,7 +212,7 @@ def test_the_doctor_defines_no_second_exception_family():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 2. ASTRA's three blockers on 3d3ee8c (R-DOCTOR-R2). Reproduced here so
+# Round 2. The reviewer's three blockers on 3d3ee8c (R-DOCTOR-R2). Reproduced here so
 # the protection lives in the repo and not only in a reviewer's temp directory.
 # Both were RED on 3d3ee8c.
 #

@@ -1,4 +1,4 @@
-"""`--worker process`: the scan runs in a child where T8.R4 and T8.R7 hold.
+"""`--worker process`: the scan runs in a child where a reviewer.R4 and a reviewer.R7 hold.
 
 Opt-in. The default is the in-process path that shipped, and the first rows
 prove the default is not merely equivalent but the SAME call.
@@ -318,7 +318,7 @@ def test_a_hanging_child_is_withheld_through_the_route(tmp_path):
 
 
 def test_a_ready_child_that_never_reads_a_large_call_is_withheld_on_time(tmp_path):
-    """ASTRA worker-design r1, R1, through the route: a ready spare that never
+    """The reviewer worker-design r1, R1, through the route: a ready spare that never
     reads stdin, handed an admitted call bigger than the pipe. Before the
     repair the parent sat in the stdin write with the deadline behind it, so
     this row runs the route on a thread and fails on "never returned"."""
@@ -356,7 +356,7 @@ def test_a_ready_child_that_never_reads_a_large_call_is_withheld_on_time(tmp_pat
 # `_parse` used to return `dict(value, binding=dict(binding))`: the PARENT's
 # binding stamped over whatever the child said, so `worker.validate`'s binding
 # check compared the parent with itself and could never fail on this path.
-# Found by T10 (warroom/G217_STIMULUS_MEASURED_2026-09-23.md); nothing called
+# Found by a reviewer (warroom/G217_STIMULUS_MEASURED_2026-09-23.md); nothing called
 # `run()` in the product until this branch, which is why it goes here.
 
 _OTHER = {"digest": "0" * 64, "channel": "message", "generation": 1,
@@ -406,7 +406,7 @@ def test_the_childs_own_binding_still_passes(tmp_path):
 
 
 # ── EVERY ProcessScan FAULT NAMES ITS CAUSE, READ BACK FROM DISK ──────────
-# T9 ruling 9-23 14:49, pinned BEFORE review rather than left for the PR: a
+# A reviewer ruling 9-23 14:49, pinned BEFORE review rather than left for the PR: a
 # ProcessScan fault carries one of the three causes, or is a deadline with none.
 #   spare never ready / died loading -> crashed (a process failure the parent saw)
 #   child closed stdout with no answer -> malformed_output (as `_parse`'s zero lines)

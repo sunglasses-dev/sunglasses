@@ -6,10 +6,10 @@ in the package produces either, so the approval gate can never open and no
 tools/call can be forwarded through the artifact at all.
 
 This is the collector. It drives `tools/list` to a terminal page, bounds the
-whole thing per T8.R13, hashes the complete snapshot and reports each page's
+whole thing per a reviewer.R13, hashes the complete snapshot and reports each page's
 scan so the activation can refuse on any of them.
 
-The row that shapes it is the last clause of T8.R13: NEVER ACTIVATE A PREFIX. A
+The row that shapes it is the last clause of a reviewer.R13: NEVER ACTIVATE A PREFIX. A
 server that stops paging, loops its cursor, or runs the list past its deadline
 has not given us a short tool list. It has given us an unknown one, and the
 difference matters because the approved sha was computed over a COMPLETE
@@ -106,7 +106,7 @@ def test_every_tool_carries_its_own_descriptor_hash():
     assert all(len(sha) == 64 for sha in result.tools.values())
 
 
-# ── T8.R13 · the bounds, and never a prefix ──────────────────────────────
+# ── a reviewer.R13 · the bounds, and never a prefix ──────────────────────────────
 
 def test_a_server_that_never_stops_paging_is_a_fault_not_a_long_list():
     """64 pages is the cap and the 65th request is not made. A list that does

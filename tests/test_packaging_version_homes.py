@@ -5,7 +5,7 @@ The release version is written down in more places than anything checks. Two
 of them were found unguarded on 2026-09-20 during the beta-readiness sweep:
 
   * `setup.py`'s `version=` literal — it NAMES THE BUILT WHEEL, and nothing
-    derives it from `__version__` (T8). Bump the other files and leave this
+    derives it from `__version__` (a reviewer). Bump the other files and leave this
     one and CI goes green over a wheel still called 0.5.9.
   * `server.json`, the MCP registry manifest, which pins the version TWICE
     (top level and `packages[0]`). Nothing in the repo, in `.github/` or in
@@ -194,7 +194,7 @@ def test_setup_version_reads_the_literal_without_executing_setup_py():
 
 
 def test_the_release_that_forgets_setup_py_is_caught():
-    """The exact shape T8 measured on 2026-09-20.
+    """The exact shape a reviewer measured on 2026-09-20.
 
     The three named files get bumped for the release and `setup.py` is
     forgotten, so every other check goes green over a wheel still called

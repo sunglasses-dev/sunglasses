@@ -1,7 +1,7 @@
 """test_receipts_hook_not_proxy_chain.py — a hook call never writes into a
 proxy chain (#172 readiness row 7, second half).
 
-WIRE_SPEC "one chain per log" (T9 ruling 15): the hook and each proxy log write
+WIRE_SPEC "one chain per log" (a reviewer ruling 15): the hook and each proxy log write
 separate chains, each in its own directory with its own lock and sequence,
 because a writer may never sign a suffix it did not write. Today that holds
 because the hook picks `receipts/hook`. Nothing in the writer holds it: both

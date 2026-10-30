@@ -1,7 +1,7 @@
 """0.4.3 — unknown channels fail CLOSED (Aug-18 cold-user test findings).
 
 Before this, an unknown channel filtered out every pattern and returned a
-clean ALLOW: silent false safety. Repro: Opus 5 + Fugu, 2026-08-18.
+clean ALLOW: silent false safety. Repro: cold-user test, 2026-08-18.
 """
 import pytest
 

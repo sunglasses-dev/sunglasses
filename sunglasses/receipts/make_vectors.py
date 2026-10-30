@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Produce the published byte vectors two independent implementations agree on.
 
-ASTRA: "Publish exact byte vectors for hashes, signatures and fingerprint
+The reviewer: "Publish exact byte vectors for hashes, signatures and fingerprint
 derivation before implementing both writer and verifier." This generates them
 from `wire.py` itself, so the specification and the code cannot drift: if
 someone changes a domain prefix, the vectors change in the same commit and the

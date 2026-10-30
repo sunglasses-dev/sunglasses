@@ -1,5 +1,5 @@
 """test_receipts_proxy_lifecycle.py — what the verifier can say about a proxy
-run's chain, and what it says it cannot (#172, T9 RULING 24).
+run's chain, and what it says it cannot (#172, a reviewer RULING 24).
 
 A proxy chain's lifecycle is the SESSION: it opens with HEADER and ends with a
 terminal event, the same two facts the legacy verifier checks. The items
@@ -62,7 +62,7 @@ def test_the_pairing_limit_is_neither_a_pass_nor_a_failure():
     passing = {"key_trust": "KEY_TRUSTED", "chain_integrity": "CHAIN_OK",
                "unsigned_tail": "NO_VISIBLE_TAIL",
                "expected_endpoint": "ENDPOINT_CONFIRMED"}
-    # A limit (T9 rulings 46 and 48): exit 3, and 1 when strict.
+    # A limit (a reviewer rulings 46 and 48): exit 3, and 1 when strict.
     assert codes.exit_code(dict(passing, lifecycle="PAIRING_UNKEYED")) == 3
     assert codes.strict_exit_code(dict(passing, lifecycle="PAIRING_UNKEYED")) == 1
     assert codes.strict_exit_code(dict(passing, lifecycle="LIFECYCLE_ORPHAN")) == 1

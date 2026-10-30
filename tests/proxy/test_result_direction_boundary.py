@@ -1,4 +1,4 @@
-"""ASTRA's RD blockers on #168: the result direction's settlement boundary.
+"""The reviewer's RD blockers on #168: the result direction's settlement boundary.
 
 Four rows, one mistake in four shapes. The inspection seam ran BEFORE the pump
 had taken ownership of the item, so the replacement it produced skipped every
@@ -6,7 +6,7 @@ rule the ordinary path enforces: the shape check that makes a mismatched result
 a protocol fault, the record that makes a close or a cancel win, and the single
 answer T6.R1 allows per id.
 
-The rows are ASTRA's; the wiring is ours.
+The rows are the reviewer's; the wiring is ours.
 """
 import hashlib
 import json
@@ -165,7 +165,7 @@ def test_RD03_invalidation_during_the_scan_withholds_the_original(tmp_path):
 
 # ── round 3 · the barrier is asked AT THE HANDOFF, not only before the scan ──
 #
-# ASTRA's round-2 instrument pauses the reader ON the yield line and completes
+# The reviewer's round-2 instrument pauses the reader ON the yield line and completes
 # the action there. The rows above interrupt the SCAN, which the round-2 repair
 # already covered; these interrupt the window the repair left open -- after the
 # scan returned, before anything crossed. He found four shapes, and the same
@@ -299,7 +299,7 @@ def test_an_authority_writer_completes_while_the_decision_runs(tmp_path):
     THE PREVIOUS VERSION OF THIS ROW DID NOT MEASURE THAT. It completed the
     cancellation in a wrapper around `_handoff`, BEFORE the original ran, so
     its `with session._settlement: pass` had already exited and no reader was
-    parked anywhere. ASTRA mutated `accept_cancellation` to take `_settlement`
+    parked anywhere. The reviewer mutated `accept_cancellation` to take `_settlement`
     before `_authority_lock` -- the exact wrong fix this row is named after --
     and the row passed 0/1. A guard that would survive the thing it guards
     against is a guard that measures itself.
@@ -349,7 +349,7 @@ def _after_the_decision(route, action):
     the wrong fix this round rejects -- an authority writer that takes that
     same owner -- turns this row into a self-deadlock and the whole file hangs.
     A hang is not a kill: it reports the same way whether the property broke or
-    the harness did, which is the failure ASTRA's XG01 was careful to avoid.
+    the harness did, which is the failure the reviewer's XG01 was careful to avoid.
     Bounded and reported, the same mutation fails this row with a sentence.
 
     ONCE, and the first draft of this helper is the reason it says so. The
@@ -358,7 +358,7 @@ def _after_the_decision(route, action):
     fired again there and its writer blocked on the exclusion that makes the
     re-derivation atomic. The row then reported "the authority could not
     complete", which is true of the second firing and says nothing about the
-    window under test. ASTRA's XD01 carries the same guard (`not fired`).
+    window under test. The reviewer's XD01 carries the same guard (`not fired`).
 
     Returns a dict the row asserts on: `completed` is False when the writer
     could not finish while the reader held the owner, and `calls` counts how
@@ -618,7 +618,7 @@ def test_an_authority_during_the_frame_build_still_wins(tmp_path, finding):
 
 
 def test_the_retirement_re_derives_without_spending_a_gate_call(tmp_path):
-    """The shape ASTRA's count forces, and the reason the policy moved.
+    """The shape the reviewer's count forces, and the reason the policy moved.
 
     `XE02_rederive_writer` asserts the right answer AND exactly two gate calls.
     Count them: the first returns nothing, an invalidation lands, the discharge
@@ -736,7 +736,7 @@ def test_a_failure_recording_completion_does_not_answer_twice(tmp_path):
     ownership rather than on the failure.
 
     `WRITE_COMPLETE` is recorded AFTER the frame has crossed. The client has
-    its one answer; a bounded refusal here would be a second. ASTRA names this
+    its one answer; a bounded refusal here would be a second. The reviewer names this
     as the fix to avoid, so it has a row rather than a comment.
     """
     route, out = _route(tmp_path, finding=False)
@@ -1032,7 +1032,7 @@ def test_a_give_back_never_resurrects_an_answered_id(tmp_path):
 def test_every_spanning_table_is_keyed_by_the_token():
     """A READING AID, NOT A PROOF, and the difference is on the record.
 
-    ASTRA defeated the sibling of this row on #179 with two reachable mutants
+    The reviewer defeated the sibling of this row on #179 with two reachable mutants
     that satisfy its source pattern and still break the behaviour -- the
     behavioural suite rejected both, which is where the real guarantee lives.
     So this row is NOT class-wide proof and must not be described as one. It is
@@ -1238,7 +1238,7 @@ def test_a_payer_whose_write_fails_gives_the_obligation_back(tmp_path):
 
 #: Every session API that accepts an attempt token on this branch, with what a
 #: FOREIGN token must not be able to do through it. Listed explicitly because a
-#: source pattern can be satisfied while the behaviour is broken -- ASTRA
+#: source pattern can be satisfied while the behaviour is broken -- the reviewer
 #: demonstrated exactly that against the structural row above -- so each entry
 #: here is driven, not read.
 # MERGE, #168 r9 onto #179. The six below arrived with #179 and this row is
@@ -1332,7 +1332,7 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
     # after every call, and five of the six mutants SURVIVED it: these APIs do
     # not touch `_unanswered`, they touch `_pending`, `_delivering` and the
     # core's debt. A row that observes the wrong table runs without being able
-    # to fail, which is the shape ASTRA rejected on #179 r8. Proven by
+    # to fail, which is the shape the reviewer rejected on #179 r8. Proven by
     # warroom/r168-followups/inventory_rows_mutation_proof.py: one
     # generation-only mutant per API, each now killed by assertion.
     #
@@ -1401,7 +1401,7 @@ def test_a_foreign_token_moves_nothing_through_any_entry_point(tmp_path,
 # ── MERGE ROUND · the inbound release receipt names WHAT IT ANSWERED ─────────
 
 def test_the_inbound_release_receipt_names_the_generation_it_answered(tmp_path):
-    """T9's ruling on the merge round: `_release_inbound` hashed the literal
+    """A reviewer's ruling on the merge round: `_release_inbound` hashed the literal
     marker "inbound", so the one receipt whose job is to say what a release
     answered named nothing at all -- the id-only key with no id in it.
 

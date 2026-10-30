@@ -133,7 +133,7 @@ def test_a_notification_with_no_id_at_all_is_fine():
 # ── T4.R4(2): resource breaches are NOT protocol faults ────────────────────
 
 def test_an_oversized_frame_is_a_budget_breach_and_is_never_parsed():
-    """T8.R1. Parsing it is the cost the bound exists to refuse, so the refusal
+    """A reviewer.R1. Parsing it is the cost the bound exists to refuse, so the refusal
     comes before the parse and the frame is deliberately valid JSON."""
     filler = "x" * (framing.MAX_FRAME_BYTES + 10)
     raw = json.dumps({"jsonrpc": "2.0", "id": 1, "pad": filler}).encode()
@@ -176,7 +176,7 @@ def test_a_frame_just_inside_the_depth_limit_is_accepted():
 
     The `method` is not decoration. An earlier version of this test built
     `{"jsonrpc": "2.0", "id": 1}` with nothing else, which is not a request, a
-    notification or a response, and the envelope check added after ASTRA's
+    notification or a response, and the envelope check added after the reviewer's
     review correctly refuses it. The test had been asserting that an invalid
     frame parses, and it passed because the parser had the same hole.
     """

@@ -1,7 +1,7 @@
-"""T9 RULINGS 34 and 35. A receipts failure the hook did not catch was an OPEN
+"""A reviewer RULINGS 34 and 35. A receipts failure the hook did not catch was an OPEN
 door, not a closed one.
 
-ASTRA receipts-3e8d648 r2. `_HookReceipts(home)` was built above the hook's
+The reviewer receipts-3e8d648 r2. `_HookReceipts(home)` was built above the hook's
 guard, and deciding whether the user opted in reads the hook chain's last
 segment with a bare `open()`. With the key deleted, no `receipts off`, and that
 segment unreadable, the PermissionError escaped `run_hook`, the hook process
@@ -75,7 +75,7 @@ def _decision(out):
     return spec.get("permissionDecision"), spec.get("permissionDecisionReason", "")
 
 
-# ── (a) the ASTRA sequence ───────────────────────────────────────────────────
+# ── (a) the reviewer sequence ───────────────────────────────────────────────────
 
 def test_a_deleted_key_under_an_unreadable_tail_asks_and_names_the_cause(
         home, unreadable_tail):

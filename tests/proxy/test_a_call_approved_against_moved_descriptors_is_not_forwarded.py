@@ -269,7 +269,7 @@ def test_red_a_call_whose_approval_record_changed_during_the_scan_is_not_forward
 # bump runs FIRST. If the record raised and the bump came after it, the session
 # would say "invalidated" while the revision a call was admitted under still
 # matched, and the call would be forwarded. Nothing in the rows above makes the
-# record raise, so the order was unpinned (ASTRA r4 package, mutant X6).
+# record raise, so the order was unpinned (the reviewer r4 package, mutant X6).
 
 def _failing_invalidation_record(server):
     """Every session event passes through except APPROVAL_INVALIDATED, which

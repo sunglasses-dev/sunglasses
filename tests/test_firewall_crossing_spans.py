@@ -1,4 +1,4 @@
-"""Crossing spans: ASTRA's R5-1 on #173 round 5.
+"""Crossing spans: review's R5-1 on #173 round 5.
 
 The ownership sweep assumed the matched intervals NEST -- that a container
 always sorts before what it contains and can be popped once something reaches
@@ -13,12 +13,12 @@ the quadratic scan it replaced decide identically -- eight of these
 twenty-four shapes reported a different rule in the receipt, and a receipt that
 names the wrong rule is what somebody reads when they ask which format leaked.
 
-The fixtures are ASTRA's own, byte for byte, but they are stored BASE64 and
+The fixtures are the reviewer's own, byte for byte, but they are stored BASE64 and
 decoded here. Two of them carry Stripe-shaped bodies and GitHub's push
 protection refused the branch, which is the correct answer: a product whose
 whole job is noticing credential-shaped strings should not commit any. The
 recorded sha256 of each decoded fixture is asserted, so the encoding cannot
-drift from what ASTRA measured.
+drift from what the reviewer measured.
 
 The expectations were MEASURED against the round-4 implementation -- the slow
 one that was correct -- and all 24 agree with it, which is the equivalence
@@ -39,7 +39,7 @@ _ENCODED = json.loads(
 
 
 def fixture(name):
-    """Decode one fixture and prove it is the one ASTRA measured."""
+    """Decode one fixture and prove it is the one the reviewer measured."""
     entry = _ENCODED[name]
     raw = base64.b64decode(entry["b64"])
     assert hashlib.sha256(raw).hexdigest() == entry["sha256"], (
@@ -103,7 +103,7 @@ def test_a_crossing_span_does_not_evict_a_containing_owner(name, tmp_path):
 @pytest.mark.parametrize("name,rule", [("CROSS-ANTHROPIC-AWS", "GLS-FW-SEC-ANTHROPIC"),
                                        ("CROSS-OPENAI-ANTHROPIC", "GLS-FW-SEC-OPENAI")])
 def test_the_two_blocking_shapes_by_name(name, rule, tmp_path):
-    """ASTRA's two named controls, spelled out separately from the table so a
+    """The reviewer's two named controls, spelled out separately from the table so a
     future edit to the table cannot quietly drop them."""
     record = _terminal(fixture(name), tmp_path)
     assert (record["decision"], record["rule_id"]) == ("deny", rule), record

@@ -1,7 +1,7 @@
-"""T10.R4/R5/R6 — the install transaction over an MCP config file.
+"""A reviewer.R4/R5/R6 — the install transaction over an MCP config file.
 
-Contract: GATE3_CONTRACT_v5_2026-09-13.md, rows T10.R4, T10.R5, T10.R6, plus
-the two rules T9 adopted from the 2026-09-15 design note: install REFUSES when
+Contract: GATE3_CONTRACT_v5_2026-09-13.md, rows a reviewer.R4, a reviewer.R5, a reviewer.R6, plus
+the two rules a reviewer adopted from the 2026-09-15 design note: install REFUSES when
 it cannot resolve the artifact it is about to wire, and every assertion re-reads
 bytes from disk rather than the object we serialised.
 
@@ -111,7 +111,7 @@ def test_install_never_wraps_the_wrapper(cfg, home, artifact):
     """C2. The second install must not re-wrap.
 
     Round 1 asserted this as a silent no-op that still returned success, and
-    ASTRA's C2-REPEAT showed that is the wrong contract: a user who asks twice
+    review's C2-REPEAT showed that is the wrong contract: a user who asks twice
     was told it worked twice. The property that matters is unchanged (never wrap
     the wrapper) but the outcome is an explicit refusal, so the assertion moved
     with it. The old wording encoded the defect it was meant to prevent.
@@ -361,7 +361,7 @@ def test_resolve_artifact_on_the_real_package_matches_what_is_shipped(tmp_path):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 2. Every control ASTRA's review found failing on 0c184de, landed here.
+# Round 2. Every control the reviewer's review found failing on 0c184de, landed here.
 #
 # These were red on round 1 and the red was reproduced before the rewrite, not
 # assumed: 24 of 48 independent property controls failed, and each test below
@@ -690,7 +690,7 @@ def test_a_marker_naming_a_different_artifact_than_it_launches_is_unverified(cfg
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 3. The ten controls ASTRA's review of 6be355d found failing.
+# Round 3. The ten controls the reviewer's review of 6be355d found failing.
 #
 # Round 2 passed all 48 of round 1's controls and its own 28-row battery, and
 # still failed ten NEW ones. Same lesson one level up: a battery generated from
@@ -941,7 +941,7 @@ def test_install_refuses_a_config_nested_past_the_parser(tmp_path, home, artifac
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 4. T8's second-reader findings on 8b16d96, each proven red on that head
+# Round 4. A reviewer's second-reader findings on 8b16d96, each proven red on that head
 # before the repair (F1-UNINSTALL, F1-JOURNAL, F1-SYMLINK, F2-SHIM).
 #
 # F1 is one defect reachable through two callers, so there is a control per
@@ -1089,7 +1089,7 @@ def test_every_mutation_anchor_is_still_present_in_install_py():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 5. ASTRA's four round-4 families, each reproduced here so the
+# Round 5. The reviewer's four round-4 families, each reproduced here so the
 # protection lives in the repo and not only in a reviewer's temp directory.
 # Every one of these was RED on da5f6eb; the reviewer's own controls were the
 # source, not my reading of my own diff.
@@ -1239,7 +1239,7 @@ def test_uninstall_refuses_a_record_whose_entry_existed_is_not_a_bool(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 6. ASTRA's two deterministic recovery RACES. Both were pre-existing on
+# Round 6. The reviewer's two deterministic recovery RACES. Both were pre-existing on
 # da5f6eb, neither was a regression of round 5, and both are closed at the
 # moment of the mutation rather than before it -- because a caller's view of
 # the directory is already stale by the time the unlink or the rename happens.
@@ -1325,7 +1325,7 @@ def test_the_expectation_does_not_outlive_its_scope(tmp_path):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 7. ASTRA's four round-6 interleavings. Two of his rows go green here
+# Round 7. The reviewer's four round-6 interleavings. Two of his rows go green here
 # exactly as written; the other two cannot, and the reason is measured rather
 # than asserted: both put a racing install INSIDE our critical section and
 # require it to SUCCEED there, so any mutual exclusion is a circular wait
@@ -1445,7 +1445,7 @@ def test_an_install_cancelled_while_it_writes_does_not_report_success(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 8. ASTRA's three compositions, each one an instance of a single
+# Round 8. The reviewer's three compositions, each one an instance of a single
 # invariant: a wrapped config must never be left without a usable inverse.
 # His own rows are the acceptance; these pin the three mechanisms directly so
 # each fails for one reason.
@@ -2177,7 +2177,7 @@ inst._forget_take(note, "an-older-take")
 
 def test_a_killed_forget_does_not_leave_an_alias_per_death(
         cfg, home, artifact, tmp_path):
-    """R14-A-CRASH-IS-NOT-A-QUANTITY (ruling R-177-R14, ASTRA round 13
+    """R14-A-CRASH-IS-NOT-A-QUANTITY (ruling R-177-R14, the reviewer round 13
     `test_R13_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND`).
 
     Round 13's counting control drove contested forgets that RETURNED, and the
@@ -2277,7 +2277,7 @@ inst._forget_take(note, "an-older-take")
 
 def test_a_dead_owners_pid_answering_alive_does_not_keep_its_alias(
         cfg, home, artifact, tmp_path):
-    """R15-OWNERSHIP-IS-AN-INCARNATION-NOT-A-PID (ASTRA round 14,
+    """R15-OWNERSHIP-IS-AN-INCARNATION-NOT-A-PID (the reviewer round 14,
     `test_R14_LIVE_REUSED_PID_PROCESS_DEATH_AFTER_LINK_NOTE_BOUND[distinct]`).
 
     Round 14 decided an alias was collectable by asking the operating system
@@ -2349,7 +2349,7 @@ inst._forget_take(pathlib.Path(sys.argv[1]), "an-older-take")
 
 def test_a_death_before_the_owner_lock_leaves_no_alias_at_all(
         cfg, home, artifact, tmp_path):
-    """R16-THE-OWNER-EXISTS-FIRST (ruling R-177-R16 (a), ASTRA round 15
+    """R16-THE-OWNER-EXISTS-FIRST (ruling R-177-R16 (a), the reviewer round 15
     `test_R15_PRELOCK_DEATH_ALIAS_BOUND`).
 
     Round 15 took the owner lock AFTER the rename that publishes the alias, and

@@ -7,7 +7,7 @@ a firewall that is silently not running. So the bar here is different from the
 other phases: **never lose data that was already in the file, and never leave a
 hook wired to an interpreter that cannot import us.**
 
-The PATH hazard (flagged by T9 at 23:06, and it is the sharp one): writing a
+The PATH hazard (flagged by a reviewer at 23:06, and it is the sharp one): writing a
 literal `python3 -m sunglasses.firewall` resolves through PATH at hook time.
 Under pipx / venv / conda that can be a *different* interpreter with no
 `sunglasses` installed — the hook then fails, the failure is invisible, and the
@@ -241,7 +241,7 @@ def test_self_test_passes_for_the_real_command():
 
 
 def test_self_test_fails_for_an_interpreter_without_sunglasses(tmp_path):
-    """The exact pipx/venv failure T9 flagged, reproduced.
+    """The exact pipx/venv failure a reviewer flagged, reproduced.
 
     A python that cannot import sunglasses must be caught HERE — otherwise the
     hook fails silently forever and the firewall is off while looking on.

@@ -28,7 +28,7 @@ from sunglasses.engine import SunglassesEngine
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from fp_corpus_data import clean_files as _clean_files  # decoupled single source (Jun 12 T8)
+from fp_corpus_data import clean_files as _clean_files  # decoupled single source (Jun 12 a reviewer)
 from fp_corpus_data import real_world_files as _real_world_files  # famous READMEs (Jul 10)
 from fp_corpus_data import real_world_known_failures as _known_failures
 

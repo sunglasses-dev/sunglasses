@@ -1,4 +1,4 @@
-"""T8.R6, the admission bound, as its own subject.
+"""A reviewer.R6, the admission bound, as its own subject.
 
 The contract table says `in-flight held messages + pending forwarded requests
 (outstanding correlations) / queued bytes | 8 / 16 MiB | S3 OVERLOADED on the
@@ -8,9 +8,9 @@ admitted a ninth correlation and a request behind a full write queue, so the
 row was a table entry rather than a bound.
 
 These rows arrived in the result-direction PR because that is where the work
-happened. ASTRA's RD09 measured the change there and read it as a regression --
+happened. The reviewer's RD09 measured the change there and read it as a regression --
 the base admits nine, the candidate admits eight -- which is the base being
-unbounded rather than the candidate being wrong. T9 ruled it out of that PR and
+unbounded rather than the candidate being wrong. A reviewer ruled it out of that PR and
 into this one, where the contract row is the subject and can be reviewed as
 one, and where "the body equals the delta" is true by construction.
 
@@ -97,7 +97,7 @@ def test_an_upstream_correlation_does_not_consume_the_client_cap():
 
 # ── round 2, R-179-R2 ───────────────────────────────────────────────────────
 #
-# ASTRA's independent probe found four ways past the round-1 bound and one
+# The reviewer's independent probe found four ways past the round-1 bound and one
 # reading of the row I had narrowed without saying so. These rows are the
 # corrections, and each one is written from the control that caught it rather
 # than from the code that failed.
@@ -151,7 +151,7 @@ def test_two_admissions_at_the_boundary_cannot_both_win(monkeypatch):
     TWO NOTES ON THE CONTROL, because the first two attempts were both worse
     than the bug.
 
-    ASTRA's probe held both threads INSIDE `check_admission` on a barrier. That
+    The reviewer's probe held both threads INSIDE `check_admission` on a barrier. That
     is only reachable while the check sits outside the lock, so against the fix
     the barrier can never fill and the probe dies with BrokenBarrierError --
     the instrument breaking, not the property failing.
@@ -264,7 +264,7 @@ def test_the_upstream_origin_has_a_bound_of_its_own():
     refuse. Read as round 1 read it, upstream was UNBOUNDED, which is worse: a
     server could open correlations for ever. Each origin is bounded separately
     at the same figure, so neither can spend the other's window and neither is
-    free. The contract copy carries this as the T8.R6 origin scope note (v5.2).
+    free. The contract copy carries this as the reviewer.R6 origin scope note (v5.2).
     """
     session = pump.Session()
     assert _fill(session, bounds.OUTSTANDING, origin="upstream")
@@ -317,7 +317,7 @@ def test_the_client_is_told_overloaded_and_not_uninspected_method():
 
 # ── round 3, R-179-R3 ───────────────────────────────────────────────────────
 #
-# ASTRA drove round 2 through the real Route twice and found two defects in the
+# The reviewer drove round 2 through the real Route twice and found two defects in the
 # round-2 repair itself. Both come from the same mistake in different clothes:
 # state that belongs to ONE ATTEMPT was stored against the identity, where a
 # later attempt could read it or a paused earlier one could overwrite it.
@@ -364,7 +364,7 @@ def test_a_paused_refusal_cannot_rename_a_later_admission():
     bump renamed the live item's key: the core still owed an entry the pump no
     longer had, and the reader raised.
 
-    ASTRA drove it through two real `Route.client_frame` calls. Driven here at
+    The reviewer drove it through two real `Route.client_frame` calls. Driven here at
     the pump, which is the layer that owns the generation.
     """
     session = pump.Session()
@@ -452,9 +452,9 @@ def test_an_earlier_refusal_cannot_retire_a_later_live_request(tmp_path):
     request as UNINSPECTED_METHOD. The live item ended neither owed nor
     answerable -- pending 0, owed 0.
 
-    ASTRA's older XR03_ROUTE row read that as a PASS, because its predicate is
+    The reviewer's older XR03_ROUTE row read that as a PASS, because its predicate is
     "no orphan AND a terminal exists", and settling the live item early
-    satisfies both. That row is RETIRED rather than repaired (T9, R-179-R4):
+    satisfies both. That row is RETIRED rather than repaired (a reviewer, R-179-R4):
     its predicate can only be met by the defect this one names. Measured, same
     row, same file: round 3 `orphaned_live=False, pending 7 = owed 7`; round 4
     `pending 8 = owed 8` with the item still answerable.
@@ -534,7 +534,7 @@ def test_every_refusal_reserves_a_generation(tmp_path):
 def test_an_older_withheld_attempt_cannot_settle_a_newer_generations_debt(tmp_path):
     """R-179-R5, the reachable form of R4_WITHHOLD_OWNER.
 
-    ASTRA reached this property through a step ruling (3) now refuses -- a
+    The reviewer reached this property through a step ruling (3) now refuses -- a
     response to a request that was withheld and never forwarded -- so his row
     is retired as "setup step refused by (3)" and this is the reachable
     variant: an older attempt withheld with its writer paused before the
@@ -607,7 +607,7 @@ def test_a_response_to_a_request_that_was_never_forwarded_is_refused(tmp_path):
     THE WINDOW IS THE ROW. Round 4 left the item in `_pending` until the
     withhold's TRAILING settlement, which runs after the client frame is
     written -- so a response arriving in between was ACCEPTED for a request
-    upstream had never seen, and ASTRA built R4_WITHHOLD_OWNER on that step.
+    upstream had never seen, and the reviewer built R4_WITHHOLD_OWNER on that step.
     Outside the window the old head refuses it too, so a row that does not
     pause the writer passes on the defect. This one pauses it.
     """
@@ -719,7 +719,7 @@ def _route_for(session, tmp_path, *, client_write=None, upstream_write=None):
     """The real Route over a real log, with approvals that always hold.
 
     Every round-6 row drives ordinary frames through this rather than calling
-    the pump directly: four of ASTRA's seven are reachable only through the
+    the pump directly: four of the reviewer's seven are reachable only through the
     route, and a row that pokes the pump would measure a composition no client
     can actually produce.
     """
@@ -826,7 +826,7 @@ def test_a_locally_claimed_answer_still_counts_against_the_bound(tmp_path):
     refused attempts parked at their writers counted ZERO, and a ninth request
     was admitted with nine debts owed. Round 4 refused that ninth in the same
     window, so this is the bound going backwards, not a pre-existing gap --
-    and T8.R6 names in-flight held messages explicitly.
+    and a reviewer.R6 names in-flight held messages explicitly.
     """
     entered, release, failures = threading.Condition(), threading.Event(), []
     arrived = [0]
@@ -898,7 +898,7 @@ def test_a_teardown_racing_the_settlement_never_raises_at_a_client(tmp_path):
     reaching a client where a receipt belongs. ADJACENT LINES ARE NOT
     ATOMICITY, the same sentence as #168's round 5, one module over.
 
-    ASTRA's row pauses `settled_as`, which the fix DELETES from this path, so
+    The reviewer's row pauses `settled_as`, which the fix DELETES from this path, so
     his barrier can no longer fill: superseded, not satisfied, and measured as
     zero calls rather than asserted. This drives the same race on the seam that
     replaced it.
@@ -919,7 +919,7 @@ def test_a_teardown_racing_the_settlement_never_raises_at_a_client(tmp_path):
     #
     # Two earlier shapes of this row were measured and thrown away. Wrapping
     # `settle_or_report` alone was an AttributeError on `d72dc43`: a red that
-    # says only "this method is new", which is the API-shape red ASTRA counted
+    # says only "this method is new", which is the API-shape red the reviewer counted
     # three of last round. Then CHOOSING the seam by what the core offers made
     # the P04 mutant -- which leaves `settle_or_report` defined and stops
     # calling it -- fail on "the settlement was never reached", a kill scored

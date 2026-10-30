@@ -1,4 +1,4 @@
-"""ASTRA receipts172-0ca8338 r4, and T9 ruling 62. Something in the way ABOVE a
+"""The reviewer receipts172-0ca8338 r4, and a reviewer ruling 62. Something in the way ABOVE a
 directory is not an absent directory.
 
 Ruling 57 drew "there" at the directory entry, and `_fs.listing` read every
@@ -7,7 +7,7 @@ that was a regular file (or a dangling symlink, or a symlink to a file) made
 `receipts/` under it absent: `receipts --verify` said NO_LOG and exited 3, the
 exit of a healthy chain with a limit. On the write side the same answer made an
 opted in home read as "not opted in", and the proxy then wrote an unsigned
-log, with no message, under its own state root (T10's C13w table).
+log, with no message, under its own state root (a reviewer's C13w table).
 
 R62: a path is absent only when its nearest existing ancestor is a directory
 that can be listed. A file, a dangling symlink, a symlink to a file or an
@@ -256,7 +256,7 @@ def test_a_denied_call_stays_denied_under_an_obstruction(tmp_path, obstruct, kin
 @pytest.mark.parametrize("opted", [True, False], ids=["opted", "never"])
 @pytest.mark.parametrize("kind", KINDS)
 def test_the_proxy_log_refuses_to_open_unsigned(tmp_path, obstruct, kind, opted):
-    """T10's C13w rows: an opted in home replaced by a file, a dangling link or
+    """A reviewer's C13w rows: an opted in home replaced by a file, a dangling link or
     a link to a file gave the proxy rc 0 and an unsigned <run>.jsonl under its
     state root, with no chain and no message. It stops, naming the cause."""
     _skip_meaningless(kind, "home", opted)

@@ -230,12 +230,12 @@ def test_the_process_listing_is_not_clipped_to_the_terminal_width():
 
 @needs_git
 def test_the_plural_finds_a_child_the_singular_hides(tmp_path):
-    """T8's finding, reproduced: two live pytests, and the singular shows one.
+    """A reviewer's finding, reproduced: two live pytests, and the singular shows one.
 
     `foreign_pytest` returns the lowest pid because the guard only needs to
     know that SOMETHING else is running. A control needs to confirm the scan
     sees the process IT started, and with any other suite live the singular
-    form hands it a stranger. T8's first positive control passed by naming a
+    form hands it a stranger. A reviewer's first positive control passed by naming a
     boundary suite running in another session.
 
     So: start one child, let it take the lower pid, start a second, and require

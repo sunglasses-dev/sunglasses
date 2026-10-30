@@ -144,7 +144,7 @@ def test_a_changed_snapshot_says_descriptor_changed_and_captures_the_new_one(tmp
 
 
 def test_an_incomplete_snapshot_never_reaches_the_store(tmp_path):
-    """T8.R13. A prefix has no sha to compare, so there is nothing to hand the
+    """A reviewer.R13. A prefix has no sha to compare, so there is nothing to hand the
     activation, and handing it one built from a truncation is the exact thing
     the collector refuses to produce."""
     store = _store(tmp_path)

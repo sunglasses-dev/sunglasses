@@ -165,7 +165,7 @@ def test_corrupt_policy_file_asks_and_confesses_rather_than_blocking(home):
 
 
 def test_a_dead_policy_is_confessed_even_when_a_later_check_decides(home):
-    """T9 nit, Aug 8: a corrupt policy.yaml AND a pin TOFU on the same call.
+    """A reviewer nit, Aug 8: a corrupt policy.yaml AND a pin TOFU on the same call.
 
     The TOFU answer used to return early with error=None, so that receipt never
     mentioned that the policy control was not running. A control that is down
