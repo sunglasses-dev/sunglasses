@@ -529,7 +529,11 @@ def test_folders_the_walk_does_not_enter_are_named(work):
     proc = _run_dir(work, root, "-o", "json")
     doc = _doc(proc)
     assert doc["excluded_folders"] == ["node_modules", os.path.join("src", "build")]
-    assert doc["files_scanned"] == 1 and proc.returncode == EXIT_CLEAN
+    # `node_modules` is a dependency folder: named and counted, verdict unchanged. `src/build` is
+    # our own output folder and held a file nobody read, so the scan is incomplete.
+    assert doc["files_scanned"] == 1 and proc.returncode == EXIT_INCOMPLETE
+    assert doc["excluded_dependency_folders"] == 1 and doc["folders_excluded_with_files"] == 1
+    assert doc["excluded_not_inspected"][0]["folder"] == os.path.join("src", "build")
     human = _run_dir(work, root).stdout
     assert "node_modules" in human and "Folders not entered" in human
     props = json.loads(_run_dir(work, root, "-o", "sarif").stdout)["runs"][0]["properties"]
