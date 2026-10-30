@@ -881,8 +881,8 @@ else), so if you have one, you wrote it, and it is yours to update.
 
 **Upgrading to v0.6.16:** `sunglasses pin` and `sunglasses pin --check` end with exit 3 when a config file
 could not be read and nothing else failed. Drift under `--check` still ends 1, and a refused consent ends 2.
-Without `--quiet` the file is named on stdout with its reason; servers declared in it are not read. Earlier
-versions ended 0 there, so a job that tests for exit 0 should expect 3.
+Without `--quiet` the file is named on stdout with its reason; servers declared in it are not read. v0.6.15
+ended 0 there, so a job that tests for exit 0 should expect 3.
 
 Also new in v0.5.6: a single positional argument that looks like a path and does
 not exist is a usage error (exit 2) rather than text to scan. `sunglasses scan
