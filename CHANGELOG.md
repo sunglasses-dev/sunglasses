@@ -5,6 +5,64 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.16] — 2026-10-30
+
+### Added
+
+- `sunglasses init --on-error {ask,deny,defer,block}` writes one word to `~/.sunglasses/on-error`. It chooses
+  what the firewall hook does when its own secret check fails on an outbound call that looks like it
+  carries a credential. `ask` is the default and also what you get from a missing file, a file longer
+  than 64 characters, or any other word. `ask` asks and says the secret check was down; `deny` refuses
+  the call; `defer` passes it to the host's own permission flow with the failure in the receipt; `block`
+  ends the hook as a failed hook (exit 1) on every secret-check fault, whether or not the call looks
+  credential-shaped. "Looks credential-shaped" is decided by a second, looser check that shares no
+  code with the one that failed: a known key start at a word boundary followed by at least 12 token
+  characters that are not a repeated-character placeholder or a published canary, or a private-key
+  line. It can ask about a call that carries nothing. Not measured: what the host does with an ask in an
+  unattended run, when its permissions are turned off, or when an allow rule already permits the call. (#519, #527)
+
+### Changed
+
+- When the secret check raises an error on an outbound call that looks credential-shaped, the firewall
+  hook now asks instead of passing the call to the host's permission flow. Any other call hit by the
+  same error is still passed to the host's permission flow, with the failure in the receipt. The receipt records
+  `secret_lane_down`, the word in effect and whether the call looked credential-shaped; the error text
+  names the exception class and never the text that was scanned. (#519)
+
+- `sunglasses pin` and `sunglasses pin --check` now name each MCP config file, installed plugin
+  config or plugin install manifest that exists but cannot be read (this includes a plugin whose install
+  folder cannot be opened), with a short reason (permission denied, a directory, not valid UTF-8, not
+  valid JSON with the line number, nested too deeply, a top level that is not an object, or
+  `mcpServers` that is not an object, or, for any other read error, the system's own message), and say the servers declared there are not pinned. The reason
+  never quotes the file. A file that does not exist is not named, and neither is a file that parses and
+  declares no servers. The run then ends with exit code 3, the existing "could not read part of it"
+  code, instead of 0; a descriptor change, exit code 1, still wins. Scripts that test for exit 0 from
+  `pin` must now expect 3 when a config file is unreadable. `pin --quiet`, as run by a timer or a
+  session-start hook, prints one line and returns the same code: `SUNGLASSES: pin is incomplete — a
+  config file could not be read. Run `sunglasses pin` to see which.` or, when a descriptor change
+  was also found, `SUNGLASSES: MCP tool descriptor drift detected and a config file could not be
+  read — `sunglasses pin --check` for detail. Affected tools are blocked until you re-run
+  `sunglasses pin`.` `sunglasses pin --help` ends with one line per exit code, and the README has an
+  upgrade note for v0.6.16. (#522, #528)
+
+- When the installed Whisper hides its download function, or its model table is not a table, loading the
+  speech model for a deep scan of audio or video tries to print one line on stderr before the load
+  starts: `loading whisper model <name>; Whisper may download it first if it is not already cached`.
+  The line is tried on every load on that path, because the helper cannot tell a cached model from a
+  missing one, and also when the name is a file on disk. When both the download function and the model
+  table are visible, a name that is not in the table prints nothing: Whisper reads the file or refuses the name and fetches nothing. If
+  stderr is missing or the write fails, the model still loads and the line is not printed anywhere
+  else. README.md describes the line next to the existing fetch notice, and describes both lines as
+  ones the loader tries to print. (#526)
+
+### Fixed
+
+- `sunglasses proxy` no longer ends in a Python traceback when the server command cannot be started or
+  the receipt log cannot be opened. It prints one line, says nothing was started, names the exception
+  class (never its message, which can carry the command's own text) and how to fix it, and exits 1.
+  When the server cannot be started, the refusal is also written to the receipt log with the reason
+  `CONFIG_IO_ERROR`. (#521)
+
 ## [0.6.15] — 2026-10-29
 
 ### Added
