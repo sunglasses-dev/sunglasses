@@ -31,10 +31,10 @@ WRITE_STALL_MS = 5_000                # R9
 WATCHDOG_SLACK_MS = 3_000             # R10
 MAX_DEPTH = 64                        # R11
 MAX_NODES = 100_000                   # R11
-SNAPSHOT_PAGES = 64                   # R13
-SNAPSHOT_TOOLS = 512                  # R13
-SNAPSHOT_BYTES = 4 * 1024 * 1024      # R13
-SNAPSHOT_DEADLINE_MS = 10_000         # R13
+SNAPSHOT_PAGES = 64
+SNAPSHOT_TOOLS = 512
+SNAPSHOT_BYTES = 4 * 1024 * 1024
+SNAPSHOT_DEADLINE_MS = 10_000
 
 # Each deadline is named and separate. One shared constant would make four
 # different promises the same number, and 2,000 ms to assemble a frame is not

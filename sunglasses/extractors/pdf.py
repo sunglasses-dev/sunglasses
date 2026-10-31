@@ -920,7 +920,7 @@ class PDFExtractor:
     # halfway is not a PDF we read.
     failures: List[str] = []
 
-    # Bounds for the containers added for finding A3 (form values, scripts,
+    # Bounds for the added containers (form values, scripts,
     # attachments). Passing a bound is RECORDED in `failures`, not silent.
     MAX_FORM_FIELDS = 10_000
     MAX_ACTIONS = 256
@@ -1024,7 +1024,7 @@ class PDFExtractor:
                         if text.strip():
                             results.append((f"page:{i+1}:{label}", text))
 
-                # 4-6. Content outside the page text (finding A3): form field
+                # 4-6. Content outside the page text: form field
                 # values, JavaScript actions and embedded files. Appended after the
                 # three groups above so a PDF without them is reported exactly as
                 # before. Each reader records what it could not read.
@@ -1052,7 +1052,7 @@ class PDFExtractor:
 
         return results
 
-    # ----- A3 helpers: form values, scripts, attachments ------------------
+    # ----- helpers: form values, scripts, attachments ---------------------
 
     _resolve = staticmethod(_resolve)
 

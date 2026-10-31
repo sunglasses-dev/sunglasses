@@ -89,7 +89,7 @@ class Chain:
         with self._locked():
             tail = self._read_tail()
             if tail is not None and tail.producer not in (None, self._producer):
-                # One chain per LOG (R15): both producers sign with the user's
+                # One chain per LOG: both producers sign with the user's
                 # one key, so another producer's seal verifies here too and
                 # would be continued. The directory is theirs; nothing is written.
                 raise ValueError(
@@ -127,7 +127,7 @@ class Chain:
         return self._open_segment(previous=tail)
 
     def _segments(self):
-        return _fs.listing(self._dir, SEGMENT_GLOB)   # raises, never "no tail"
+        return _fs.listing(self._dir, SEGMENT_GLOB)   # R56: raises, never "no tail"
 
     def _read_tail(self) -> _Tail | None:
         segments = self._segments()
@@ -207,7 +207,7 @@ class Chain:
         opened = dataclasses.replace(empty, seq=0, head=wire.record_hash(line),
                                      size=len(line), unsigned=1)
         pieces, _ = self._plan(opened, [], GENESIS)
-        # The marker first. No segment is begun that its marker could not
+        # R62 B: the marker first. No segment is begun that its marker could not
         # name, and a marker this call made for a segment that was not begun
         # is taken back, so the next call tries again from where this one began.
         made = self._marker is not None and self._mark(genesis)

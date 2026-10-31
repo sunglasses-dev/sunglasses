@@ -608,7 +608,7 @@ class ImageExtractor:
             try:
                 # Snapshot AT this position. The iterator hands back the shared
                 # object, so anything that defers the actual read until after the
-                # next `seek` would read the wrong frame -- which is wrong.
+                # next `seek` would read the wrong frame.
                 target = frame.convert("RGB")
             except Exception as exc:
                 self.failures.append(

@@ -109,7 +109,7 @@ def print_result(result, verbose=False):
               f"{sev_color}[{result.severity.upper()}]{RESET} "
               f"{DIM}({result.latency_ms}ms){RESET}")
         # The deduped VIEW, not result.findings — one matched span, one threat
-        # line. Audit M9: three findings quoting the identical text under three
+        # line. Three findings quoting the identical text under three
         # different attack names is how a reader stops trusting the verdict.
         reported = result.reported_findings()
         folded_total = sum(len(f.get("also_matched") or []) for f in reported)
@@ -1881,7 +1881,7 @@ def _emit_scan_result(args, result, source):
 
     # The channel the scan actually used, not the flag default: scan_file() forces
     # channel="file", so printing args.channel here contradicted the JSON output of
-    # the same scan (audit L6).
+    # the same scan.
     print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
@@ -2595,7 +2595,7 @@ def _receipts_off(home):
     from .receipts import optin
     try:
         done = optin.turn_off(home)
-    except (OSError, ValueError, optin.KeyUnusable) as exc:   # a key dir that cannot be listed
+    except (OSError, ValueError, optin.KeyUnusable) as exc:   # R57: a key dir that cannot be listed
         print(f"\n  {RED}Signing was NOT turned off:{RESET} "
               f"{_display(f'{type(exc).__name__}: {exc}', limit=200)}\n")
         return 1
@@ -2619,7 +2619,7 @@ def _verify_key(home):
     cause; the logs are still verified with the public key."""
     from .receipts import optin
     try:
-        # a key or chain directory that cannot be listed is not "signing
+        # R56: a key or chain directory that cannot be listed is not "signing
         # off"; whether the key can sign cannot be known, so it is said.
         if not optin.opted_in(home):
             return 0
@@ -2719,7 +2719,7 @@ def _verify_received(args):
     import pathlib
     from .receipts import _fs
     log = pathlib.Path(args.log)
-    if not _fs.listing(log, "segment-*.chain"):          # raises, never "not a log"
+    if not _fs.listing(log, "segment-*.chain"):          # R57: raises, never "not a log"
         print(f"\n  {RED}--log {_display(str(log), limit=200)}{RESET}: not a "
               f"directory of signed segments (segment-*.chain). Nothing "
               f"verified.\n")
@@ -2762,7 +2762,7 @@ def _receipt_public_key(home, keys):
     Raw 32 bytes, or None. Never trusted on its own: see --fingerprint."""
     from .receipts import _fs
     public_dir = home / keys.KEY_DIR / keys.PUBLIC_DIR
-    candidates = _fs.listing(public_dir, "*.pub")      # raises, never "no key"
+    candidates = _fs.listing(public_dir, "*.pub")      # R57: raises, never "no key"
     private = keys.private_path(home)
     if private is not None:
         prefix = private.stem.split("-", 1)[-1]
@@ -2918,7 +2918,7 @@ def cmd_receipts(args):
                   f"Run `sunglasses init` to install the firewall.{RESET}\n")
             return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
 
-        # L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+        # The hook command embeds an ABSOLUTE interpreter path — correct, and
         # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
         # and can find an interpreter with no sunglasses installed. But it means a
         # recreated venv or an upgraded python leaves a hook that cannot start, and that
@@ -2993,7 +2993,7 @@ def cmd_receipts(args):
             if marker is not None:
                 code = codes.combine_exits(code, _verify_marker(marker, hook, sunglasses_home()))
             elif hook in chain_logs:
-                # Segments and no marker. Nothing names the chain this
+                # R62 (c): segments and no marker. Nothing names the chain this
                 # log opened with, so a wipe cannot be told: a limit, never a fail.
                 print(f"\n  {YELLOW}LOG_UNMARKED{RESET} {DIM}-- the hook log has "
                       f"segments and no {optin.HOOK_MARKER[-1]} names its first chain, "
@@ -4437,7 +4437,7 @@ def cmd_doctor(args, _run=None):
                      for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
-        # Said in the one place an operator reads.
+        # A build with no live self-test says so plainly, in the one place an operator reads.
         print(f"  {YELLOW}Self-test NOT RUN{RESET} "
               f"{DIM}— this build has no live self-test, so nothing below is"
               f" proof that a wrapped route mediates traffic.{RESET}")

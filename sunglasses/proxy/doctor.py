@@ -272,7 +272,7 @@ def _route_result(passed) -> str:
 # ONE classifier, install's. Re-exported rather than
 # redefined. The original lived here with a different signature, unreachable
 # from inside this module and perfectly reachable as `doctor.classify(...)`
-# from outside, which is the disagreement the ruling exists to prevent.
+# from outside, which is exactly the disagreement a single classifier prevents.
 classify = _install.classify
 
 
@@ -406,7 +406,7 @@ def receipts_key_status(home=None):
     home = pathlib.Path(home)
     from ..receipts import optin
     try:
-        # a directory that cannot be listed is never OFF. The route's
+        # R56: a directory that cannot be listed is never OFF. The route's
         # proxy would refuse to start on it, so the doctor says why.
         if not optin.opted_in(home):
             return "OFF", ""

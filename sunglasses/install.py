@@ -1323,7 +1323,7 @@ def _alias_owner_is_gone(private, *, retained=None):
             # honours locks that must fail, and if it succeeds the answer here
             # is worth nothing. An instrument that self-tests at the moment of
             # use, rather than a platform check written once and believed.
-            # R17: locality first, then the no-op-flock self-test. The type
+            # Locality first, then the no-op-flock self-test. The type
             # check answers "could another host be holding this", which the
             # self-test cannot; the self-test answers "does this kernel
             # actually enforce", which the type check cannot.
@@ -1512,7 +1512,7 @@ def _collect_discharged_notes(d, held_name):
         return retained
     if (d / held_name).exists():
         return retained
-    # The loop variable is NOT `q`, and that is not a style choice. Round 12's
+    # The loop variable is NOT `q`, and that is not a style choice. The
     # audit test that relocates the real `_discard` site first asserts that
     # `                q.unlink()` appears in
     # install.py EXACTLY once before it relocates it. A second one anywhere in
@@ -1571,7 +1571,7 @@ def _collect_stale_aliases(d, private, intent):
     retained: list = []
     if intent is None:
         return retained
-    # R15: with no locking there is no evidence of an incarnation, so nothing
+    # With no locking there is no evidence of an incarnation, so nothing
     # here can be proven dead. Refusing to collect leaves growth we have
     # declared; collecting on a guess removes somebody's only route back.
     if LOCKING is None:

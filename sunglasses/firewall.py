@@ -1814,7 +1814,7 @@ class _HookReceipts:
     def __init__(self, home):
         self.home = home
         # R21: a deleted key is not `receipts off`. A hook chain that the off
-        # record has not ended still means the user opted in. A key or
+        # record has not ended still means the user opted in. R56: a key or
         # chain directory that cannot be listed raises here, never reads as
         # "not opted in", and run_hook's guard asks, naming the cause. With
         # neither directory there, nothing of the receipts package loads.
@@ -2077,7 +2077,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
     tool_input = payload.get("tool_input") or {}
     extras: dict = {}
 
-    # Audit L5: answer only the event we are installed for. The hook accepted any
+    # Answer only the event we are installed for. The hook accepted any
     # hook_event_name, so a PostToolUse payload was scanned and could come back
     # "deny" — a veto on an action that had already run. Meaningless rather than
     # dangerous, but a firewall that appears to block something it cannot block is
@@ -2428,18 +2428,18 @@ def _receipts_unwritable(decision, error, receipts, exc):
             check = f"Your signing key (~/.sunglasses/keys) cannot sign: {exc}."
     from .receipts import _fs
     if isinstance(exc, _fs.Unlistable):
-        # which directory, and that it could not be listed, not "empty".
+        # R56: which directory, and that it could not be listed, not "empty".
         check = (f"A receipts directory {exc}, and a signed log never turns "
                  f"unsigned on a guess. Fix its permissions (chmod 700).")
         if getattr(exc, "blocked_by", None) is not None:
-            # the thing in the way is what to fix, not the path under it.
+            # R62: the thing in the way is what to fix, not the path under it.
             from .receipts._shown import shown_path
             check = (f"A receipts directory {exc}, and a signed log never "
                      f"turns unsigned on a guess. Fix it: make "
                      f"{shown_path(exc.blocked_by)[0]} a directory, chmod 700.")
     from .receipts import chain as _chain
     if isinstance(exc, _chain.MarkerUnwritable):
-        # Which marker, why, and that the next call tries again.
+        # R62 B: which marker, why, and that the next call tries again.
         check = (f"The hook log's marker {exc}, and no signed log is begun "
                  f"without it. Fix ~/.sunglasses/keys (chmod 700) or free disk "
                  f"space; the next call tries again.")

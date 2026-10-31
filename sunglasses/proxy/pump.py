@@ -589,7 +589,7 @@ class Session:
                         kind="ID_NAMESPACE_CLAIMED")
             return False
         identity = key(origin, request_id)
-        # Round 2. A NEW ATTEMPT OWNS ITS OWN REFUSAL STATE. A refusal is described by
+        # A NEW ATTEMPT OWNS ITS OWN REFUSAL STATE. A refusal is described by
         # the per-call `Attempt` handed to `on_refusal` (below), not by a cause
         # kept in a table keyed by identity. An id refused OVERLOADED and then
         # refused again for a different reason therefore reports the second
@@ -664,7 +664,7 @@ class Session:
         # that owns nothing reaches this line, so the reservation here cannot
         # take anything away from anyone.
         #
-        # The refusal still RESERVES (M13) and still travels with an attempt
+        # The refusal still RESERVES and still travels with an attempt
         # identity: those two guarantees are the reason this
         # block exists at all, and moving it does not weaken either.
         if origin == ORIGIN_CLIENT and not handshake.client_method_known(method):
@@ -692,7 +692,7 @@ class Session:
                 return False
             breach = bounds.check_admission(
                 outstanding=self._outstanding_locked(origin), queued=0)
-            # Round 2. THE ATTEMPT'S GENERATION IS RESERVED HERE, in the
+            # THE ATTEMPT'S GENERATION IS RESERVED HERE, in the
             # same critical section as the decision, whichever way the decision
             # goes. Reserving the refused attempt's generation in a
             # SECOND critical section inside `_refuse_overloaded`, after this

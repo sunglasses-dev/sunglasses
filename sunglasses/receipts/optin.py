@@ -61,7 +61,7 @@ def has_key(home) -> bool:
 
 
 def _key_dir_unlistable(home, unlistable) -> KeyUnusable:
-    # when something above the key directory is in the way, that is the
+    # R62: when something above the key directory is in the way, that is the
     # path to name and to fix, not the key directory under it.
     blocked = getattr(unlistable, "blocked_by", None)
     keys_dir, note = _shown(home / KEY_DIR)
