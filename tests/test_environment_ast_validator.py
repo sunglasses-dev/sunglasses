@@ -469,7 +469,6 @@ R1_FIRES = {
     "path_write_to_a_file": "import os\nfrom pathlib import Path\nPath('out.txt').write_text(str(os.environ))\n",
     "logger_set_level_then_debug": "import os, logging\nlog = logging.getLogger('x')\nlog.setLevel(logging.DEBUG)\nlog.debug('%s', os.environ)\n",
     "root_set_level_then_debug": "import os, logging\nlogging.getLogger().setLevel(logging.DEBUG)\nlogging.debug('%s', os.environ)\n",
-    "match_guard_not_about_the_loop": "import os\nflag = 1\nfor key, val in os.environ.items():\n    match flag:\n        case 1 if flag:\n            print(val)\n",
     "python_fence_after_a_closed_text_fence": "```text\nx\n```\n\n```python\nimport os\nprint(os.environ)\n```\n",
     "python_fence_after_unclosed_other_fence_is_inside_it": "```python\nimport os\nprint(os.environ)\n```\n```text\nstill open\n",
 }
@@ -499,8 +498,6 @@ R1_QUIET = {
     "set_level_on_another_object": "import os, logging\nclass Widget:\n    def setLevel(self, level):\n        pass\nWidget().setLevel(10)\nlogging.debug('%s', os.environ)\n",
     "set_level_on_a_handler": "import os, logging\nhandler = logging.StreamHandler()\nhandler.setLevel(logging.DEBUG)\nlogging.debug('%s', os.environ)\n",
     # a case that the guard picks one name for
-    "match_guard_picks_one_name": "import os\nfor key, val in os.environ.items():\n    match True:\n        case _ if key == 'LANG':\n            print(val)\n",
-    "match_guard_picks_one_name_by_value": "import os\nfor key, val in os.environ.items():\n    match 1:\n        case 1 if val.startswith('en_'):\n            print(val)\n",
     # fences
     "python_fence_inside_a_text_fence": "````text\n```python\nimport os\nprint(os.environ)\n```\n````\n",
     "python_fence_inside_a_tilde_text_fence": "~~~markdown\n```python\nimport os\nprint(os.environ)\n```\n~~~\n",
@@ -664,6 +661,24 @@ def test_a_match_statement_is_read_where_the_interpreter_parses_it(validator):
     assert hits(validator, text) == [RULE]
     text = "import os\nfor k, v in os.environ.items():\n    match k:\n        case 'A':\n            print(k, v)\n"
     assert hits(validator, text) == []
+
+
+MATCH_GUARDS = {
+    "fires_when_the_guard_is_not_about_the_loop": (
+        "import os\nflag = 1\nfor key, val in os.environ.items():\n    match flag:\n        case 1 if flag:\n            print(val)\n", True),
+    "quiet_when_the_guard_picks_one_name": (
+        "import os\nfor key, val in os.environ.items():\n    match True:\n        case _ if key == 'LANG':\n            print(val)\n", False),
+    "quiet_when_the_guard_picks_one_name_by_value": (
+        "import os\nfor key, val in os.environ.items():\n    match 1:\n        case 1 if val.startswith('en_'):\n            print(val)\n", False),
+}
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="a match statement is not Python before 3.10")
+@pytest.mark.parametrize("name", sorted(MATCH_GUARDS))
+def test_a_match_guard_that_tests_a_loop_name_is_a_filter(validator, engine, name):
+    text, fires = MATCH_GUARDS[name]
+    assert hits(validator, text) == ([RULE] if fires else []), name
+    assert (RULE in ids(engine, text, "file")) is fires, name
 
 
 @pytest.mark.skipif(sys.version_info >= (3, 10), reason="only before 3.10 is a match statement a syntax error")
