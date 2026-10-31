@@ -37,6 +37,10 @@ setup(
         # One name for "everything that reads a file that is not plain text".
         # The per-format extras stay for anyone who wants exactly one of them.
         "media": ["Pillow", "pytesseract", "PyPDF2", "pyzbar"],
+        # Faster keyword search. Findings are the same with or without it
+        # (tests/test_extension_parity.py). pyahocorasick needs Python 3.10+, so on
+        # 3.9 the extra installs nothing and the scanner uses plain string search.
+        "fast": ['pyahocorasick; python_version >= "3.10"'],
         "audio": ["openai-whisper"],
         "video": ["openai-whisper"],
         # Signed receipts (#172): Ed25519 from PyCA. Optional, and inert until

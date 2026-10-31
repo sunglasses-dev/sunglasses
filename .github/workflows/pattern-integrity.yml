@@ -156,6 +156,8 @@ jobs:
     # A hang must fail, not wait. Set from the first hosted measurement, not
     # from local arithmetic (ASTRA round 1); tighten once measured.
     timeout-minutes: 150
+    env:
+      SUNGLASSES_REQUIRE_FAST: "1"
     # Four parts that together are exactly the fast suite (tests/ci_shard.py,
     # the same split the integrity legs use). A single fast job was the longest
     # check on a pull request, so every merge waited on it after the integrity
@@ -232,6 +234,12 @@ jobs:
           # difference there gets investigated before it is classified.
           pip install "Pillow==12.3.0"
           pip install "pytesseract==0.3.13" "PyPDF2==3.0.1" "pyzbar==0.1.9"
+          # The fast lane runs with the optional keyword-search extension and the
+          # integrity matrix runs without it, so both paths are exercised on every
+          # code change. tests/test_extension_parity.py compares them directly and,
+          # with SUNGLASSES_REQUIRE_FAST set, fails rather than skips if the
+          # extension is missing.
+          pip install pyahocorasick
 
       # A version receipt, printed per job. Interpreter-dependent resolution can change
       # frame-reading behaviour, which is the J1 surface — so the versions that actually

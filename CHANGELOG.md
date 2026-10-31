@@ -5,6 +5,14 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `pip install 'sunglasses[fast]'` adds an optional extension (pyahocorasick) that makes keyword search faster. It needs Python 3.10 or newer; on 3.9 the extra installs nothing and the scanner keeps using plain string search. A prebuilt wheel exists for common platforms; where there is none, installing it needs a C compiler.
+
+### Fixed
+
+- A scan now reports the same findings, in the same order and with the same excerpt, whether or not the optional extension is installed. Before, the two keyword searches picked a rule's first hit differently, so the order of findings, and in rare cases the excerpt shown for a finding, could differ between two machines for the same input. Decisions, severities and which rules fire did not change. On a plain install a few findings can now list in a different order, or show a different excerpt, than in 0.6.16.
+
 ### Changed
 
 - `scan --dir`, `scan --repo` and `scan --file` now put the word `not_inspected` in `decision` when part of the input was not read: an archive or compiled file, a file that could not be opened, or a build or cache folder of the project (`__pycache__`, `build`, `dist`, `coverage`, `.next`, `.nuxt`, `*.egg-info`) that held files or could not be shown empty (unreadable, holding a link to a folder, or on a platform where the folder cannot be pinned to the one the walk saw, where even an empty such folder makes the scan incomplete). They used to print `allow` beside `inspection_complete: false` and exit 3. For those cases the exit code is unchanged; a scan whose project has a build or cache folder that held files used to exit 0 and now exits 3. The text report prints `Decision: NOT_INSPECTED` and a `Not inspected:` line with the file and folder counts. The JSON gains `files_not_inspected`, `folders_excluded_with_files`, `excluded_not_inspected`, `excluded_dependency_folders` and `excluded_tool_cache_folders`. Dependency, version-control and tool-cache folders (`node_modules`, `.venv`, `venv`, `vendor`, `.tox`, a nested `.git`, `.mypy_cache`, `.pytest_cache`) are still named and counted, and still leave the verdict unchanged.
