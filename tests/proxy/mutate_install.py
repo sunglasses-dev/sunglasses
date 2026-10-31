@@ -263,14 +263,8 @@ MUTATIONS = [
     # ── Config writer hardening: one mutation per guard ─────────────────────
     ('NAME-CHECK', 'a server name is not checked before it reaches a path',
      '''    _check_name(name)
-    _refuse_symlinked_config(config_path)
-    _refuse_case_alias(home, name)
-    with _locked_for(config_path, _lock_path(home, config_path)):
-        return _install_locked(''',
-     '''    _refuse_symlinked_config(config_path)
-    _refuse_case_alias(home, name)
-    with _locked_for(config_path, _lock_path(home, config_path)):
-        return _install_locked(''',
+    if not _refuse_symlinked_config(config_path):''',
+     '''    if not _refuse_symlinked_config(config_path):''',
      'test_unusable_names_are_refused_by_install_and_uninstall'),
     ('LINK-REFUSED', 'a symbolic-link config is replaced by a file on uninstall',
      '''    _check_name(name, writing=False)
