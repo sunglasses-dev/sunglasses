@@ -335,13 +335,34 @@ def test_a_folder_deleted_after_the_proxy_started_costs_the_notice_nothing(tmp_p
     assert f"this run is in {started_in}" in text
 
 
-def test_a_folder_that_cannot_be_read_when_the_proxy_starts_is_said_so(tmp_path, monkeypatch):
-    monkeypatch.setattr(approvals.os, "getcwd", lambda: (_ for _ in ()).throw(FileNotFoundError()))
-    err = io.StringIO()
-    serve.approval_notice(err, None, serve._command_stem(ARGV))("i" * 32, SHA)
+@pytest.mark.parametrize("kind", ["default", "absolute", "relative"])
+def test_a_folder_already_gone_when_the_notice_is_made_still_prints_the_command(tmp_path, kind):
+    """A real deleted working directory (not a stub): the normal entry point exits earlier on
+    one, but this function is public and must not raise out of the route's callback."""
+    gone, elsewhere = tmp_path / "gone", tmp_path / "elsewhere"
+    gone.mkdir()
+    elsewhere.mkdir()
+    old = os.getcwd()
+    os.chdir(gone)
+    try:
+        gone.rmdir()
+        with pytest.raises(OSError):
+            os.getcwd()
+        root = {"default": None, "absolute": str(tmp_path / "root"), "relative": "state"}[kind]
+        err = io.StringIO()
+        serve.approval_notice(err, root, serve._command_stem(ARGV))("i" * 32, SHA)
+    finally:
+        os.chdir(old)
     text = err.getvalue()
     assert len(text.splitlines()) == 1 and f"approve {'i' * 32} --snapshot {SHA}" in text
     assert "this run is in unavailable (the folder can no longer be read)" in text
+    if kind == "absolute":
+        assert f"--state-root {tmp_path / 'root'}" in text
+    elif kind == "relative":
+        assert "--state-root" in text and "can no longer be read, so the path is not printed" in text
+        assert str(tmp_path) not in text
+    else:
+        assert "--state-root" not in text.split("(it shows")[0]
 
 
 def test_the_store_the_proxy_really_starts_with_knows_the_command_and_the_folder(tmp_path, monkeypatch):

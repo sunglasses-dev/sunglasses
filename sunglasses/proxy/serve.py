@@ -136,18 +136,31 @@ def approval_notice(stderr, root=None, command_stem=None):
     the launch configuration, so such a root is never echoed; the line says so
     and leaves the flag to the person.
     """
-    shown = os.path.join(os.getcwd(), str(root)) if root else None
-    unsafe = shown is not None and not shown.isprintable()
     # Read when the proxy starts, with the identity: a folder deleted afterwards still reads
     # as the folder this run was started in, and the command line above is never lost to it.
     started_in = approvals.current_folder()
     here = (approvals.folder_text(started_in) if started_in
             else "unavailable (the folder can no longer be read)")
+    unresolved = False
+    if not root:
+        shown = None
+    elif os.path.isabs(str(root)):
+        shown = str(root)
+    elif started_in:
+        shown = os.path.join(started_in, str(root))
+    else:
+        shown, unresolved = None, True
+    unsafe = shown is not None and not shown.isprintable()
 
     def notice(server_id, snapshot_sha256):
         if unsafe:
             where = (" (this proxy was started with a --state-root whose name has "
                      "control characters, so it is not printed: add the same "
+                     "--state-root to the command)")
+            tail = ""
+        elif unresolved:
+            where = (" (this proxy was started with a relative --state-root and its folder "
+                     "can no longer be read, so the path is not printed: add the same "
                      "--state-root to the command)")
             tail = ""
         else:
