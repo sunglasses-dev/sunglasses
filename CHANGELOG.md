@@ -17,7 +17,7 @@ All notable changes to Sunglasses are documented here.
   shown is the environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a
   value from an unfiltered loop over it. It stays quiet on one named variable, names only, a loop
   that tests the variable it prints, a precision that cuts the value away, `json.dumps(os.environ)`
-  (which raises), a plain `return`, a comment, a docstring, a test double, a branch that cannot run (`if False`, `False and ...`, a filter or `match` guard that is never true, the `else` of a `while True` or of a loop over a
+  (which raises), a plain `return`, a comment, a docstring, a test double, a branch that cannot run (`if False`, `False and ...`, a filter or `match` guard that is never true (`typing.TYPE_CHECKING` counts only as that flag, not a name or attribute spelled the same), the `else` of a `while True` or of a loop over a
   non-empty literal that always leaves), output sent to
   `/dev/null`, and shell or Node text. It is a judgment from syntax, not proof that the code runs: a
   function that is never called or a dump behind a flag is still reported, an environment copied

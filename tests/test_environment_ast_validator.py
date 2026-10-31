@@ -576,6 +576,19 @@ R4_FIRES = {
     "true_filter_shown": "import os\nprint([v for v in os.environ.values() if True])\n",
 }
 
+# TYPE_CHECKING is false only when it is the typing flag; any other name or attribute spelled that way is a value
+R4_QUIET.update({
+    "typing_flag_filter_imported": "import os\nfrom typing import TYPE_CHECKING\nprint([v for v in os.environ.values() if TYPE_CHECKING])\n",
+    "typing_flag_attribute": "import os, typing\nif typing.TYPE_CHECKING:\n    print(os.environ)\n",
+    "typing_flag_through_an_alias": "import os\nimport typing as t\nif t.TYPE_CHECKING:\n    print(os.environ)\n",
+    "typing_flag_in_a_fragment_without_its_import": "import os\nif TYPE_CHECKING:\n    print(os.environ)\n",
+})
+R4_FIRES.update({
+    "type_checking_assigned_true_filter": "import os\nTYPE_CHECKING = True\nprint([v for v in os.environ.values() if TYPE_CHECKING])\n",
+    "type_checking_attribute_of_another_object": "import os\nfrom types import SimpleNamespace\nflags = SimpleNamespace(TYPE_CHECKING=True)\nprint([v for v in os.environ.values() if flags.TYPE_CHECKING])\n",
+    "type_checking_assigned_true_if": "import os\nfrom typing import TYPE_CHECKING\nTYPE_CHECKING = True\nif TYPE_CHECKING:\n    print(os.environ)\n",
+})
+
 ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES, **R3_FIRES, **R4_FIRES}
 ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET, **R2_QUIET, **R4_QUIET}
 
@@ -740,6 +753,8 @@ MATCH_GUARDS = {
         "import os\nfor key, val in os.environ.items():\n    match 1:\n        case 1 if val.startswith('en_'):\n            print(val)\n", False),
     "quiet_when_the_guard_is_never_true": (
         "import os\nfor v in os.environ.values():\n    match 1:\n        case 1 if False:\n            print(v)\n", False),
+    "fires_when_the_guard_is_a_rebound_type_checking": (
+        "import os\nfrom typing import TYPE_CHECKING\nTYPE_CHECKING = True\nfor v in os.environ.values():\n    match 1:\n        case 1 if TYPE_CHECKING:\n            print(v)\n", True),
     "fires_when_a_never_true_guard_holds_the_exit": (
         "import os\nfor v in os.environ.values():\n    match 1:\n        case 1 if False:\n            break\n    print(v)\n", True),
 }
@@ -891,6 +906,12 @@ def families(size):
     out = {"long_literal": "import os\nx = [" + "1, " * (size // 3) + "]\n"}
     out["wide_comprehension"] = "import os\nx = [0 " + "".join(
         "for v%d in os.environ.values() " % i for i in range(size // 40)) + "]\n"
+    depth = 40
+    head = "import os\n" + "".join(" " * i + "for i in [1]:\n" for i in range(depth))
+    out["nested_literal_loops"] = head + (" " * depth + "x = 1\n") * max(1, (size - len(head)) // (depth + 6))
+    tail = "".join(" " * i + "else:\n" + " " * (i + 1) + "pass\n" for i in range(depth - 1, -1, -1))
+    out["nested_literal_loops_with_else"] = head + (" " * depth + "x = 1\n") * max(1, (size - len(head) - len(tail)) // (depth + 6)) \
+        + " " * depth + "break\n" + tail
     for key, piece in unit.items():
         if piece is None:
             continue
