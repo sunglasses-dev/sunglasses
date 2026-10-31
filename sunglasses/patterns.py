@@ -29533,6 +29533,36 @@ PATTERNS = [
         "description": "Text inside a tool result or fetched page that tells the agent to retrieve the user's records, files or account details and then send them to a named email address, URL or phone number. A tool result reports data. It has no business asking the agent to move the user's data somewhere."
     },
     {
+        "id": "GLS-EX-031",
+        "name": "Program prints or sends the whole environment",
+        "category": "exfiltration",
+        "severity": "high",
+        "channel": ["file", "code"],
+        "regex": [
+            # Python: a loop over every variable whose body calls an output function with the VALUE variable in its arguments, the call ending the line (a trailing `if` filter, a names-only call and a fixed message do not match). Every repeat is bounded.
+            r"""(?m)^[ \t]{0,40}for\s{1,8}\w{1,40}\s{0,8},\s{0,8}(\w{1,40})\s{1,8}in\s{1,8}(?:sorted\s{0,8}\(\s{0,8})?(?:os\.)?environ\.items\s{0,8}\(\s{0,8}\)\s{0,8}\)?\s{0,8}:[ \t]{0,8}(?:#[^\n]{0,100})?(?:\n[ \t]{0,40}(?:with\b[^\n]{0,200}:[ \t]{0,8}\n[ \t]{0,40})?)?[\w.]{0,60}(?:print\w{0,10}|pp|write\w{0,10}|log\w{0,10}|debug|info|warning|error|echo|send\w{0,10}|emit)\s{0,8}\([^\n]{0,200}?\b\1\b[^\n]{0,200}?\)[ \t]{0,8}(?:#[^\n]{0,100})?$""",
+            # Python: the environment mapping itself, as the whole argument, handed to an output call (a name list, one key or a method call is not the mapping).
+            r"""(?m)^[ \t]{0,40}(?:(?:return|yield)\s{1,8})?(?:print|pprint|pformat|json\.dumps?|[\w.]{0,60}\.write|logging\.\w{1,20}|log(?:ger)?\.\w{1,20})\s{0,8}\(\s{0,8}(?:[rf]?(?:\"[^\"\n]{0,80}\"|'[^'\n]{0,80}')\s{0,8},\s{0,8})?(?:(?:dict|str|repr|json\.dumps|pformat)\s{0,8}\(\s{0,8}){0,3}os\.environ\b[ \t]{0,8}[,)]""",
+            # Python: the environment mapping as the whole body of an HTTP request.
+            r"""(?m)^[ \t]{0,40}(?:[\w.]{1,40}[ \t]{0,8}=[ \t]{0,8})?(?:await\s{1,8})?[\w.]{0,60}\.(?:post|put|patch|urlopen|request)\s{0,8}\([^\n#]{0,300}?\b(?:data|json|body|content)\s{0,8}=\s{0,8}(?:(?:dict|json\.dumps)\s{0,8}\(\s{0,8}){0,3}os\.environ\b[ \t]{0,8}[,)]""",
+            # Node: process.env as the whole value handed to a print, write or serialise call.
+            r"""(?m)^[ \t]{0,40}(?:await\s{1,8})?(?:console\.\w{1,20}|JSON\.stringify|util\.inspect|process\.std(?:out|err)\.write|(?:[\w.]{0,60}|require\s{0,8}\(\s{0,8}[\x27\"]fs[\x27\"]\s{0,8}\))\.write\w{0,20})\s{0,8}\(\s{0,8}(?:(?:\"[^\"\n]{0,60}\"|'[^'\n]{0,60}'|`[^`\n]{0,60}`)\s{0,8},\s{0,8}){0,2}(?:(?:JSON\.stringify|util\.inspect)\s{0,8}\(\s{0,8}){0,2}process\.env\b[ \t]{0,8}[,)]""",
+            # Node: a loop over Object.entries(process.env) whose body logs or writes with the VALUE variable in its arguments, the call ending the line.
+            r"""(?m)^[ \t]{0,40}for\s{0,8}\(\s{0,8}(?:const|let|var)\s{1,8}\[\s{0,8}\w{1,40}\s{0,8},\s{0,8}(\w{1,40})\s{0,8}\]\s{1,8}of\s{1,8}Object\.entries\s{0,8}\(\s{0,8}process\.env\s{0,8}\)\s{0,8}\)\s{0,8}\{?[ \t]{0,8}(?:\n[ \t]{0,40})?(?:console\.\w{1,20}|process\.std(?:out|err)\.write|[\w.]{0,60}\.write\w{0,20})\s{0,8}\([^\n]{0,200}?\b\1\b[^\n]{0,200}?\)[ \t;]{0,8}\}?[ \t]{0,8}$""",
+            # Shell: printenv, export -p or declare -x redirected to a file, or piped to a network or encoding tool (not >/dev/null, not a stderr dup).
+            r"""(?m)(?:^[ \t]{0,40}|(?:&&|\|\||;)[ \t]{1,8})(?:sudo\s{1,8})?(?:printenv|export\s{1,8}-p|declare\s{1,8}-x)[ \t]{0,8}(?:--[ \t]{0,8})?(?:>>(?![ \t]{0,8}/dev/null)|>(?![>&]|[ \t]{0,8}/dev/null)|\|[ \t]{0,8}(?:curl|wget|ncat|netcat|socat|base64|openssl|mail|sendmail)\b)""",
+            # Shell: env piped to a network or encoding tool.
+            r"""(?m)(?:^[ \t]{0,40}|(?:&&|\|\||;)[ \t]{1,8})(?:sudo\s{1,8})?env[ \t]{0,8}\|[ \t]{0,8}(?:curl|wget|ncat|netcat|socat|base64|openssl|mail|sendmail)\b""",
+            # Shell: the whole environment substituted into a curl or wget command line (a `#` before the substitution ends the code).
+            r"""(?m)(?:^[ \t]{0,40}|(?:&&|\|\||;)[ \t]{1,8})(?:sudo\s{1,8})?(?:curl|wget)\b[^\n#]{0,300}?(?:\$\(\s{0,8}(?:env|printenv|export\s{1,8}-p)\s{0,8}\)|`\s{0,8}(?:env|printenv|export\s{1,8}-p)\s{0,8}`)""",
+            # Node: process.env as the whole body of an HTTP request.
+            r"""(?m)^[ \t]{0,40}(?:(?:await|return)\s{1,8})?(?:fetch|axios\.\w{1,10}|[\w.]{1,40}\.(?:post|put|patch|request))\s{0,8}\([^\n#]{0,300}?\b(?:body|data)\s{0,8}:\s{0,8}(?:JSON\.stringify\s{0,8}\(\s{0,8})?process\.env\b[ \t]{0,8}[,)}]""",
+            # Node: a for-in loop over process.env whose body logs or writes process.env[key].
+            r"""(?m)^[ \t]{0,40}for\s{0,8}\(\s{0,8}(?:const|let|var)\s{1,8}(\w{1,40})\s{1,8}in\s{1,8}process\.env\s{0,8}\)\s{0,8}\{?[ \t]{0,8}(?:\n[ \t]{0,40})?(?:console\.\w{1,20}|process\.std(?:out|err)\.write|[\w.]{0,60}\.write\w{0,20})\s{0,8}\([^\n]{0,200}?process\.env\s{0,8}\[\s{0,8}\1\s{0,8}\][^\n]{0,200}?\)[ \t;]{0,8}\}?[ \t]{0,8}$""",
+        ],
+        "description": "Code that prints, writes or sends every environment variable, name and value, instead of one named variable: a Python loop over os.environ.items() whose body outputs the value, print(dict(os.environ)) or json.dumps(dict(os.environ)), the mapping as an HTTP body, process.env as the whole argument of console.log, JSON.stringify or a write call, a loop over Object.entries(process.env) that logs the value, or env/printenv redirected to a file or piped to curl, wget, ncat, socat, base64 and similar. Environment variables hold API keys and tokens, so this is the shape of a program that quietly hands them to whatever reads its output. One named variable (os.environ['HOME'], process.env.NODE_ENV, printenv HOME), a names-only or count-only list, a loop that prints only the key or a fixed message, a filtered loop, env | grep X, a redirect to /dev/null, comment lines, and passing the environment to a child process are not matched. Added after a scanner review of a skill whose script ended in an unconditional print loop over os.environ.items()."
+    },
+    {
         "id": "GLS-IP-006",
         "name": "Retrieved text gives orders about the agent's reply",
         "category": "indirect_prompt_injection",
