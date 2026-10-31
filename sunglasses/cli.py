@@ -4238,8 +4238,8 @@ def cmd_install(args):
         # install's first look, before any lock or write, gets the plain sentence;
         # a file missing later, or a missing lock or state path, keeps its own.
         if isinstance(e, _inst.ConfigMissing):
-            print(f"\n  {RED}SUNGLASSES install failed{RESET} — there is no MCP "
-                  f"config file at {target}. Nothing was changed.")
+            print(f"\n  {RED}SUNGLASSES install failed{RESET} — no MCP config "
+                  f"file was found at {target}. This command changed nothing.")
             print(f"  {DIM}run it in the folder that holds your project's .mcp.json, "
                   f"or name the file with --config <path>{RESET}\n")
             sys.exit(2)

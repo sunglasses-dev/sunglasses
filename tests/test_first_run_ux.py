@@ -182,15 +182,15 @@ def test_install_with_no_mcp_config_says_so_plainly_and_changes_nothing(tmp_path
     proc = _run(tmp_path, ["install", "filesystem"])
     assert proc.returncode == 2, (proc.stdout, proc.stderr)
     out = proc.stdout + proc.stderr
-    assert "there is no MCP config file at " + str(tmp_path / ".mcp.json") in out
-    assert "Nothing was changed." in out
+    assert "no MCP config file was found at " + str(tmp_path / ".mcp.json") in out
+    assert "This command changed nothing." in out
     assert "--config <path>" in out
     assert "Errno" not in out and "No such file or directory" not in out
     assert not (tmp_path / ".mcp.json").exists()
 
 
 def test_install_lock_failure_with_a_config_present_is_not_called_a_missing_config(tmp_path):
-    # ASTRA r1: a dangling link at the transaction lock path is ENOENT too, raised after the
+    # A dangling link at the transaction lock path is ENOENT too, raised after the
     # config was found. It must keep naming the lock, never claim the config is absent.
     import hashlib
     cfg = tmp_path / ".mcp.json"
@@ -203,14 +203,14 @@ def test_install_lock_failure_with_a_config_present_is_not_called_a_missing_conf
     proc = _run(tmp_path, ["install", "demo"])
     assert proc.returncode == 2, (proc.stdout, proc.stderr)
     out = proc.stdout + proc.stderr
-    assert "there is no MCP config file" not in out and "Nothing was changed." not in out
+    assert "no MCP config file was found" not in out and "changed nothing" not in out
     assert "lock" in out
     assert cfg.read_bytes() == before
 
 
 def test_install_config_gone_after_the_first_look_keeps_the_failed_operation(tmp_path, monkeypatch, capsys):
     # Absent at the locked re-read, after state was prepared: an ordinary read error, not
-    # the first-run sentence, because "Nothing was changed" would not be true of it.
+    # the first-run sentence, because "changed nothing" would not be true of it.
     from sunglasses import install as inst
     cfg = tmp_path / ".mcp.json"
     cfg.write_text(json.dumps({"mcpServers": {"demo": {"command": "echo", "args": ["ok"]}}}))
@@ -226,7 +226,7 @@ def test_install_config_gone_after_the_first_look_keeps_the_failed_operation(tmp
         cli.cmd_install(args)
     out = _ANSI.sub("", capsys.readouterr().out)
     assert raised.value.code == 2
-    assert "there is no MCP config file" not in out and "Nothing was changed." not in out
+    assert "no MCP config file was found" not in out and "changed nothing" not in out
     assert f"cannot read {cfg}" in out
 
 
@@ -236,7 +236,7 @@ def test_install_read_errors_other_than_absent_keep_their_own_wording(tmp_path):
     proc = _run(tmp_path, ["install", "filesystem"])
     assert proc.returncode == 2, (proc.stdout, proc.stderr)
     out = proc.stdout + proc.stderr
-    assert "there is no MCP config file" not in out
+    assert "no MCP config file was found" not in out
     assert "is not usable JSON" in out
 
 
