@@ -32,7 +32,7 @@ def get_real_stats():
     info = engine.info()
 
     patterns = PATTERNS
-    total = info["patterns"]
+    total = info["detecting_patterns"]
     categories = set(p["category"] for p in patterns)
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
@@ -54,6 +54,7 @@ def get_real_stats():
 
     return {
         "patterns": total,
+        "listed_patterns": info["listed_patterns"],
         "categories": len(categories),
         "keywords": keyword_count,
         # The README states both: the DECLARED count (table row, and in brackets on the
@@ -152,6 +153,10 @@ def sync_website_index(stats):
     return update_file(index, replacements, "website/index.html")
 
 
+# The key each total goes by in stats/current.json (a total not listed is published as itself).
+PUBLISHED_KEY = {"patterns": "detecting_patterns"}
+
+
 def _previous_totals(stats):
     """The totals the site pages carry right now: explicit `_prev_*` values first, else the
     landing repo's stats/current.json. A key with no usable number stays None."""
@@ -163,7 +168,7 @@ def _previous_totals(stats):
         pass
     out = {}
     for key in ("patterns", "keywords", "categories"):
-        raw = stats.get(f"_prev_{key}", recorded.get(key))
+        raw = stats.get(f"_prev_{key}", recorded.get(PUBLISHED_KEY.get(key, key), recorded.get(key)))
         try:
             out[key] = int(str(raw).replace(",", ""))
         except (TypeError, ValueError):

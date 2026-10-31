@@ -24,6 +24,14 @@ All notable changes to Sunglasses are documented here.
   keeps `--config` in the command. The line is not printed beside a failed check. Exit codes and
   `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
   `pip install "sunglasses[media]"`. (C491)
+- The published pattern count is now the number of rules that can produce a finding: 1,512 of the 1,583
+  rules the ruleset lists. The other 71 (`GLS-SMP-008` and 70 `GLS-V3-*` rows) carry neither a regex nor a
+  keyword, so no scan can report them; they stay listed and are named in a test, and a new rule with no
+  matcher fails that test until it is named. `engine.info()` and `stats/current.json` replace `patterns`
+  with `detecting_patterns` (1,512) and `listed_patterns` (1,583), so code that still reads `patterns`
+  fails with a missing key instead of reading an old number. `sunglasses info` prints how many listed
+  rules have no matcher. The README and the `scanner_info` tool output carry the new keys. Scan results are
+  unchanged.
 
 ## [0.6.16] — 2026-10-30
 

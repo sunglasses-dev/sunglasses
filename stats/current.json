@@ -1,6 +1,7 @@
 {
   "version": "0.6.16",
-  "patterns": 1583,
+  "detecting_patterns": 1512,
+  "listed_patterns": 1583,
   "keywords": 6675,
   "categories": 117,
   "normalization_techniques": 17,

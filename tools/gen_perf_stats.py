@@ -174,7 +174,9 @@ def main():
         # repo copy honest between ships, which is when the site copy is edited.
         from sunglasses.patterns import PATTERNS
         info = SunglassesEngine().info()
-        stats["patterns"] = info["patterns"]
+        stats.pop("patterns", None)
+        stats["detecting_patterns"] = info["detecting_patterns"]
+        stats["listed_patterns"] = info["listed_patterns"]
         stats["keywords"] = info["keywords"]
         stats["categories"] = len({(p.get("category") or "").strip()
                                    for p in PATTERNS if (p.get("category") or "").strip()})
