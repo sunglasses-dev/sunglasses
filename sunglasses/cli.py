@@ -4109,6 +4109,10 @@ def main():
         help="Read ONLY this config file (default: ./.mcp.json and ~/.claude.json)")
     doctor_parser.add_argument("--json", action="store_true",
                                help="Output the report as JSON")
+    doctor_parser.add_argument(
+        "--agents", action="store_true",
+        help="Also list the MCP config files of other agents (Cursor, Codex, Gemini CLI, "
+             "Windsurf) and what each holds; read-only, changes and starts nothing")
     doctor_parser.set_defaults(func=cmd_doctor)
 
     config_parser = subparsers.add_parser("config", help="Configure SUNGLASSES")
@@ -4351,6 +4355,12 @@ WHAT IT CHECKS
   launches through us), DIRECT (it does not) or UNVERIFIED, and names every
   source it could not open rather than omitting it.
 
+  With --agents it also lists the MCP servers in the config files of other
+  agents (Claude Code, Cursor, Codex, Gemini CLI, Windsurf). Read-only: names
+  and how each server is reached, never env values, arguments or headers. A
+  file it could not read shows UNREADABLE with the reason, never "absent". The
+  exit code is not changed by this block.
+
 WHAT IT CANNOT DO IN THIS RELEASE
   It cannot demonstrate that a wrapped route actually mediates traffic. The
   live self-test that spawns the proxy against a bundled echo server is not
@@ -4389,6 +4399,12 @@ def cmd_doctor(args, _run=None):
     # `~/.claude.json`, and a flag that appended would report on servers the
     # operator did not ask about while naming one file in the output.
     sources = None
+    if getattr(args, "agents", False) and args.config is not None:
+        print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "
+              f"--agents reads each agent's own config locations; it cannot be combined "
+              f"with --config")
+        print(f"  {DIM}drop --config to list the agents, or drop --agents to read only that file{RESET}\n")
+        sys.exit(2)
     if args.config is not None:
         import pathlib as _pl
         # `is not None`, never truthiness: `if args.config:` reads an EMPTY STRING
@@ -4436,6 +4452,11 @@ def cmd_doctor(args, _run=None):
 
     report = (_run or _doc.run)(sources=sources)
     rendered = _doc.render(report)
+    # Opt-in, and a separate block: the headline and the exit code above are about the
+    # Claude route and do not change with what other agents' files hold.
+    if getattr(args, "agents", False):
+        from .proxy import agent_discovery as _agents
+        rendered["agents"] = _agents.discover()
 
     if getattr(args, "json", False):
         print(json.dumps(rendered, indent=2))
@@ -4507,6 +4528,8 @@ def cmd_doctor(args, _run=None):
             print(f"    {GREEN}APPROVED{RESET}   {_printable(row['server'])}  {tools} tool(s)  "
                   f"{DIM}folder {_printable(row['folder'])}{RESET}")
         print()
+    if "agents" in rendered:
+        _print_agents(rendered["agents"])
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
     # was tried and nothing failed. Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
@@ -4525,6 +4548,30 @@ def cmd_doctor(args, _run=None):
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
     print()
     sys.exit(rendered["exit_code"])
+
+
+def _print_agents(rows):
+    """The `doctor --agents` block. A file we could not open is named, never left out."""
+    print(f"  {BOLD}Other agents' MCP configs{RESET}  "
+          f"{DIM}(read-only: nothing was changed or started; a server listed here is not routed "
+          f"through Sunglasses){RESET}")
+    for row in rows:
+        label = f" ({row['label']})" if row["label"] else ""
+        head = f"    {row['agent']:<12} {row['path']}{label}"
+        if row["state"] == "absent":
+            print(f"{head}  {DIM}absent{RESET}")
+            continue
+        if row["state"] == "UNREADABLE":
+            print(f"{head}  {YELLOW}UNREADABLE{RESET} {DIM}{row['reason']}{RESET}")
+            continue
+        count = len(row["servers"])
+        note = f"  {DIM}{row['reason']}{RESET}" if row["reason"] else ""
+        print(f"{head}  {count} server{'' if count == 1 else 's'}{note}")
+        for server in row["servers"]:
+            via = f" {server['via']}" if server["via"] else ""
+            print(f"      {DIM}{server['state']:<10}{RESET} {server['name']}  "
+                  f"{DIM}{server['transport']}{via}{RESET}")
+    print()
 
 
 def cmd_config(args):
