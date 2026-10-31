@@ -50,6 +50,12 @@ ATTACKS = {
         '  echo "Configuring package manager..."\n  cat > "$PROJECT/.npmrc" << EOF\n'
         "registry=${CORP_REGISTRY}\nEOF\n  cat > \"$PROJECT/.yarnrc\" << EOF\nregistry \"${CORP_REGISTRY}\"\nEOF\nfi\n"
     ),
+    "sudo_npm_set": "sudo npm config set registry https://npm.mirror.example/\n",
+    "chained_npm_set": "cd app && npm config set registry https://npm.mirror.example/\n",
+    "then_branch_npm_set": "if [ -f package.json ]; then npm config set registry https://npm.mirror.example/; fi\n",
+    "export_variable_then_heredoc": 'export NPM_REGISTRY="https://npm.mirror.example"\ncat > .npmrc << EOF\nregistry=${NPM_REGISTRY}\nEOF\n',
+    "indented_echo_in_function": 'setup() {\n  echo "registry=https://pkg.mirror.example/" >> "$P/.npmrc"\n}\n',
+    "indented_heredoc_in_branch": '  if x; then\n    cat > "$P/.npmrc" << EOF\n  registry=https://pkg.mirror.example/\nEOF\n  fi\n',
     "variable_mirror_name": (
         'NPM_MIRROR=https://npm.mirror.example\nmkdir -p out\ncat > .npmrc << EOF\nregistry=$NPM_MIRROR\nEOF\n'
     ),
@@ -72,6 +78,14 @@ BENIGN = {
     "variable_public": 'REG="https://registry.npmjs.org"\ncat > .npmrc << EOF\nregistry=${REG}\nEOF\n',
     "variable_not_used_in_config": 'CORP_REGISTRY="https://npm.mirror.example"\necho "mirror is $CORP_REGISTRY"\ncat > notes.txt << EOF\nhello\nEOF\n',
     "reserved_documentation_host": "pip config set global.index-url https://example.org/\n",
+    "comment_echo": '# echo "registry=https://npm.mirror.example/" >> .npmrc\n',
+    "comment_npm_set": "# npm config set registry https://npm.mirror.example/\n",
+    "comment_pip_set": "  # pip config set global.index-url https://pypi.mirror.example/simple\n",
+    "comment_heredoc": "# cat > .npmrc << EOF\n# registry=https://npm.mirror.example\n# EOF\n",
+    "commented_setting_in_body": 'cat > .npmrc << EOF\n# registry=https://npm.mirror.example\n; registry=https://npm.mirror.example\nEOF\n',
+    "comment_variable": '# CORP_REGISTRY="https://npm.mirror.example"\ncat > .npmrc << EOF\nregistry=${CORP_REGISTRY}\nEOF\n',
+    "get_with_trailing_comment": "npm config get registry  # npm config set registry https://x.mirror.example\n",
+    "js_comment": "// npm config set registry https://npm.mirror.example/\n",
     "yaml_setting_text": "registries:\n  npm:\n    url: https://npm.mirror.example\n",
 }
 
@@ -113,15 +127,25 @@ NOT_FLAGGED_ON_PURPOSE = {
     # The content of a config file seen on its own, with no write around it, is indistinguishable from the
     # documentation example above, so it is not read as a redirect.
     "config_file_content_alone": "registry=https://npm.mirror.example/\n",
-    # A variable that is set far from the write (past the 1,500-character window) is not tied to it.
+    # A variable that is set far from the write (past the 60-line window) is not tied to it.
     "variable_set_far_away": (
         'CORP_REGISTRY="https://npm.mirror.example"\n' + "# pad\n" * 400 + 'cat > .npmrc << EOF\nregistry=${CORP_REGISTRY}\nEOF\n'
     ),
     # Python or Node code that writes the same lines with its own file API is not read by this rule.
     "python_writes_file": 'open(".npmrc", "w").write("registry=https://npm.mirror.example/\\n")\n',
+    # The same redirect through an environment variable (a one-command prefix, or an export) is not read: it is how
+    # CI files commonly name a mirror, and nothing is written to a config file.
+    "env_variable_registry": "export NPM_CONFIG_REGISTRY=https://npm.mirror.example/\n",
+    "env_variable_pip_index": "PIP_INDEX_URL=https://pypi.mirror.example/simple pip install -r requirements.txt\n",
+    # A variable followed, before the write, by a second registry-named assignment is not tied to the write: the
+    # search for the write stops at the next such assignment, which keeps the cost linear in the file size.
+    "variable_then_second_variable": (
+        'CORP_REGISTRY="https://npm.mirror.example"\nOTHER_MIRROR="https://x.example.org"\ncat > .npmrc << EOF\nregistry=${CORP_REGISTRY}\nEOF\n'
+    ),
 }
 
 
 @pytest.mark.parametrize("name", sorted(NOT_FLAGGED_ON_PURPOSE))
 def test_stated_limits_are_not_flagged(engine, name):
     assert RULE not in _ids(engine, NOT_FLAGGED_ON_PURPOSE[name]), name
+
