@@ -657,10 +657,9 @@ def _atomic_write(path, data: bytes):
         raise ConfigIOError(f"write to {path} was interrupted: {e}") from e
     except ConfigIOError:
         # The re-read and the lock both raise this from INSIDE the try, and
-        # neither clause above catches it, so before round 7 either one left a
-        # `.sg-*.tmp` behind while this docstring promised none. Same shape as
-        # everything else this round: the promise was in the prose and not in a
-        # clause.
+        # neither clause above catches it, so either one would leave a
+        # `.sg-*.tmp` behind while this docstring promised none: the promise
+        # has to be in a clause, not only in the prose.
         try:
             os.unlink(tmp)
         except OSError:
@@ -890,7 +889,7 @@ def _held_bytes_are_answered_for(private, *, d):
         # The WHOLE identity: another note answers for these bytes only if it
         # names the same file AND agrees on what that file should hash to. A
         # note that merely reuses the name is a different claim about a
-        # different thing, and round 12 deleted good evidence on exactly that.
+        # different thing, and treating it as the same deletes good evidence.
         if theirs and (theirs["held"], theirs["sha256"]) == (
                 mine["held"], mine["sha256"]):
             try:
@@ -1107,11 +1106,11 @@ def _release_owner_file(private, fh):
     """
     if fh is None:
         return
-    # R18-A-CLEANUP-THAT-RAISES-DESTROYS-THE-ERROR-IT-WAS-CLEANING-UP. This runs
+    # A CLEANUP THAT RAISES DESTROYS THE ERROR IT WAS CLEANING UP. This runs
     # in a `finally`, so ANY exception escaping it replaces whatever was already
     # propagating -- the caller's real failure disappears and the traceback
-    # blames the cleanup. `except OSError` was too narrow, as
-    # `test_C4_precommit_fault_atomic_no_success[write]` and `[flush]` proved:
+    # blames the cleanup. `except OSError` was too narrow, as the
+    # pre-commit fault-injection tests for the write and flush steps proved:
     # their fault injection hands back an object with no `.close()`, the
     # AttributeError escaped, and the child died with the atomicity assertion
     # never reached. A real `open` always returns a closeable file, so this was
@@ -1134,7 +1133,7 @@ def _release_owner_file(private, fh):
 
 # WHERE flock IS ENFORCED BETWEEN EVERY PROCESS THAT CAN REACH A FILE, and
 # where it is not. This list is the whole of the claim and lives in one place
-# on purpose (R-177-R17 (b)).
+# on purpose.
 #
 # On these, the kernel that owns the file owns the lock, so an exclusive lock
 # excludes every process on the machine and there is no second machine.
@@ -1324,7 +1323,7 @@ def _alias_owner_is_gone(private, *, retained=None):
         except OSError:
             return False                      # somebody is holding it
         try:
-            # R16-PROVE THE LOCK IS A LOCK. `flock` is advisory and some
+            # PROVE THE LOCK IS A LOCK. `flock` is advisory and some
             # filesystems -- a network mount is the ordinary case -- accept the
             # call and enforce nothing. There, every lock looks free and every
             # live owner reads as dead. So while we are holding this one, take
@@ -1332,7 +1331,7 @@ def _alias_owner_is_gone(private, *, retained=None):
             # honours locks that must fail, and if it succeeds the answer here
             # is worth nothing. An instrument that self-tests at the moment of
             # use, rather than a platform check written once and believed.
-            # R17: locality first, then the no-op-flock self-test. The type
+            # Locality first, then the no-op-flock self-test. The type
             # check answers "could another host be holding this", which the
             # self-test cannot; the self-test answers "does this kernel
             # actually enforce", which the type check cannot.
@@ -1397,7 +1396,7 @@ def _unlink_under_proof(fh, target, *, owner, retained):
     try:
         target.unlink()
     except OSError as e:
-        # R76. The removal was REFUSED, so the file is still there and the
+        # The removal was REFUSED, so the file is still there and the
         # caller must not go on as if it were gone: both callers remove the
         # owner file next, and that file is the only proof a later collect
         # can use. Burning it on a failed unlink left the alias uncollectable
@@ -1495,7 +1494,7 @@ def _collect_orphaned_owner_files(d):
         if alias.exists():
             continue
         # A PRE-FILTER AND NOTHING MORE. Its answer is never what authorises
-        # the removal below -- that is the whole of round 17's finding.
+        # the removal below.
         if not _ask_owner_is_gone(alias, retained):
             continue
         with _owner_proven_gone(alias) as proof:
@@ -1521,9 +1520,9 @@ def _collect_discharged_notes(d, held_name):
         return retained
     if (d / held_name).exists():
         return retained
-    # The loop variable is NOT `q`, and that is not a style choice. Round 12's
-    # hashed `R12_AUDIT_NEW_SHAPES[qualified_site_relocation]` locates the real
-    # `_discard` site by asserting that `                q.unlink()` appears in
+    # The loop variable is NOT `q`, and that is not a style choice. The
+    # audit test that relocates the real `_discard` site first asserts that
+    # `                q.unlink()` appears in
     # install.py EXACTLY once before it relocates it. A second one anywhere in
     # the file at that indentation turns the audit test's row red in its SETUP,
     # which reads like the audit escape coming back and is nothing of the kind.
@@ -1537,7 +1536,7 @@ def _collect_discharged_notes(d, held_name):
             except OSError:
                 pass
             continue
-        # R-177-R18 (3): an ALIAS is removed only while its owner's lock is
+        # An ALIAS is removed only while its owner's lock is
         # held, here as everywhere else, whatever else says it is spent.
         with _owner_proven_gone(spent) as proof:
             if proof is None:
@@ -1580,7 +1579,7 @@ def _collect_stale_aliases(d, private, intent):
     retained: list = []
     if intent is None:
         return retained
-    # R15: with no locking there is no evidence of an incarnation, so nothing
+    # With no locking there is no evidence of an incarnation, so nothing
     # here can be proven dead. Refusing to collect leaves growth we have
     # declared; collecting on a guess removes somebody's only route back.
     if LOCKING is None:
@@ -1597,7 +1596,7 @@ def _collect_stale_aliases(d, private, intent):
         if (note.get("held"), note.get("sha256"),
                 note.get("owner")) != identity:
             continue
-        # A PRE-FILTER, and its answer authorises nothing (R-177-R18 (1)).
+        # A PRE-FILTER, and its answer authorises nothing.
         if not _ask_owner_is_gone(alias, retained):
             continue
         with _owner_proven_gone(alias) as proof:
@@ -1632,8 +1631,8 @@ def _forget_take(taking, owner):
     private = _unique_name(lambda k: taking.with_name(
         f"{taking.name}.forgetting-{os.getpid()}-{k:x}"))
     # THE OWNER FILE IS CREATED AND LOCKED BEFORE THE RENAME THAT PUBLISHES THE
-    # ALIAS (R-177-R16 (a)). Round 15 did it after, and dying in between left an
-    # alias with no owner that nothing could ever prove dead. Now a death there
+    # ALIAS. Doing it after, and dying in between, leaves an
+    # alias with no owner that nothing can ever prove dead. A death there
     # leaves a stray lock file and no alias at all.
     held_open = _hold_owner_file(private)
     try:
@@ -1656,7 +1655,7 @@ def _forget_held(taking, private, owner):
     except (OSError, ValueError):
         intent = None
     # OWNERSHIP IS THE AUTHOR, not the filename. Two cleanups that took
-    # different bytes can name the same held file; round 12's mutual discard is
+    # different bytes can name the same held file; discarding by name is
     # each deleting the other's note because the names matched.
     if isinstance(intent, dict) and intent.get("owner") == owner:
         try:
@@ -1953,7 +1952,7 @@ def _adopt_standby(home, name, target):
         return False
 
     # Half a promotion: the record is at its canonical name and the bytes are
-    # not there yet. Round 9 could reach this state two ways -- a process that
+    # not there yet. This state is reachable two ways -- a process that
     # ended between the two renames, and a second rename that failed -- and
     # neither was discoverable, because the standby RECORD that named the bytes
     # had already been consumed by the first rename. The canonical record names
@@ -2099,18 +2098,17 @@ def _reclaim_taken(home, name):
         held_named = peek.get("held") if peek else None
         try:
             if _reclaim_one(taking, name, d=d, bytes_path=bytes_path):
-                # R14-COLLECT-DISCHARGED (a). The bytes are back at the
+                # The bytes are back at the
                 # canonical name, so every note that named the held copy --
                 # the one we used and any alias of it a killed forget left --
                 # answers for a file that is no longer there.
                 _collect_discharged_notes(d, held_named)
-                # R17-A-COLLECTOR-NOBODY-CALLS-BOUNDS-NOTHING. The orphan sweep
-                # used to have ONE caller, the contested branch of a forget, so
-                # a run of deaths with nothing completing between them never
-                # reached it and the stray lock files grew with the crash count
-                # -- the round-14 finding wearing a different file type. It runs
-                # on the recovery path too now, which is the path a machine that
-                # has been crashing actually takes.
+                # A COLLECTOR NOBODY CALLS BOUNDS NOTHING. The orphan sweep
+                # also runs on the recovery path, not only in the contested
+                # branch of a forget: a run of deaths with nothing completing
+                # between them would otherwise never reach it and the stray
+                # lock files would grow with the crash count. Recovery is the
+                # path a machine that has been crashing actually takes.
                 _collect_orphaned_owner_files(d)
                 return True
         except (ConfigConflict, ConfigIOError) as e:
@@ -2228,9 +2226,9 @@ def _discard(*paths):
         except OSError:
             # There is nothing at the canonical name to take. Whatever note is
             # there belongs to a take that is still in flight, and removing it
-            # is how round 8 lost another cleanup's bytes.
+            # is how another cleanup's bytes get lost.
             continue
-        # R9-NOTE-OWNERSHIP. The note lives at one name because that is the
+        # The note lives at one name because that is the
         # name recovery looks for, so a second take would CLOBBER the first
         # one's note and the first one's bytes would be under a held name
         # nothing could find. A take that is still answered for by a live note
@@ -2238,7 +2236,7 @@ def _discard(*paths):
         # left where they are.
         if _note_is_live(taking, d=q.parent):
             continue
-        # R9-NOTE-FIRST. A take whose note cannot be written is a take that
+        # A take whose note cannot be written is a take that
         # cannot be recovered from, so it does not happen at all. The claim is
         # atomic: whoever creates the note owns the take, and a stale answer
         # from the fast path above cannot turn into a write.
@@ -2504,7 +2502,7 @@ def classify(entry, *, artifact):
     resolved = str(pathlib.Path(artifact).resolve())
     if meta.get("artifact") != resolved or meta.get("sha256") != actual:
         return "UNVERIFIED"
-    # C6-COMMAND-BINDING. The marker is untrusted data in a file the user (or
+    # The marker is untrusted data in a file the user (or
     # anything else) can edit, so it cannot vouch for itself: setting BOTH the
     # entry's command and the marker's command to `/usr/bin/true` made them
     # agree while the artifact never ran. Agreement is necessary and not
@@ -2686,7 +2684,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             original_entry = {"command": argv[0], "args": list(argv[1:])}
             entry_existed = False
 
-        # R4-OPTIONS: env, cwd and anything else the entry carries survive.
+        # env, cwd and anything else the entry carries survive.
         wrapper = {k: v for k, v in original_entry.items()
                    if k not in ("command", "args")}
         wrapper["command"] = sys.executable
@@ -2704,7 +2702,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     _, rec_path, pending_path, bytes_path = _records_dir(home, name)
     _refuse_symlinked_storage(name, rec_path, pending_path, bytes_path)
 
-    # R4/R5-COLLISION and R4-IDENTITY-BEFORE-DIGEST. A completed record means an
+    # A completed record means an
     # install is OUTSTANDING, and its retained bytes are the only way back to
     # the state it captured. Overwriting it destroys that, which is what
     # happened when a config was edited back to unwrapped and installed again:
@@ -2722,7 +2720,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             + "; uninstall it before installing again, so the bytes it retained "
               "are not the ones we throw away")
 
-    # A pending journal is a transaction we left open (R-177-R3: recover or
+    # A pending journal is a transaction we left open (recover or
     # refuse, never strand). It is safe to resume ONLY when the target is still
     # byte-for-byte what the journal captured, i.e. the crash happened before
     # the replace. Otherwise we cannot tell what is on disk and we refuse.
@@ -2877,8 +2875,8 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
             restored = False
         if restored:
             # The target is the original again, so there is nothing left for a
-            # standby to be the inverse OF. Round 9 left it lying in the records
-            # directory after a cancellation it had handled perfectly well.
+            # standby to be the inverse OF. A standby left lying in the records
+            # directory after a cancellation handled perfectly well is a leak.
             _discard(rec_path, spare_bytes, spare_record)
         else:
             # INVERSE LAST. The rollback can fail for two honest reasons: the write itself
@@ -3130,7 +3128,7 @@ def _uninstall_locked(config_path, name, *, home):
     _adopt_standby(home, name, target)
 
     if not rec_path.exists():
-        # C4-REPLACE-CRASH-RECOVERY. No completed record, but an open journal
+        # No completed record, but an open journal
         # means a transaction was interrupted, and if the replace had already
         # happened the user's config is wrapped with nothing claiming to own it.
         # The journal IS the recovery input, so uninstall consumes it rather
@@ -3141,7 +3139,7 @@ def _uninstall_locked(config_path, name, *, home):
     try:
         record = _read_record(rec_path, name, expect_state="complete")
     except ConfigConflict:
-        # R4-COMPLETE-PARTIAL. A completed record that cannot be READ is an
+        # A completed record that cannot be READ is an
         # interrupted completion, not an authority. Before this, uninstall saw
         # the completed FILENAME, failed to parse it, and refused with exit 2
         # while the still-valid journal sat unread beside it: a stranded
@@ -3171,7 +3169,7 @@ def _uninstall_locked(config_path, name, *, home):
     try:
         retained_path, retained = _retained_of(record, name, home=home)
     except _RetainedUnusable as e:
-        # NARROW ON PURPOSE (R-177-R10a). Falling back for every
+        # NARROW ON PURPOSE. Falling back for every
         # unusable retained copy would change behaviour that existing test rows
         # pin. The fallback belongs only to a record that was promoted from a
         # standby whose bytes had already failed: there the bytes were never
@@ -3210,7 +3208,7 @@ def _uninstall_locked(config_path, name, *, home):
 
     # The file moved under us. Put the entry back, or remove it if we created
     # it, and leave every unrelated property alone, collected by property
-    # rather than by position (C3, R5-INVERSE).
+    # rather than by position (C3).
     doc = _parse(current, target)
     servers = _servers(doc, target)
     observed_servers = dict(servers)
@@ -3251,7 +3249,7 @@ def _uninstall_locked(config_path, name, *, home):
         if spent is not None:
             spent.close()
 
-    # R10a-KEEP-WHAT-FAILED. An entry-only restore that happened BECAUSE the
+    # KEEP WHAT FAILED. An entry-only restore that happened BECAUSE the
     # retained copy was unusable is a recovery, not a cleanup: the copy that
     # failed its digest is the evidence of whatever went wrong, so it is set
     # aside under a name the result carries rather than deleted with the rest
@@ -3269,7 +3267,7 @@ def _uninstall_locked(config_path, name, *, home):
                 pass
     _discard(*(q for q in (rec_path, pending_path, retained_path) if q))
 
-    # R38. The file moved, and the restore may still have put back exactly
+    # The file moved, and the restore may still have put back exactly
     # what was there before, so the answer is taken from the bytes written and
     # not from the path taken. Digests only: the claim needs no retained copy.
     written = _digest_bytes(restored)

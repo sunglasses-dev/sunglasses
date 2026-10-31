@@ -182,7 +182,7 @@ def _verify(data, public_key, expected_fingerprint, expected_endpoint) -> _Walk:
     records = []             # (line_no, record, hash) for every linked record
     verified = None          # index into `records` of the last verified checkpoint
     chain_id = None
-    genesis = None           # kept even when its key is not this one (R40)
+    genesis = None           # kept even when its key is not this one
     for index, line in enumerate(lines):
         line_no = index + 1
         try:
@@ -338,7 +338,7 @@ def _proxy_lifecycle(prefix):
     if not events:
         # A genesis and nothing else: the proxy opens a session with HEADER,
         # so none was opened. ORPHAN would be a false red, COMPLETE a false
-        # green (ruling 43; vector 6d, and 6c for the hook side).
+        # green (vector 6d, and 6c for the hook side).
         return "NO_SESSION"
     if events[0] != "HEADER":
         return "LIFECYCLE_ORPHAN"
@@ -366,7 +366,7 @@ class LogReport:
     first_failure_segment: str | None = None
     failure_detail: str | None = None
     fingerprint: str | None = None
-    authority_transitions: int = 0       # R120: APPROVAL_INVALIDATED, verified
+    authority_transitions: int = 0       # APPROVAL_INVALIDATED, verified
 
 
 def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
@@ -420,7 +420,7 @@ def verify_log(directory, public_key: bytes, *, expected_fingerprint=None,
         if (index and named is not None and walk.genesis is not None
                 and walk.genesis.get("key_id") != fingerprint):
             # A successor under another key is a key transition. Rotation is
-            # specified, not built (R40): named as the limit, never judged,
+            # specified, not built: named as the limit, never judged,
             # and never reported as a forgery it may not be.
             fail("ROTATION_UNSUPPORTED", name,
                  "this segment is signed by another key; rotation is not built")

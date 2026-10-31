@@ -70,12 +70,137 @@ def _valid_sha(value):
             and all(c in _HEX for c in value))
 
 
+def _record_of(text):
+    """The record in `text`, or the reason it is not one. The one validation: the Store and the
+    read-only listings below all use it, so none of them can call a record approved that the
+    Store would refuse."""
+    # Duplicate keys first: `json.loads` keeps the last silently, and contract row 5.5
+    # names duplicate tool names as ambiguous. A record that cannot say
+    # which descriptor was approved has not approved one.
+    try:
+        record = json.loads(text, object_pairs_hook=_no_duplicates)
+    except (ValueError, _Duplicate):
+        return None, INVALID
+    if not isinstance(record, dict):
+        return None, INVALID
+    if record.get("approved_by") != "human":
+        return None, INVALID
+    if not _valid_sha(record.get("snapshot_sha256")):
+        return None, INVALID
+    if not record.get("server_identity"):
+        return None, INVALID
+    tools = record.get("tools")
+    if not isinstance(tools, dict):
+        return None, INVALID
+    for entry in tools.values():
+        if not isinstance(entry, dict) or not _valid_sha(
+                entry.get("descriptor_sha256")):
+            return None, INVALID
+    return record, None
+
+
+def current_folder():
+    """The working directory, or None when it can no longer be read (the folder was deleted)."""
+    try:
+        return os.getcwd()
+    except OSError:
+        return None
+
+
+def folder_text(folder):
+    """A folder as a line may print it: never a name with a control character in it."""
+    if not isinstance(folder, str) or not folder:
+        return "unknown (recorded before folders were kept)"
+    return folder if folder.isprintable() else "(a folder whose name has control characters)"
+
+
+def other_folders(root, command_stem, here, limit=3):
+    """Folders, other than `here`, that hold an approval for the same command and arguments.
+
+    Read only. Printable folder names only, and at most `limit` of them: this feeds a line on
+    the proxy's own stderr, which a person reads.
+    """
+    if not command_stem:
+        return []
+    found = []
+    try:
+        paths = sorted((pathlib.Path(root) / "approvals").glob("*.json"))
+    except OSError:
+        return []
+    for path in paths:
+        try:
+            record, bad = _record_of(path.read_text())
+        except (OSError, ValueError):   # ValueError: bytes that are not text
+            continue
+        if bad or record.get("command_stem") != command_stem:
+            continue
+        folder = record.get("folder")
+        if (isinstance(folder, str) and folder.isprintable() and folder != here
+                and folder not in found):
+            found.append(folder)
+        if len(found) >= limit:
+            break
+    return found
+
+
+def _label(name):
+    """A file name as a line may print it, shortened: never one with a control character in it."""
+    name = name[:12]
+    return name if name.isprintable() else "(a name with control characters)"
+
+
+def approval_rows(root):
+    """Every approval under `root`, read only: server, folder, snapshot and tool count.
+
+    Looks and never writes or creates anything. A record that cannot be read, or that the Store
+    would refuse, becomes a row that says so rather than a row that says APPROVED, and a folder
+    that cannot be listed becomes one row saying so, so a listing never reads as "no approvals"
+    over something it could not open. Only a folder that is not there is no approvals.
+    """
+    directory = pathlib.Path(root) / "approvals"
+    try:
+        names = sorted(name for name in os.listdir(directory) if name.endswith(".json"))
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return [{"server": "(the approvals folder)", "state": "UNREADABLE", "folder": None,
+                 "snapshot": None, "tools": None}]
+    rows = []
+    for name in names:
+        server = _label(name[:-len(".json")])
+        try:
+            record, bad = _record_of((directory / name).read_text())
+        except OSError:
+            rows.append({"server": server, "state": "UNREADABLE", "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
+        except ValueError:   # bytes that are not text: not a record, as far as a listing goes
+            rows.append({"server": server, "state": INVALID, "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
+        if bad:
+            rows.append({"server": server, "state": INVALID, "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
+        rows.append({"server": server, "state": "APPROVED",
+                     "folder": folder_text(record.get("folder")),
+                     "snapshot": record["snapshot_sha256"][:12],
+                     "tools": len(record["tools"])})
+    return rows
+
+
 class Store:
     """The record on disk, the state it implies, and the activation gate."""
 
-    def __init__(self, root, *, server_id):
+    def __init__(self, root, *, server_id, command_stem=None):
         self.root = pathlib.Path(root)
         self.server_id = server_id
+        # The identity without its folder: the same server started from another folder shares
+        # it, which is how a refusal can say "approved, but from over there".
+        self.command_stem = command_stem
+        # The folder the proxy was started from, read once: it is the folder the identity was
+        # made from, and it is still the right answer when that folder is deleted later.
+        self.folder = current_folder()
         self.pending_snapshot = None
         self.approvals = self.root / "approvals"
         self.captures = self.root / "captures"
@@ -96,7 +221,16 @@ class Store:
         return self.approvals / f"{self.server_id}.json"
 
     def capture(self, snapshot_sha256, payload):
-        """The capture the human is shown. Approval quotes this sha."""
+        """The capture the human is shown. Approval quotes this sha.
+
+        It also records the folder the proxy was started from, because the server identity
+        includes it: an approval is bound to that folder, and `proxy approve` and `doctor`
+        say which one. The folder is not part of the sha a human approves.
+        """
+        if self.folder:
+            payload = {**payload, "folder": self.folder}
+        if self.command_stem:
+            payload["command_stem"] = self.command_stem
         (self.captures / f"{self.server_id}.{snapshot_sha256}.json").write_text(
             json.dumps(payload, sort_keys=True))
         # REMEMBERED so a refusal can name it. `proxy approve` needs this sha,
@@ -154,6 +288,10 @@ class Store:
             # empty tool list is a true statement about a server with no tools.
             "tools": stored.get("tools_by_name") or {},
         }
+        if isinstance(stored.get("folder"), str):
+            record["folder"] = stored["folder"]
+        if isinstance(stored.get("command_stem"), str):
+            record["command_stem"] = stored["command_stem"]
         with self._lock:
             self._path.write_text(json.dumps(record, sort_keys=True))
             # contract row 5.1 and T505. The record names which descriptors a human
@@ -251,29 +389,7 @@ class Store:
             # OSError escape turns a hold into a crash in whatever was asking,
             # and contract row 5.5 says this state holds rather than decides.
             return None, INVALID
-        # Duplicate keys first: `json.loads` keeps the last silently, and contract row 5.5
-        # names duplicate tool names as ambiguous. A record that cannot say
-        # which descriptor was approved has not approved one.
-        try:
-            record = json.loads(text, object_pairs_hook=_no_duplicates)
-        except (ValueError, _Duplicate):
-            return None, INVALID
-        if not isinstance(record, dict):
-            return None, INVALID
-        if record.get("approved_by") != "human":
-            return None, INVALID
-        if not _valid_sha(record.get("snapshot_sha256")):
-            return None, INVALID
-        if not record.get("server_identity"):
-            return None, INVALID
-        tools = record.get("tools")
-        if not isinstance(tools, dict):
-            return None, INVALID
-        for entry in tools.values():
-            if not isinstance(entry, dict) or not _valid_sha(
-                    entry.get("descriptor_sha256")):
-                return None, INVALID
-        return record, None
+        return _record_of(text)
 
     def state(self):
         with self._lock:

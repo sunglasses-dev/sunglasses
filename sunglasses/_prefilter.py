@@ -488,7 +488,7 @@ def _max_len(seq):
 
 # Every node kind that can carry a subpattern. A walker that does not enter one
 # of these cannot see what is inside it, and for `_has_lookaround` "cannot see"
-# reads as "there is none", which is the R1a defect: a lookahead inside a
+# reads as "there is none": a lookahead inside a
 # conditional stayed invisible, the rule stayed anchored, and the finding was
 # lost. Enumerated rather than discovered one bug at a time, and
 # `test_every_container_node_kind_is_walked` fails if a future interpreter adds

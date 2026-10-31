@@ -36,7 +36,7 @@ EVENTS = frozenset({
     # Required by the contract: without it in the allowlist, the
     # one event that says the stderr cap was applied could not be written.
     "STDERR_BOUNDED",
-    # R-179-R6/R5_NOATTEMPT_REFUSAL. A typed refusal is only typed if the log
+    # A typed refusal is only typed if the log
     # will take it: `Log.event` raises ValueError on a kind that is not here,
     # so a refusal written through `Route._record` and missing from this list
     # is an exception on a fault path rather than a receipt.
@@ -92,7 +92,7 @@ PERMITTED_FIELDS = frozenset({
     "inspection_complete", "decision", "rule_ids", "inspected_bytes",
     "observed_bytes", "elapsed_ms", "worker_pid", "leaf_provenance", "bytes",
     "reason_code", "rule", "budget", "settled", "supervised", "count",
-    # R-CLOSE-KIND, and this line is the difference between the change working
+    # This line is the difference between the change working
     # and only LOOKING like it works. The kind reaches `session.events` as soon
     # as a Cause carries it, but this list is what the DURABLE receipt keeps:
     # a field missing here is dropped on the way to disk, silently, and every
@@ -104,8 +104,8 @@ PERMITTED_FIELDS = frozenset({
     "catalog_version", "contract_version",
     # NO `authority_epoch`. This set is FROZEN with the wire
     # #172 shipped inside v0.6.0: every 0.6.0 verifier holds a copy and reads a
-    # key outside it as UNKNOWN_FIELD, a failure (R44), and a post-tag change is
-    # an epoch, never an edit (R22). The transition record carries its reason in
+    # key outside it as UNKNOWN_FIELD, a failure, and a post-tag change is
+    # an epoch, never an edit. The transition record carries its reason in
     # `reason_code`, and the chain's signed `seq` orders two of them.
 })
 
@@ -120,7 +120,7 @@ PERMITTED_FIELDS = frozenset({
 # the bounds below are wrong, and that is a receipt failure like any other.
 RULE_IDS_KEPT = 256            # the first 256, in the order the engine gave,
 RULE_IDS_BYTES = 6 * 1024      # and the kept ids, each encoded with its quotes,
-                               # total at most this; whichever cuts first (R43)
+                               # total at most this; whichever cuts first
 LEAVES_KEPT = 8
 FIELD_BYTES = 72               # one encoded value; a sha256 hex digest is 66
 
@@ -383,7 +383,7 @@ class Log:
         if self._chain is None:
             # OPENED NOW, not on the first event. A log created lazily cannot
             # record a failure that happens before it, which is exactly the
-            # window R1 is closing by saying "opened before the first frame".
+            # window this closes by saying "opened before the first frame".
             try:
                 self._handle = self.path.open("a", encoding="utf-8")
             except OSError as cause:
@@ -457,7 +457,7 @@ class Log:
                                     "t_mono_ns": time.monotonic_ns()}], seal=seal)
             except Exception as failure:
                 self._failure = failure
-                # R41: the cause is named. The wire's messages carry field
+                # The cause is named. The wire's messages carry field
                 # paths, sizes and bounds, never a value, so naming it here
                 # copies nothing a peer wrote.
                 raise ReceiptIOError(

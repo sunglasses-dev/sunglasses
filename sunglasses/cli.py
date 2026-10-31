@@ -109,7 +109,7 @@ def print_result(result, verbose=False):
               f"{sev_color}[{result.severity.upper()}]{RESET} "
               f"{DIM}({result.latency_ms}ms){RESET}")
         # The deduped VIEW, not result.findings — one matched span, one threat
-        # line. Audit M9: three findings quoting the identical text under three
+        # line. Three findings quoting the identical text under three
         # different attack names is how a reader stops trusting the verdict.
         reported = result.reported_findings()
         folded_total = sum(len(f.get("also_matched") or []) for f in reported)
@@ -1138,7 +1138,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             # zero findings behind it — but it must not leave the scan looking
             # complete either.
             files_incomplete += 1
-            # v0.5.6 round 5: this used to be a COUNT and nothing else, so the
+            # As a COUNT and nothing else, the
             # report said "Files not fully read: 1" and never which file or why —
             # while the walker's own skips were listed by name right beside it.
             # A count is not a name: a reader cannot act on "one of these is
@@ -1424,11 +1424,10 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
     if files_incomplete or unread_skips or folder_gaps:
-        # The banner introduces the list. Round 5: it was printed in the verdict
-        # block BELOW, so a reader met the named skips first and the header last,
-        # and a header that promises a list of what went unread has to arrive
-        # before the list. Caught by the round-5 `banner_without_named_scope`
-        # assertion on this surface.
+        # The banner introduces the list, so it is printed before it: a header
+        # that promises a list of what went unread has to arrive before the list,
+        # not after the named skips (the `banner_without_named_scope` assertion
+        # holds this).
         _print_coverage_banner("part of this repo was not read" if kind == "repo"
                                else "part of this directory was not read")
     if files_incomplete:
@@ -1883,7 +1882,7 @@ def _emit_scan_result(args, result, source):
 
     # The channel the scan actually used, not the flag default: scan_file() forces
     # channel="file", so printing args.channel here contradicted the JSON output of
-    # the same scan (audit L6).
+    # the same scan.
     print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
     print_result(result, verbose=args.verbose)
@@ -2920,7 +2919,7 @@ def cmd_receipts(args):
                   f"Run `sunglasses init` to install the firewall.{RESET}\n")
             return codes.exit_for("NO_LOG", strict=getattr(args, "strict", False))
 
-        # Audit L4. The hook command embeds an ABSOLUTE interpreter path — correct, and
+        # The hook command embeds an ABSOLUTE interpreter path — correct, and
         # argued in build_hook_entry: a bare `python3` resolves through PATH at hook time
         # and can find an interpreter with no sunglasses installed. But it means a
         # recreated venv or an upgraded python leaves a hook that cannot start, and that
@@ -3004,7 +3003,7 @@ def cmd_receipts(args):
             return code
 
         # A receipts file is bytes on disk: it may predate the write-side sanitize
-        # (audit H2) or have been edited since. Everything pulled out of it is treated
+        # or have been edited since. Everything pulled out of it is treated
         # as untrusted before it reaches the terminal.
         colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
         print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
@@ -4289,7 +4288,7 @@ def cmd_uninstall(args):
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
     if res.byte_exact and res.earlier:
-        # R38. The end state is the file before an earlier install on it, so
+        # The end state is the file before an earlier install on it, so
         # saying it changed would be false; saying which original it matches
         # keeps the claim exact.
         print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
@@ -4426,7 +4425,7 @@ def cmd_doctor(args, _run=None):
         # So we refuse, in `install`'s shape and with `install`'s code, because
         # "point it at a path that does not exist and it refuses, naming the
         # file" is already this product's documented answer. Exit 2 does not
-        # contend with R3's `1 > 2` precedence: nothing ran, so there is no
+        # contend with the `1 > 2` precedence: nothing ran, so there is no
         # self-test verdict for it to outrank.
         if not target.exists():
             print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "
@@ -4443,13 +4442,13 @@ def cmd_doctor(args, _run=None):
         sys.exit(rendered["exit_code"])
 
     st = rendered["self_test"]
-    # CU-M8. A route's verdict is read from `per_wrapper`, the SAME field the
+    # A route's verdict is read from `per_wrapper`, the SAME field the
     # JSON prints, and never recomputed here.
     route_verdict = {(w["name"], w["source"]): w["result"]
                      for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
-        # The whole point of R-DOCTOR-R3c, in the one place an operator reads.
+        # A build with no live self-test says so plainly, in the one place an operator reads.
         print(f"  {YELLOW}Self-test NOT RUN{RESET} "
               f"{DIM}— this build has no live self-test, so nothing below is"
               f" proof that a wrapped route mediates traffic.{RESET}")
@@ -4497,7 +4496,17 @@ def cmd_doctor(args, _run=None):
                       f"them is wrapped. Add a server to ./.mcp.json, then run: "
                       f"sunglasses install <name>{RESET}")
 
-    print()
+    if rendered.get("approvals"):
+        print(f"  {BOLD}Approvals{RESET}  {DIM}(each is bound to the folder the server was "
+              f"started from){RESET}")
+        for row in rendered["approvals"]:
+            if row["state"] != "APPROVED":
+                print(f"    {YELLOW}{row['state']}{RESET} {_printable(row['server'])}")
+                continue
+            tools = "?" if row["tools"] is None else row["tools"]
+            print(f"    {GREEN}APPROVED{RESET}   {_printable(row['server'])}  {tools} tool(s)  "
+                  f"{DIM}folder {_printable(row['folder'])}{RESET}")
+        print()
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
     # was tried and nothing failed. Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
