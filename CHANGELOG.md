@@ -9,6 +9,27 @@ All notable changes to Sunglasses are documented here.
 
 - A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and up to three folders with printable names where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders, showing a record the proxy would refuse as `INVALID` and one it could not read as `UNREADABLE` (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve that run's capture for the folder it is in. An approval written before this change shows its folder as unknown; a fresh capture from a new proxy run records one.
 - `pip install 'sunglasses[fast]'` adds an optional extension (pyahocorasick) that makes keyword search faster. It needs Python 3.10 or newer; on 3.9 the extra installs nothing and the scanner keeps using plain string search. A prebuilt wheel exists for common platforms; where there is none, installing it needs a C compiler.
+- `GLS-STRUCT-005` reports, for review (`quarantine`, never a block), Python code that reads as
+  printing, logging, writing or sending every environment variable together with its value, where an
+  agent or whoever reads the output will see the secrets (API keys, tokens). It reads the syntax
+  tree of a whole Python text, or of each fenced `python` block in a document (up to 20), and
+  follows the names the file imports. It reports `print`, `pprint`, `sys.stdout.write`, a write to a
+  file the program opened for writing, `json.dump`, logging calls that would be shown, and the
+  `data=` or `params=` (or a dict passed as `json=`) of a `requests` or `httpx` call, when what is
+  shown is the environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a
+  value from an unfiltered loop over it. It stays quiet on one named variable, names only, a loop
+  that tests the variable it prints, a precision that cuts the value away, `json.dumps(os.environ)`
+  (which raises), a plain `return`, a comment, a docstring, a test double, a branch it can prove cannot run (a constant or `not <constant>` test of an `if`, `while`, filter or `match` guard, the right side of `False and ...`, code after `return`, the `else` of a `while True` or of a loop over a
+  non-empty literal that always leaves; comparisons, compound tests and empty containers are not folded), output sent to
+  `/dev/null`, and shell or Node text. It is a judgment from syntax, not proof that the code runs: a
+  function that is never called or a dump behind a flag is still reported, an environment copied
+  into another name before it is shown is not followed, code under `if TYPE_CHECKING:` is read like any other (no name is taken for the typing flag), a `map` or generator is read for what it
+  holds, not for whether anything runs it to the end (an unused one, or one that `all`, `any`,
+  `next`, `islice` or a failing `sum` stops, is reported like one that is drained), no more than
+  256 environment names are tracked in one scope, and syntax newer than the Python that runs the scan (a `match`
+  statement before 3.10) is not read. A text the Python parser itself cannot take (too deep, parser
+  stack full) is treated as not Python; a parsed tree too deep for the reader's own walk makes the
+  scan report that inspection was not complete. The pattern count does not move. (C497)
 - `sunglasses doctor --agents` also lists the MCP servers configured for other agents on this machine: the Claude Code files, Cursor, Codex, Gemini CLI and Windsurf, each in the locations its own documentation names. For every file it prints whether it is absent, readable, or `UNREADABLE` with the reason (permission denied, a folder or another kind of file where the file belongs, larger than 1 MiB, not valid JSON or TOML, nested too deeply, a link that leaves the home folder and the project, or a Codex file on a Python older than 3.11, which has no TOML reader). A file is read only if it resolves, through every folder on its path, to a regular file inside the home folder or the project; it is opened without waiting, so a pipe cannot stall this inventory reader. Each server is shown with its name, whether it starts a command or connects to a URL, the command's file name (or `?` when the command holds a space, a quote or an `=`) or the URL's host (or `?` when the URL holds a control character or what it puts there is not a host name; a name with other letters is shown in its ASCII form), and the state `doctor` already gives a server (`WRAPPED`, `DIRECT` or `UNVERIFIED`); environment values, arguments, headers and the rest of a URL are never read into the output, at most 500 servers per file are listed, with the rest counted, and two servers whose names print alike are numbered so each keeps its own row. It reads files only: it changes nothing and starts nothing. The `--json` output gains an `agents` key only with the flag, and without it the output is unchanged. The flag does not change the exit code and cannot be combined with `--config`.
 
 ### Changed
