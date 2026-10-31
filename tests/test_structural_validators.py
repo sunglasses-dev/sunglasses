@@ -535,10 +535,11 @@ def test_the_layer_is_counted_apart_from_the_patterns():
     info = SunglassesEngine().info()
     assert info["validators"] == len(VALIDATORS) == 2
     assert SunglassesEngine(validators=False).info()["validators"] == 0
-    assert info["patterns"] == SunglassesEngine(validators=False).info()["patterns"]
+    assert info["patterns_with_matcher"] == SunglassesEngine(validators=False).info()["patterns_with_matcher"]
     with open(os.path.join(HERE, "..", "stats", "current.json")) as fh:
         stats = json.load(fh)
-    assert info["patterns"] == stats["patterns"]
+    assert info["patterns_with_matcher"] == stats["patterns_with_matcher"]
+    assert info["listed_patterns"] == stats["listed_patterns"]
 
 
 def test_the_validator_is_declared_like_a_rule():

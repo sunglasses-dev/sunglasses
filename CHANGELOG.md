@@ -26,6 +26,14 @@ All notable changes to Sunglasses are documented here.
   `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
   `pip install "sunglasses[media]"`. (C491)
 - The README's normalization count now comes from the code. It said 17, a number nothing counted. `sunglasses/preprocessor.py` lists the steps in `NORMALIZATION_STEPS`, one row per technique, with the keyword lane's function and the regex lane's wider one in the same row: 16. `tools/gen_normalization_stats.py` writes the count into `stats/current.json`. `tests/test_normalization_steps.py` proves each row on a crafted input and checks that the input no longer folds with that row turned off; it also fails when either lane calls, by bare name, a function no row names (for the engine, a preprocessor helper it imports by name), and when the text of a preprocessor function, its imports, any other top-level code in it that is not a data table, or the engine's view builders changes, until a pinned value is updated. Data tables and the rest of the engine are not pinned; the test's docstring lists what is not covered. Scanning is unchanged.
+- The published pattern count is now the number of rules that carry a regex or a keyword matcher: 1,512 of the 1,583
+  rules the ruleset lists. The other 71 (`GLS-SMP-008` and 70 `GLS-V3-*` rows) carry neither, so no scan can report
+  them; they stay listed and are named in a test, and a new rule with no matcher fails that test until it is named.
+  The count says a rule has a matcher, not that every such rule fires; that is tracked separately. `engine.info()` and
+  `stats/current.json` replace `patterns` with `patterns_with_matcher` (1,512) and `listed_patterns` (1,583), so code
+  that reads `patterns` by key fails with a missing key instead of reading an old number; a reader that falls back to a
+  default will not notice, so check yours. `sunglasses info` prints how many listed rules have no matcher. The README
+  and the `scanner_info` tool output carry the new keys, and the README's table and summary lines say "carry a matcher" and "listed" instead of a bare count. A custom ruleset's rows are counted by what each one carries. Scan results are unchanged.
 
 ### Fixed
 

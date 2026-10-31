@@ -2132,6 +2132,16 @@ class SunglassesEngine:
         # Carrier patterns only — this is the number published in version.json and
         # checked against the live site. Mechanisms are reported on their own line.
         self._pattern_count = len(carriers)
+        # A listed rule that has neither a compiled regex nor an indexed keyword has
+        # nothing to match with, so it is listed but not counted as carrying a matcher.
+        # Having a matcher is not proof that the rule fires: a keyword the normalizer
+        # removes, or a regex no input satisfies, still counts. The built-in mechanism
+        # rules are not carriers and are not part of this count. Rows are matched by
+        # object, not by `id`, so a custom row with no `id`, or one that cannot be hashed,
+        # is counted by what it carries and does not stand in for another row.
+        with_matcher = {id(p) for p, _ in self._regex_patterns}
+        with_matcher.update(id(p) for hits in self._keyword_to_patterns.values() for p in hits)
+        self._matcher_count = sum(1 for p in carriers if id(p) in with_matcher)
         self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
         # `info()["keywords"]` and the README's keyword total are two different
@@ -4204,7 +4214,9 @@ class SunglassesEngine:
         """Return engine stats."""
         return {
             "version": __import__('sunglasses').__version__,
-            "patterns": self._pattern_count,
+            # the rules in the ruleset, and how many of them carry a regex or keyword matcher
+            "listed_patterns": self._pattern_count,
+            "patterns_with_matcher": self._matcher_count,
             "mechanisms": self._mechanism_count,
             "validators": len(self._validators),
             # the pre-screen index (excludes the generic keywords listed above)
