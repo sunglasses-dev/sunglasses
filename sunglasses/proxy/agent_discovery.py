@@ -13,7 +13,7 @@ Three rules carry the whole module:
   reached, the command's file name or the URL's host. `env`, `args` and `headers`
   values are never read into a row, so they cannot reach the output.
 * A server's state is `install.classify`'s answer, the same one `doctor` gives for
-  the Claude files: WRAPPED only for an entry that really runs this install's proxy.
+  the Claude Code files: WRAPPED only for an entry that really runs this install's proxy.
 * A file is read only when it resolves to a regular file inside the home folder or
   the project, and is opened without blocking, so a link out of those folders or a
   FIFO cannot make the list read or hang on something else.

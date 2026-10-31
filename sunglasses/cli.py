@@ -4114,7 +4114,7 @@ def main():
                                help="Output the report as JSON")
     doctor_parser.add_argument(
         "--agents", action="store_true",
-        help="Also list the MCP config files of other agents (Cursor, Codex, Gemini CLI, "
+        help="Also list the MCP config files of other agents (Cursor, Codex CLI, Gemini CLI, "
              "Windsurf) and what each holds; read-only, changes and starts nothing")
     doctor_parser.set_defaults(func=cmd_doctor)
 
@@ -4359,7 +4359,7 @@ WHAT IT CHECKS
   source it could not open rather than omitting it.
 
   With --agents it also lists the MCP servers in the config files of other
-  agents (Claude Code, Cursor, Codex, Gemini CLI, Windsurf). Read-only: names
+  agents (Claude Code, Cursor, Codex CLI, Gemini CLI, Windsurf). Read-only: names
   and how each server is reached, never env values, arguments or headers. A
   file it could not read shows UNREADABLE with the reason, never "absent". The
   exit code is not changed by this block.
@@ -4456,7 +4456,7 @@ def cmd_doctor(args, _run=None):
     report = (_run or _doc.run)(sources=sources)
     rendered = _doc.render(report)
     # Opt-in, and a separate block: the headline and the exit code above are about the
-    # Claude route and do not change with what other agents' files hold.
+    # Claude Code route and do not change with what other agents' files hold.
     if getattr(args, "agents", False):
         from .proxy import agent_discovery as _agents
         rendered["agents"] = _agents.discover()
