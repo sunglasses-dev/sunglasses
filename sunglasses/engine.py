@@ -2136,11 +2136,12 @@ class SunglassesEngine:
         # nothing to match with, so it is listed but not counted as carrying a matcher.
         # Having a matcher is not proof that the rule fires: a keyword the normalizer
         # removes, or a regex no input satisfies, still counts. The built-in mechanism
-        # rules are not carriers and are not part of this count. A custom row without
-        # an `id` has no matcher entry to count and builds as it did before.
-        with_matcher = set(self._compiled_by_id)
-        with_matcher.update(p.get("id") for hits in self._keyword_to_patterns.values() for p in hits)
-        self._matcher_count = sum(1 for p in carriers if p.get("id") in with_matcher)
+        # rules are not carriers and are not part of this count. Rows are matched by
+        # object, not by `id`, so a custom row with no `id`, or one that cannot be hashed,
+        # is counted by what it carries and does not stand in for another row.
+        with_matcher = {id(p) for p, _ in self._regex_patterns}
+        with_matcher.update(id(p) for hits in self._keyword_to_patterns.values() for p in hits)
+        self._matcher_count = sum(1 for p in carriers if id(p) in with_matcher)
         self._mechanism_count = len(self._mechanisms)
         self._keyword_count = len(self._keyword_to_patterns)
         # `info()["keywords"]` and the README's keyword total are two different

@@ -151,10 +151,52 @@ def test_the_published_stats_carry_both_numbers_and_not_the_old_key():
     assert "patterns" not in stats, "a reader of the old key must fail, not read a stale number"
 
 
-def test_a_custom_row_without_an_id_still_builds_and_is_not_counted():
+def test_a_custom_row_without_an_id_still_builds_and_is_not_counted_as_carrying_a_matcher():
     live = {"id": "T-1", "name": "live", "category": "x", "severity": "high",
             "channel": ["message"], "description": "d", "keywords": ["zzqx marker phrase"]}
     no_id = {"name": "no id", "category": "x", "severity": "high",
              "channel": ["message"], "description": "d"}
     info = SunglassesEngine(patterns=[live, no_id]).info()
     assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 1)
+
+
+def _row(**more):
+    return {"name": "n", "category": "x", "severity": "high", "channel": ["message"],
+            "description": "d", **more}
+
+
+def test_rows_without_an_id_are_counted_by_what_they_carry():
+    # Two rows with no `id`, neither with a matcher: listed twice, counted never. A row with
+    # no `id` must not stand in for another one that has no `id`.
+    info = SunglassesEngine(patterns=[_row(), _row()]).info()
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 0)
+    live = {"id": "T-1", **_row(keywords=["zzqx marker phrase"])}
+    info = SunglassesEngine(patterns=[live, _row(), _row()]).info()
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (3, 1)
+    # A keyword row with no `id` beside a row with none and no matcher: one counts, one does not.
+    info = SunglassesEngine(patterns=[_row(keywords=["zzqx marker phrase"]), _row()]).info()
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 1)
+
+
+def test_a_row_whose_id_cannot_be_hashed_does_not_break_the_count():
+    live = {"id": "T-1", **_row(keywords=["zzqx marker phrase"])}
+    odd = {"id": ["T-2"], **_row()}
+    info = SunglassesEngine(patterns=[live, odd]).info()
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 1)
+
+
+def test_the_old_key_name_is_not_used_anywhere_it_could_return():
+    # Built from two halves so this file does not contain it.
+    needles = ("detecting" + "_patterns", "_detecting" + "_count")
+    here = pathlib.Path(__file__).resolve()
+    roots = [ROOT / d for d in ("sunglasses", "scripts", "tools", "stats", "tests")]
+    files = [ROOT / "README.md", ROOT / "attack-db" / "README.md", ROOT / "CHANGELOG.md"]
+    for root in roots:
+        files.extend(p for p in root.rglob("*") if p.suffix in (".py", ".json", ".md", ".yml"))
+    hits = []
+    for path in files:
+        if path.resolve() == here or "__pycache__" in path.parts or not path.is_file():
+            continue
+        text = path.read_text(errors="replace")
+        hits.extend(f"{path.relative_to(ROOT)}: {n}" for n in needles if n in text)
+    assert not hits, hits

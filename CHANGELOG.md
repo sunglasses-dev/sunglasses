@@ -33,7 +33,7 @@ All notable changes to Sunglasses are documented here.
   `stats/current.json` replace `patterns` with `patterns_with_matcher` (1,512) and `listed_patterns` (1,583), so code
   that reads `patterns` by key fails with a missing key instead of reading an old number; a reader that falls back to a
   default will not notice, so check yours. `sunglasses info` prints how many listed rules have no matcher. The README
-  and the `scanner_info` tool output carry the new keys. Scan results are unchanged.
+  and the `scanner_info` tool output carry the new keys, and the README's table and summary lines say "carry a matcher" and "listed" instead of a bare count. A custom ruleset's rows are counted by what each one carries. Scan results are unchanged.
 
 ### Fixed
 

@@ -29,11 +29,11 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} indexed keywords ({} declared), {} attack categories (English-first, see [Language coverage](#language-coverage-measured))"
+TEXT_LINE = "- \u2705 Text scanning: {} patterns that carry a matcher ({} listed), {} indexed keywords ({} declared), {} listed categories (English-first, see [Language coverage](#language-coverage-measured))"
 
 
 def _expected_line(stats):
-    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["keywords"]:,}',
+    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["listed_patterns"]:,}', f'{stats["keywords"]:,}',
                             f'{stats["keywords_declared"]:,}', f'{stats["categories"]:,}')
 
 
@@ -41,7 +41,7 @@ def test_sync_readme_rewrites_the_text_scanning_line(tmp_path, monkeypatch):
     """The line must be REWRITTEN, counted, not merely survive the run."""
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_readme")
     stats = sync.get_real_stats()
-    stale = TEXT_LINE.format("1", "2", "3", "4")
+    stale = TEXT_LINE.format("1", "2", "3", "4", "5")
     (tmp_path / "README.md").write_text(f"x\n{stale}\ny\n")
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
     assert sync.sync_readme(stats) is True
@@ -71,9 +71,9 @@ KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns
 
 def _expected_table(stats):
     d, e, i = stats["keywords_declared"], stats["keyword_entries"], stats["keywords"]
-    return [f'| Patterns | {stats["patterns"]:,} |',
+    return [f'| Patterns | {stats["patterns"]:,} carry a matcher ({stats["listed_patterns"]:,} listed) |',
             KEYWORDS_ROW.format(f"{d:,}", f"{e:,}", f"{i:,}", f"{d - i:,}"),
-            f'| Attack categories | {stats["categories"]:,} |']
+            f'| Attack categories | {stats["categories"]:,} listed |']
 
 
 def test_sync_readme_rewrites_every_stats_table_row(tmp_path, monkeypatch):

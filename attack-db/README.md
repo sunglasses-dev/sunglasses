@@ -21,7 +21,6 @@ database is easy to browse, search, and contribute to.
   (2026-09-23: the advisory-only mirror removed. 24 files whose rules were
   retired in #70 had outlived them, because the exporter only ever writes)
 - Community adds new patterns via pull requests
-- The more patterns → the more attacks Sunglasses catches
 
 ## Categories
 

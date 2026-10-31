@@ -2,18 +2,19 @@
 
 `attack-db/README.md` carried three hand-typed figures ("1048 detection
 patterns", "1059 patterns / 65 categories", "its 65 categories") while
-`sunglasses/patterns.py` held 1554 rules in 118 categories. The mirror parity
+`sunglasses/patterns.py` held 1554 rules in 118 categories at the time. The mirror parity
 test keeps the JSON honest; nothing read the prose beside it, so the numbers
 stopped moving the day somebody stopped typing them.
 
 The truth here is `PATTERNS`, the same list the exporter reads, so a figure in
 the README agrees with the scanner or this fails and names the line. Categories
 are counted by rule, not by folder: the exporter folds two category names into
-one folder, and the root README already says 118.
+one folder, and the root README said 118 then.
 """
 import pathlib
 import re
 
+from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
 
 README = pathlib.Path(__file__).resolve().parents[1] / "attack-db" / "README.md"
@@ -56,3 +57,21 @@ def test_the_reader_sees_every_shape_the_readme_has_used():
            "1,554 patterns across 118 categories\n")
     assert [n for _, n in _stated(old, _PATTERN_COUNT)] == [1048, 1059, 1554]
     assert [n for _, n in _stated(old, _CATEGORY_COUNT)] == [65, 65, 65, 118]
+
+
+# The sentence that splits the listed rules into those with a matcher and those without.
+_SPLIT = re.compile(r"\b(\d[\d,]*) of them carry a regex or keyword matcher and (\d[\d,]*) carry none\b", re.I)
+
+
+def test_the_split_sentence_is_the_engines_split():
+    info = SunglassesEngine().info()
+    found = _SPLIT.findall(README.read_text())
+    assert len(found) == 1, f"the README must state the split once, found {found}"
+    carry, none = (int(x.replace(",", "")) for x in found[0])
+    assert (carry, none) == (info["patterns_with_matcher"], info["listed_patterns"] - info["patterns_with_matcher"])
+    assert carry + none == len(PATTERNS)
+
+
+def test_the_reader_sees_the_split_sentence_in_the_shape_the_readme_has():
+    text = "1,583 patterns. These are the listed rules: 9,999 of them carry a regex or keyword matcher and 999 carry none yet."
+    assert [tuple(int(x.replace(",", "")) for x in m) for m in _SPLIT.findall(text)] == [(9999, 999)]
