@@ -3721,84 +3721,63 @@ class SunglassesEngine:
         negated_kw = {}
         negated_regex = {}
 
+        # Step 2a: where each keyword first stands (word-bounded). Both the
+        # Aho-Corasick automaton and the pure-Python scan only answer that one
+        # question; what is done about a hit is the same code below, and hits are
+        # taken in one canonical order (start, end, keyword) whichever answered, so
+        # a scan reports the same findings, order and excerpts with or without
+        # the optional extension.
+        first_hits = {}
         if self._automaton:
-            # Fast path: Aho-Corasick (all keywords at once)
             for end_idx, keyword in self._automaton.iter(normalized):
-                if not self._word_bounded(normalized, end_idx - len(keyword) + 1, keyword):
+                if keyword in first_hits:
                     continue
-                for pattern in self._keyword_to_patterns.get(keyword, []):
-                    if match_channels.isdisjoint(pattern.get("channel", ())):
-                        continue
-                    held = negated_kw.get(pattern["id"])
-                    if held is not None:
-                        here = end_idx - len(keyword) + 1
-                        if not self._negated_here(normalized, here, align, end_idx + 1,
-                                                  pattern["id"] in self._REFUSAL_STRING_RULES):
-                            self._restore_live(held, self._excerpt(normalized, here, end_idx + 1))
-                            del negated_kw[pattern["id"]]
-                        continue
-                    if pattern["id"] in seen_ids or pattern["id"] in candidates:
-                        continue
-                    if pattern["id"] in self._regex_bearing_ids:
-                        # Corroborate, don't stamp: keyword is a hint, the
-                        # pattern's own regex is the verdict (steps 3 / 3.5).
-                        candidates[pattern["id"]] = pattern
-                        continue
-                    seen_ids.add(pattern["id"])
-                    kw_start = end_idx - len(keyword) + 1
-                    finding = {
-                        **pattern,
-                        "matched_text": self._excerpt(normalized, kw_start, end_idx + 1),
-                    }
-                    # Negation context check (skipped for negation_immune patterns —
-                    # e.g. emotional-coercion jailbreaks where "don't" is part of the
-                    # attack template itself, not a warning context)
-                    if not pattern.get("negation_immune") and self._check_negation(
-                            normalized, kw_start, align, end_idx + 1, pattern["id"] in self._REFUSAL_STRING_RULES):
-                        finding["severity"] = "review"
-                        finding["negation_context"] = True
-                        finding["original_severity"] = pattern["severity"]
-                        negated_kw[pattern["id"]] = finding
-                    findings.append(finding)
+                at = end_idx - len(keyword) + 1
+                if self._word_bounded(normalized, at, keyword):
+                    first_hits[keyword] = at
         else:
-            # Fallback: pure Python string matching (no dependencies)
-            for keyword, patterns in self._keyword_to_patterns.items():
+            for keyword in self._keyword_to_patterns:
                 first = self._first_bounded(normalized, keyword)
                 if first is not None:
-                    for pattern in patterns:
-                        if match_channels.isdisjoint(pattern.get("channel", ())):
-                            continue
-                        held = negated_kw.get(pattern["id"])
-                        if held is not None:
-                            live = self._live_occurrence(normalized, keyword, 0, align,
-                                                         pattern["id"] in self._REFUSAL_STRING_RULES)
-                            if live is not None:
-                                self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
-                                del negated_kw[pattern["id"]]
-                            continue
-                        if pattern["id"] in seen_ids or pattern["id"] in candidates:
-                            continue
-                        if pattern["id"] in self._regex_bearing_ids:
-                            candidates[pattern["id"]] = pattern
-                            continue
-                        seen_ids.add(pattern["id"])
-                        idx = first
-                        finding = {
-                            **pattern,
-                            "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
-                        }
-                        refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
-                        if not pattern.get("negation_immune") and self._check_negation(
-                                normalized, idx, align, idx + len(keyword), refusal_ok):
-                            finding["severity"] = "review"
-                            finding["negation_context"] = True
-                            finding["original_severity"] = pattern["severity"]
-                            live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
-                            if live is not None:
-                                self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
-                            else:
-                                negated_kw[pattern["id"]] = finding
-                        findings.append(finding)
+                    first_hits[keyword] = first
+
+        for keyword, first in sorted(
+                first_hits.items(), key=lambda hit: (hit[1], hit[1] + len(hit[0]), hit[0])):
+            patterns = self._keyword_to_patterns[keyword]
+            for pattern in patterns:
+                if match_channels.isdisjoint(pattern.get("channel", ())):
+                    continue
+                held = negated_kw.get(pattern["id"])
+                if held is not None:
+                    live = self._live_occurrence(normalized, keyword, 0, align,
+                                                 pattern["id"] in self._REFUSAL_STRING_RULES)
+                    if live is not None:
+                        self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
+                        del negated_kw[pattern["id"]]
+                    continue
+                if pattern["id"] in seen_ids or pattern["id"] in candidates:
+                    continue
+                if pattern["id"] in self._regex_bearing_ids:
+                    candidates[pattern["id"]] = pattern
+                    continue
+                seen_ids.add(pattern["id"])
+                idx = first
+                finding = {
+                    **pattern,
+                    "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
+                }
+                refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
+                if not pattern.get("negation_immune") and self._check_negation(
+                        normalized, idx, align, idx + len(keyword), refusal_ok):
+                    finding["severity"] = "review"
+                    finding["negation_context"] = True
+                    finding["original_severity"] = pattern["severity"]
+                    live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
+                    if live is not None:
+                        self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
+                    else:
+                        negated_kw[pattern["id"]] = finding
+                findings.append(finding)
 
         # Step 3: Regex patterns (for things like API keys)
         #
