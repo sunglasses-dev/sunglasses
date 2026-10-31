@@ -272,9 +272,10 @@ def _host(url):
     string is refused whole if it holds any control character (the parser is never
     given the chance to strip one), the authority is the one the parser itself found,
     and each label is checked on its own: letters, digits and inner hyphens, 1 to 63
-    characters, 253 in all. A name with other letters is shown in its ASCII
-    (punycode) form, and an `xn--` label must survive a decode and re-encode. An IP
-    literal in square brackets must parse as an address.
+    characters, 253 in all. A name with other letters is shown in the ASCII form
+    IDNA produces (not every such name becomes `xn--`), and an `xn--` label must
+    survive a decode and re-encode. An IP literal in square brackets must parse as
+    an address.
     """
     if url != url.strip() or not url.isprintable():
         return "?"
