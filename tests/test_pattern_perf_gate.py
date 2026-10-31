@@ -103,15 +103,18 @@ class ClockWatch:
     `time_once` running while the nearest caller that holds both floors holds a floor under the production one
     ("measured"), or `judge` being given such floors after the real `time_once` ran in the same test, in any of its
     fixtures or in the test itself ("judged"). A replacement of `time_once` (fixed samples) never runs the real
-    code, so it is never a violation.
+    code, so it is not a violation by itself; a test that also ran the real one earlier is judged as mixed real and
+    fixed work and its `judge` call is recorded.
 
     The watch can only see through the profile functions it installed. Taking one out during a test by calling
     `sys.setprofile` or `threading.setprofile` by name, even to put it back, is a violation ("replaced"); an
     interpreter that drops it (at the recursion limit) shows in `alive`. Events go on to the profile function that
     was in place: the test thread's own, and for a worker the one set for threads. Covered: the test's own thread
-    and threads started while the watch is installed. Not covered: a child process; a measurement made before this
+    and threads started while the watch is installed (a worker that outlives the module puts back what it found at its
+    next event). Not covered: a child process; a measurement made before this
     module's fixture is set up or after it is torn down; a profile function put in and taken out through a reference
-    to either setter taken before this module's fixture ran, or through the C interface; a function whose bytecode,
+    to either setter taken before this module's fixture ran, through the C interface, or by writing the thread
+    module's stored function (`threading._profile_hook`) directly; a function whose bytecode,
     global names or constants differ from the two (a patched copy); and a `time_once` call with no caller that holds
     both floors, which has no floors to compare. The xunit hooks and a floor named in a code string are refused
     statically, and so is any use of the low-level thread interface (`_thread`, which a thread profile
@@ -123,6 +126,9 @@ class ClockWatch:
         self.checked = 0              # how many of them a test or module teardown has already reported
         self.real_in = set()          # ids of the tests in which the real time_once ran (setup, call and teardown count as one test)
         self.muted = False
+        self._off = False
+        self._epoch = 0               # which install a thread belongs to, so a worker that outlives its install lets go of the hook
+        self._epoch_of = {}           # thread id -> the install it was first seen in
         self._previous = None
         self._thread_previous = None
         self._owner = None
@@ -132,6 +138,9 @@ class ClockWatch:
         self._previous = sys.getprofile()
         self._thread_previous = getattr(threading, "getprofile", lambda: threading._profile_hook)()   # getprofile: 3.10 and later
         self._owner = threading.get_ident()
+        self._epoch += 1
+        self._off = False
+        self._epoch_of[self._owner] = self._epoch
         self._set_profile = sys.setprofile
         self._set_thread_profile = threading.setprofile
         self._set_profile(self._hook)
@@ -140,6 +149,7 @@ class ClockWatch:
         threading.setprofile = self._refuse_a_thread_replacement
 
     def uninstall(self):
+        self._off = True
         sys.setprofile = self._set_profile
         threading.setprofile = self._set_thread_profile
         self._set_profile(self._previous)
@@ -206,6 +216,13 @@ class ClockWatch:
         return known[1]
 
     def _hook(self, frame, event, arg):
+        thread = threading.get_ident()
+        if self._off or self._epoch_of.setdefault(thread, self._epoch) != self._epoch:
+            # a worker that outlived the install it started under: its next event puts back what it found, so no
+            # module's hook stays in a thread the module no longer watches
+            if thread != self._owner:
+                self._set_profile(self._thread_previous)
+            return
         if event == "call" and not self.muted:
             try:
                 self._look_at(frame)
@@ -1678,6 +1695,34 @@ def test_a_call_made_before_the_floors_are_bound_is_neither_a_crash_nor_a_pass_f
         measures_before_it_holds_floors()
         assert watch.alive()
     assert [v[1] for v in _measured(watch)] == [(0, 0)]
+
+
+@pytest.mark.parametrize("installed_again", [False, True])
+def test_a_worker_that_outlives_its_install_takes_the_hook_off_itself(installed_again):
+    started, go, seen = threading.Event(), threading.Event(), []
+
+    def work():
+        started.set()
+        go.wait(10)
+        seen.append(sys.getprofile())
+    with WATCH.silenced():
+        local = ClockWatch()
+        local.install()
+        worker = threading.Thread(target=work)
+        try:
+            worker.start()
+            assert started.wait(10)
+        finally:
+            local.uninstall()
+        if installed_again:
+            local.install()                       # a later install is not this worker's
+        try:
+            go.set()
+            worker.join(10)
+        finally:
+            if installed_again:
+                local.uninstall()
+    assert len(seen) == 1 and seen[0] != local._hook
 
 
 def test_the_watch_hands_every_event_on_to_the_profiler_it_found():
