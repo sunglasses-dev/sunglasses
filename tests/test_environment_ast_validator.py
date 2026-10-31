@@ -508,8 +508,41 @@ R1_QUIET = {
     "format_long_index_but_valid_digits": "import os\nprint('{1234567890}'.format(os.environ))\n",
 }
 
-ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES}
-ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET}
+R2_QUIET = {
+    # a generator runs its filters, later iterables and element only when something consumes it
+    "unused_generator_filter_prints": "import os\npending = (value for value in os.environ.values() if print(os.environ))\n",
+    "unused_generator_later_iterable": "import os\npending = (value for value in [1] for other in [print(os.environ)])\n",
+    # nothing gets past a filter that is never true, in a list comprehension too
+    "false_filter_then_filter_prints": "import os\n[value for value in [1] if False if print(os.environ)]\n",
+    "false_filter_then_later_iterable": "import os\n[value for value in [1] if False for other in [print(os.environ)]]\n",
+    # a consumer that stops early, or one that fails on the first value, shows part of it
+    "all_stops_at_the_first_falsy": "import os\nall(print(value) for value in os.environ.values())\n",
+    "any_stops_at_the_first_truthy": "import os\nany(print(value) or True for value in os.environ.values())\n",
+    "for_break_over_map": "import os\nfor unused in map(print, os.environ.values()):\n    break\n",
+    "dict_of_map_print_raises": "import os\ndict(map(print, os.environ.values()))\n",
+    "sum_of_map_print_raises": "import os\nsum(map(print, os.environ.values()))\n",
+    "min_of_map_print_raises": "import os\nmin(map(print, os.environ.values()))\n",
+    "max_of_map_print_raises": "import os\nmax(map(print, os.environ.values()))\n",
+    # a name bound again is not the logger any more
+    "logger_rebound_to_another_object": "import os, logging\nlogger = logging.getLogger()\nclass Widget:\n    def setLevel(self, n):\n        pass\nlogger = Widget()\nlogger.setLevel(10)\nlogging.debug('%s', os.environ)\n",
+    # a conditional on a negated constant
+    "not_false_else_arm": "import os\nif not False:\n    pass\nelse:\n    print(os.environ)\n",
+}
+
+R2_FIRES = {
+    # the same shapes, consumed all the way, still show everything
+    "consumed_generator_filter_prints": "import os\nlist(value for value in os.environ.values() if print(os.environ))\n",
+    "consumed_generator_later_iterable": "import os\nlist(1 for value in [1] for other in [print(os.environ)])\n",
+    "list_comprehension_first_iter_prints": "import os\n[value for value in [print(os.environ)]]\n",
+    "for_over_map_without_exit": "import os\nfor unused in map(print, os.environ.values()):\n    pass\n",
+    "list_of_map_print": "import os\nlist(map(print, os.environ.values()))\n",
+    "sum_with_int_result_generator": "import os\nsum(len(print(v) or '') for v in os.environ.values())\n",
+    "any_over_map_print_goes_on": "import os\nany(map(print, os.environ.values()))\n",
+    "logger_bound_once_set_level": "import os, logging\nlogger = logging.getLogger()\nlogger.setLevel(10)\nlogging.debug('%s', os.environ)\n",
+}
+
+ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES}
+ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET, **R2_QUIET}
 
 
 def test_the_tables_do_not_overlap():

@@ -8,24 +8,25 @@ All notable changes to Sunglasses are documented here.
 ### Added
 
 - `GLS-STRUCT-005` reports, for review (`quarantine`, never a block), Python code that reads as
-  printing, logging, writing or sending every environment variable together with its value, where
-  an agent or whoever reads the output will see the secrets (API keys, tokens). It reads the syntax
-  tree of a whole Python text, or of each fenced `python` block in a document (up to 20), and follows
-  the names the file imports. It reports `print`, `pprint`, `sys.stdout.write`, a write to a file the
-  program opened for writing, `json.dump`, logging calls that would be shown, and the `data=` or
-  `params=` (or a dict passed as `json=`) of a `requests` or `httpx` call, when what is shown is the
-  environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a value from an
-  unfiltered loop over it. It stays quiet on one named variable, names only, a loop that tests the
-  variable it prints, a precision that cuts the value away, `json.dumps(os.environ)` (which raises),
-  a plain `return`, a comment, a docstring, a test double, a `map` or generator that nothing runs, a
-  branch that cannot run (`if False`, `False and ...`), output sent to `/dev/null`, and shell or Node
-  text. It is a judgment
-  from syntax, not proof that the code runs: a function that is never called or a dump behind a flag
-  is still reported, an environment copied into another name before it is shown is not followed, and
-  syntax newer than the Python that runs the scan (a `match` statement before 3.10) is not read.
-  A text the Python parser itself cannot take (too deep, parser stack full) is treated as not Python;
-  a parsed tree too deep for the reader's own walk makes the scan report that inspection was not
-  complete. The pattern count does not move. (C497)
+  printing, logging, writing or sending every environment variable together with its value, where an
+  agent or whoever reads the output will see the secrets (API keys, tokens). It reads the syntax
+  tree of a whole Python text, or of each fenced `python` block in a document (up to 20), and
+  follows the names the file imports. It reports `print`, `pprint`, `sys.stdout.write`, a write to a
+  file the program opened for writing, `json.dump`, logging calls that would be shown, and the
+  `data=` or `params=` (or a dict passed as `json=`) of a `requests` or `httpx` call, when what is
+  shown is the environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a
+  value from an unfiltered loop over it. It stays quiet on one named variable, names only, a loop
+  that tests the variable it prints, a precision that cuts the value away, `json.dumps(os.environ)`
+  (which raises), a plain `return`, a comment, a docstring, a test double, a `map` or generator that
+  nothing runs to the end (an unused generator, or one that `all`, a `break` or a `sum` of `None`
+  items cuts short), a branch that cannot run (`if False`, `False and ...`), output sent to
+  `/dev/null`, and shell or Node text. It is a judgment from syntax, not proof that the code runs: a
+  function that is never called or a dump behind a flag is still reported, an environment copied
+  into another name before it is shown is not followed, a generator handed to a function the rule
+  does not know is not followed, and syntax newer than the Python that runs the scan (a `match`
+  statement before 3.10) is not read. A text the Python parser itself cannot take (too deep, parser
+  stack full) is treated as not Python; a parsed tree too deep for the reader's own walk makes the
+  scan report that inspection was not complete. The pattern count does not move. (C497)
 
 ### Changed
 

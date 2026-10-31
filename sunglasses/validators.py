@@ -1595,9 +1595,14 @@ _BUILTINS = frozenset((
     "any", "all", "sum", "min", "max", "set", "frozenset", "exit", "quit",
 ))
 _BARE_MODULES = frozenset(("os", "sys", "json", "logging", "requests", "httpx", "pprint"))
-_EAGER = frozenset(("builtins.list", "builtins.tuple", "builtins.sorted", "builtins.any", "builtins.all",
-                    "builtins.sum", "builtins.min", "builtins.max", "builtins.dict", "builtins.set",
+_EAGER = frozenset(("builtins.list", "builtins.tuple", "builtins.sorted", "builtins.set",
                     "builtins.frozenset", "collections.deque"))
+# these run a generator to its end only while its items are values they accept: a ``print`` result (None) stops
+# ``dict`` / ``sum`` / ``min`` / ``max`` after the first or second item with a TypeError. ``all`` stops at the
+# first falsy item and ``any`` at the first truthy one: ``any`` goes through the ``None`` items of a ``print`` and
+# is read as a consumer only for those; ``all`` never is.
+_EAGER_VALUES = frozenset(("builtins.sum", "builtins.min", "builtins.max", "builtins.dict"))
+_NONE_MAPPERS = frozenset(("builtins.print", "pprint.pprint"))
 _EXIT_CALLS = frozenset(("sys.exit", "os._exit", "builtins.exit", "builtins.quit"))
 _LOG_HIGH = {"warning": 30, "warn": 30, "error": 40, "exception": 40, "critical": 50, "fatal": 50}
 _LOG_LOW = {"debug": 10, "info": 20}
@@ -1744,6 +1749,9 @@ def _truth(test):
         return False
     if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
         return False
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        inner = _truth(test.operand)
+        return None if inner is None else not inner
     return None
 
 
@@ -1869,8 +1877,8 @@ class _EnvironmentReader:
                 self.replaced = True            # the program binds os.environ to something of its own
         for call in calls:
             self._note_logging_call(call)
-        self._consumers()
         self._note_exits(self.tree.body)
+        self._consumers()
 
     def _note_binding(self, name, value):
         if self._opened_for_writing(value):
@@ -1899,16 +1907,18 @@ class _EnvironmentReader:
         if isinstance(node, ast.Call):
             return self.qual(node.func) == "logging.getLogger"
         if isinstance(node, ast.Name):
-            return node.id in self.loggers
+            return self._bound_once(node, self.loggers)
         return self.qual(node) == "logging.root"
 
     def _consumers(self):
         """Fill ``self.consumed``: the lazy ``map`` calls and generator expressions that a ``for``, a list or tuple
-        built from them, ``any`` / ``all`` / ``sum`` and the like, ``*`` unpacking, ``yield from`` or ``str.join``
-        run to the end. A bare ``map(print, ...)`` or an unused generator prints nothing."""
+        built from them, ``sorted`` and the like, ``*`` unpacking, ``yield from`` or ``str.join`` run to the
+        end. A bare ``map(print, ...)`` or an unused generator prints nothing, and neither does the rest of one
+        that a ``break`` / ``return`` leaves, that ``any`` / ``all`` stop, or that ``sum`` / ``dict`` / ``min``
+        / ``max`` cannot go on with once an item is the ``None`` that ``print`` returns."""
         for node in ast.walk(self.tree):
             if isinstance(node, (ast.For, ast.AsyncFor)):
-                lazy = [node.iter]
+                lazy = [] if self.exits.get(id(node)) else [node.iter]
             elif isinstance(node, ast.comprehension):
                 lazy = [node.iter]
             elif isinstance(node, (ast.Starred, ast.YieldFrom)):
@@ -1917,6 +1927,10 @@ class _EnvironmentReader:
                 made = self.qual(node.func)
                 joins = isinstance(node.func, ast.Attribute) and node.func.attr == "join" and _is_text(node.func.value)
                 lazy = node.args if (made in _EAGER or joins) else []
+                if made in _EAGER_VALUES:
+                    lazy = [item for item in node.args if not self._yields_none(item)]
+                elif made == "builtins.any":
+                    lazy = [item for item in node.args if self._yields_none(item)]   # None is falsy: any() goes on
             else:
                 continue
             for item in lazy:
@@ -1924,6 +1938,15 @@ class _EnvironmentReader:
                     item = item.value
                 if isinstance(item, (ast.GeneratorExp, ast.Call)):
                     self.consumed.add(id(item))
+
+    def _yields_none(self, item):
+        """A ``map`` of ``print`` or a generator whose element is a ``print`` / ``logging`` call: items of ``None``."""
+        if isinstance(item, ast.GeneratorExp):
+            made = self.qual(item.elt.func) if isinstance(item.elt, ast.Call) else None
+            return bool(made) and (made in _NONE_MAPPERS or made.startswith("logging."))
+        if isinstance(item, ast.Call) and self.qual(item.func) == "builtins.map" and item.args:
+            return self.qual(item.args[0]) in _NONE_MAPPERS
+        return False
 
     def _level(self, node):
         if isinstance(node, ast.Constant):
@@ -2449,18 +2472,19 @@ class _EnvironmentReader:
                     inner = _NO_CTX
         elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
             inner = ctx
-            runs = True
-            for generator in node.generators:
-                self._expr(generator.iter, inner)
+            self._expr(node.generators[0].iter, inner)      # the first iterable is evaluated at once, always
+            if isinstance(node, ast.GeneratorExp) and id(node) not in self.consumed:
+                return                      # a generator nothing runs does not execute the rest of itself
+            for index, generator in enumerate(node.generators):
+                if index:
+                    self._expr(generator.iter, inner)
                 inner = self.bind(inner, generator.target, generator.iter)
                 for cond in generator.ifs:
                     self._expr(cond, inner)
                     if _truth(cond) is False:
-                        runs = False        # nothing gets past a filter that is never true
+                        return              # nothing gets past a filter that is never true
                     if inner.live() and _count_loads(cond, inner.names()):
                         inner = _NO_CTX
-            if not runs or (isinstance(node, ast.GeneratorExp) and id(node) not in self.consumed):
-                return                      # a generator nothing runs does not execute its body
             for part in ((node.key, node.value) if isinstance(node, ast.DictComp) else (node.elt,)):
                 self._expr(part, inner)
         elif isinstance(node, ast.Lambda):
