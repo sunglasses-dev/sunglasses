@@ -383,7 +383,7 @@ class Log:
         if self._chain is None:
             # OPENED NOW, not on the first event. A log created lazily cannot
             # record a failure that happens before it, which is exactly the
-            # window R1 is closing by saying "opened before the first frame".
+            # window this closes by saying "opened before the first frame".
             try:
                 self._handle = self.path.open("a", encoding="utf-8")
             except OSError as cause:

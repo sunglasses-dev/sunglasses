@@ -2691,7 +2691,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
     _, rec_path, pending_path, bytes_path = _records_dir(home, name)
     _refuse_symlinked_storage(name, rec_path, pending_path, bytes_path)
 
-    # R4. A completed record means an
+    # A completed record means an
     # install is OUTSTANDING, and its retained bytes are the only way back to
     # the state it captured. Overwriting it destroys that, which is what
     # happened when a config was edited back to unwrapped and installed again:

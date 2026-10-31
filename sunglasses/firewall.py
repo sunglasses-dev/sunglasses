@@ -1676,7 +1676,7 @@ def _restrict(path, mode: int) -> None:
 
 
 # ── Receipt field sanitize ──────────────────────────────────────────────────
-# Audit finding H2. `tool_name` is chosen by the MCP server, i.e. by the party the
+# `tool_name` is chosen by the MCP server, i.e. by the party the
 # pin lane exists to defend against, and it was stored and re-rendered verbatim. A
 # name carrying ANSI escapes made `sunglasses receipts` clear the screen and print a
 # forged all-clear; an embedded newline forged an extra row; a 300-character name

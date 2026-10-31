@@ -125,7 +125,7 @@ CONTROL_PREFIX = "sg-"
 
 # contract row 6.6. Bounded, because a tombstone table that grows with the session is a
 # memory bound a peer controls.
-# F1. How many times an answer may be re-derived because an
+# How many times an answer may be re-derived because an
 # authority landed while it was being prepared. The precedence allows two
 # changes (None -> DESCRIPTOR_CHANGED -> REQUEST_CANCELLED) and each is
 # terminal once accepted, so this is slack above the reachable maximum
@@ -466,7 +466,7 @@ class Session:
         self._authority_observed = None
         # identity -> the core key whose generation this record answers.
         self._settling_key: dict = {}
-        # F2. CLIENT IDS ADMITTED AND NOT YET ANSWERED ON THE WIRE.
+        # CLIENT IDS ADMITTED AND NOT YET ANSWERED ON THE WIRE.
         #
         # Kept HERE and not on the route because admission is the session's
         # event however the caller reached it -- test controls admit
@@ -476,7 +476,7 @@ class Session:
         # `_settling` and the core all agree there is nothing outstanding while
         # the client has received no bytes at all. Retirement is not answering;
         # a frame reaching the sink is.
-        # F2. KEYED BY TOKEN, never by bare request id. The
+        # KEYED BY TOKEN, never by bare request id. The
         # session's own tables key on `key(origin, request_id)` -- which
         # carries the JSON TYPE -- precisely because 1 and 1.0 are different
         # ids to a peer and the same key to Python: `{1, 1.0}` is `{1}`. Two
@@ -2378,7 +2378,7 @@ class Session:
                     withheld = self._final_decision(identity[2], withheld)
                     # The epoch the decision that leaves this block was derived
                     # from, carried to the retirement with the frame built from
-                    # it. F1.
+                    # it.
                     observed = self._authority_observed
                     if withheld is not None and self._handoff_frame is not None:
                         # STILL OWED. The frame below is prepared by code
@@ -2386,7 +2386,7 @@ class Session:
                         # separately after the retirement (a receipt that
                         # cannot be written closes the session), so the
                         # obligation is put back and stays on the books until
-                        # the frame exists. Round 4 removed it here and the
+                        # the frame exists. An earlier version removed it here and the
                         # close that followed found nothing to retain, so the
                         # client got no answer at all.
                         self._settling.add(identity)
@@ -2404,7 +2404,7 @@ class Session:
                         rule="S3", kind="HANDOFF_GENERATION_MISMATCH")
             return b""
         if withheld is None and self._handoff_record is not None:
-            # F1. THE HANDOFF IS THE SINGLE RECORDER, for the AUTHORITY answer and
+            # THE HANDOFF IS THE SINGLE RECORDER, for the AUTHORITY answer and
             # for two further shapes.
             #
             # The inspection seam built its replacement through
@@ -2434,7 +2434,7 @@ class Session:
             # the retirement, and a failed write answers by calling `_close`,
             # which takes this same non-reentrant lock, which would deadlock.
             #
-            # F1. AND IN A BOUNDED LOOP, because an authority accepted
+            # AND IN A BOUNDED LOOP, because an authority accepted
             # during the build invalidates the frame just built. The bound is
             # not arbitrary: the precedence is recorded-S3 > cancellation >
             # invalidation, and each is terminal once accepted, so the answer

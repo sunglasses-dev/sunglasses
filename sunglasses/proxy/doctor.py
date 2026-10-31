@@ -339,7 +339,7 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
         # reported as ABSENT: never named, never counted unreadable, and the
         # run exited 0 while the other source read WRAPPED. "I could not look"
         # collapsed into "there was nothing to see", which is the single
-        # collapse R3 exists to prevent, and it collapsed the safe way round.
+        # collapse this rule exists to prevent, and it collapsed the safe way round.
         #
         # We probe by READING. An error on a real path is operational, is
         # named, and drives exit 2.

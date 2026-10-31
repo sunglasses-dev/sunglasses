@@ -137,7 +137,7 @@ class QRExtractor:
                 f"only the first frame was inspected for QR codes")
 
         if iterator is None:
-            # Fall back to the frame PIL already has open. This is the I1 case: the
+            # Fall back to the frame PIL already has open. This is the unreadable-sequence case: the
             # sequence is unreadable, frame 0 is not, and frame 0 is where the
             # known finding lives.
             try:
@@ -267,7 +267,7 @@ def scan_qr(image_path: str, engine=None) -> dict:
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3). A public entry
+    # Invariant B. A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -276,8 +276,8 @@ def scan_qr(image_path: str, engine=None) -> dict:
     _probe_readable(image_path)
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
-    # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Without it these five let ImportError and decoder errors escape
+    # traceback -- the same contract `dispatch` already applies to these formats.
+    # Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:

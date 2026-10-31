@@ -3003,7 +3003,7 @@ def cmd_receipts(args):
             return code
 
         # A receipts file is bytes on disk: it may predate the write-side sanitize
-        # (audit H2) or have been edited since. Everything pulled out of it is treated
+        # or have been edited since. Everything pulled out of it is treated
         # as untrusted before it reaches the terminal.
         colors = {"deny": RED, "ask": YELLOW, "defer": DIM, "allow": GREEN}
         print(f"\n  {BOLD}SUNGLASSES firewall receipts{RESET} {DIM}({len(rows)} calls, "
@@ -4415,7 +4415,7 @@ def cmd_doctor(args, _run=None):
         # So we refuse, in `install`'s shape and with `install`'s code, because
         # "point it at a path that does not exist and it refuses, naming the
         # file" is already this product's documented answer. Exit 2 does not
-        # contend with R3's `1 > 2` precedence: nothing ran, so there is no
+        # contend with the `1 > 2` precedence: nothing ran, so there is no
         # self-test verdict for it to outrank.
         if not target.exists():
             print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "

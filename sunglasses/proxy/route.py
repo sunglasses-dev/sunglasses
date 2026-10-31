@@ -154,7 +154,7 @@ class Route:
                         else inspection.trusted_catalog())
         self.approvals = approvals
         self.descriptor_sha_for = descriptor_sha_for or (lambda name: None)
-        # F2. THE CLIENTS THE SESSION STILL OWES A FRAME: its `_unanswered`
+        # THE CLIENTS THE SESSION STILL OWES A FRAME: its `_unanswered`
         # set, keyed by attempt token and taken one at a time by
         # `_pay_bounded_refusals`.
         #
@@ -276,7 +276,7 @@ class Route:
         the half without it is the half that carries what a compromised server
         said.
         """
-        # F3. TAKEN BEFORE THE AUTHORISATION, not cleared after the
+        # TAKEN BEFORE THE AUTHORISATION, not cleared after the
         # write. The window between committing to a release and clearing the
         # id let a concurrent receipt failure pay a client whose frame was
         # already on its way, so the original AND a bounded refusal both
@@ -414,7 +414,7 @@ class Route:
         """
         if request_id is NO_ID:
             return None
-        # F1. THE ADAPTER, and the name is why it is still here. This
+        # THE ADAPTER, and the name is why it is still here. This
         # attribute is wrapped by test controls and its calls are COUNTED
         # (a test asserts exactly two), so the decision it
         # returns had to become reachable from somewhere that is not a call to
@@ -547,7 +547,7 @@ class Route:
                                          REASON_UNINSPECTED_METHOD,
                                          RULE_ADMISSION, record=False)
 
-        # contract row 2.4, R9 and R11. Binary content is UNSUPPORTED and the WHOLE
+        # contract row 2.4. Binary content is UNSUPPORTED and the WHOLE
         # message is withheld. Skipping the blob and inspecting the rest
         # reports a clean scan of a message we did not read.
         if selector.unsupported(method, surface) is not None:

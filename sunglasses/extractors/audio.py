@@ -185,7 +185,7 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3). A public entry
+    # Invariant B. A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -194,8 +194,8 @@ def scan_audio(audio_path: str, engine=None, whisper_model: str = "base") -> dic
     _probe_readable(audio_path)
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
-    # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Without it these five let ImportError and decoder errors escape
+    # traceback -- the same contract `dispatch` already applies to these formats.
+    # Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:
