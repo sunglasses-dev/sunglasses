@@ -149,3 +149,127 @@ NOT_FLAGGED_ON_PURPOSE = {
 def test_stated_limits_are_not_flagged(engine, name):
     assert RULE not in _ids(engine, NOT_FLAGGED_ON_PURPOSE[name]), name
 
+
+# Round r2: the public-host exemption is read against the URL authority, not against a prefix of the text.
+def _shapes(url):
+    return {
+        "heredoc": "cat > .npmrc << EOF\nregistry=%s\nEOF\n" % url,
+        "echo": 'echo "registry=%s" >> .npmrc\n' % url,
+        "npm_set": "npm config set registry %s\n" % url,
+        "pip_set": "pip config set global.index-url %s\n" % url,
+        "variable": 'CORP_REGISTRY="%s"\ncat > .npmrc << EOF\nregistry=${CORP_REGISTRY}\nEOF\n' % url,
+    }
+
+
+# The exempt name is followed by more host (a suffix label), or sits in the user-info part in front of another host.
+NOT_THE_PUBLIC_HOST = {
+    "suffix_label": "https://registry.npmjs.org.mirror.example/",
+    "user_info": "https://registry.npmjs.org@npm.mirror.example/",
+    "user_info_port": "https://registry.npmjs.org:80@npm.mirror.example/",
+    "pypi_suffix": "https://pypi.org.mirror.example/simple",
+    "pypi_user_info_password": "https://pypi.org:pw@npm.mirror.example/simple",
+    "third_party_public_mirror": "https://registry.npmmirror.com/",
+    "public_name_with_credentials": "https://user:pw@registry.npmjs.org/",
+}
+PUBLIC_HOST_FORMS = {
+    "plain": "https://registry.npmjs.org/",
+    "port": "https://registry.npmjs.org:443/",
+    "trailing_dot": "https://registry.npmjs.org./",
+    "www_subdomain": "https://www.pypi.org/simple",
+    "upper_case": "HTTPS://REGISTRY.NPMJS.ORG/",
+    "legacy_pypi_host": "https://pypi.python.org/simple",
+    "yarn_host": "https://registry.yarnpkg.com",
+    "github_packages": "https://npm.pkg.github.com",
+    "pythonhosted": "https://files.pythonhosted.org/simple",
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_shapes("x")))
+@pytest.mark.parametrize("name", sorted(NOT_THE_PUBLIC_HOST))
+def test_a_host_that_only_starts_like_a_public_one_is_found(engine, name, shape):
+    text = _shapes(NOT_THE_PUBLIC_HOST[name])[shape]
+    assert RULE in _ids(engine, text), (name, shape)
+
+
+@pytest.mark.parametrize("shape", sorted(_shapes("x")))
+@pytest.mark.parametrize("name", sorted(PUBLIC_HOST_FORMS))
+def test_the_public_host_in_its_ordinary_spellings_stays_quiet(engine, name, shape):
+    text = _shapes(PUBLIC_HOST_FORMS[name])[shape]
+    assert RULE not in _ids(engine, text), (name, shape)
+
+
+R2_ATTACKS = {
+    "dockerfile_run": "RUN npm config set registry https://npm.mirror.example/\n",
+    "chain_without_space": "cd app&&npm config set registry https://npm.mirror.example/\n",
+    "command_wrapper": "command npm config set registry https://npm.mirror.example/\n",
+    "absolute_path": "/usr/local/bin/npm config set registry https://npm.mirror.example/\n",
+    "quoted_key": 'npm config set "registry" "https://npm.mirror.example/"\n',
+    "key_equals_value": "npm config set registry=https://npm.mirror.example/\n",
+    "global_flag_first": "npm -g config set registry https://npm.mirror.example/\n",
+    "npm_set_short": "npm set registry https://npm.mirror.example/\n",
+    "pip_install_section": "pip config set install.index-url https://pypi.mirror.example/simple\n",
+    "variable_with_digit": 'MIRROR_REGISTRY2="https://npm.mirror.example"\ncat > .npmrc << EOF\nregistry=$MIRROR_REGISTRY2\nEOF\n',
+    "variable_bare_name": 'REGISTRY="https://npm.mirror.example"\ncat > .npmrc << EOF\nregistry=${REGISTRY}\nEOF\n',
+    "fifth_body_line": 'cat > .npmrc << EOF\nsave-exact=true\nfund=false\naudit=false\nloglevel=warn\nregistry=https://npm.mirror.example/\nEOF\n',
+    "then_on_one_line": "if [ -f package.json ]; then npm config set registry https://npm.mirror.example/; fi\n",
+    "indented_after_semicolon": "set -e; npm config set registry https://npm.mirror.example/\n",
+    "echo_single_quotes": "echo 'registry=https://npm.mirror.example/' >> .npmrc\n",
+    "echo_unquoted": "echo registry=https://npm.mirror.example/ >> .npmrc\n",
+    "heredoc_dash": "cat > .npmrc <<-EOF\n\tregistry=https://npm.mirror.example/\nEOF\n",
+}
+
+R2_BENIGN = {
+    "comment_after_separator": "echo hi; # npm config set registry https://npm.mirror.example/\n",
+    "comment_before_separator": "# done && npm config set registry https://npm.mirror.example/\n",
+    "comment_after_then": "# if x; then npm config set registry https://npm.mirror.example/\n",
+    "comment_pip_after_separator": "true && # pip config set global.index-url https://pypi.mirror.example/simple\n",
+    "comment_echo_after_separator": 'cd x; # echo "registry=https://npm.mirror.example/" >> .npmrc\n',
+    "log_line_quoted_command": 'echo "run: npm config set registry https://npm.mirror.example/ to use the mirror"\n',
+    "log_line_quoted_chain": 'echo "step done; npm config set registry https://npm.mirror.example/"\n',
+    "log_line_quoted_redirect": 'echo "wrote registry=https://npm.mirror.example/ >> .npmrc"\n',
+    "prose_conditional": "If you need the mirror, then npm config set registry https://npm.mirror.example/ works.\n",
+    "backup_echo": 'echo "registry=https://npm.mirror.example/" >> .npmrc.bak\n',
+    "backup_heredoc": "cat > .npmrc.orig << EOF\nregistry=https://npm.mirror.example/\nEOF\n",
+    "backup_pip_conf": "cat > pip.conf.backup << EOF\nindex-url = https://pypi.mirror.example/simple\nEOF\n",
+    "prefixed_file_name": 'echo "registry=https://npm.mirror.example/" >> my.npmrc\n',
+    "key_with_longer_name": 'echo "myregistry=https://npm.mirror.example/" >> .npmrc\n',
+    "key_with_prefix_name": 'echo "npm_config_registry=https://npm.mirror.example/" >> .npmrc\n',
+    "completed_empty_heredoc": "cat > .npmrc << EOF\nEOF\nregistry=https://npm.mirror.example/\n",
+    "quoted_delimiter_variable": 'CORP_REGISTRY="https://npm.mirror.example"\ncat > .npmrc << \'EOF\'\nregistry=${CORP_REGISTRY}\nEOF\n',
+    "variable_into_backup": 'CORP_REGISTRY="https://npm.mirror.example"\ncat > .npmrc.bak << EOF\nregistry=$CORP_REGISTRY\nEOF\n',
+    "setting_after_the_delimiter": "cat > .npmrc << EOF\nsave-exact=true\nEOF\nregistry=https://npm.mirror.example/\n",
+}
+
+
+@pytest.mark.parametrize("name", sorted(R2_ATTACKS))
+def test_r2_shapes_are_found(engine, name):
+    assert RULE in _ids(engine, R2_ATTACKS[name]), name
+
+
+@pytest.mark.parametrize("name", sorted(R2_BENIGN))
+def test_r2_benign_text_stays_quiet(engine, name):
+    assert RULE not in _ids(engine, R2_BENIGN[name]), name
+
+
+# Stated limits added in r2, each NOT flagged.
+R2_NOT_FLAGGED_ON_PURPOSE = {
+    # The heredoc opener comes before the redirect.
+    "opener_before_redirect": "cat << EOF > .npmrc\nregistry=https://npm.mirror.example/\nEOF\n",
+    # The text is piped into tee instead of redirected.
+    "pipe_into_tee": 'echo "registry=https://npm.mirror.example/" | tee .npmrc\n',
+    # A global option that takes a value in front of the config subcommand.
+    "option_with_value": "npm --prefix app config set registry https://npm.mirror.example/\n",
+    # A URL held in a variable whose name does not carry registry, mirror or index.
+    "generic_variable_name": 'UPSTREAM_URL="https://npm.mirror.example"\ncat > .npmrc << EOF\nregistry=${UPSTREAM_URL}\nEOF\n',
+    # The setting more than eight lines into the heredoc body.
+    "setting_past_the_window": "cat > .npmrc << EOF\n" + "a=b\n" * 9 + "registry=https://npm.mirror.example/\nEOF\n",
+    # Quoting the whole command word.
+    "quoted_command_word": "'npm' config set registry https://npm.mirror.example/\n",
+    # Printing through a line continuation.
+    "continued_command": "npm config set \\\n  registry https://npm.mirror.example/\n",
+}
+
+
+@pytest.mark.parametrize("name", sorted(R2_NOT_FLAGGED_ON_PURPOSE))
+def test_r2_stated_limits_are_not_flagged(engine, name):
+    assert RULE not in _ids(engine, R2_NOT_FLAGGED_ON_PURPOSE[name]), name
