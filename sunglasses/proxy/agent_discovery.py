@@ -21,6 +21,7 @@ Three rules carry the whole module:
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import os
 import pathlib
 import re
@@ -259,17 +260,24 @@ def _state(spec, artifact):
         return UNVERIFIED
 
 
-_HOST = re.compile(r"[a-z0-9]([a-z0-9._-]*[a-z0-9])?\Z")
-_HOST_V6 = re.compile(r"[0-9a-f:.]+\Z")
+_LABEL = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\Z")
 
 
 def _host(url):
     """The URL's host name when it is one, else `?`.
 
     The parser's hostname is not a check: it keeps a backslash, an encoded slash, an
-    `=` or a space inside what it calls the host, and the secret a caller put there
-    would be shown. Only letters, digits, dots and hyphens (or an IP literal) pass.
+    `=` or a space inside what it calls the host, it erases a tab or a line break
+    before anything can look at it, and the secret a caller put there would be shown.
+    So the raw authority is looked at first (no control character, no space), then
+    each label is checked on its own: letters, digits and inner hyphens, 1 to 63
+    characters, 253 in all. A name with other letters is shown in its ASCII (punycode)
+    form. An IP literal in square brackets must parse as an address.
     """
+    rest = url.split("//", 1)[1] if "//" in url else ""
+    authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
+    if any(ch == " " or not ch.isprintable() for ch in authority):
+        return "?"
     try:
         parts = urlsplit(url)
         host = parts.hostname or ""
@@ -277,9 +285,25 @@ def _host(url):
         return "?"
     if not host:
         return "?"
-    if "[" in parts.netloc:
-        return host if _HOST_V6.match(host) else "?"
-    return host if _HOST.match(host) else "?"
+    if parts.netloc.rpartition("@")[2].startswith("["):
+        if "%" in host:
+            return "?"
+        try:
+            return str(ipaddress.IPv6Address(host))
+        except ValueError:
+            return "?"
+    try:
+        ascii_host = host if host.isascii() else host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return "?"
+    ascii_host = ascii_host.lower()
+    if ascii_host.endswith("."):
+        ascii_host = ascii_host[:-1]
+    if not ascii_host or len(ascii_host) > 253:
+        return "?"
+    if not all(_LABEL.match(label) for label in ascii_host.split(".")):
+        return "?"
+    return ascii_host
 
 
 def _server_row(name, spec, artifact):

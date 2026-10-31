@@ -488,16 +488,38 @@ def test_a_file_replaced_by_another_file_between_the_check_and_the_open_is_not_r
 
 # 7. Round-3 repairs: what a row may show --------------------------------------------
 
+_L63 = "a" * 63
+
 @pytest.mark.parametrize("url, shown", [
+    # a host name is shown
     ("https://api.example.com/mcp", "api.example.com"),
     ("https://API.Example.com:8443/mcp", "api.example.com"),
     ("http://[::1]:9000/x", "::1"),
     ("https://127.0.0.1/mcp", "127.0.0.1"),
+    ("https://b\u00fccher.example/x", "xn--bcher-kva.example"),
+    ("https://example.com./x", "example.com"),
+    (f"https://{_L63}.example/x", f"{_L63}.example"),
+    ("https://" + ".".join([_L63] * 3 + ["a" * 61]) + "/x", ".".join([_L63] * 3 + ["a" * 61])),
+    ("https://h.example/a b", "h.example"),
+    ("https://h.example/a\tb", "h.example"),
+    # anything else is a question mark
     ("https://host\\SECRET/path", "?"),
     ("https://host%2fSECRET/path", "?"),
     ("https://KEY=SECRET/x", "?"),
     ("https://ho st/SECRET", "?"),
+    ("https://host\tSECRET/x", "?"),
+    ("https://host\nSECRET/x", "?"),
+    ("https://host\rSECRET/x", "?"),
+    ("https://my_SECRET.example/x", "?"),
+    ("https://a..SECRET/x", "?"),
     ("https://-bad-.example.com/x", "?"),
+    ("https://a-.example.com/x", "?"),
+    (f"https://{'a' * 64}.example/x", "?"),
+    ("https://" + ".".join([_L63] * 3 + ["a" * 62]) + "/x", "?"),
+    ("https://\u202ehost.example/x", "?"),
+    ("http://[::1%eth0]/x", "?"),
+    ("http://[zzz]/x", "?"),
+    ("https://[SECRET@host.example/x", "?"),
     ("https://", "?"),
 ])
 def test_a_host_is_shown_only_when_it_is_a_host_name(world, url, shown):
@@ -507,6 +529,30 @@ def test_a_host_is_shown_only_when_it_is_a_host_name(world, url, shown):
     assert row["via"] == shown
     for extra in ([], ["--json"]):
         assert "SECRET" not in _doctor("--agents", *extra, home=home, cwd=project).stdout
+
+
+def test_a_bracket_in_the_user_part_never_makes_the_host_an_address(world):
+    from urllib.parse import urlsplit
+    home, project = world
+    url = "https://u[ser]:SECRET@host.example/x"
+    try:
+        urlsplit(url)
+        expected = "host.example"  # this Python reads it; the host is what follows the last @
+    except ValueError:
+        expected = "?"             # this Python refuses it
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {"a": {"url": url}}})
+    assert _servers(home, project, "cursor", "user")["servers"][0]["via"] == expected
+
+
+def test_the_address_branch_is_chosen_from_the_host_part_only(monkeypatch):
+    """Whatever the URL parser accepts, a `[` before the last `@` is user name, not an address."""
+    from urllib.parse import SplitResult
+    monkeypatch.setattr(agent_discovery, "urlsplit",
+                        lambda url: SplitResult("https", "u[ser]:pw@host.example", "/x", "", ""))
+    assert agent_discovery._host("https://u[ser]:pw@host.example/x") == "host.example"
+    monkeypatch.setattr(agent_discovery, "urlsplit",
+                        lambda url: SplitResult("https", "u@[::1]:80", "/x", "", ""))
+    assert agent_discovery._host("https://u@[::1]:80/x") == "::1"
 
 
 def test_two_long_names_with_the_same_digest_stay_two_rows(world):
