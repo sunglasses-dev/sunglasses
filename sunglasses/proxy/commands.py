@@ -177,8 +177,8 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     tools = stored.get("tools_by_name") or {}
     stdout.write(f"server {server_id}\nsnapshot {snapshot}\n")
     folder = approvals.folder_text(stored.get("folder"))
-    stdout.write(f"approval bound to folder {folder}; start the server from there, "
-                 f"or approve again from the folder you start it in\n")
+    stdout.write(f"approval bound to folder {folder}; to use another folder, start the proxy "
+                 f"from it and approve the capture that run prints\n")
     stdout.write(f"{len(tools)} tool(s) in this capture\n")
     for tool_name in sorted(tools):
         digest = (tools[tool_name] or {}).get("descriptor_sha256") or "?"

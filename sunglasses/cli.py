@@ -4475,11 +4475,11 @@ def cmd_doctor(args, _run=None):
         print(f"  {BOLD}Approvals{RESET}  {DIM}(each is bound to the folder the server was "
               f"started from){RESET}")
         for row in rendered["approvals"]:
-            if row["state"] == "UNREADABLE":
-                print(f"    {YELLOW}UNREADABLE{RESET} {row['server']}")
+            if row["state"] != "APPROVED":
+                print(f"    {YELLOW}{row['state']}{RESET} {_printable(row['server'])}")
                 continue
             tools = "?" if row["tools"] is None else row["tools"]
-            print(f"    {GREEN}APPROVED{RESET}   {row['server']}  {tools} tool(s)  "
+            print(f"    {GREEN}APPROVED{RESET}   {_printable(row['server'])}  {tools} tool(s)  "
                   f"{DIM}folder {_printable(row['folder'])}{RESET}")
         print()
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing

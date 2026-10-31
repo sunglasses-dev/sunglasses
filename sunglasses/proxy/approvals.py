@@ -70,6 +70,35 @@ def _valid_sha(value):
             and all(c in _HEX for c in value))
 
 
+def _record_of(text):
+    """The record in `text`, or the reason it is not one. The one validation: the Store and the
+    read-only listings below all use it, so none of them can call a record approved that the
+    Store would refuse."""
+    # Duplicate keys first: `json.loads` keeps the last silently, and contract row 5.5
+    # names duplicate tool names as ambiguous. A record that cannot say
+    # which descriptor was approved has not approved one.
+    try:
+        record = json.loads(text, object_pairs_hook=_no_duplicates)
+    except (ValueError, _Duplicate):
+        return None, INVALID
+    if not isinstance(record, dict):
+        return None, INVALID
+    if record.get("approved_by") != "human":
+        return None, INVALID
+    if not _valid_sha(record.get("snapshot_sha256")):
+        return None, INVALID
+    if not record.get("server_identity"):
+        return None, INVALID
+    tools = record.get("tools")
+    if not isinstance(tools, dict):
+        return None, INVALID
+    for entry in tools.values():
+        if not isinstance(entry, dict) or not _valid_sha(
+                entry.get("descriptor_sha256")):
+            return None, INVALID
+    return record, None
+
+
 def folder_text(folder):
     """A folder as a line may print it: never a name with a control character in it."""
     if not isinstance(folder, str) or not folder:
@@ -92,10 +121,10 @@ def other_folders(root, command_stem, here, limit=3):
         return []
     for path in paths:
         try:
-            record = json.loads(path.read_text())
-        except (OSError, ValueError):
+            record, bad = _record_of(path.read_text())
+        except OSError:
             continue
-        if not isinstance(record, dict) or record.get("command_stem") != command_stem:
+        if bad or record.get("command_stem") != command_stem:
             continue
         folder = record.get("folder")
         if (isinstance(folder, str) and folder.isprintable() and folder != here
@@ -106,35 +135,45 @@ def other_folders(root, command_stem, here, limit=3):
     return found
 
 
+def _label(name):
+    """A file name as a line may print it, shortened: never one with a control character in it."""
+    name = name[:12]
+    return name if name.isprintable() else "(a name with control characters)"
+
+
 def approval_rows(root):
     """Every approval under `root`, read only: server, folder, snapshot and tool count.
 
-    Looks and never writes or creates anything, and a record it cannot read becomes a row that
-    says so rather than disappearing, so a listing never reads as "no approvals" over a
-    directory it could not open.
+    Looks and never writes or creates anything. A record that cannot be read, or that the Store
+    would refuse, becomes a row that says so rather than a row that says APPROVED, and a folder
+    that cannot be listed becomes one row saying so, so a listing never reads as "no approvals"
+    over something it could not open. Only a folder that is not there is no approvals.
     """
     directory = pathlib.Path(root) / "approvals"
     try:
-        paths = sorted(directory.glob("*.json"))
-    except OSError:
+        names = sorted(name for name in os.listdir(directory) if name.endswith(".json"))
+    except FileNotFoundError:
         return []
+    except OSError:
+        return [{"server": "(the approvals folder)", "state": "UNREADABLE", "folder": None,
+                 "snapshot": None, "tools": None}]
     rows = []
-    for path in paths:
-        server = path.stem[:12]
+    for name in names:
+        server = _label(name[:-len(".json")])
         try:
-            record = json.loads(path.read_text())
-            if not isinstance(record, dict):
-                raise ValueError
-        except (OSError, ValueError):
+            record, bad = _record_of((directory / name).read_text())
+        except OSError:
             rows.append({"server": server, "state": "UNREADABLE", "folder": None,
                          "snapshot": None, "tools": None})
             continue
-        tools = record.get("tools")
-        snapshot = record.get("snapshot_sha256")
+        if bad:
+            rows.append({"server": server, "state": INVALID, "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
         rows.append({"server": server, "state": "APPROVED",
                      "folder": folder_text(record.get("folder")),
-                     "snapshot": snapshot[:12] if isinstance(snapshot, str) else None,
-                     "tools": len(tools) if isinstance(tools, dict) else None})
+                     "snapshot": record["snapshot_sha256"][:12],
+                     "tools": len(record["tools"])})
     return rows
 
 
@@ -334,29 +373,7 @@ class Store:
             # OSError escape turns a hold into a crash in whatever was asking,
             # and contract row 5.5 says this state holds rather than decides.
             return None, INVALID
-        # Duplicate keys first: `json.loads` keeps the last silently, and contract row 5.5
-        # names duplicate tool names as ambiguous. A record that cannot say
-        # which descriptor was approved has not approved one.
-        try:
-            record = json.loads(text, object_pairs_hook=_no_duplicates)
-        except (ValueError, _Duplicate):
-            return None, INVALID
-        if not isinstance(record, dict):
-            return None, INVALID
-        if record.get("approved_by") != "human":
-            return None, INVALID
-        if not _valid_sha(record.get("snapshot_sha256")):
-            return None, INVALID
-        if not record.get("server_identity"):
-            return None, INVALID
-        tools = record.get("tools")
-        if not isinstance(tools, dict):
-            return None, INVALID
-        for entry in tools.values():
-            if not isinstance(entry, dict) or not _valid_sha(
-                    entry.get("descriptor_sha256")):
-                return None, INVALID
-        return record, None
+        return _record_of(text)
 
     def state(self):
         with self._lock:

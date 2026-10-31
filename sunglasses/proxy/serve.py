@@ -166,7 +166,7 @@ def approval_notice(stderr, root=None, command_stem=None):
             stderr.write(
                 "sunglasses proxy: this server is already approved from "
                 + ", ".join(elsewhere)
-                + "; start it from there, or approve again from this folder\n")
+                + "; start it from there, or approve this run's capture with the command above\n")
         stderr.flush()
     return notice
 

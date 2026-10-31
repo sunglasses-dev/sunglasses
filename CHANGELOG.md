@@ -7,7 +7,7 @@ All notable changes to Sunglasses are documented here.
 
 ### Added
 
-- A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and any folder where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve again from there.
+- A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and up to three folders with printable names where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders, showing a record the proxy would refuse as `INVALID` and one it could not read as `UNREADABLE` (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve that run's capture for the folder it is in. An approval written before this change shows its folder as unknown; a fresh capture from a new proxy run records one.
 
 ### Changed
 
