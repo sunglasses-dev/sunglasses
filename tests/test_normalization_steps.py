@@ -12,17 +12,21 @@ turned off, or for an inline row with that line of normalize_with_length
 removed, the input no longer folds. A function that undoes two things sits in
 two rows and has a probe in each.
 
-What keeps a new step from shipping uncounted, and what does not:
-- a function called by bare name in normalize_with_length, or a preprocessor
-  helper called by bare name anywhere in engine.py, must be a row's function or
-  a listed non-step;
-- the source of every top-level function in preprocessor.py and of the engine's
-  view builders (VIEW_BUILDERS) is pinned by FINGERPRINT, so an inline change,
-  a qualified call or new behaviour inside an existing helper fails the
-  fingerprint test until someone has read this list again and updated it;
-- not pinned: the tables the functions read (HOMOGLYPHS, LEET, ...), since a
-  new entry widens a row and is not a new step, and engine code outside
-  VIEW_BUILDERS (scan() builds the same views inline).
+What makes a new step fail here, and what does not:
+- call guard: a function normalize_with_length calls by bare name (builtins
+  aside), and a preprocessor helper engine.py calls by bare name after a
+  `from .preprocessor import` or `from sunglasses.preprocessor import` at any
+  level, aliases resolved, must be a row's function or a listed non-step;
+- fingerprint: FINGERPRINT pins the text of every top-level function in
+  preprocessor.py with its decorators, preprocessor.py's import statements, and
+  the engine's view builders (VIEW_BUILDERS). Any change to that text fails the
+  fingerprint test until the value is updated. It is a review trigger: it says
+  the text changed, not that the list was read again;
+- neither covers: preprocessor.py's tables and other module-level assignments
+  (HOMOGLYPHS, LEET, the compiled patterns), since a new entry widens a row and
+  is not a new step; engine code outside VIEW_BUILDERS (scan() builds the same
+  views inline) except through the call guard; a helper reached through a module
+  attribute (`preprocessor.x(...)`), getattr, or a name bound some other way.
 The documents then have to agree with len(NORMALIZATION_STEPS), through
 tools/gen_normalization_stats.py.
 """
@@ -91,6 +95,11 @@ PROBES = [
      {"strip_delimiter_padding": KEEP}),
     # One tab: two would be read as a word boundary by strip_delimiter_padding.
     ("whitespace_runs", "normalize", "ignore\tprevious", "ignore previous", {"collapse_whitespace": KEEP}),
+    # Both functions fold a run of line breaks, so the control turns off both.
+    ("whitespace_runs", "normalize", "ignore\n\nprevious", "ignore previous",
+     {"collapse_whitespace": KEEP, "strip_delimiter_padding": KEEP}),
+    ("delimiter_padding", "normalize", "i_g_n_o_r_e previous", "ignore previous",
+     {"strip_delimiter_padding": KEEP}),
     ("rot13", "normalize", "vtaber cerivbhf", "ignore previous", {"decode_rot13": KEEP}),
     # Inline in normalize_with_length: the control removes the line instead (INLINE).
     ("reversed", "normalize", "suoiverp erongi", "ignore previous", {}),
@@ -113,7 +122,7 @@ VIEW_BUILDERS = ("_fold_text", "_shadow_fold_text", "_compact_text", "_wide_fold
 # sha256 of the pinned sources (_pinned_source). When it changes: read
 # NORMALIZATION_STEPS against the change, add or fix a row and its probe if the
 # change undoes something new, then put the new value here.
-FINGERPRINT = "7d52a0add71fec9c925a9d53ebd26cba06daa4bac532b5e62e126e1f43c1e5b1"
+FINGERPRINT = "c1d2a863172055526a442481918b6165fc5b29ad8dd0e9670bad9e22042915dd"
 
 
 def _read(reader, text):
@@ -217,8 +226,9 @@ def test_no_lane_calls_a_function_no_row_names():
     defined = {n.name for n in PREPROCESSOR_TREE.body if isinstance(n, ast.FunctionDef)}
     keyword_lane = _bare_calls(_top_level(PREPROCESSOR_TREE, "normalize_with_length")) - set(dir(builtins))
 
-    local_name = {alias.asname or alias.name: alias.name for node in ENGINE_TREE.body
-                  if isinstance(node, ast.ImportFrom) and node.module == "preprocessor" and node.level == 1
+    local_name = {alias.asname or alias.name: alias.name for node in ast.walk(ENGINE_TREE)
+                  if isinstance(node, ast.ImportFrom)
+                  and (node.module, node.level) in (("preprocessor", 1), ("sunglasses.preprocessor", 0))
                   for alias in node.names}
     regex_lane = {local_name[n] for n in _bare_calls(ENGINE_TREE) if n in local_name}
 
@@ -229,17 +239,23 @@ def test_no_lane_calls_a_function_no_row_names():
     assert set(NOT_A_STEP) <= defined
 
 
+def _text_with_decorators(source, node):
+    lines = source.splitlines()
+    first = min([node.lineno] + [d.lineno for d in getattr(node, "decorator_list", [])])
+    return "\n".join(lines[first - 1:node.end_lineno])
+
+
 def _pinned_source():
-    parts = [ast.get_source_segment(PREPROCESSOR_SOURCE, n) for n in PREPROCESSOR_TREE.body
-             if isinstance(n, ast.FunctionDef)]
-    parts += [ast.get_source_segment(ENGINE_SOURCE, _top_level(ENGINE_TREE, name)) for name in VIEW_BUILDERS]
+    parts = [_text_with_decorators(PREPROCESSOR_SOURCE, n) for n in PREPROCESSOR_TREE.body
+             if isinstance(n, (ast.FunctionDef, ast.Import, ast.ImportFrom))]
+    parts += [_text_with_decorators(ENGINE_SOURCE, _top_level(ENGINE_TREE, name)) for name in VIEW_BUILDERS]
     return "\n\x00\n".join(parts)
 
 
 def test_the_normalization_code_is_the_code_this_list_was_read_against():
-    """Fails on any change to a preprocessor function or a view builder, inline
-    steps and qualified calls included. Read NORMALIZATION_STEPS against the
-    change, then update FINGERPRINT."""
+    """Fails on any change to the pinned text (see the module docstring for what
+    that is and is not). Read NORMALIZATION_STEPS against the change, then
+    update FINGERPRINT."""
     assert hashlib.sha256(_pinned_source().encode()).hexdigest() == FINGERPRINT, (
         "the normalization code changed: check NORMALIZATION_STEPS still lists what it undoes, "
         "then set FINGERPRINT to the new sha256")

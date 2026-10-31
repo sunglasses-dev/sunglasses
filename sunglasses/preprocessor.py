@@ -529,8 +529,10 @@ def strip_delimiter_padding(text: str) -> str:
 # Braille cells as a space). An empty tuple means the step is written inline
 # in normalize_with_length. tests/test_normalization_steps.py proves each row
 # on a crafted input, with a control that turns the row off, and pins the
-# source of every function here and of the engine's view builders, so a change
-# to any of them fails until this list has been read again;
+# text of every function here (decorators included), this module's imports and
+# the engine's view builders, so a change to that text fails the test until the
+# value is updated, which is the moment to read this list again. Its docstring
+# lists what is not pinned;
 # tools/gen_normalization_stats.py writes the count into stats/current.json.
 NORMALIZATION_STEPS = (
     # (step, what it undoes, functions)
@@ -553,9 +555,11 @@ NORMALIZATION_STEPS = (
     ("base64", "base64 blobs, up to three nested layers with the decoders above",
      ("decode_base64_segments",)),
     ("leetspeak", "digits and symbols standing in for letters, such as 1gn0r3", ("decode_leetspeak",)),
-    ("delimiter_padding", "letters split by dots, dashes or single spaces, such as i.g.n.o.r.e",
+    ("delimiter_padding", "letters split by dots, dashes, underscores or single spaces, such as i.g.n.o.r.e",
      ("strip_delimiter_padding",)),
-    ("whitespace_runs", "tabs and runs of spaces between words", ("collapse_whitespace",)),
+    ("whitespace_runs", "runs of whitespace between words (spaces, tabs, line breaks, vertical tabs,"
+     " form feeds) read as one space, and whitespace at either end dropped",
+     ("collapse_whitespace", "strip_delimiter_padding")),
     ("rot13", "ROT13, read as an extra view", ("decode_rot13",)),
     ("reversed", "text written backwards, read as an extra view of short inputs", ()),
     ("mixed_case", "mixed upper and lower case", ()),

@@ -6,7 +6,7 @@ into stats/current.json by hand and nothing counted it. preprocessor.NORMALIZATI
 lists what the code undoes, one row per technique, 16 rows. This script counts
 that list; it does not discover techniques on its own. What holds the list to
 the code is tests/test_normalization_steps.py (a probe and a control per row, a
-bare-name call guard on both lanes, and a pin on the source of the
+bare-name call guard on both lanes, and a pin on the text of the
 normalization functions); its docstring says what that does not cover.
 
     python3 tools/gen_normalization_stats.py            # print the measurement
