@@ -147,6 +147,42 @@ def test_doctor_with_no_servers_names_the_next_step_and_keeps_its_exit(tmp_path)
     assert out.index("No server entries found.") < out.index(step)
 
 
+def test_doctor_with_a_dangling_default_config_link_names_the_file_install_will_write(tmp_path):
+    # C498: ./.mcp.json was a link to a file that is not there. doctor read nothing and
+    # suggested a bare `install`, which refuses any link (exit 2). The step names the
+    # destination with --config instead, and the bare suggestion is not printed.
+    gone = tmp_path / "elsewhere" / "gone.json"
+    (tmp_path / ".mcp.json").symlink_to(gone)
+    proc = _run(tmp_path, ["doctor"])
+    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    out = proc.stdout
+    assert "No server entries found." in out
+    behind = (tmp_path / ".mcp.json").resolve()
+    assert f"./.mcp.json is a link to {behind}, which does not exist." in out
+    assert f"create {behind} with a server in it, then run: " \
+           f"sunglasses install <name> --config {behind}" in out
+    assert "Add a server to ./.mcp.json" not in out
+    # the bare step really is refused by install, so it must not be the advice
+    bare = _run(tmp_path, ["install", "demo"])
+    assert bare.returncode == 2 and "is a symbolic link" in bare.stdout + bare.stderr
+    assert not gone.exists() and (tmp_path / ".mcp.json").is_symlink()
+
+
+def test_doctor_with_a_default_config_link_to_an_empty_file_names_that_file(tmp_path):
+    # Same refusal for a link that resolves: install never writes through ./.mcp.json.
+    real = tmp_path / "real.json"
+    real.write_text('{"mcpServers":{}}')
+    (tmp_path / ".mcp.json").symlink_to(real)
+    proc = _run(tmp_path, ["doctor"])
+    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    out = proc.stdout
+    behind = real.resolve()
+    assert f"./.mcp.json is a link to {behind}." in out
+    assert f"add a server to {behind}, then run: " \
+           f"sunglasses install <name> --config {behind}" in out
+    assert "Add a server to ./.mcp.json" not in out
+
+
 def test_doctor_scoped_to_an_empty_config_speaks_only_of_that_file(tmp_path):
     # A project config with a server in it is NOT what was asked about: the line names the
     # file --config named, and the next step keeps --config so it edits that same file.

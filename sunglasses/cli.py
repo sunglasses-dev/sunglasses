@@ -4485,12 +4485,31 @@ def cmd_doctor(args, _run=None):
         # list a server first, in the same file `--config` named.
         if not st["failed"] and st["failure_class"] in (None, _doc.SELF_TEST_UNAVAILABLE) \
                 and rendered.get("receipts_key", {}).get("status") != "KEY_UNUSABLE":
+            import pathlib as _pl
+            import shlex as _shlex
+            default = _pl.Path.cwd() / ".mcp.json"
             if sources:
-                import shlex as _shlex
                 named = sources[0][1]
                 print(f"  {DIM}{named} lists no MCP servers, so nothing in it is "
                       f"wrapped. Add a server to it, then run: sunglasses install "
                       f"<name> --config {_shlex.quote(str(named))}{RESET}")
+            elif default.is_symlink():
+                # `install` refuses to write through a link (C498): a bare `install` here
+                # exits 2, so the step names the file behind the link with --config.
+                try:
+                    behind = default.resolve()
+                except (OSError, RuntimeError):     # a loop: name the link's own text
+                    behind = _pl.Path(os.readlink(default))
+                quoted = _shlex.quote(str(behind))
+                if behind.exists():
+                    print(f"  {DIM}./.mcp.json is a link to {behind}. install does not "
+                          f"write through a link: add a server to {behind}, then run: "
+                          f"sunglasses install <name> --config {quoted}{RESET}")
+                else:
+                    print(f"  {DIM}./.mcp.json is a link to {behind}, which does not exist. "
+                          f"install does not write through a link: create {behind} with a "
+                          f"server in it, then run: sunglasses install <name> "
+                          f"--config {quoted}{RESET}")
             else:
                 print(f"  {DIM}The configs checked list no MCP servers, so nothing in "
                       f"them is wrapped. Add a server to ./.mcp.json, then run: "
