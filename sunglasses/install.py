@@ -96,6 +96,14 @@ class ConfigIOError(Exception):
     """Unusable input, or an interrupted write. Original left intact."""
 
 
+class ConfigMissing(ConfigIOError):
+    """The config was not there at the first look, before any lock or write.
+
+    Raised only from that first look, so "nothing was changed" is true of it. A
+    file that goes missing later, mid-transaction, is an ordinary ConfigIOError
+    naming the operation that failed."""
+
+
 class ArtifactUnresolved(Exception):
     """The artifact we were asked to wire cannot be resolved."""
 
@@ -2594,7 +2602,7 @@ def _refuse_symlinked_config(target):
     try:
         is_link = stat.S_ISLNK(os.lstat(target).st_mode)
     except FileNotFoundError:
-        return                     # absent: the transaction reports that itself
+        return False               # absent: the caller decides what that means
     except OSError as e:
         raise ConfigIOError(f"cannot inspect {target}: {e}") from e
     if is_link:
@@ -2606,6 +2614,7 @@ def _refuse_symlinked_config(target):
             f"{target} is a symbolic link; writing it would replace the link "
             f"and leave {behind} unchanged. Name that "
             f"file instead")
+    return True
 
 
 def install(config_path, name, *, artifact, home, argv=None):
@@ -2618,7 +2627,9 @@ def install(config_path, name, *, artifact, home, argv=None):
     Serialising one syscall at a time moves a race rather than closing it.
     """
     _check_name(name)
-    _refuse_symlinked_config(config_path)
+    if not _refuse_symlinked_config(config_path):
+        # Before the lock and every write, so the caller may say nothing changed.
+        raise ConfigMissing(f"no MCP config file at {config_path}")
     _refuse_case_alias(home, name)
     with _locked_for(config_path, _lock_path(home, config_path)):
         return _install_locked(config_path, name, artifact=artifact, home=home,

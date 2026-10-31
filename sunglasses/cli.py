@@ -4136,9 +4136,10 @@ def cmd_install(args):
         sys.exit(2)
     except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
         # A first run in a folder with no MCP config read as a crash: the raw
-        # "[Errno 2] No such file or directory" twice over (C491). Only the
-        # absent file gets the plain sentence; every other read error keeps its own.
-        if isinstance(e.__cause__, FileNotFoundError):
+        # "[Errno 2] No such file or directory" twice over (C491). Only absence at
+        # install's first look, before any lock or write, gets the plain sentence;
+        # a file missing later, or a missing lock or state path, keeps its own.
+        if isinstance(e, _inst.ConfigMissing):
             print(f"\n  {RED}SUNGLASSES install failed{RESET} — there is no MCP "
                   f"config file at {target}. Nothing was changed.")
             print(f"  {DIM}run it in the folder that holds your project's .mcp.json, "
@@ -4381,9 +4382,22 @@ def cmd_doctor(args, _run=None):
             print(line + (f"  {YELLOW}{detail}{RESET}" if detail else ""))
     else:
         print(f"  {DIM}No server entries found.{RESET}")
-        # A first run has nothing wrapped, and the report alone does not say what to do next (C491).
-        print(f"  {DIM}Nothing is wrapped yet. Wrap a server with: "
-              f"sunglasses install <name>{RESET}")
+        # A first run has nothing wrapped, and the report alone does not say what to
+        # do next (C491). Said only of the sources read, and never beside a failure.
+        # `install` wraps an entry that is already in the file, so the step is to
+        # list a server first, in the same file `--config` named.
+        if not st["failed"] and st["failure_class"] in (None, _doc.SELF_TEST_UNAVAILABLE) \
+                and rendered.get("receipts_key", {}).get("status") != "KEY_UNUSABLE":
+            if sources:
+                import shlex as _shlex
+                named = sources[0][1]
+                print(f"  {DIM}{named} lists no MCP servers, so nothing in it is "
+                      f"wrapped. Add a server to it, then run: sunglasses install "
+                      f"<name> --config {_shlex.quote(str(named))}{RESET}")
+            else:
+                print(f"  {DIM}The configs checked list no MCP servers, so nothing in "
+                      f"them is wrapped. Add a server to ./.mcp.json, then run: "
+                      f"sunglasses install <name>{RESET}")
 
     print()
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing

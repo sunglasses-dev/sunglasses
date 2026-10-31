@@ -141,8 +141,37 @@ def test_doctor_with_no_servers_names_the_next_step_and_keeps_its_exit(tmp_path)
     assert proc.returncode == 1, (proc.stdout, proc.stderr)
     out = proc.stdout
     assert "No server entries found." in out
-    assert "Nothing is wrapped yet. Wrap a server with: sunglasses install <name>" in out
-    assert out.index("No server entries found.") < out.index("Nothing is wrapped yet.")
+    step = ("The configs checked list no MCP servers, so nothing in them is wrapped. "
+            "Add a server to ./.mcp.json, then run: sunglasses install <name>")
+    assert step in out
+    assert out.index("No server entries found.") < out.index(step)
+
+
+def test_doctor_scoped_to_an_empty_config_speaks_only_of_that_file(tmp_path):
+    # A project config with a server in it is NOT what was asked about: the line names the
+    # file --config named, and the next step keeps --config so it edits that same file.
+    (tmp_path / ".mcp.json").write_text(json.dumps(
+        {"mcpServers": {"demo": {"command": "echo", "args": ["ok"]}}}))
+    empty = tmp_path / "empty.json"
+    empty.write_text('{"mcpServers":{}}')
+    proc = _run(tmp_path, ["doctor", "--config", str(empty)])
+    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    out = proc.stdout
+    assert f"{empty} lists no MCP servers, so nothing in it is wrapped." in out
+    assert f"sunglasses install <name> --config {empty}" in out
+    assert "The configs checked" not in out and "Nothing is wrapped yet" not in out
+
+
+def test_doctor_onboarding_line_is_never_printed_beside_a_failed_self_test(tmp_path, monkeypatch, capsys):
+    # An empty inventory is not a "nothing failed" predicate: a failed check keeps the stage.
+    (tmp_path / "home").mkdir(exist_ok=True)
+    report = doctor.run(sources=[], home=tmp_path / "home")
+    out, _ = _text(report, monkeypatch, capsys)
+    assert "The configs checked list no MCP servers" in out      # control: same report, no failure
+    out, code = _text(report, monkeypatch, capsys, _a_failed_self_test_check)
+    assert code == 1
+    assert "No server entries found." in out
+    assert "no MCP servers" not in out and "Nothing is wrapped" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +187,47 @@ def test_install_with_no_mcp_config_says_so_plainly_and_changes_nothing(tmp_path
     assert "--config <path>" in out
     assert "Errno" not in out and "No such file or directory" not in out
     assert not (tmp_path / ".mcp.json").exists()
+
+
+def test_install_lock_failure_with_a_config_present_is_not_called_a_missing_config(tmp_path):
+    # ASTRA r1: a dangling link at the transaction lock path is ENOENT too, raised after the
+    # config was found. It must keep naming the lock, never claim the config is absent.
+    import hashlib
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {"demo": {"command": "echo", "args": ["ok"]}}}))
+    before = cfg.read_bytes()
+    locks = tmp_path / "home" / ".sunglasses" / "proxy" / "locks"
+    locks.mkdir(parents=True)
+    lock = locks / (hashlib.sha256(str(cfg.resolve()).encode()).hexdigest() + ".lock")
+    lock.symlink_to(locks / "absent-dir" / "lock")
+    proc = _run(tmp_path, ["install", "demo"])
+    assert proc.returncode == 2, (proc.stdout, proc.stderr)
+    out = proc.stdout + proc.stderr
+    assert "there is no MCP config file" not in out and "Nothing was changed." not in out
+    assert "lock" in out
+    assert cfg.read_bytes() == before
+
+
+def test_install_config_gone_after_the_first_look_keeps_the_failed_operation(tmp_path, monkeypatch, capsys):
+    # Absent at the locked re-read, after state was prepared: an ordinary read error, not
+    # the first-run sentence, because "Nothing was changed" would not be true of it.
+    from sunglasses import install as inst
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {"demo": {"command": "echo", "args": ["ok"]}}}))
+
+    def vanished(path):
+        raise inst.ConfigIOError(f"cannot read {path}: no such file") from FileNotFoundError(2, "gone")
+
+    monkeypatch.setattr(inst, "_read_bytes", vanished)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SUNGLASSES_HOME", str(tmp_path / "home" / ".sunglasses"))
+    args = type("A", (), {"config": str(cfg), "name": "demo", "argv": None})()
+    with pytest.raises(SystemExit) as raised:
+        cli.cmd_install(args)
+    out = _ANSI.sub("", capsys.readouterr().out)
+    assert raised.value.code == 2
+    assert "there is no MCP config file" not in out and "Nothing was changed." not in out
+    assert f"cannot read {cfg}" in out
 
 
 def test_install_read_errors_other_than_absent_keep_their_own_wording(tmp_path):

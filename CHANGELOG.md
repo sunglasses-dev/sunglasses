@@ -9,10 +9,14 @@ All notable changes to Sunglasses are documented here.
 
 - `sunglasses install <name>` in a folder with no MCP config now says there is no config file at that
   path, that nothing was changed, and to run it next to the project's `.mcp.json` or pass
-  `--config <path>`. It used to print the raw `[Errno 2]` text twice. Exit code 2 is unchanged, and
-  every other read error keeps its own message. `sunglasses doctor` with no server entries now names
-  the next step (`sunglasses install <name>`); its exit code is unchanged. The README's FAST row now
-  says images, PDFs and QR codes need `pip install "sunglasses[media]"`. (C491)
+  `--config <path>`. It used to print the raw `[Errno 2]` text twice. The sentence is printed only when
+  the file is absent at install's first look, before any lock or write; a config that disappears
+  later, or a missing lock or state path, keeps naming the operation that failed. Exit code 2 is
+  unchanged. `sunglasses doctor` with no server entries now says the configs it checked list no
+  servers and to add one before `sunglasses install <name>`; with `--config` it names that file and
+  keeps `--config` in the command. The line is not printed beside a failed check. Exit codes and
+  `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
+  `pip install "sunglasses[media]"`. (C491)
 
 ## [0.6.16] — 2026-10-30
 
