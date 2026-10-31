@@ -713,10 +713,9 @@ def test_the_layer_is_counted_apart_from_the_patterns():
 def test_the_channels_are_exact(engine, validator):
     assert set(validator.channel) == {"file", "code"}
     text = NEW_FIRES["loop_values_only"]
-    for channel in ("file", "code"):
-        assert RULE in ids(engine, text, channel)
-    for channel in ("message", "web_content", "tool_output"):
-        assert RULE not in ids(engine, text, channel)
+    for channel in ("message", "file", "api_response", "web_content", "log_memory",
+                    "tool_output", "agent_input", "code", "prompt"):
+        assert (RULE in ids(engine, text, channel)) == (channel in validator.channel), channel
 
 
 def test_the_layer_can_be_switched_off_and_changes_nothing_else():
