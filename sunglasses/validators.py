@@ -1609,6 +1609,9 @@ _WIDTH_ONLY = re.compile(r"^[<>^]?\d{0,4}s?$")
 _WRITE_MODE = re.compile(r"^[rwax+]*[wax+][rwax+]*$")
 
 
+_ENV_WORD = re.compile(r"\benviron\b")     # the word a read of the environment has to spell
+
+
 class _Found(Exception):
     """The reader found a sink that shows the environment; ``args[0]`` is the evidence."""
 
@@ -1618,20 +1621,20 @@ class _Kind:
 
     ``shape`` is ``map`` (a mapping of every variable), ``items`` (name/value pairs), ``values`` or
     ``keys``. ``concrete`` is a real ``dict`` or ``list``; otherwise it is the environ object itself or
-    a live view of it. ``environ`` says the object or view stands on ``os.environ``, whose text form
+    a live view of it. ``on_env`` says the object or view stands on ``os.environ``, whose text form
     carries every value even for a view of the names."""
 
-    __slots__ = ("shape", "concrete", "environ")
+    __slots__ = ("shape", "concrete", "on_env")
 
-    def __init__(self, shape, concrete, environ):
+    def __init__(self, shape, concrete, on_env):
         self.shape = shape
         self.concrete = concrete
-        self.environ = environ
+        self.on_env = on_env
 
     def in_text(self):
         """Whether ``str(x)`` carries values."""
         if self.shape == "keys":
-            return self.environ and not self.concrete
+            return self.on_env and not self.concrete
         return True
 
     def in_iteration(self):
@@ -1982,8 +1985,8 @@ class _EnvironmentReader:
                         or (truth is not True and self._leaves(node.orelse, inner)):
                     return True
                 continue
-            for field in ("body", "orelse", "finalbody"):
-                children = getattr(node, field, None)
+            for children in (getattr(node, "body", None), getattr(node, "orelse", None),
+                             getattr(node, "finalbody", None)):
                 if isinstance(children, list) and self._leaves(children, inner):
                     return True
             for group in (getattr(node, "handlers", ()), getattr(node, "cases", ())):
@@ -2046,7 +2049,7 @@ class _EnvironmentReader:
                 if func.attr == "copy":
                     return _Kind("map", True, False)
                 if func.attr in ("items", "values", "keys"):
-                    return _Kind(func.attr, False, inner.environ)
+                    return _Kind(func.attr, False, inner.on_env)
             return None
         made = self.qual(func)
         if made == "builtins.dict" and len(node.args) == 1 and not isinstance(node.args[0], ast.Starred):
@@ -2518,7 +2521,7 @@ class EnvironmentDumpedByPython:
                    "finding to look at, not a block.")
 
     def pregate(self, text):
-        return "environ" in text
+        return _ENV_WORD.search(text) is not None
 
     def run(self, text):
         for source, tree in _python_trees(text):
