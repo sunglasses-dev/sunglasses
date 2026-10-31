@@ -46,6 +46,11 @@ All notable changes to Sunglasses are documented here.
   keeps `--config` in the command. The line is not printed beside a failed check. Exit codes and
   `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
   `pip install "sunglasses[media]"`. (C491)
+- `sunglasses doctor` with no server entries, in a folder whose `./.mcp.json` is a symbolic link,
+  no longer suggests a bare `sunglasses install <name>`: install refuses to write through a link
+  (exit 2). It now names the file the link points at and gives the command with `--config` and that
+  path, and says when that file does not exist. Output for a folder without a link, `--json` and
+  exit codes are unchanged.
 - The README's normalization count now comes from the code. It said 17, a number nothing counted. `sunglasses/preprocessor.py` lists the steps in `NORMALIZATION_STEPS`, one row per technique, with the keyword lane's function and the regex lane's wider one in the same row: 16. `tools/gen_normalization_stats.py` writes the count into `stats/current.json`. `tests/test_normalization_steps.py` proves each row on a crafted input and checks that the input no longer folds with that row turned off; it also fails when either lane calls, by bare name, a function no row names (for the engine, a preprocessor helper it imports by name), and when the text of a preprocessor function, its imports, any other top-level code in it that is not a data table, or the engine's view builders changes, until a pinned value is updated. Data tables and the rest of the engine are not pinned; the test's docstring lists what is not covered. Scanning is unchanged.
 
 ### Fixed
