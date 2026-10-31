@@ -148,19 +148,18 @@ def approval_notice(stderr, root=None, command_stem=None):
         else:
             where = ""
             tail = f" --state-root {shlex.quote(shown)}" if shown else ""
+        # An approval is bound to the folder the server is started from. Say which folder this
+        # is on the same line, and (below) where an approval for the same command already
+        # exists, so a run from the wrong folder reads as that and not as a server with no
+        # tools. Our stderr only: the reply the agent gets is unchanged.
+        here = os.getcwd()
         stderr.write(
             "sunglasses proxy: this server's tools are withheld until you approve "
             "them. At a terminal, run: sunglasses proxy approve "
             f"{server_id} --snapshot {snapshot_sha256}{tail} "
-            f"(it shows the tools and asks before approving){where}\n")
-        # An approval is bound to the folder the server is started from. Say which folder this
-        # is, and where an approval for the same command already exists, so a run from the
-        # wrong folder reads as that and not as a server with no tools. Our stderr only: the
-        # reply the agent gets is unchanged.
-        here = os.getcwd()
-        stderr.write(
-            "sunglasses proxy: an approval is bound to the folder the server is started "
-            f"from; this run is in {approvals.folder_text(here)}\n")
+            f"(it shows the tools and asks before approving){where}; an approval is "
+            f"bound to the folder the server is started from, and this run is in "
+            f"{approvals.folder_text(here)}\n")
         elsewhere = approvals.other_folders(state_root(root), command_stem, here)
         if elsewhere:
             stderr.write(

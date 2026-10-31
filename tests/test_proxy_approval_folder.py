@@ -284,6 +284,14 @@ def test_the_notice_names_the_folder_this_run_is_in(tmp_path):
     assert "already approved from" not in text
 
 
+def test_the_notice_is_one_line_and_never_prints_a_folder_with_control_characters(tmp_path):
+    for hostile in ("a\nb", "a\x1b[2Jb", "a\rb"):
+        text = _notice(tmp_path / "root", tmp_path / hostile)
+        assert len(text.splitlines()) == 1 and text.endswith("\n"), repr(text)
+        assert "\x1b" not in text and hostile not in text
+        assert "this run is in (a folder whose name has control characters)" in text
+
+
 def test_the_notice_names_the_folder_that_holds_an_approval_for_the_same_command(tmp_path):
     root = tmp_path / "root"
     _approved_from(root, tmp_path / "there")
