@@ -82,6 +82,13 @@ RATIO_FLOOR_NAME = "ratio" + "_floor"
 JUDGE_FLOORS_AT = tuple(REAL_JUDGE.__code__.co_varnames.index(n) for n in (GROWTH_FLOOR_NAME, RATIO_FLOOR_NAME))
 
 
+def _with_other_local_names(code):
+    """The same bytecode with every local variable renamed, except those a nested scope shares: a cell keeps its name
+    (before 3.11 the interpreter finds an argument's cell by that name, and a copy that renamed it would read it unbound)."""
+    cells = set(code.co_cellvars)
+    return code.replace(co_varnames=tuple(n if n in cells else f"v{i}" for i, n in enumerate(code.co_varnames)))
+
+
 def _below(floors):
     return floors[0] < PRODUCTION_FLOORS[0] or floors[1] < PRODUCTION_FLOORS[1]
 
@@ -1605,7 +1612,7 @@ def test_the_watch_sees_the_same_function_under_another_code_object():
     again_spec.loader.exec_module(again)                  # the script executed a second time: new code objects
     assert again.time_once.__code__ is not REAL_TIME_ONCE.__code__
     local_names = types.FunctionType(
-        REAL_TIME_ONCE.__code__.replace(co_varnames=tuple(f"v{i}" for i in range(len(REAL_TIME_ONCE.__code__.co_varnames)))),
+        _with_other_local_names(REAL_TIME_ONCE.__code__),
         g.__dict__, argdefs=REAL_TIME_ONCE.__defaults__)          # the same bytecode with every local variable renamed
     with _watching() as watch:
         _measure_at_zero_floors(renamed)
@@ -1616,8 +1623,7 @@ def test_the_watch_sees_the_same_function_under_another_code_object():
 
 def test_the_watch_reads_the_floors_of_a_judge_whose_local_names_are_all_different():
     code = REAL_JUDGE.__code__
-    renamed = types.FunctionType(code.replace(co_varnames=tuple(f"v{i}" for i in range(len(code.co_varnames)))),
-                                 g.__dict__, argdefs=REAL_JUDGE.__defaults__)
+    renamed = types.FunctionType(_with_other_local_names(code), g.__dict__, argdefs=REAL_JUDGE.__defaults__)
     samples = {1000: 0.001, 2000: 0.002}
     with _watching() as watch:
         _measure_at_zero_floors(REAL_TIME_ONCE)                    # a real measurement in this test, so a verdict counts
