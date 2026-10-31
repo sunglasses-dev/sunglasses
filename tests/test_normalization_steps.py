@@ -20,12 +20,15 @@ What makes a new step fail here, and what does not:
   Scopes are not tracked: a name imported as different helpers in different
   places counts as a call to every one of them, so a shared name can also make
   a row's function look called when only another helper is;
-- fingerprint: FINGERPRINT pins the text of every top-level function in
-  preprocessor.py with its decorators, preprocessor.py's import statements, and
+- fingerprint: FINGERPRINT pins the text of preprocessor.py's top-level
+  statements other than its docstring and assignments to data names: every
+  function with its decorators, every import, any module-level if, try, with or
+  loop block with everything in it, and any assignment whose target names a
+  function or something imported or calls anything (`globals()[...]`); and
   the engine's view builders (VIEW_BUILDERS). Any change to that text fails the
   fingerprint test until the value is updated. It is a review trigger: it says
   the text changed, not that the list was read again;
-- neither covers: preprocessor.py's tables and other module-level assignments
+- neither covers: preprocessor.py's top-level assignments to data names
   (HOMOGLYPHS, LEET, the compiled patterns), since a new entry widens a row and
   is not a new step; engine code outside VIEW_BUILDERS (scan() builds the same
   views inline) except through the call guard; a helper reached through a module
@@ -252,9 +255,28 @@ def _text_with_decorators(source, node):
     return "\n".join(lines[first - 1:node.end_lineno])
 
 
+def _pinned_statements(tree):
+    """Top-level statements other than the docstring and assignments to data
+    names (see the module docstring)."""
+    body = tree.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+        body = body[1:]
+    code_names = {n.name for n in body if isinstance(n, ast.FunctionDef)}
+    code_names |= {a.asname or a.name.split(".")[0] for n in body
+                   if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+
+    def binds_data_only(n):
+        if not isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            return False
+        targets = n.targets if isinstance(n, ast.Assign) else [n.target]
+        return not any(isinstance(x, ast.Call) or isinstance(x, ast.Name) and x.id in code_names
+                       for t in targets for x in ast.walk(t))
+
+    return [n for n in body if not binds_data_only(n)]
+
+
 def _pinned_source():
-    parts = [_text_with_decorators(PREPROCESSOR_SOURCE, n) for n in PREPROCESSOR_TREE.body
-             if isinstance(n, (ast.FunctionDef, ast.Import, ast.ImportFrom))]
+    parts = [_text_with_decorators(PREPROCESSOR_SOURCE, n) for n in _pinned_statements(PREPROCESSOR_TREE)]
     parts += [_text_with_decorators(ENGINE_SOURCE, _top_level(ENGINE_TREE, name)) for name in VIEW_BUILDERS]
     return "\n\x00\n".join(parts)
 
