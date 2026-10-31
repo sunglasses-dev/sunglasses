@@ -122,7 +122,7 @@ def other_folders(root, command_stem, here, limit=3):
     for path in paths:
         try:
             record, bad = _record_of(path.read_text())
-        except OSError:
+        except (OSError, ValueError):   # ValueError: bytes that are not text
             continue
         if bad or record.get("command_stem") != command_stem:
             continue
@@ -164,6 +164,10 @@ def approval_rows(root):
             record, bad = _record_of((directory / name).read_text())
         except OSError:
             rows.append({"server": server, "state": "UNREADABLE", "folder": None,
+                         "snapshot": None, "tools": None})
+            continue
+        except ValueError:   # bytes that are not text: not a record, as far as a listing goes
+            rows.append({"server": server, "state": INVALID, "folder": None,
                          "snapshot": None, "tools": None})
             continue
         if bad:

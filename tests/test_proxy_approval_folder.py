@@ -146,6 +146,26 @@ def test_the_human_report_escapes_a_label_whatever_the_row_says(tmp_path, capsys
     assert "INVALID" in out
 
 
+def test_a_file_of_bytes_that_are_not_text_does_not_stop_the_listing_or_the_hint(tmp_path, capsys):
+    root = tmp_path / "home" / "proxy"
+    _approved_from(root, tmp_path / "there")
+    (root / "approvals" / "000bad.json").write_bytes(b"\xff\xfe not text \xff")
+    (root / "approvals" / "unrelated.json").write_bytes(b"\xc3\x28")
+    rows = approvals.approval_rows(root)
+    assert sorted(r["state"] for r in rows) == ["APPROVED", "INVALID", "INVALID"]
+    # The hint still finds the good record that sorts after the bad one.
+    stem = serve._command_stem(ARGV)
+    assert approvals.other_folders(root, stem, "/here") == [os.path.realpath(tmp_path / "there")] or \
+        approvals.other_folders(root, stem, "/here") == [str(tmp_path / "there")]
+    # doctor, as data and as the printed report, still reports.
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {"d": {"command": "python3", "args": ["x.py"]}}}))
+    rendered = doctor.render(doctor.run(sources=[("project", cfg)], home=tmp_path / "home"))
+    assert [r["state"] for r in rendered["approvals"]].count("INVALID") == 2
+    out = _human_doctor(rendered["approvals"], capsys)
+    assert out.count("INVALID") == 2 and "APPROVED" in out
+
+
 @pytest.mark.skipif(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
                     reason="needs a directory this user cannot list")
 def test_an_approvals_folder_that_cannot_be_listed_is_reported_not_empty(tmp_path):
