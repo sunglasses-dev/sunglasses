@@ -73,7 +73,7 @@ class Negotiation:
         self.reason = reason
         self.close = close
         self.detail = detail
-        # R-CLOSE-KIND. The caller closes with OUR reason, so it carries our
+        # The caller closes with OUR reason, so it carries our
         # kind too rather than choosing one.
         self.kind = kind
 

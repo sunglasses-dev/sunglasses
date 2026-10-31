@@ -78,7 +78,7 @@ class Settled(Exception):
     """An attempt to settle an item that already has an answer."""
 
 
-# R-CLOSE-KIND. WHICH fault, from a fixed vocabulary, for the receipt.
+# WHICH fault, from a fixed vocabulary, for the receipt.
 #
 # The reason catalog is small on purpose and two pairs carry most of the
 # traffic: MALFORMED_UPSTREAM/S5 fires at eight close sites and
@@ -128,7 +128,7 @@ CAUSE_KINDS = frozenset({
     # inherit -- the site my first enumeration grouped with the pass-through
     # ones and got wrong.
     "CLIENT_RESPONSE_UNSOLICITED",
-    # R-185-R4-VOCAB. The close sites that arrived AFTER this catalog was
+    # The close sites that arrived AFTER this catalog was
     # first written -- #168's result direction, #177's install lane and #179's
     # admission bound -- and were found by this PR's own map guard going red
     # on the rebase, not by anybody reading the diff. A vocabulary that stops

@@ -343,7 +343,7 @@ def is_placeholder(token: str, rule: "SecretRule | None" = None) -> bool:
     claimed = False
     for segment in body:
         # Words compare in lowercase; SHAPE is measured on the segment exactly
-        # as it arrived. Mixing those two is R1b.
+        # as it arrived; mixing those two is a bug.
         low = segment.lower()
         if low in words or _is_filler(segment):
             claimed = True
@@ -1676,7 +1676,7 @@ def _restrict(path, mode: int) -> None:
 
 
 # ── Receipt field sanitize ──────────────────────────────────────────────────
-# Audit finding H2. `tool_name` is chosen by the MCP server, i.e. by the party the
+# `tool_name` is chosen by the MCP server, i.e. by the party the
 # pin lane exists to defend against, and it was stored and re-rendered verbatim. A
 # name carrying ANSI escapes made `sunglasses receipts` clear the screen and print a
 # forged all-clear; an embedded newline forged an extra row; a 300-character name
@@ -1832,7 +1832,7 @@ class _HookReceipts:
             signer = optin.signer(self.home)
             from .receipts import chain
             # One writer for both records: its in-memory note of the opening
-            # it wrote is what lets the close seal it (R15d).
+            # it wrote is what lets the close seal it.
             self._chain = chain.Chain(self.home / "receipts" / "hook",
                                       signer, producer="hook",
                                       marker=optin.hook_marker(self.home))
@@ -2077,7 +2077,7 @@ def evaluate(payload: dict, home=None) -> "tuple":
     tool_input = payload.get("tool_input") or {}
     extras: dict = {}
 
-    # Audit L5: answer only the event we are installed for. The hook accepted any
+    # Answer only the event we are installed for. The hook accepted any
     # hook_event_name, so a PostToolUse payload was scanned and could come back
     # "deny" — a veto on an action that had already run. Meaningless rather than
     # dangerous, but a firewall that appears to block something it cannot block is

@@ -102,7 +102,7 @@ def test_a_marker_signature_does_not_verify_under_another_domain(vectors, domain
                       other + wire.encode(marker["record_unsigned"]))
 
 
-# --- SR01, a line edited ---------------------------------------------------
+# --- a line edited ---------------------------------------------------
 
 def test_editing_a_committed_record_changes_its_chain_hash(vectors):
     record = dict(vectors["records"]["event"]["record"], event="allow")
@@ -120,7 +120,7 @@ def test_editing_a_signed_checkpoint_breaks_its_signature(vectors):
                       wire.checkpoint_signing_bytes(tampered))
 
 
-# --- SR04, a correctly encoded signature from the wrong key ----------------
+# --- a correctly encoded signature from the wrong key ----------------
 
 def test_a_valid_signature_from_the_wrong_key_is_rejected(vectors):
     """Not garbage. A real Ed25519 signature, correctly formed, wrong signer."""
@@ -150,7 +150,7 @@ def test_a_fingerprint_needs_a_real_public_key():
         wire.key_fingerprint(b"too short")
 
 
-# --- SR05, truncation ------------------------------------------------------
+# --- truncation ------------------------------------------------------
 
 def test_a_line_without_its_lf_is_truncated_not_shorter(vectors):
     line = bytes.fromhex(vectors["records"]["genesis"]["line_hex"])
@@ -164,7 +164,7 @@ def test_a_record_may_not_span_two_physical_lines(vectors):
         wire.decode_strict(line + b"\n")
 
 
-# --- SR09, schema and encoding --------------------------------------------
+# --- schema and encoding --------------------------------------------
 
 def test_duplicate_keys_are_refused():
     """Two parsers can disagree about which value wins, which is the attack."""
