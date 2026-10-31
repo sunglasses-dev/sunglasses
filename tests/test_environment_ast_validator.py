@@ -412,7 +412,6 @@ NEW_QUIET = {
     "dead_if_false": "import os\nif False:\n    print(os.environ)\n",
     "dead_if_zero": "import os\nif 0:\n    print(os.environ)\n",
     "dead_if_none": "import os\nif None:\n    print(os.environ)\n",
-    "dead_type_checking": "import os\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    print(os.environ)\n",
     "dead_while_false": "import os\nwhile False:\n    print(os.environ)\n",
     "dead_after_return": "import os\ndef f():\n    return 1\n    print(os.environ)\n",
     "dead_after_raise": "import os\nraise SystemExit\nprint(os.environ)\n",
@@ -576,14 +575,19 @@ R4_FIRES = {
     "true_filter_shown": "import os\nprint([v for v in os.environ.values() if True])\n",
 }
 
-# TYPE_CHECKING is false only when it is the typing flag; any other name or attribute spelled that way is a value
+# an exit under a TYPE_CHECKING test is an exit under an unknown test: the loop is read as a filter
 R4_QUIET.update({
-    "typing_flag_filter_imported": "import os\nfrom typing import TYPE_CHECKING\nprint([v for v in os.environ.values() if TYPE_CHECKING])\n",
-    "typing_flag_attribute": "import os, typing\nif typing.TYPE_CHECKING:\n    print(os.environ)\n",
-    "typing_flag_through_an_alias": "import os\nimport typing as t\nif t.TYPE_CHECKING:\n    print(os.environ)\n",
-    "typing_flag_in_a_fragment_without_its_import": "import os\nif TYPE_CHECKING:\n    print(os.environ)\n",
+    "type_checking_test_that_leaves_makes_the_loop_a_filter": "import os\ntry:\n    from typing import TYPE_CHECKING\nexcept ImportError:\n    from typing_extensions import TYPE_CHECKING\nfor v in os.environ.values():\n    if TYPE_CHECKING:\n        break\n    print(v)\n",
+    "type_checking_in_a_loop_else_that_leaves_is_a_filter": "import os\nfrom typing import TYPE_CHECKING\nfor v in os.environ.values():\n    while not TYPE_CHECKING:\n        break\n    else:\n        break\n    print(v)\n",
 })
+
+# TYPE_CHECKING is not folded: whether a name is the typing flag depends on how it was bound, so code under it is read
 R4_FIRES.update({
+    "type_checking_guarded_dump_is_read": "import os\nfrom typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    print(os.environ)\n",
+    "type_checking_filter_imported": "import os\nfrom typing import TYPE_CHECKING\nprint([v for v in os.environ.values() if TYPE_CHECKING])\n",
+    "type_checking_attribute_of_typing": "import os, typing\nif typing.TYPE_CHECKING:\n    print(os.environ)\n",
+    "type_checking_through_an_alias": "import os\nfrom typing import TYPE_CHECKING as TC\nif TC:\n    print(os.environ)\n",
+    "type_checking_in_a_fragment_without_its_import": "import os\nif TYPE_CHECKING:\n    print(os.environ)\n",
     "type_checking_assigned_true_filter": "import os\nTYPE_CHECKING = True\nprint([v for v in os.environ.values() if TYPE_CHECKING])\n",
     "type_checking_attribute_of_another_object": "import os\nfrom types import SimpleNamespace\nflags = SimpleNamespace(TYPE_CHECKING=True)\nprint([v for v in os.environ.values() if flags.TYPE_CHECKING])\n",
     "type_checking_assigned_true_if": "import os\nfrom typing import TYPE_CHECKING\nTYPE_CHECKING = True\nif TYPE_CHECKING:\n    print(os.environ)\n",

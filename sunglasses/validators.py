@@ -130,8 +130,8 @@ comparison, ``not``, ``and``/``or``, a conditional expression, a subscript or sl
 (``len``, ``.upper()``), a precision, names only, and ``json.dumps(os.environ)`` (which raises
 ``TypeError``) show nothing. A loop that tests the variables it prints (``if``, ``while``, ``match``, a
 comprehension ``if``), or can leave early (``break``, ``continue``, ``return``, ``raise``,
-``sys.exit``), is not a dump of every variable. Branches that cannot run (``if False``,
-``TYPE_CHECKING``, code after ``return``) are skipped.
+``sys.exit``), is not a dump of every variable. Branches that cannot run (``if False``, code after
+``return``) are skipped; ``TYPE_CHECKING`` is a test like any other, so code under it is read.
 
 It is a judgment from syntax, not proof that the code runs: a function never called, a dump behind
 a flag, and a logging handler that discards the record are still reported. The grammar is the one of the
@@ -1734,15 +1734,13 @@ def _empty_body(node):
     return node is None or (isinstance(node, ast.Constant) and not node.value)
 
 
-def _truth(test, typing_flag=None):
-    """True / False for a test that is a constant, else None. ``typing_flag`` says whether a node is the
-    ``typing.TYPE_CHECKING`` constant (false at run time); without it no name is taken for that flag."""
+def _truth(test):
+    """True / False for a test that is a constant, else None. No name is taken for a constant, ``TYPE_CHECKING``
+    included: whether it is the typing flag depends on how it was bound."""
     if isinstance(test, ast.Constant):
         return bool(test.value)
-    if typing_flag is not None and typing_flag(test):
-        return False
     if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
-        inner = _truth(test.operand, typing_flag)
+        inner = _truth(test.operand)
         return None if inner is None else not inner
     return None
 
@@ -1822,6 +1820,7 @@ class _EnvironmentReader:
         self.logging_off = False
         self.exits = {}        # id(loop) -> the loop body can leave early
         self.replaced = False  # os.environ is assigned to in the file: it is no longer the process environment
+        self._else_memo = {}   # id(loop) -> its else arm can run
         self._continues = None  # ids of the nodes with a continue below them, filled when a loop else needs it
         self._collect()
 
@@ -1912,26 +1911,17 @@ class _EnvironmentReader:
             return _LOG_NUMBERS.get(made.split(".")[-1])
         return None
 
-    def truth(self, test):
-        return _truth(test, self._is_typing_flag)
-
-    def _is_typing_flag(self, node):
-        """Whether the node is ``typing.TYPE_CHECKING`` (imported, or a name nothing binds), not any name or attribute
-        that happens to be spelled that way."""
-        if isinstance(node, ast.Name):
-            if node.id != "TYPE_CHECKING":
-                return False
-            if node.id not in self.targets and node.id not in self.stores:
-                return True                 # a fragment that leaves out its import
-        elif not (isinstance(node, ast.Attribute) and node.attr == "TYPE_CHECKING"):
-            return False
-        return self.qual(node) in ("typing.TYPE_CHECKING", "typing_extensions.TYPE_CHECKING")
-
     def _else_runs(self, node):
         """Whether the ``else`` arm of a loop can run: never after ``while <true>``, and never after a ``for`` over
         a non-empty literal whose body always leaves with no ``continue`` in it."""
         if not node.orelse:
             return True
+        runs = self._else_memo.get(id(node))
+        if runs is None:
+            runs = self._else_memo[id(node)] = self._else_decision(node)
+        return runs
+
+    def _else_decision(self, node):
         if isinstance(node, ast.While):
             return _truth(node.test) is not True
         source = node.iter
@@ -1980,13 +1970,13 @@ class _EnvironmentReader:
                     return True
                 continue
             if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
-                live = not (isinstance(node, ast.While) and self.truth(node.test) is False)
+                live = not (isinstance(node, ast.While) and _truth(node.test) is False)
                 if (live and self._leaves(node.body, True)) \
                         or (self._else_runs(node) and self._leaves(node.orelse, inner)):
                     return True
                 continue
             if isinstance(node, ast.If):
-                truth = self.truth(node.test)
+                truth = _truth(node.test)
                 if (truth is not False and self._leaves(node.body, inner)) \
                         or (truth is not True and self._leaves(node.orelse, inner)):
                     return True
@@ -1997,7 +1987,7 @@ class _EnvironmentReader:
                     return True
             for group in (getattr(node, "handlers", ()), getattr(node, "cases", ())):
                 if any(self._leaves(child.body, inner) for child in group
-                       if getattr(child, "guard", None) is None or self.truth(child.guard) is not False):
+                       if getattr(child, "guard", None) is None or _truth(child.guard) is not False):
                     return True
         return False
 
@@ -2177,7 +2167,7 @@ class _EnvironmentReader:
         for generator in node.generators:
             inner = self.bind(inner, generator.target, generator.iter)
             for cond in generator.ifs:
-                if self.truth(cond) is False:
+                if _truth(cond) is False:
                     return False            # nothing gets past a filter that is never true
                 if _count_loads(cond, inner.names()):
                     inner = _NO_CTX
@@ -2425,13 +2415,13 @@ class _EnvironmentReader:
                 self._block(node.orelse, ctx)
         elif isinstance(node, ast.While):
             self._expr(node.test, ctx)
-            if self.truth(node.test) is not False:
+            if _truth(node.test) is not False:
                 self._block(node.body, _NO_CTX if _count_loads(node.test, ctx.names()) else ctx)
             if self._else_runs(node):
                 self._block(node.orelse, ctx)
         elif isinstance(node, ast.If):
             self._expr(node.test, ctx)
-            truth = self.truth(node.test)
+            truth = _truth(node.test)
             inner = _NO_CTX if ctx.live() and _count_loads(node.test, ctx.names()) else ctx
             if truth is not False:
                 self._block(node.body, inner)
@@ -2450,7 +2440,7 @@ class _EnvironmentReader:
                     self._expr(case.guard, inner)
                     if inner.live() and _count_loads(case.guard, inner.names()):
                         body = _NO_CTX          # the guard picks which names get this case
-                    if self.truth(case.guard) is False:
+                    if _truth(case.guard) is False:
                         continue                # a case that never matches
                 self._block(case.body, body)
         elif isinstance(node, (ast.With, ast.AsyncWith)):
@@ -2476,7 +2466,7 @@ class _EnvironmentReader:
                               "shape": "loop" if ctx.live() else "whole_environment"})
         if isinstance(node, ast.IfExp):
             self._expr(node.test, ctx)
-            truth = self.truth(node.test)
+            truth = _truth(node.test)
             inner = _NO_CTX if ctx.live() and _count_loads(node.test, ctx.names()) else ctx
             if truth is not False:
                 self._expr(node.body, inner)
@@ -2486,7 +2476,7 @@ class _EnvironmentReader:
             inner = ctx
             for value in node.values:
                 self._expr(value, inner)
-                if self.truth(value) is isinstance(node.op, ast.Or):
+                if _truth(value) is isinstance(node.op, ast.Or):
                     break                   # the rest is never evaluated
                 if inner.live() and _count_loads(value, inner.names()):
                     inner = _NO_CTX
@@ -2499,7 +2489,7 @@ class _EnvironmentReader:
                 inner = self.bind(inner, generator.target, generator.iter)
                 for cond in generator.ifs:
                     self._expr(cond, inner)
-                    if self.truth(cond) is False:
+                    if _truth(cond) is False:
                         return              # nothing gets past a filter that is never true
                     if inner.live() and _count_loads(cond, inner.names()):
                         inner = _NO_CTX

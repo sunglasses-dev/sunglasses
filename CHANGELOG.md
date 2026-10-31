@@ -17,11 +17,11 @@ All notable changes to Sunglasses are documented here.
   shown is the environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a
   value from an unfiltered loop over it. It stays quiet on one named variable, names only, a loop
   that tests the variable it prints, a precision that cuts the value away, `json.dumps(os.environ)`
-  (which raises), a plain `return`, a comment, a docstring, a test double, a branch that cannot run (`if False`, `False and ...`, a filter or `match` guard that is never true (`typing.TYPE_CHECKING` counts only as that flag, not a name or attribute spelled the same), the `else` of a `while True` or of a loop over a
+  (which raises), a plain `return`, a comment, a docstring, a test double, a branch that cannot run (`if False`, `False and ...`, a filter or `match` guard that is never true, the `else` of a `while True` or of a loop over a
   non-empty literal that always leaves), output sent to
   `/dev/null`, and shell or Node text. It is a judgment from syntax, not proof that the code runs: a
   function that is never called or a dump behind a flag is still reported, an environment copied
-  into another name before it is shown is not followed, a `map` or generator is read for what it
+  into another name before it is shown is not followed, code under `if TYPE_CHECKING:` is read like any other (no name is taken for the typing flag), a `map` or generator is read for what it
   holds, not for whether anything runs it to the end (an unused one, or one that `all`, `any`,
   `next`, `islice` or a failing `sum` stops, is reported like one that is drained), no more than
   256 environment names are tracked in one scope, and syntax newer than the Python that runs the scan (a `match`
