@@ -20,7 +20,7 @@ All notable changes to Sunglasses are documented here.
   keeps `--config` in the command. The line is not printed beside a failed check. Exit codes and
   `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
   `pip install "sunglasses[media]"`. (C491)
-- The README's normalization count now comes from the code. It said 17, a number nothing counted. `sunglasses/preprocessor.py` lists the steps in `NORMALIZATION_STEPS`, one row per thing undone, with the keyword lane's function and the regex lane's wider one in the same row: 16. `tools/gen_normalization_stats.py` writes the count into `stats/current.json`, and `tests/test_normalization_steps.py` proves each row on a crafted input, checks that the input no longer folds with that row turned off, and fails when either lane calls a function no row names. Scanning is unchanged.
+- The README's normalization count now comes from the code. It said 17, a number nothing counted. `sunglasses/preprocessor.py` lists the steps in `NORMALIZATION_STEPS`, one row per technique, with the keyword lane's function and the regex lane's wider one in the same row: 16. `tools/gen_normalization_stats.py` writes the count into `stats/current.json`. `tests/test_normalization_steps.py` proves each row on a crafted input and checks that the input no longer folds with that row turned off; it also fails when either lane calls, by bare name, a function no row names, and when the source of any preprocessor function or of the engine's view builders changes, until the list is read again. Scanning is unchanged.
 
 ## [0.6.16] — 2026-10-30
 

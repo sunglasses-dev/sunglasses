@@ -7,14 +7,30 @@ lane's wider fold in engine.py, where a wider function undoing the same thing
 as a keyword-lane one is the same technique, not another.
 
 preprocessor.NORMALIZATION_STEPS is the list. These tests prove each row on a
-crafted input, prove the input needs that row (with the row's functions turned
-off the input no longer folds), and fail when either lane calls a function no
-row names, so a new step cannot ship uncounted. The documents then have to agree
-with len(NORMALIZATION_STEPS), through tools/gen_normalization_stats.py.
+crafted input and prove the input needs that row: with the row's functions
+turned off, or for an inline row with that line of normalize_with_length
+removed, the input no longer folds. A function that undoes two things sits in
+two rows and has a probe in each.
+
+What keeps a new step from shipping uncounted, and what does not:
+- a function called by bare name in normalize_with_length, or a preprocessor
+  helper called by bare name anywhere in engine.py, must be a row's function or
+  a listed non-step;
+- the source of every top-level function in preprocessor.py and of the engine's
+  view builders (VIEW_BUILDERS) is pinned by FINGERPRINT, so an inline change,
+  a qualified call or new behaviour inside an existing helper fails the
+  fingerprint test until someone has read this list again and updated it;
+- not pinned: the tables the functions read (HOMOGLYPHS, LEET, ...), since a
+  new entry widens a row and is not a new step, and engine code outside
+  VIEW_BUILDERS (scan() builds the same views inline).
+The documents then have to agree with len(NORMALIZATION_STEPS), through
+tools/gen_normalization_stats.py.
 """
 import ast
 import base64
+import builtins
 import contextlib
+import hashlib
 import json
 import pathlib
 import re
@@ -46,8 +62,14 @@ PROBES = [
     # Off means the controls are deleted, which is what the plain view already does.
     ("hidden_separators", "normalize", "ignore\x00previous", "ignore previous",
      {"controls_as_spaces": lambda text: preprocessor.CONTROL_CHARS.sub("", text)}),
-    ("hidden_separators", "_spaced_text", "ignore​previous", "ignore previous",
+    ("hidden_separators", "_spaced_text", "ignore\u200bprevious", "ignore previous",
      {"space_ignorable_between_words": NOTHING}),
+    # A blank-drawn filler between two Braille cells is the gap between two words.
+    ("hidden_separators", "_wide_fold_text", "\u2801\u3164\u2803", "\u2801 \u2803",
+     {"strip_ignorable": KEEP}),
+    # The Braille blank is drawn as a space and is not whitespace to a regex.
+    ("hidden_separators", "_wide_fold_text", "ignore\u2800previous", "ignore previous",
+     {"replace_lookalikes": KEEP}),
     ("invisible_characters", "normalize", "ig​nore", "ignore", {"strip_invisible": KEEP}),
     ("invisible_characters", "_wide_fold_text", "ig⁣nore", "ignore", {"strip_ignorable": KEEP}),
     # Circled and mathematical letters: fullwidth ones are also in HOMOGLYPHS, so they prove nothing here.
@@ -57,6 +79,7 @@ PROBES = [
      "ignore", {"normalize_unicode": KEEP}),
     ("homoglyphs", "normalize", "іgnore", "ignore", {"replace_homoglyphs": KEEP}),
     ("homoglyphs", "_wide_fold_text", "іgnore", "ignore", {"replace_lookalikes": KEEP}),
+    ("homoglyphs", "_wide_fold_text", "rm \u2212rf", "rm -rf", {"replace_lookalikes": KEEP}),
     ("html_references", "normalize", "&#105;gnore", "ignore", {"decode_html_entities": KEEP}),
     ("html_references", "_wide_fold_text", "&#105;gnore", "ignore", {"decode_letter_references": KEEP}),
     ("url_encoding", "normalize", "%69gnore", "ignore", {"decode_url_encoding": KEEP}),
@@ -69,14 +92,28 @@ PROBES = [
     # One tab: two would be read as a word boundary by strip_delimiter_padding.
     ("whitespace_runs", "normalize", "ignore\tprevious", "ignore previous", {"collapse_whitespace": KEEP}),
     ("rot13", "normalize", "vtaber cerivbhf", "ignore previous", {"decode_rot13": KEEP}),
-    # Inline in normalize_with_length, so there is nothing to turn off; the source guard covers them.
+    # Inline in normalize_with_length: the control removes the line instead (INLINE).
     ("reversed", "normalize", "suoiverp erongi", "ignore previous", {}),
     ("mixed_case", "normalize", "IgNoRe PrEvIoUs", "ignore previous", {}),
     ("l_for_i", "normalize", "lgnore prevlous", "ignore prev", {}),
 ]
 
-# What each inline row is, in the source of normalize_with_length.
-INLINE = {"reversed": "[::-1]", "mixed_case": ".lower()", "l_for_i": "re.sub(r'\\bl(?=[a-z])', 'i'"}
+# What each inline row is in the source of normalize_with_length, and what the
+# control puts in its place to turn the row off.
+INLINE = {
+    "reversed": ("text[::-1]", "text"),
+    "mixed_case": ("text = text.lower()", "text = text"),
+    "l_for_i": ("re.sub(r'\\bl(?=[a-z])', 'i', text)", "text"),
+}
+
+# The engine functions that build the regex lane's views from preprocessor helpers.
+VIEW_BUILDERS = ("_fold_text", "_shadow_fold_text", "_compact_text", "_wide_fold_text",
+                 "_wide_compact_text", "_spaced_text", "_fold_spaced_text", "_compact_spaced_text")
+
+# sha256 of the pinned sources (_pinned_source). When it changes: read
+# NORMALIZATION_STEPS against the change, add or fix a row and its probe if the
+# change undoes something new, then put the new value here.
+FINGERPRINT = "7d52a0add71fec9c925a9d53ebd26cba06daa4bac532b5e62e126e1f43c1e5b1"
 
 
 def _read(reader, text):
@@ -108,20 +145,20 @@ def _rows():
 def test_every_row_is_well_formed_and_unique():
     steps = [row[0] for row in NORMALIZATION_STEPS]
     assert len(steps) == len(set(steps))
-    named = [f for _s, _u, functions in NORMALIZATION_STEPS for f in functions]
-    assert len(named) == len(set(named)), "one function undoes one thing; it cannot sit in two rows"
     for step, undoes, functions in NORMALIZATION_STEPS:
+        assert len(functions) == len(set(functions)), step
         assert undoes and isinstance(functions, tuple), step
         for name in functions:
             assert callable(getattr(preprocessor, name, None)), f"{step}: no preprocessor.{name}"
 
 
-def test_every_row_has_a_probe_and_every_named_function_is_proven():
+def test_every_row_has_a_probe_and_each_of_its_functions_is_proven_in_it():
+    """Per row: a function that sits in two rows needs a probe in each."""
     rows = _rows()
     assert {p[0] for p in PROBES} == set(rows)
-    proven = {name for p in PROBES for name in p[4]}
-    named = {f for functions in rows.values() for f in functions}
-    assert proven == named, f"functions with no probe that turns them off: {sorted(named - proven)}"
+    for step, functions in rows.items():
+        proven = {name for p in PROBES if p[0] == step for name in p[4]}
+        assert proven == set(functions), f"{step}: no probe turns off {sorted(set(functions) - proven)}"
 
 
 @pytest.mark.parametrize("step,reader,text,expected,functions", PROBES,
@@ -132,7 +169,7 @@ def test_the_step_folds_its_probe(step, reader, text, expected, functions):
 
 
 @pytest.mark.parametrize("step,reader,text,expected,functions", [p for p in PROBES if p[4]],
-                         ids=[f"{p[0]}-{p[1]}" for p in PROBES if p[4]])
+                         ids=[f"{p[0]}-{p[1]}-{i}" for i, p in enumerate(PROBES) if p[4]])
 def test_the_probe_needs_its_step(step, reader, text, expected, functions):
     """With the row's function off, no other step folds the probe. A probe some
     neighbour also folds would prove nothing about the row it stands for."""
@@ -140,24 +177,50 @@ def test_the_probe_needs_its_step(step, reader, text, expected, functions):
         assert expected not in _read(reader, text)
 
 
-def _calls_in(tree, function_name):
-    """Names called inside one top-level function of a parsed module."""
-    function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == function_name)
-    return {c.func.id for c in ast.walk(function) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+def _without_line(marker, replacement):
+    """normalize_with_length compiled again with one inline step replaced."""
+    source = ast.get_source_segment(PREPROCESSOR_SOURCE, _top_level(PREPROCESSOR_TREE, "normalize_with_length"))
+    assert marker in source, f"normalize_with_length no longer has {marker!r}"
+    namespace = dict(vars(preprocessor))
+    exec(compile(source.replace(marker, replacement), preprocessor.__file__, "exec"), namespace)
+    return namespace["normalize_with_length"]
+
+
+@pytest.mark.parametrize("step,reader,text,expected,functions", [p for p in PROBES if not p[4]],
+                         ids=[p[0] for p in PROBES if not p[4]])
+def test_the_probe_needs_its_inline_step(step, reader, text, expected, functions):
+    assert reader == "normalize"
+    assert expected not in _without_line(*INLINE[step])(text)[0]
+
+
+PREPROCESSOR_SOURCE = pathlib.Path(preprocessor.__file__).read_text()
+PREPROCESSOR_TREE = ast.parse(PREPROCESSOR_SOURCE)
+ENGINE_SOURCE = pathlib.Path(engine.__file__).read_text()
+ENGINE_TREE = ast.parse(ENGINE_SOURCE)
+
+
+def _top_level(tree, name):
+    return next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
+
+
+def _bare_calls(node):
+    """Names called by bare name anywhere inside node."""
+    return {c.func.id for c in ast.walk(node) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
 
 
 def test_no_lane_calls_a_function_no_row_names():
-    """Both directions: every function a lane calls is a row or a named non-step,
-    and every function a row names is called by a lane."""
-    source = pathlib.Path(preprocessor.__file__).read_text()
-    tree = ast.parse(source)
-    defined = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
-    keyword_lane = _calls_in(tree, "normalize_with_length") & defined
+    """Both directions: every function a lane calls by bare name is a row's or a
+    named non-step, and every function a row names is called by a lane. Python
+    builtins aside, the keyword lane may call nothing else by bare name, imported
+    or not; the regex lane is every preprocessor helper engine.py imports and
+    calls (an import nobody calls is not a lane)."""
+    defined = {n.name for n in PREPROCESSOR_TREE.body if isinstance(n, ast.FunctionDef)}
+    keyword_lane = _bare_calls(_top_level(PREPROCESSOR_TREE, "normalize_with_length")) - set(dir(builtins))
 
-    engine_tree = ast.parse(pathlib.Path(engine.__file__).read_text())
-    imported = {alias.name for node in engine_tree.body if isinstance(node, ast.ImportFrom)
-                and node.module == "preprocessor" and node.level == 1 for alias in node.names}
-    regex_lane = imported & defined
+    local_name = {alias.asname or alias.name: alias.name for node in ENGINE_TREE.body
+                  if isinstance(node, ast.ImportFrom) and node.module == "preprocessor" and node.level == 1
+                  for alias in node.names}
+    regex_lane = {local_name[n] for n in _bare_calls(ENGINE_TREE) if n in local_name}
 
     named = {f for functions in _rows().values() for f in functions}
     called = (keyword_lane | regex_lane) - set(NOT_A_STEP)
@@ -166,14 +229,27 @@ def test_no_lane_calls_a_function_no_row_names():
     assert set(NOT_A_STEP) <= defined
 
 
+def _pinned_source():
+    parts = [ast.get_source_segment(PREPROCESSOR_SOURCE, n) for n in PREPROCESSOR_TREE.body
+             if isinstance(n, ast.FunctionDef)]
+    parts += [ast.get_source_segment(ENGINE_SOURCE, _top_level(ENGINE_TREE, name)) for name in VIEW_BUILDERS]
+    return "\n\x00\n".join(parts)
+
+
+def test_the_normalization_code_is_the_code_this_list_was_read_against():
+    """Fails on any change to a preprocessor function or a view builder, inline
+    steps and qualified calls included. Read NORMALIZATION_STEPS against the
+    change, then update FINGERPRINT."""
+    assert hashlib.sha256(_pinned_source().encode()).hexdigest() == FINGERPRINT, (
+        "the normalization code changed: check NORMALIZATION_STEPS still lists what it undoes, "
+        "then set FINGERPRINT to the new sha256")
+
+
 def test_every_inline_row_is_still_inline():
-    source = ast.get_source_segment(
-        pathlib.Path(preprocessor.__file__).read_text(),
-        next(n for n in ast.parse(pathlib.Path(preprocessor.__file__).read_text()).body
-             if isinstance(n, ast.FunctionDef) and n.name == "normalize_with_length"))
+    source = ast.get_source_segment(PREPROCESSOR_SOURCE, _top_level(PREPROCESSOR_TREE, "normalize_with_length"))
     inline_rows = {step for step, functions in _rows().items() if not functions}
     assert inline_rows == set(INLINE)
-    for step, marker in INLINE.items():
+    for step, (marker, _replacement) in INLINE.items():
         assert marker in source, f"{step}: normalize_with_length no longer has {marker!r}"
 
 

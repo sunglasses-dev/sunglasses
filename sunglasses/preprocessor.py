@@ -2,8 +2,8 @@
 SUNGLASSES Preprocessor — Normalizes text before pattern matching.
 
 Strips Unicode tricks, decodes Base64/URL/HTML/hex/ROT13, collapses
-invisible characters, maps homoglyphs to ASCII. Defends against 17+
-known evasion techniques used to bypass prompt injection scanners.
+invisible characters, maps homoglyphs to ASCII. NORMALIZATION_STEPS at the
+end of this file lists what is undone, one row per technique.
 """
 
 import base64
@@ -524,21 +524,27 @@ def strip_delimiter_padding(text: str) -> str:
 # len(NORMALIZATION_STEPS) and not a number typed by hand. A row names
 # the functions that do it: the keyword lane's first, then the regex lane's
 # wider version of the same undo. Two functions undoing one thing are one
-# technique, not two. An empty tuple means the step is written inline in
-# normalize_with_length. tests/test_normalization_steps.py proves each row on
-# a crafted input and fails when either lane calls a function no row names;
+# technique, not two; one function that undoes two things sits in both rows
+# (strip_ignorable deletes invisible characters and reads a gap between two
+# Braille cells as a space). An empty tuple means the step is written inline
+# in normalize_with_length. tests/test_normalization_steps.py proves each row
+# on a crafted input, with a control that turns the row off, and pins the
+# source of every function here and of the engine's view builders, so a change
+# to any of them fails until this list has been read again;
 # tools/gen_normalization_stats.py writes the count into stats/current.json.
 NORMALIZATION_STEPS = (
     # (step, what it undoes, functions)
     ("shadow_ascii", "printable ASCII written as invisible Unicode tag characters",
      ("decode_shadow_ascii",)),
-    ("hidden_separators", "a control or invisible character used as the space between two words",
-     ("controls_as_spaces", "space_ignorable_between_words")),
+    ("hidden_separators",
+     "a control, invisible or blank-drawn character standing for the space between two words",
+     ("controls_as_spaces", "space_ignorable_between_words", "strip_ignorable", "replace_lookalikes")),
     ("invisible_characters", "zero-width, bidi, control and other invisible characters inside a word",
      ("strip_invisible", "strip_ignorable")),
     ("compatibility_forms", "fullwidth, circled, mathematical and other compatibility forms (NFKC)",
      ("normalize_unicode",)),
-    ("homoglyphs", "letters from another script that look like Latin ones",
+    ("homoglyphs", "letters and signs from another script or symbol block that look like ASCII ones,"
+     " such as a Cyrillic i or a minus sign for a hyphen",
      ("replace_homoglyphs", "replace_lookalikes")),
     ("html_references", "HTML character references such as &#105;",
      ("decode_html_entities", "decode_letter_references")),

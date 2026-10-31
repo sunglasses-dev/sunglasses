@@ -2,11 +2,12 @@
 """Count the normalization techniques SUNGLASSES actually runs, from the code.
 
 The README and the site said "17 normalization techniques". The number was typed
-into stats/current.json by hand and nothing counted it; the code has 16 distinct
-undos. preprocessor.NORMALIZATION_STEPS lists them, one row per thing undone;
-tests/test_normalization_steps.py proves each row and fails when a lane calls a
-function no row names. This script turns the list into the published count, and
-stats/current.json records what it measured.
+into stats/current.json by hand and nothing counted it. preprocessor.NORMALIZATION_STEPS
+lists what the code undoes, one row per technique, 16 rows. This script counts
+that list; it does not discover techniques on its own. What holds the list to
+the code is tests/test_normalization_steps.py (a probe and a control per row, a
+bare-name call guard on both lanes, and a pin on the source of the
+normalization functions); its docstring says what that does not cover.
 
     python3 tools/gen_normalization_stats.py            # print the measurement
     python3 tools/gen_normalization_stats.py --write    # update stats/current.json
