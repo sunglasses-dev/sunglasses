@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Listing the other folders that hold an approval for the same command no longer raises when the proxy state folder path contains a NUL byte; it lists none. The proxy start-up already refused such a folder, so only a direct call could hit it.
+
 ### Added
 
 - `GLS-STRUCT-006` reports, for review (`quarantine`, never a block), a shell script that points npm,
@@ -24,10 +28,6 @@ All notable changes to Sunglasses are documented here.
   descriptor number over four digits, an escape bash 3.2 cannot read, a host with no `://` scheme, or code in another language. Reading is bounded: shell nested in `sh -c`, `$(...)` or a here-document-fed shell is read to depth 3 and at most 22 nested scripts, and at most 20 fenced blocks are read on their own. One variable expansion brings in at most 64 KiB, the text one `echo` or `printf` would write is read up to 64 KiB (sizes are UTF-8 bytes, and a `%b` operand, a literal piece or a padded width is built only while it fits), and one scan expands at most 64 MiB in all (a fallback such as `${V:-$A}` is charged for what it expands and again for the text it fills in); past that the value is unknown. ANSI-C `$'...'` strings are read as written, and a setting inside an `env -S` string is reported on the line where the word that holds the string starts (the string's own word for `-S STRING` and `--split-string STRING`; the option word for `-SSTRING` and `--split-string=STRING`, so a continuation inside that word is not counted) plus the newlines the command's text still holds (a line continuation inside the string is not counted). `env` short options are read in order, so `-uS` names a variable and `-iS` splits a string; an `env` that exits before it runs a command (`-0`, or a letter it does not have) reports nothing, and a split string is read with `env`'s own rules when it holds a backslash (`\_` is a blank, `\c` ends the string, an escape `env` refuses reports nothing). The split-string rules are those of the `env` this was checked against; another build may differ on an escape. The `env -S` reader has three known gaps: (1) a split string that itself holds another attached `-S` string (`env -S'-Snpm config set ...'`) is not reported; (2) a long option that starts `--` and that `env` does not have (`--invalid`, `--0`) is skipped, so a setting after it is reported although the real `env` exits before it runs anything; (3) inside single quotes within a split string, `\c` and `\_` are read as escapes and not as literal text, so a setting whose operand holds them is missed. A mirror a team really uses, or documentation
   that shows the command, is reported the same way, because a script cannot be told apart from its
   documentation. The pattern count does not move. (C499)
-
-### Fixed
-
-- Listing the other folders that hold an approval for the same command no longer raises when the proxy state folder path contains a NUL byte; it lists none. The proxy start-up already refused such a folder, so only a direct call could hit it.
 
 ## [0.6.17] — 2026-10-31
 
