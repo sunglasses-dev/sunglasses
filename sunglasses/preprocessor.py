@@ -517,3 +517,41 @@ def strip_delimiter_padding(text: str) -> str:
             collapsed_parts.append(collapsed)
     text = ''.join(collapsed_parts)
     return text
+
+
+# Every way of writing text that the scanner reads back before it matches, one
+# row per thing undone, so a public count of "normalization techniques" is
+# len(NORMALIZATION_STEPS) and not a number typed by hand. A row names
+# the functions that do it: the keyword lane's first, then the regex lane's
+# wider version of the same undo. Two functions undoing one thing are one
+# technique, not two. An empty tuple means the step is written inline in
+# normalize_with_length. tests/test_normalization_steps.py proves each row on
+# a crafted input and fails when either lane calls a function no row names;
+# tools/gen_normalization_stats.py writes the count into stats/current.json.
+NORMALIZATION_STEPS = (
+    # (step, what it undoes, functions)
+    ("shadow_ascii", "printable ASCII written as invisible Unicode tag characters",
+     ("decode_shadow_ascii",)),
+    ("hidden_separators", "a control or invisible character used as the space between two words",
+     ("controls_as_spaces", "space_ignorable_between_words")),
+    ("invisible_characters", "zero-width, bidi, control and other invisible characters inside a word",
+     ("strip_invisible", "strip_ignorable")),
+    ("compatibility_forms", "fullwidth, circled, mathematical and other compatibility forms (NFKC)",
+     ("normalize_unicode",)),
+    ("homoglyphs", "letters from another script that look like Latin ones",
+     ("replace_homoglyphs", "replace_lookalikes")),
+    ("html_references", "HTML character references such as &#105;",
+     ("decode_html_entities", "decode_letter_references")),
+    ("url_encoding", "URL percent-encoding such as %69", ("decode_url_encoding",)),
+    ("hex_escapes", "hex escapes such as \\x69", ("decode_hex_escapes",)),
+    ("base64", "base64 blobs, up to three nested layers with the decoders above",
+     ("decode_base64_segments",)),
+    ("leetspeak", "digits and symbols standing in for letters, such as 1gn0r3", ("decode_leetspeak",)),
+    ("delimiter_padding", "letters split by dots, dashes or single spaces, such as i.g.n.o.r.e",
+     ("strip_delimiter_padding",)),
+    ("whitespace_runs", "tabs and runs of spaces between words", ("collapse_whitespace",)),
+    ("rot13", "ROT13, read as an extra view", ("decode_rot13",)),
+    ("reversed", "text written backwards, read as an extra view of short inputs", ()),
+    ("mixed_case", "mixed upper and lower case", ()),
+    ("l_for_i", "a lowercase l written for a capital I, read as an extra view of short inputs", ()),
+)
