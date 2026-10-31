@@ -3,7 +3,7 @@
   "patterns": 1583,
   "keywords": 6675,
   "categories": 117,
-  "normalization_techniques": 17,
+  "normalization_techniques": 16,
   "scan_speed_display": "~1.5ms short input, ~4ms typical attack string",
   "license": "MIT",
   "benchmark_positives": 38,
@@ -58,5 +58,6 @@
     "Vietnamese": 2
   },
   "language_stats_generated_by": "tools/gen_language_stats.py",
-  "scan_speed_provenance": "Measured 2026-10-30 on the published sunglasses 0.6.16 wheel, Apple M3 Max (48GB), macOS 27, Python 3.14, 3 quiet runs, median run shown; 77-document corpus."
+  "scan_speed_provenance": "Measured 2026-10-30 on the published sunglasses 0.6.16 wheel, Apple M3 Max (48GB), macOS 27, Python 3.14, 3 quiet runs, median run shown; 77-document corpus.",
+  "normalization_stats_generated_by": "tools/gen_normalization_stats.py"
 }
