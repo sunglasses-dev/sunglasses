@@ -5,6 +5,24 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `GLS-STRUCT-005` reports, for review (`quarantine`, never a block), Python code that reads as
+  printing, logging, writing or sending every environment variable together with its value, where
+  an agent or whoever reads the output will see the secrets (API keys, tokens). It reads the syntax
+  tree of a whole Python text, or of each fenced `python` block in a document (up to 20), and follows
+  the names the file imports. It reports `print`, `pprint`, `sys.stdout.write`, a write to a file the
+  program opened for writing, `json.dump`, logging calls that would be shown, and the `data=` or
+  `params=` (or a dict passed as `json=`) of a `requests` or `httpx` call, when what is shown is the
+  environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a value from an
+  unfiltered loop over it. It stays quiet on one named variable, names only, a loop that tests the
+  variable it prints, a precision that cuts the value away, `json.dumps(os.environ)` (which raises),
+  a plain `return`, a comment, a docstring, a test double, and shell or Node text. It is a judgment
+  from syntax, not proof that the code runs: a function that is never called or a dump behind a flag
+  is still reported, an environment copied into another name before it is shown is not followed, and
+  syntax newer than the Python that runs the scan (a `match` statement before 3.10) is not read.
+  The pattern count does not move. (C497)
+
 ### Changed
 
 - `scan --dir`, `scan --repo` and `scan --file` now put the word `not_inspected` in `decision` when part of the input was not read: an archive or compiled file, a file that could not be opened, or a build or cache folder of the project (`__pycache__`, `build`, `dist`, `coverage`, `.next`, `.nuxt`, `*.egg-info`) that held files or could not be shown empty (unreadable, holding a link to a folder, or on a platform where the folder cannot be pinned to the one the walk saw, where even an empty such folder makes the scan incomplete). They used to print `allow` beside `inspection_complete: false` and exit 3. For those cases the exit code is unchanged; a scan whose project has a build or cache folder that held files used to exit 0 and now exits 3. The text report prints `Decision: NOT_INSPECTED` and a `Not inspected:` line with the file and folder counts. The JSON gains `files_not_inspected`, `folders_excluded_with_files`, `excluded_not_inspected`, `excluded_dependency_folders` and `excluded_tool_cache_folders`. Dependency, version-control and tool-cache folders (`node_modules`, `.venv`, `venv`, `vendor`, `.tox`, a nested `.git`, `.mypy_cache`, `.pytest_cache`) are still named and counted, and still leave the verdict unchanged.

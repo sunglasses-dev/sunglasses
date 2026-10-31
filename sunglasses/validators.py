@@ -99,13 +99,58 @@ This is a reader of words, not a shell. It does not model reachability beyond a 
 word-level cases (``false && ...``, ``exit``), heredoc bodies, functions, other downloaders,
 interpreter-native fetches, array-form commands, or hook formats that are not JSON. Those are
 documented limits; the carriers still run.
+
+GLS-STRUCT-005 -- Python that prints, logs, writes or sends every environment variable
+----------------------------------------------------------------------------------------
+
+The text is parsed as one Python module; if that is a syntax error (a document, Python 2, a
+fragment), each fenced block tagged ``python``, ``py`` or ``python3`` is parsed on its own (at most
+20; a fence left open runs to the end of the text). Nothing is matched by spelling: names are
+resolved from the file's imports (``import os as o``, ``from os import environ``), a name the file
+rebinds is not the module, and a fenced fragment that leaves out ``import os`` still reads ``os``
+as the module.
+
+"The environment" is ``os.environ``, ``dict(os.environ)``, ``os.environ.copy()``, ``{**os.environ}``,
+and its ``.items()``, ``.values()`` and ``.keys()`` (alone or inside ``list``, ``tuple``, ``sorted``).
+A loop binds the value of each variable when it iterates ``.items()`` (``for k, v``, or one name for
+the pair), ``.values()``, or the names with ``os.environ[k]`` / ``.get(k)`` in the body. A variable
+assigned from the environment is not followed.
+
+A finding needs a sink that shows what it is given: ``print`` (to stdout, stderr, ``None`` or a file the
+program opened for writing, not ``/dev/null``), ``pprint``, ``sys.stdout.write``, ``f.write``,
+``json.dump``, ``Path(...).write_text``, ``map(print, ...)``, a logging call at a level that is shown
+(warning and above by default; debug and info only when the file sets a level that shows them; a higher
+level set in the file hides what is under it; none after ``logging.disable``), and the ``data=`` or
+``params=`` of a ``requests`` or ``httpx`` call (``json=`` only when it is a real dict and no ``data=``
+or ``files=`` overrides it). What the sink shows is decided on the tree: a bare name,
+``str``/``repr``/``format``, an f-string field with no spec (or a spec that a string takes), ``+``,
+``%`` and ``.format`` whose placeholders match the arguments and do not truncate, a tuple, list or dict
+display, ``sep.join(...)`` over the items, ``json.dumps`` of a real dict or list, ``print(*items)``. A
+comparison, ``not``, ``and``/``or``, a conditional expression, a subscript or slice, any other call
+(``len``, ``.upper()``), a precision, names only, and ``json.dumps(os.environ)`` (which raises
+``TypeError``) show nothing. A loop that tests the variables it prints (``if``, ``while``, ``match``, a
+comprehension ``if``), or can leave early (``break``, ``continue``, ``return``, ``raise``,
+``sys.exit``), is not a dump of every variable. Branches that cannot run (``if False``,
+``TYPE_CHECKING``, code after ``return``) are skipped.
+
+It is a judgment from syntax, not proof that the code runs: a function never called, a dump behind
+a flag, and a logging handler that discards the record are still reported. The grammar is the one of the
+interpreter that runs the scan, so syntax newer than that interpreter (a ``match`` statement before
+Python 3.10) makes the text not Python and it is not read. ``return`` and ``yield``
+of the environment are not output and are not reported. The finding is for review (medium); it
+reads ``file`` and ``code``. A tree too deep for the parser raises ``RecursionError``, which the
+engine reports as an inspection that is not complete.
 """
 from __future__ import annotations
 
+import ast
 import ipaddress
 import json
 import re
+import string
+import textwrap
 import urllib.parse
+import warnings
 
 __all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
 
@@ -1537,4 +1582,855 @@ class SettingsWithoutPrompts:
         return findings
 
 
-VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts())
+# ----------------------------------------------------------------------- Python tree side
+
+_MAX_FENCES = 20
+_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*(?:python3?|py)(?![\w+-])", re.I)
+_FENCE_SHUT = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+
+_BUILTINS = frozenset((
+    "print", "open", "dict", "list", "tuple", "sorted", "str", "repr", "ascii", "format", "map",
+    "exit", "quit",
+))
+_BARE_MODULES = frozenset(("os", "sys", "json", "logging", "requests", "httpx", "pprint"))
+_EXIT_CALLS = frozenset(("sys.exit", "os._exit", "builtins.exit", "builtins.quit"))
+_LOG_HIGH = {"warning": 30, "warn": 30, "error": 40, "exception": 40, "critical": 50, "fatal": 50}
+_LOG_LOW = {"debug": 10, "info": 20}
+_LOG_NUMBERS = {"DEBUG": 10, "INFO": 20, "WARNING": 30, "WARN": 30, "ERROR": 40, "CRITICAL": 50, "FATAL": 50,
+                "NOTSET": 0}
+_HTTP_VERBS = frozenset(("get", "post", "put", "patch", "delete", "head", "options", "request"))
+_HTTP_MODULES = ("requests", "httpx")
+_PERCENT = re.compile(r"%(\([^)]*\))?([#0\- +]*)(\*|\d+)?(?:\.(\*|\d*))?[hlL]?([a-zA-Z%])")
+_WIDTH_ONLY = re.compile(r"^[<>^]?\d{0,4}s?$")
+_WRITE_MODE = re.compile(r"^[rwax+]*[wax+][rwax+]*$")
+
+
+class _Found(Exception):
+    """The reader found a sink that shows the environment; ``args[0]`` is the evidence."""
+
+
+class _Kind:
+    """What a mapping, view or list made from ``os.environ`` is.
+
+    ``shape`` is ``map`` (a mapping of every variable), ``items`` (name/value pairs), ``values`` or
+    ``keys``. ``concrete`` is a real ``dict`` or ``list``; otherwise it is the environ object itself or
+    a live view of it. ``environ`` says the object or view stands on ``os.environ``, whose text form
+    carries every value even for a view of the names."""
+
+    __slots__ = ("shape", "concrete", "environ")
+
+    def __init__(self, shape, concrete, environ):
+        self.shape = shape
+        self.concrete = concrete
+        self.environ = environ
+
+    def in_text(self):
+        """Whether ``str(x)`` carries values."""
+        if self.shape == "keys":
+            return self.environ and not self.concrete
+        return True
+
+    def in_iteration(self):
+        """Whether iterating ``x`` yields values."""
+        return self.shape in ("items", "values")
+
+    def in_json(self):
+        """Whether ``json.dumps(x)`` works and carries values."""
+        return self.concrete and self.shape in ("map", "items", "values")
+
+
+class _Ctx:
+    """Names that hold the environment's values in the loop or comprehension being read."""
+
+    __slots__ = ("keys", "values", "pairs")
+
+    def __init__(self, keys=frozenset(), values=frozenset(), pairs=frozenset()):
+        self.keys = keys
+        self.values = values
+        self.pairs = pairs
+
+    def live(self):
+        return bool(self.keys or self.values or self.pairs)
+
+    def names(self):
+        return self.keys | self.values | self.pairs
+
+
+_NO_CTX = _Ctx()
+
+
+def _fenced_python(text):
+    """The bodies of the fenced blocks tagged python; one pass over the lines."""
+    blocks = []
+    body = None
+    fence = None
+    for line in text.splitlines():
+        if body is None:
+            opened = _FENCE_OPEN.match(line)
+            if opened:
+                fence = opened.group(1)
+                body = []
+            continue
+        shut = _FENCE_SHUT.match(line)
+        if shut and shut.group(1)[0] == fence[0] and len(shut.group(1)) >= len(fence):
+            blocks.append("\n".join(body))
+            body = None
+            if len(blocks) >= _MAX_FENCES:
+                break
+        else:
+            body.append(line)
+    if body is not None and len(blocks) < _MAX_FENCES:
+        blocks.append("\n".join(body))  # a fence left open runs to the end of the text, as in markdown
+    return blocks
+
+
+def _parse(source):
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return ast.parse(source)
+    except (SyntaxError, ValueError, MemoryError, RecursionError):
+        # a text the interpreter itself cannot parse (too deep, parser stack full) is not a program
+        return None
+
+
+def _python_trees(text):
+    """The text as one module; if it is not Python, each fenced python block on its own."""
+    tree = _parse(text)
+    if tree is not None:
+        return [(text, tree)]
+    trees = []
+    for block in _fenced_python(text):
+        source = textwrap.dedent(block)
+        tree = _parse(source)
+        if tree is not None:
+            trees.append((source, tree))
+    return trees
+
+
+def _is_text(node):
+    return isinstance(node, ast.Constant) and isinstance(node.value, str)
+
+
+def _empty_body(node):
+    """True for a request body that is absent, ``None`` or another falsy constant (requests then sends ``json=``)."""
+    return node is None or (isinstance(node, ast.Constant) and not node.value)
+
+
+def _truth(test):
+    """True / False for a test that is a constant, else None."""
+    if isinstance(test, ast.Constant):
+        return bool(test.value)
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return False
+    if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
+        return False
+    return None
+
+
+def _count_loads(node, names):
+    """Whether the expression or statement mentions one of ``names``."""
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and child.id in names:
+            return True
+    return False
+
+
+def _percent_slots(fmt):
+    """The conversions of a ``%`` format as (shows the argument, ok) pairs, or None when the format is
+    one this reader does not follow (named keys, ``*`` widths, a bad conversion)."""
+    slots = []
+    position = 0
+    while True:
+        position = fmt.find("%", position)
+        if position < 0:
+            return slots
+        found = _PERCENT.match(fmt, position)
+        if found is None:
+            return None
+        position = found.end()
+        named, _flags, width, precision, conv = found.groups()
+        if conv == "%":
+            continue
+        if named is not None or width == "*" or precision == "*":
+            return None
+        slots.append(conv in "sra" and precision is None)
+
+
+def _brace_slots(fmt):
+    """The fields of a ``str.format`` format as a list of (key, shows the argument, needs a string), where
+    key is an index or a keyword, or None when the format is one this reader does not follow. A spec with no
+    conversion before it raises for anything but a string, so such a field shows a string value only."""
+    try:
+        parts = list(string.Formatter().parse(fmt))
+    except ValueError:
+        return None
+    slots = []
+    auto = 0
+    explicit = False
+    for _literal, field, spec, conv in parts:
+        if field is None:
+            continue
+        if any(ch in field for ch in ".[") or conv not in (None, "s", "r", "a") or "{" in (spec or ""):
+            return None
+        if field == "":
+            key = auto
+            auto += 1
+        elif field.isdigit():
+            key = int(field)
+            explicit = True
+        else:
+            key = field
+        slots.append((key, bool(_WIDTH_ONLY.match(spec or "")), bool(spec) and conv is None))
+    if auto and explicit:
+        return None
+    return slots
+
+
+class _EnvironmentReader:
+    """Reads one module tree for code that shows or sends every environment variable."""
+
+    def __init__(self, tree):
+        self.tree = tree
+        self.targets = {}      # imported name -> {what it stands for}
+        self.stores = {}       # name -> times it is bound by anything but an import
+        self.files = {}        # name -> times it is bound to a file opened for writing
+        self.loggers = set()   # names bound once to logging.getLogger(...)
+        self.sessions = {}     # names bound once to a requests session (``requests``) or httpx client (``httpx``)
+        self.levels = []       # logging levels set anywhere: ints, None when not a literal
+        self.logging_off = False
+        self.exits = {}        # id(loop) -> the loop body can leave early
+        self._collect()
+
+    # ------------------------------------------------------------------ name facts
+
+    def _store(self, name, count=1):
+        self.stores[name] = self.stores.get(name, 0) + count
+
+    def _collect(self):
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    name = alias.asname or alias.name.split(".")[0]
+                    what = alias.name if alias.asname else alias.name.split(".")[0]
+                    self.targets.setdefault(name, set()).add(what)
+            elif isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    name = alias.asname or alias.name
+                    what = (node.module or "") + "." + alias.name if node.module and not node.level else "?"
+                    self.targets.setdefault(name, set()).add(what)
+            elif isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+                self._store(node.id)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                self._store(node.name)
+            elif isinstance(node, ast.arg):
+                self._store(node.arg)
+            elif isinstance(node, ast.ExceptHandler) and node.name:
+                self._store(node.name)
+            elif type(node).__name__ in ("MatchAs", "MatchStar") and getattr(node, "name", None):
+                self._store(node.name)
+            elif type(node).__name__ == "MatchMapping" and getattr(node, "rest", None):
+                self._store(node.rest)
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                self._note_binding(node.targets[0].id, node.value)
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                for item in node.items:
+                    if isinstance(item.optional_vars, ast.Name):
+                        self._note_binding(item.optional_vars.id, item.context_expr)
+            elif isinstance(node, ast.Call):
+                self._note_logging_call(node)
+        self._note_exits(self.tree.body)
+
+    def _note_binding(self, name, value):
+        if self._opened_for_writing(value):
+            self.files[name] = self.files.get(name, 0) + 1
+        elif isinstance(value, ast.Call):
+            made = self.qual(value.func)
+            if made == "logging.getLogger":
+                self.loggers.add(name)
+            elif made in ("requests.Session", "requests.session", "httpx.Client"):
+                self.sessions[name] = made.split(".")[0]
+
+    def _note_logging_call(self, call):
+        made = self.qual(call.func)
+        if made == "logging.disable":
+            self.logging_off = True
+        elif made == "logging.basicConfig":
+            for keyword in call.keywords:
+                if keyword.arg == "level":
+                    self.levels.append(self._level(keyword.value))
+        elif isinstance(call.func, ast.Attribute) and call.func.attr == "setLevel" and call.args:
+            self.levels.append(self._level(call.args[0]))
+
+    def _level(self, node):
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, int) and not isinstance(node.value, bool):
+                return node.value
+            if isinstance(node.value, str):
+                return _LOG_NUMBERS.get(node.value.upper())
+        made = self.qual(node)
+        if made and made.startswith("logging."):
+            return _LOG_NUMBERS.get(made.split(".")[-1])
+        return None
+
+    def _note_exits(self, stmts):
+        """Fill ``self.exits``: whether each loop's body holds a statement that can leave it early."""
+        pending = list(stmts)
+        order = []
+        while pending:
+            node = pending.pop()
+            order.append(node)
+            for field in ("body", "orelse", "finalbody"):
+                pending.extend(getattr(node, field, ()) if isinstance(getattr(node, field, None), list) else ())
+            for handler in getattr(node, "handlers", ()):
+                pending.append(handler)
+            for case in getattr(node, "cases", ()):
+                pending.append(case)
+        leaves = {}
+        for node in reversed(order):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                leaves[id(node)] = False
+                continue
+            leave = isinstance(node, (ast.Return, ast.Raise, ast.Break, ast.Continue))
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+                leave = self.qual(node.value.func) in _EXIT_CALLS
+            for field in ("body", "orelse", "finalbody"):
+                children = getattr(node, field, None)
+                if isinstance(children, list):
+                    leave = leave or any(leaves.get(id(child), False) for child in children)
+            for group in (getattr(node, "handlers", ()), getattr(node, "cases", ())):
+                leave = leave or any(leaves.get(id(child), False) for child in group)
+            leaves[id(node)] = leave
+            if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+                self.exits[id(node)] = any(leaves.get(id(child), False) for child in node.body)
+
+    def builtin(self, name):
+        return name in _BUILTINS and name not in self.stores and name not in self.targets
+
+    def qual(self, node):
+        """The dotted name a Name or Attribute chain stands for, or None."""
+        if isinstance(node, ast.Name):
+            whats = self.targets.get(node.id)
+            if whats is not None:
+                if len(whats) == 1 and node.id not in self.stores:
+                    return next(iter(whats))
+                return None
+            if node.id in _BUILTINS and node.id not in self.stores:
+                return "builtins." + node.id
+            if node.id in _BARE_MODULES and node.id not in self.stores:
+                return node.id  # a fenced fragment that leaves out its import
+            return None
+        if isinstance(node, ast.Attribute):
+            base = self.qual(node.value)
+            return base + "." + node.attr if base else None
+        return None
+
+    def _opened_for_writing(self, node):
+        if not (isinstance(node, ast.Call) and self.qual(node.func) == "builtins.open" and node.args):
+            return False
+        mode = node.args[1] if len(node.args) > 1 else next((k.value for k in node.keywords if k.arg == "mode"), None)
+        if not (isinstance(mode, ast.Constant) and isinstance(mode.value, str)):
+            return False
+        if "b" in mode.value or not _WRITE_MODE.match(mode.value):
+            return False
+        target = node.args[0]
+        if isinstance(target, ast.Constant) and isinstance(target.value, str) and target.value == "/dev/null":
+            return False
+        return self.qual(target) != "os.devnull"
+
+    # ------------------------------------------------------------------ what the environment is
+
+    def env(self, node):
+        """The ``_Kind`` of an expression made from ``os.environ``, or None."""
+        if isinstance(node, (ast.Name, ast.Attribute)):
+            return _Kind("map", False, True) if self.qual(node) == "os.environ" else None
+        if isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values):
+                if key is None and (inner := self.env(value)) is not None and inner.shape == "map":
+                    return _Kind("map", True, False)
+            return None
+        if not isinstance(node, ast.Call):
+            return None
+        func = node.func
+        if isinstance(func, ast.Attribute) and not node.keywords:
+            inner = self.env(func.value)
+            if inner is not None and inner.shape == "map" and not node.args:
+                if func.attr == "copy":
+                    return _Kind("map", True, False)
+                if func.attr in ("items", "values", "keys"):
+                    return _Kind(func.attr, False, inner.environ)
+            return None
+        made = self.qual(func)
+        if made == "builtins.dict" and len(node.args) == 1 and not isinstance(node.args[0], ast.Starred):
+            inner = self.env(node.args[0])
+            if inner is not None and inner.shape in ("map", "items"):
+                return _Kind("map", True, False)
+        if made in ("builtins.list", "builtins.tuple", "builtins.sorted") and node.args \
+                and not isinstance(node.args[0], ast.Starred) and (made == "builtins.sorted" or len(node.args) == 1):
+            if made != "builtins.sorted" and node.keywords:
+                return None
+            inner = self.env(node.args[0])
+            if inner is not None:
+                return _Kind("keys" if inner.shape == "map" else inner.shape, True, False)
+        return None
+
+    # ------------------------------------------------------------------ what is shown
+
+    def string_valued(self, node, ctx):
+        """Whether the expression is a ``str`` (a write needs one; a print does not)."""
+        if isinstance(node, ast.JoinedStr):
+            return True
+        if isinstance(node, ast.BinOp):
+            return isinstance(node.op, (ast.Add, ast.Mod))
+        if isinstance(node, ast.Name):
+            return node.id in ctx.values
+        if isinstance(node, ast.Subscript):
+            return self._value_of_key(node, ctx) or self._pair_value(node, ctx)
+        if isinstance(node, ast.Call):
+            made = self.qual(node.func)
+            if made in ("builtins.str", "builtins.repr", "builtins.ascii", "builtins.format", "json.dumps",
+                        "pprint.pformat", "urllib.parse.urlencode"):
+                return True
+            if isinstance(node.func, ast.Attribute) and node.func.attr in ("format", "join") \
+                    and isinstance(node.func.value, ast.Constant) and isinstance(node.func.value.value, str):
+                return True
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "get" and node.args:
+                return self._value_of_key(node, ctx)
+        return False
+
+    def _value_of_key(self, node, ctx):
+        """``E[k]`` or ``E.get(k)`` for a name ``k`` that is one of the environment's names."""
+        if isinstance(node, ast.Subscript):
+            base, key = node.value, node.slice
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" \
+                and node.args and not node.keywords:
+            base, key = node.func.value, node.args[0]
+        else:
+            return False
+        inner = self.env(base)
+        return inner is not None and inner.shape == "map" and isinstance(key, ast.Name) and key.id in ctx.keys
+
+    def _pair_value(self, node, ctx):
+        """``pair[1]`` for a name bound to a whole name/value pair."""
+        return (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id in ctx.pairs
+                and isinstance(node.slice, ast.Constant) and node.slice.value == 1)
+
+    def shows(self, node, ctx, as_json=False):
+        """Whether the text of the expression carries an environment value."""
+        if isinstance(node, ast.Constant):
+            return False
+        kind = self.env(node)
+        if kind is not None:
+            return kind.in_json() if as_json else kind.in_text()
+        if isinstance(node, ast.Name):
+            return node.id in ctx.values or node.id in ctx.pairs
+        if isinstance(node, ast.Subscript) or (isinstance(node, ast.Call) and self._value_of_key(node, ctx)):
+            return self._value_of_key(node, ctx) or self._pair_value(node, ctx)
+        if isinstance(node, ast.JoinedStr):
+            return any(self._field_shows(part, ctx) for part in node.values if isinstance(part, ast.FormattedValue))
+        if isinstance(node, ast.BinOp):
+            if isinstance(node.op, ast.Add):
+                return self.shows(node.left, ctx) or self.shows(node.right, ctx)
+            if isinstance(node.op, ast.Mod) and _is_text(node.left):
+                slots = _percent_slots(node.left.value)
+                args = node.right.elts if isinstance(node.right, ast.Tuple) else [node.right]
+                if slots is None or len(slots) != len(args) or any(isinstance(a, ast.Starred) for a in args):
+                    return False
+                return any(shown and self.shows(arg, ctx) for shown, arg in zip(slots, args))
+            return False
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            return any(self._element_shows(elt, ctx, as_json) for elt in node.elts)
+        if isinstance(node, ast.Dict):
+            return any(self.shows(part, ctx, as_json) for pair in zip(node.keys, node.values) for part in pair
+                       if part is not None) or (self.env(node) is not None and self.env(node).in_text())
+        if isinstance(node, (ast.ListComp, ast.SetComp)):
+            return self._comprehension_shows(node, node.elt, ctx)
+        if isinstance(node, ast.DictComp):
+            return self._comprehension_shows(node, ast.Tuple(elts=[node.key, node.value], ctx=ast.Load()), ctx)
+        if isinstance(node, ast.Call):
+            return self._call_shows(node, ctx)
+        return False
+
+    def _element_shows(self, elt, ctx, as_json=False):
+        if isinstance(elt, ast.Starred):
+            kind = self.env(elt.value)
+            return kind.in_iteration() if kind is not None else self.shows(elt.value, ctx, as_json)
+        return self.shows(elt, ctx, as_json)
+
+    def _field_shows(self, field, ctx):
+        spec = field.format_spec
+        if spec is not None:
+            if not all(isinstance(part, ast.Constant) for part in spec.values):
+                return False
+            text = "".join(part.value for part in spec.values)
+            if not _WIDTH_ONLY.match(text):
+                return False
+            if text and field.conversion == -1 and not self._is_value(field.value, ctx):
+                return False
+        return self.shows(field.value, ctx)
+
+    def _is_value(self, node, ctx):
+        """Whether the expression is one environment value (a ``str``), which takes a format spec."""
+        if isinstance(node, ast.Name):
+            return node.id in ctx.values
+        return self._value_of_key(node, ctx) or self._pair_value(node, ctx)
+
+    def _comprehension_shows(self, node, elt, ctx):
+        inner = ctx
+        for generator in node.generators:
+            inner = self.bind(inner, generator.target, generator.iter)
+            for cond in generator.ifs:
+                if _count_loads(cond, inner.names()):
+                    inner = _NO_CTX
+        return self.shows(elt, inner)
+
+    def _call_shows(self, call, ctx):
+        made = self.qual(call.func)
+        args = call.args
+        plain = not call.keywords and not any(isinstance(a, ast.Starred) for a in args)
+        if made in ("builtins.str", "builtins.repr", "builtins.ascii", "pprint.pformat") and len(args) == 1 \
+                and not any(isinstance(a, ast.Starred) for a in args):
+            return self.shows(args[0], ctx)
+        if made == "builtins.format" and len(args) == 1 and plain:
+            return self.shows(args[0], ctx)
+        if made == "json.dumps" and args and not isinstance(args[0], ast.Starred):
+            if any(k.arg is None or k.arg == "cls" for k in call.keywords):
+                return False
+            return self.shows(args[0], ctx, as_json=True)
+        if made == "urllib.parse.urlencode" and args and not isinstance(args[0], ast.Starred):
+            kind = self.env(args[0])
+            return kind is not None and kind.shape in ("map", "items")
+        func = call.func
+        if isinstance(func, ast.Attribute) and func.attr == "encode" and not args:
+            return self.shows(func.value, ctx)
+        if isinstance(func, ast.Attribute) and _is_text(func.value):
+            if func.attr == "format":
+                return self._format_shows(func.value.value, call, ctx)
+            if func.attr == "join" and len(args) == 1 and not call.keywords:
+                return self._join_shows(args[0], ctx)
+        return False
+
+    def _format_shows(self, fmt, call, ctx):
+        slots = _brace_slots(fmt)
+        if slots is None or any(isinstance(a, ast.Starred) for a in call.args) \
+                or any(k.arg is None for k in call.keywords):
+            return False
+        keyword = {k.arg: k.value for k in call.keywords}
+        for key, plain, needs_text in slots:
+            if isinstance(key, int):
+                if key >= len(call.args):
+                    return False
+                argument = call.args[key]
+            else:
+                if key not in keyword:
+                    return False
+                argument = keyword[key]
+            if plain and self.shows(argument, ctx) and (not needs_text or self._is_value(argument, ctx)):
+                return True
+        return False
+
+    def _join_shows(self, argument, ctx):
+        if isinstance(argument, (ast.ListComp, ast.GeneratorExp)):
+            return self._comprehension_shows(argument, argument.elt, ctx)
+        if isinstance(argument, (ast.List, ast.Tuple)):
+            return any(self._element_shows(elt, ctx) for elt in argument.elts)
+        kind = self.env(argument)
+        return kind is not None and kind.in_iteration()
+
+    # ------------------------------------------------------------------ names that carry values
+
+    def bind(self, ctx, target, iterable):
+        """The context inside ``for target in iterable``; names the target rebinds stop carrying values."""
+        kind = self.env(iterable)
+        if kind is None:
+            if not ctx.live():
+                return ctx
+            gone = {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+            return _Ctx(ctx.keys - gone, ctx.values - gone, ctx.pairs - gone)
+        if kind.shape == "items":
+            if isinstance(target, ast.Name):
+                return _Ctx(ctx.keys, ctx.values, ctx.pairs | {target.id})
+            if isinstance(target, (ast.Tuple, ast.List)) and len(target.elts) == 2 \
+                    and all(isinstance(e, ast.Name) for e in target.elts):
+                key, value = target.elts
+                return _Ctx(ctx.keys | {key.id}, ctx.values | {value.id}, ctx.pairs)
+        elif kind.shape == "values" and isinstance(target, ast.Name):
+            return _Ctx(ctx.keys, ctx.values | {target.id}, ctx.pairs)
+        elif kind.shape in ("map", "keys") and isinstance(target, ast.Name):
+            return _Ctx(ctx.keys | {target.id}, ctx.values, ctx.pairs)
+        return ctx
+
+    # ------------------------------------------------------------------ sinks
+
+    def _stream(self, node):
+        """Whether the expression is a text stream the output is visible on or kept in."""
+        if node is None or (isinstance(node, ast.Constant) and node.value is None):
+            return True
+        made = self.qual(node)
+        if made in ("sys.stdout", "sys.stderr"):
+            return True
+        if isinstance(node, ast.Name):
+            return self.files.get(node.id) == 1 and self.stores.get(node.id) == 1
+        return self._opened_for_writing(node)
+
+    def _logging_shows(self, level):
+        """Whether a record at ``level`` is shown. With no literal level set in the file the default
+        (warning and above) applies; with one, the lowest literal level set; a level the reader cannot
+        read hides debug and info. Never after ``logging.disable``."""
+        if self.logging_off:
+            return False
+        known = [value for value in self.levels if value is not None]
+        if None in self.levels and level < 30:
+            return False
+        return level >= (min(known) if known else 30)
+
+    def _log_message_shows(self, call, ctx, skip):
+        args = call.args[skip:]
+        if not args or any(isinstance(a, ast.Starred) for a in call.args):
+            return False
+        message, extra = args[0], args[1:]
+        if isinstance(message, ast.Constant) and isinstance(message.value, str):
+            slots = _percent_slots(message.value)
+            if not extra or slots is None or len(slots) != len(extra):
+                return False
+            return any(shown and self.shows(arg, ctx) for shown, arg in zip(slots, extra))
+        return not extra and self.shows(message, ctx)
+
+    def sink(self, call, ctx):
+        """The name of the output call if ``call`` shows the environment, else None."""
+        made = self.qual(call.func)
+        args = call.args
+        if made == "builtins.print":
+            if any(k.arg is None for k in call.keywords):
+                return None
+            file = next((k.value for k in call.keywords if k.arg == "file"), None)
+            if self._stream(file) and any(self._element_shows(a, ctx) for a in args):
+                return "print"
+            return None
+        if made == "builtins.map" and len(args) == 2 and self.qual(args[0]) == "builtins.print":
+            kind = self.env(args[1])
+            return "print" if kind is not None and kind.in_iteration() else None
+        if made in ("pprint.pprint", "pprint.pp"):
+            stream = next((k.value for k in call.keywords if k.arg == "stream"), None)
+            if args and not isinstance(args[0], ast.Starred) and self._stream(stream) and self.shows(args[0], ctx):
+                return "pprint"
+            return None
+        if made == "json.dump" and len(args) >= 2 and not any(isinstance(a, ast.Starred) for a in args):
+            if self._stream(args[1]) and self.shows(args[0], ctx, as_json=True):
+                return "json.dump"
+            return None
+        if made and made.startswith("logging."):
+            return self._log_sink(call, ctx, made.split(".")[-1], 0)
+        func = call.func
+        if isinstance(func, ast.Attribute):
+            if func.attr == "write" and args and not isinstance(args[0], ast.Starred) and self._stream(func.value):
+                return "write" if self.string_valued(args[0], ctx) and self.shows(args[0], ctx) else None
+            if func.attr == "write_text" and args and isinstance(func.value, ast.Call) \
+                    and self.qual(func.value.func) == "pathlib.Path" and not isinstance(args[0], ast.Starred):
+                return "write_text" if self.string_valued(args[0], ctx) and self.shows(args[0], ctx) else None
+            receiver = func.value
+            logger = self._bound_once(receiver, self.loggers) \
+                or (isinstance(receiver, ast.Call) and self.qual(receiver.func) == "logging.getLogger")
+            if logger:
+                return self._log_sink(call, ctx, func.attr, 0)
+            if self._bound_once(receiver, self.sessions) and func.attr in _HTTP_VERBS:
+                return self._http_sink(call, ctx, func.attr, self.sessions[receiver.id])
+        if made:
+            module, _dot, verb = made.rpartition(".")
+            if module in _HTTP_MODULES and verb in _HTTP_VERBS:
+                return self._http_sink(call, ctx, verb, module)
+        return None
+
+    def _bound_once(self, node, names):
+        """Whether the expression is a name that is bound exactly once, and that to one of ``names``."""
+        return isinstance(node, ast.Name) and node.id in names and self.stores.get(node.id) == 1
+
+    def _log_sink(self, call, ctx, method, skip):
+        if method == "log" and call.args:
+            level = self._level(call.args[0])
+            if not self._logging_shows(20 if level is None else level):
+                return None
+            return "logging" if self._log_message_shows(call, ctx, 1) else None
+        level = _LOG_HIGH.get(method) or _LOG_LOW.get(method)
+        if level is None or not self._logging_shows(level):
+            return None
+        return "logging" if self._log_message_shows(call, ctx, skip) else None
+
+    def _http_sink(self, call, ctx, verb, module):
+        keyword = {k.arg: k.value for k in call.keywords if k.arg}
+        if any(k.arg is None for k in call.keywords) or any(isinstance(a, ast.Starred) for a in call.args):
+            return None
+        sent = []
+        if "data" in keyword:
+            sent.append(keyword["data"])
+        # requests takes a body second for post/put/patch and params second for get; httpx takes neither
+        elif module == "requests" and verb in ("post", "put", "patch") and len(call.args) > 1:
+            sent.append(call.args[1])
+        if "params" in keyword:
+            sent.append(keyword["params"])
+        elif module == "requests" and verb == "get" and len(call.args) > 1:
+            sent.append(call.args[1])
+        for body in sent:
+            kind = self.env(body)
+            if kind is not None:
+                if kind.shape == "map" or (kind.shape == "items" and kind.concrete):
+                    return "http"
+            elif self.shows(body, ctx):
+                return "http"
+        if "json" in keyword and all(_empty_body(keyword.get(name)) for name in ("data", "files")) \
+                and self.shows(keyword["json"], ctx, as_json=True):
+            return "http"
+        return None
+
+    # ------------------------------------------------------------------ the walk
+
+    def read(self):
+        """The evidence of the first sink that shows the environment, or None."""
+        try:
+            self._block(self.tree.body, _NO_CTX)
+        except _Found as found:
+            return found.args[0]
+        return None
+
+    def _block(self, stmts, ctx):
+        for stmt in stmts:
+            self._stmt(stmt, ctx)
+            if isinstance(stmt, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
+                return
+
+    @staticmethod
+    def _rebinds(body, names):
+        """Whether the statements assign, delete or import any of ``names``."""
+        for stmt in body:
+            for node in ast.walk(stmt):
+                if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)) and node.id in names:
+                    return True
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    if any((alias.asname or alias.name.split(".")[0]) in names for alias in node.names):
+                        return True
+        return False
+
+    def _stmt(self, node, ctx):
+        if isinstance(node, (ast.For, ast.AsyncFor)):
+            self._expr(node.iter, ctx)
+            inner = ctx
+            if isinstance(node, ast.For) and not self.exits.get(id(node), False):
+                inner = self.bind(ctx, node.target, node.iter)
+                if inner.names() - ctx.names() and self._rebinds(node.body, inner.names()):
+                    inner = _NO_CTX
+            self._block(node.body, inner)
+            self._block(node.orelse, ctx)
+        elif isinstance(node, ast.While):
+            self._expr(node.test, ctx)
+            if _truth(node.test) is not False:
+                self._block(node.body, _NO_CTX if _count_loads(node.test, ctx.names()) else ctx)
+            self._block(node.orelse, ctx)
+        elif isinstance(node, ast.If):
+            self._expr(node.test, ctx)
+            truth = _truth(node.test)
+            inner = _NO_CTX if ctx.live() and _count_loads(node.test, ctx.names()) else ctx
+            if truth is not False:
+                self._block(node.body, inner)
+            if truth is not True:
+                self._block(node.orelse, inner)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            for decorator in node.decorator_list:
+                self._expr(decorator, ctx)
+            self._block(node.body, _NO_CTX)
+        elif type(node).__name__ == "Match":
+            self._expr(node.subject, ctx)
+            inner = _NO_CTX if ctx.live() and _count_loads(node.subject, ctx.names()) else ctx
+            for case in node.cases:
+                if case.guard is not None:
+                    self._expr(case.guard, inner)
+                self._block(case.body, inner)
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            for item in node.items:
+                self._expr(item.context_expr, ctx)
+            self._block(node.body, ctx)
+        elif type(node).__name__ in ("Try", "TryStar"):
+            self._block(node.body, ctx)
+            for handler in node.handlers:
+                self._block(handler.body, ctx)
+            self._block(node.orelse, ctx)
+            self._block(node.finalbody, ctx)
+        else:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, ast.expr):
+                    self._expr(child, ctx)
+
+    def _expr(self, node, ctx):
+        if isinstance(node, ast.Call):
+            shown = self.sink(node, ctx)
+            if shown is not None:
+                raise _Found({"sink": shown, "line": node.lineno,
+                              "shape": "loop" if ctx.live() else "whole_environment"})
+        if isinstance(node, ast.IfExp):
+            self._expr(node.test, ctx)
+            inner = _NO_CTX if ctx.live() and _count_loads(node.test, ctx.names()) else ctx
+            self._expr(node.body, inner)
+            self._expr(node.orelse, inner)
+        elif isinstance(node, ast.BoolOp):
+            inner = ctx
+            for value in node.values:
+                self._expr(value, inner)
+                if inner.live() and _count_loads(value, inner.names()):
+                    inner = _NO_CTX
+        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            inner = ctx
+            for generator in node.generators:
+                self._expr(generator.iter, inner)
+                inner = self.bind(inner, generator.target, generator.iter)
+                for cond in generator.ifs:
+                    self._expr(cond, inner)
+                    if inner.live() and _count_loads(cond, inner.names()):
+                        inner = _NO_CTX
+            for part in ((node.key, node.value) if isinstance(node, ast.DictComp) else (node.elt,)):
+                self._expr(part, inner)
+        elif isinstance(node, ast.Lambda):
+            self._expr(node.body, _NO_CTX)
+        else:
+            for child in ast.iter_child_nodes(node):
+                self._expr(child, ctx)
+
+
+class EnvironmentDumpedByPython:
+    """GLS-STRUCT-005: Python code that shows or sends every environment variable."""
+
+    id = "GLS-STRUCT-005"
+    name = "Python program prints or sends the whole environment"
+    category = "exfiltration"
+    severity = "medium"
+    channel = ["file", "code"]
+    description = ("Python code that reads as one that prints, logs, writes or sends every environment "
+                   "variable, with its value, where an agent or whoever reads the output will see the "
+                   "secrets (API keys, tokens). It is a judgment from the syntax tree, not proof that the "
+                   "code runs: a debug helper that dumps the environment is the dump it is, so this is a "
+                   "finding to look at, not a block.")
+
+    def pregate(self, text):
+        return "environ" in text
+
+    def run(self, text):
+        for source, tree in _python_trees(text):
+            evidence = _EnvironmentReader(tree).read()
+            if evidence is None:
+                continue
+            lines = source.splitlines()
+            line = lines[evidence["line"] - 1].strip() if evidence["line"] <= len(lines) else ""
+            return [{
+                "id": self.id,
+                "name": self.name,
+                "category": self.category,
+                "severity": self.severity,
+                "channel": list(self.channel),
+                "description": self.description,
+                "matched_text": line[:50],
+                "structural": True,
+                "evidence": evidence,
+            }]
+        return []
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentDumpedByPython())
