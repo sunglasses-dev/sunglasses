@@ -1748,6 +1748,21 @@ def _truth(test):
     return None
 
 
+def _else_runs(node):
+    """Whether the ``else`` arm of a loop can run: never after ``while <true>``, and never after a ``for`` over a
+    non-empty literal whose body always leaves with no ``continue`` in it."""
+    if isinstance(node, ast.While):
+        return _truth(node.test) is not True
+    source = node.iter
+    if isinstance(source, (ast.List, ast.Tuple, ast.Set)) and source.elts \
+            and not any(isinstance(e, ast.Starred) for e in source.elts):
+        if not any(isinstance(n, ast.Continue) for s in node.body for n in ast.walk(s)):
+            for stmt in node.body:
+                if isinstance(stmt, (ast.Break, ast.Return, ast.Raise)):
+                    return False
+    return True
+
+
 def _count_loads(node, names):
     """Whether the expression or statement mentions one of ``names``."""
     for child in ast.walk(node):
@@ -1936,7 +1951,9 @@ class _EnvironmentReader:
                     return True
                 continue
             if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
-                if self._leaves(node.body, True) or self._leaves(node.orelse, inner):
+                live = not (isinstance(node, ast.While) and _truth(node.test) is False)
+                if (live and self._leaves(node.body, True)) \
+                        or (_else_runs(node) and self._leaves(node.orelse, inner)):
                     return True
                 continue
             if isinstance(node, ast.If):
@@ -1950,7 +1967,8 @@ class _EnvironmentReader:
                 if isinstance(children, list) and self._leaves(children, inner):
                     return True
             for group in (getattr(node, "handlers", ()), getattr(node, "cases", ())):
-                if any(self._leaves(child.body, inner) for child in group):
+                if any(self._leaves(child.body, inner) for child in group
+                       if getattr(child, "guard", None) is None or _truth(child.guard) is not False):
                     return True
         return False
 
@@ -2130,6 +2148,8 @@ class _EnvironmentReader:
         for generator in node.generators:
             inner = self.bind(inner, generator.target, generator.iter)
             for cond in generator.ifs:
+                if _truth(cond) is False:
+                    return False            # nothing gets past a filter that is never true
                 if _count_loads(cond, inner.names()):
                     inner = _NO_CTX
         return self.shows(elt, inner)
@@ -2188,8 +2208,10 @@ class _EnvironmentReader:
     def bind(self, ctx, target, iterable):
         """The context inside ``for target in iterable``; names the target rebinds stop carrying values."""
         kind = self.env(iterable)
-        if kind is not None and len(ctx.keys) + len(ctx.values) + len(ctx.pairs) >= _MAX_NAMES:
-            return ctx                      # names past the cap are not tracked: a set copied per step stays cheap
+        if kind is not None:
+            added = 2 if kind.shape == "items" and isinstance(target, (ast.Tuple, ast.List)) else 1
+            if len(ctx.keys) + len(ctx.values) + len(ctx.pairs) + added > _MAX_NAMES:
+                kind = None                 # names past the cap are not tracked: a set copied per step stays cheap
         if kind is None:
             if not ctx.live():
                 return ctx
@@ -2370,12 +2392,14 @@ class _EnvironmentReader:
                 if inner.names() - ctx.names() and self._rebinds(node.body, inner.names()):
                     inner = _NO_CTX
             self._block(node.body, inner)
-            self._block(node.orelse, ctx)
+            if _else_runs(node):
+                self._block(node.orelse, ctx)
         elif isinstance(node, ast.While):
             self._expr(node.test, ctx)
             if _truth(node.test) is not False:
                 self._block(node.body, _NO_CTX if _count_loads(node.test, ctx.names()) else ctx)
-            self._block(node.orelse, ctx)
+            if _else_runs(node):
+                self._block(node.orelse, ctx)
         elif isinstance(node, ast.If):
             self._expr(node.test, ctx)
             truth = _truth(node.test)
@@ -2397,6 +2421,8 @@ class _EnvironmentReader:
                     self._expr(case.guard, inner)
                     if inner.live() and _count_loads(case.guard, inner.names()):
                         body = _NO_CTX          # the guard picks which names get this case
+                    if _truth(case.guard) is False:
+                        continue                # a case that never matches
                 self._block(case.body, body)
         elif isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:

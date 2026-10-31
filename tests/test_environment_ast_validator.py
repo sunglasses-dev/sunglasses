@@ -555,8 +555,29 @@ R2_FIRES = {
     "outer_loop_with_dead_break_still_prints": "import os\nfor k, v in os.environ.items():\n    if False:\n        break\n    print(k, v)\n",
 }
 
-ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES, **R3_FIRES}
-ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET, **R2_QUIET}
+R4_QUIET = {
+    # an else arm that cannot run: after while <true>, or after a loop over a non-empty literal that always leaves
+    "else_after_while_true_break": "import os\nfor v in os.environ.values():\n    while True:\n        break\n    else:\n        print(v)\n",
+    "else_after_literal_loop_break": "import os\nfor v in os.environ.values():\n    for i in [1]:\n        break\n    else:\n        print(v)\n",
+    "else_after_literal_loop_return": "import os\ndef run():\n    for v in os.environ.values():\n        for i in (1, 2):\n            return\n        else:\n            print(v)\n",
+    # nothing gets past a filter that is never true, in the value a sink shows
+    "false_filter_list_shown": "import os\nprint([v for v in os.environ.values() if False])\n",
+    "false_filter_dict_shown": "import os\nprint({k: v for k, v in os.environ.items() if False})\n",
+    "false_filter_not_true_shown": "import os\nprint({v for v in os.environ.values() if not True})\n",
+    "false_filter_joined": "import os\nprint(','.join(v for v in os.environ.values() if False))\n",
+}
+
+R4_FIRES = {
+    # an else arm that can run, and a dead body that does not hide the output
+    "else_after_loop_over_unknown": "import os\nfor v in os.environ.values():\n    for i in range(n):\n        break\n    else:\n        print(v)\n",
+    "else_after_literal_loop_with_continue": "import os\nfor v in os.environ.values():\n    for i in [1, 2]:\n        if i == 1:\n            continue\n        break\n    else:\n        print(v)\n",
+    "dead_while_return_is_not_a_filter": "import os\ndef run():\n    for value in os.environ.values():\n        while False:\n            return\n        print(value)\nrun()\n",
+    "dead_while_raise_is_not_a_filter": "import os\nfor value in os.environ.values():\n    while False:\n        raise SystemExit\n    print(value)\n",
+    "true_filter_shown": "import os\nprint([v for v in os.environ.values() if True])\n",
+}
+
+ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES, **R3_FIRES, **R4_FIRES}
+ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET, **R2_QUIET, **R4_QUIET}
 
 
 def test_the_tables_do_not_overlap():
@@ -717,6 +738,10 @@ MATCH_GUARDS = {
         "import os\nfor key, val in os.environ.items():\n    match True:\n        case _ if key == 'LANG':\n            print(val)\n", False),
     "quiet_when_the_guard_picks_one_name_by_value": (
         "import os\nfor key, val in os.environ.items():\n    match 1:\n        case 1 if val.startswith('en_'):\n            print(val)\n", False),
+    "quiet_when_the_guard_is_never_true": (
+        "import os\nfor v in os.environ.values():\n    match 1:\n        case 1 if False:\n            print(v)\n", False),
+    "fires_when_a_never_true_guard_holds_the_exit": (
+        "import os\nfor v in os.environ.values():\n    match 1:\n        case 1 if False:\n            break\n    print(v)\n", True),
 }
 
 
@@ -878,6 +903,17 @@ def test_names_past_the_cap_are_not_tracked_in_one_scope(validator):
     clauses = "".join("for v%d in os.environ.values() " % i for i in range(300))
     assert hits(validator, "import os\nx = [print(v0) %s]\n" % clauses) == [RULE]
     assert hits(validator, "import os\nx = [print(v299) %s]\n" % clauses) == []     # a stated limit
+
+
+def test_a_two_name_binding_does_not_pass_the_cap(validator):
+    clauses = "".join("for v%d in os.environ.values() " % i for i in range(255))
+    assert hits(validator, "import os\nx = [print(last) %sfor key, last in os.environ.items()]\n" % clauses) == []
+    assert hits(validator, "import os\nx = [print(v254) %sfor key, last in os.environ.items()]\n" % clauses) == [RULE]
+
+
+def test_a_tracked_name_bound_again_past_the_cap_stops_carrying_a_value(validator):
+    clauses = "".join("for v%d in os.environ.values() " % i for i in range(256))
+    assert hits(validator, "import os\nx = [print(v0) %sfor v0 in os.environ]\n" % clauses) == []
 
 
 def best_of(call, runs=3):
