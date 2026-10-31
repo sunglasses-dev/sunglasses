@@ -29,11 +29,11 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-TEXT_LINE = "- \u2705 Text scanning: {} patterns, {} indexed keywords ({} declared), {} attack categories (English-first, see [Language coverage](#language-coverage-measured))"
+TEXT_LINE = "- \u2705 Text scanning: {} patterns that carry a matcher ({} listed), {} indexed keywords ({} declared), {} listed categories (English-first, see [Language coverage](#language-coverage-measured))"
 
 
 def _expected_line(stats):
-    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["keywords"]:,}',
+    return TEXT_LINE.format(f'{stats["patterns"]:,}', f'{stats["listed_patterns"]:,}', f'{stats["keywords"]:,}',
                             f'{stats["keywords_declared"]:,}', f'{stats["categories"]:,}')
 
 
@@ -41,7 +41,7 @@ def test_sync_readme_rewrites_the_text_scanning_line(tmp_path, monkeypatch):
     """The line must be REWRITTEN, counted, not merely survive the run."""
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_readme")
     stats = sync.get_real_stats()
-    stale = TEXT_LINE.format("1", "2", "3", "4")
+    stale = TEXT_LINE.format("1", "2", "3", "4", "5")
     (tmp_path / "README.md").write_text(f"x\n{stale}\ny\n")
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
     assert sync.sync_readme(stats) is True
@@ -71,9 +71,9 @@ KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns
 
 def _expected_table(stats):
     d, e, i = stats["keywords_declared"], stats["keyword_entries"], stats["keywords"]
-    return [f'| Patterns | {stats["patterns"]:,} |',
+    return [f'| Patterns | {stats["patterns"]:,} carry a matcher ({stats["listed_patterns"]:,} listed) |',
             KEYWORDS_ROW.format(f"{d:,}", f"{e:,}", f"{i:,}", f"{d - i:,}"),
-            f'| Attack categories | {stats["categories"]:,} |']
+            f'| Attack categories | {stats["categories"]:,} listed |']
 
 
 def test_sync_readme_rewrites_every_stats_table_row(tmp_path, monkeypatch):
@@ -96,3 +96,42 @@ def test_real_readme_stats_table_is_current_and_each_row_is_hit_once():
     lines = (ROOT / "README.md").read_text().splitlines()
     for want in _expected_table(sync.get_real_stats()):
         assert lines.count(want) == 1, f"README table row not current: {want[:60]}"
+
+
+OPENING = ("A local scanner checks text with {} patterns that carry a matcher ({} are listed) "
+           "across {} listed categories and reports findings.")
+UNDER_TABLE = "The ruleset lists {}; the other {} carry neither. Carrying a matcher is not proof."
+ATTACK_DB = ("**{} patterns across {} attack categories.** These are the listed rules: "
+             "{} of them carry a regex or keyword matcher and {} carry none.")
+
+
+def test_sync_readme_keeps_the_split_sentences_in_step_with_the_counts(tmp_path, monkeypatch):
+    """The opening line, the sentence under the table and attack-db/README.md state the same split
+    as the table; a moved count must move them too, not leave 1,512 / 71 behind."""
+    sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_split")
+    stats = {**sync.get_real_stats(), "patterns": 1513, "listed_patterns": 1590, "categories": 118}
+    (tmp_path / "attack-db").mkdir()
+    (tmp_path / "README.md").write_text(
+        "\n".join([OPENING.format("1,512", "1,583", "117"), UNDER_TABLE.format("1,583", "71")]) + "\n")
+    (tmp_path / "attack-db" / "README.md").write_text(ATTACK_DB.format("1,583", "117", "1,512", "71") + "\n")
+    monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
+    assert sync.sync_readme(stats) is True
+    assert (tmp_path / "README.md").read_text().splitlines() == [
+        OPENING.format("1,513", "1,590", "118"), UNDER_TABLE.format("1,590", "77")]
+    assert (tmp_path / "attack-db" / "README.md").read_text() == ATTACK_DB.format("1,590", "118", "1,513", "77") + "\n"
+    assert sync.sync_readme(stats) is False  # a second run has nothing left to move
+
+
+def test_sync_readme_leaves_the_real_split_sentences_alone_and_hits_each_once(tmp_path, monkeypatch):
+    sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_split_real")
+    stats = sync.get_real_stats()
+    (tmp_path / "attack-db").mkdir()
+    real = (ROOT / "README.md").read_text()
+    real_db = (ROOT / "attack-db" / "README.md").read_text()
+    assert real.count("patterns that carry a matcher (") >= 2 and real.count("carry neither.") == 1
+    (tmp_path / "README.md").write_text(real)
+    (tmp_path / "attack-db" / "README.md").write_text(real_db)
+    monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
+    assert sync.sync_readme(stats) is False
+    assert (tmp_path / "README.md").read_text() == real
+    assert (tmp_path / "attack-db" / "README.md").read_text() == real_db

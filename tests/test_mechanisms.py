@@ -293,8 +293,8 @@ def test_mechanisms_are_counted_separately_from_carriers():
     from sunglasses.patterns import PATTERNS as CARRIERS
 
     info = engine.info()
-    assert info["patterns"] == len(CARRIERS), (
-        f"carrier count {info['patterns']} != len(PATTERNS) {len(CARRIERS)} — "
+    assert info["listed_patterns"] == len(CARRIERS), (
+        f"carrier count {info['listed_patterns']} != len(PATTERNS) {len(CARRIERS)} — "
         f"mechanisms must not be folded into the published number"
     )
     assert info["mechanisms"] == len(MECHANISM_PATTERNS)
