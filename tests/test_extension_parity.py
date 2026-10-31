@@ -194,3 +194,20 @@ def test_a_plain_negation_before_a_look_alike_spelling_keeps_the_decision_it_had
     assert _decision(keywords, f"never beta. never {look_alike}", fast) == ("allow_redacted", "review")
     # The same keyword standing on its own is live, as on main.
     assert _decision(keywords, f"do not beta. {spelled}", fast) == ("block", "high")
+
+
+@pytest.mark.parametrize("fast", _paths())
+@pytest.mark.parametrize("keywords", [["iota", "beta"], ["ignore previous instructions", "beta"]])
+def test_a_rule_that_lists_the_look_alike_word_first_reviews_on_both_searches(keywords, fast):
+    """The one place a plain install now decides differently from 0.6.16 in the other
+    direction. With the look-alike word listed first, a plain install started the finding at
+    that word and blocked these inputs (listing luck: the same rule listed the other way round
+    reviewed them, and so did the extension in both listings). The two searches now take their
+    first hit in one order, so every case here reviews on both, in both textual orders and with
+    a quoted example in place of the second negation."""
+    spelled = "iota" if "iota" in keywords else "ignore previous instructions"
+    look_alike = spelled.replace("i", "l", 1)
+    for text in (f"do not beta. do not {look_alike}", f"do not {look_alike}. do not beta",
+                 f'do not beta. Example: "{look_alike}"', f'Example: "{look_alike}". do not beta',
+                 f"never beta. never {look_alike}"):
+        assert _decision(keywords, text, fast) == ("allow_redacted", "review"), text
