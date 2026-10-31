@@ -16,7 +16,10 @@ What makes a new step fail here, and what does not:
 - call guard: a function normalize_with_length calls by bare name (builtins
   aside), and a preprocessor helper engine.py calls by bare name after a
   `from .preprocessor import` or `from sunglasses.preprocessor import` at any
-  level, aliases resolved, must be a row's function or a listed non-step;
+  level, aliases resolved, must be a row's function or a listed non-step.
+  Scopes are not tracked: a name imported as different helpers in different
+  places counts as a call to every one of them, so a shared name can also make
+  a row's function look called when only another helper is;
 - fingerprint: FINGERPRINT pins the text of every top-level function in
   preprocessor.py with its decorators, preprocessor.py's import statements, and
   the engine's view builders (VIEW_BUILDERS). Any change to that text fails the
@@ -226,11 +229,15 @@ def test_no_lane_calls_a_function_no_row_names():
     defined = {n.name for n in PREPROCESSOR_TREE.body if isinstance(n, ast.FunctionDef)}
     keyword_lane = _bare_calls(_top_level(PREPROCESSOR_TREE, "normalize_with_length")) - set(dir(builtins))
 
-    local_name = {alias.asname or alias.name: alias.name for node in ast.walk(ENGINE_TREE)
-                  if isinstance(node, ast.ImportFrom)
-                  and (node.module, node.level) in (("preprocessor", 1), ("sunglasses.preprocessor", 0))
-                  for alias in node.names}
-    regex_lane = {local_name[n] for n in _bare_calls(ENGINE_TREE) if n in local_name}
+    # Scopes are not tracked, so a name imported as different helpers in
+    # different places stands for all of them.
+    local_names = {}
+    for node in ast.walk(ENGINE_TREE):
+        if isinstance(node, ast.ImportFrom) and (node.module, node.level) in (
+                ("preprocessor", 1), ("sunglasses.preprocessor", 0)):
+            for alias in node.names:
+                local_names.setdefault(alias.asname or alias.name, set()).add(alias.name)
+    regex_lane = {f for n in _bare_calls(ENGINE_TREE) for f in local_names.get(n, ())}
 
     named = {f for functions in _rows().values() for f in functions}
     called = (keyword_lane | regex_lane) - set(NOT_A_STEP)
