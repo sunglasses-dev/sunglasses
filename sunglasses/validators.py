@@ -1595,14 +1595,7 @@ _BUILTINS = frozenset((
     "any", "all", "sum", "min", "max", "set", "frozenset", "exit", "quit",
 ))
 _BARE_MODULES = frozenset(("os", "sys", "json", "logging", "requests", "httpx", "pprint"))
-_EAGER = frozenset(("builtins.list", "builtins.tuple", "builtins.sorted", "builtins.set",
-                    "builtins.frozenset", "collections.deque"))
-# these run a generator to its end only while its items are values they accept: a ``print`` result (None) stops
-# ``dict`` / ``sum`` / ``min`` / ``max`` after the first or second item with a TypeError. ``all`` stops at the
-# first falsy item and ``any`` at the first truthy one: ``any`` goes through the ``None`` items of a ``print`` and
-# is read as a consumer only for those; ``all`` never is.
-_EAGER_VALUES = frozenset(("builtins.sum", "builtins.min", "builtins.max", "builtins.dict"))
-_NONE_MAPPERS = frozenset(("builtins.print", "pprint.pprint"))
+_MAX_NAMES = 256           # environment-bound names tracked in one scope
 _EXIT_CALLS = frozenset(("sys.exit", "os._exit", "builtins.exit", "builtins.quit"))
 _LOG_HIGH = {"warning": 30, "warn": 30, "error": 40, "exception": 40, "critical": 50, "fatal": 50}
 _LOG_LOW = {"debug": 10, "info": 20}
@@ -1829,7 +1822,6 @@ class _EnvironmentReader:
         self.levels = []       # logging levels set anywhere: ints, None when not a literal
         self.logging_off = False
         self.exits = {}        # id(loop) -> the loop body can leave early
-        self.consumed = set()  # id of a map(...) call or generator expression that something runs to the end
         self.replaced = False  # os.environ is assigned to in the file: it is no longer the process environment
         self._collect()
 
@@ -1877,8 +1869,7 @@ class _EnvironmentReader:
                 self.replaced = True            # the program binds os.environ to something of its own
         for call in calls:
             self._note_logging_call(call)
-        self._note_exits(self.tree.body)
-        self._consumers()
+        self._note_exits()
 
     def _note_binding(self, name, value):
         if self._opened_for_writing(value):
@@ -1910,44 +1901,6 @@ class _EnvironmentReader:
             return self._bound_once(node, self.loggers)
         return self.qual(node) == "logging.root"
 
-    def _consumers(self):
-        """Fill ``self.consumed``: the lazy ``map`` calls and generator expressions that a ``for``, a list or tuple
-        built from them, ``sorted`` and the like, ``*`` unpacking, ``yield from`` or ``str.join`` run to the
-        end. A bare ``map(print, ...)`` or an unused generator prints nothing, and neither does the rest of one
-        that a ``break`` / ``return`` leaves, that ``any`` / ``all`` stop, or that ``sum`` / ``dict`` / ``min``
-        / ``max`` cannot go on with once an item is the ``None`` that ``print`` returns."""
-        for node in ast.walk(self.tree):
-            if isinstance(node, (ast.For, ast.AsyncFor)):
-                lazy = [] if self.exits.get(id(node)) else [node.iter]
-            elif isinstance(node, ast.comprehension):
-                lazy = [node.iter]
-            elif isinstance(node, (ast.Starred, ast.YieldFrom)):
-                lazy = [node.value]         # ``f(*gen)`` unpacks it at once; ``yield from gen`` drains it
-            elif isinstance(node, ast.Call):
-                made = self.qual(node.func)
-                joins = isinstance(node.func, ast.Attribute) and node.func.attr == "join" and _is_text(node.func.value)
-                lazy = node.args if (made in _EAGER or joins) else []
-                if made in _EAGER_VALUES:
-                    lazy = [item for item in node.args if not self._yields_none(item)]
-                elif made == "builtins.any":
-                    lazy = [item for item in node.args if self._yields_none(item)]   # None is falsy: any() goes on
-            else:
-                continue
-            for item in lazy:
-                if isinstance(item, ast.Starred):
-                    item = item.value
-                if isinstance(item, (ast.GeneratorExp, ast.Call)):
-                    self.consumed.add(id(item))
-
-    def _yields_none(self, item):
-        """A ``map`` of ``print`` or a generator whose element is a ``print`` / ``logging`` call: items of ``None``."""
-        if isinstance(item, ast.GeneratorExp):
-            made = self.qual(item.elt.func) if isinstance(item.elt, ast.Call) else None
-            return bool(made) and (made in _NONE_MAPPERS or made.startswith("logging."))
-        if isinstance(item, ast.Call) and self.qual(item.func) == "builtins.map" and item.args:
-            return self.qual(item.args[0]) in _NONE_MAPPERS
-        return False
-
     def _level(self, node):
         if isinstance(node, ast.Constant):
             if isinstance(node.value, int) and not isinstance(node.value, bool):
@@ -1959,36 +1912,47 @@ class _EnvironmentReader:
             return _LOG_NUMBERS.get(made.split(".")[-1])
         return None
 
-    def _note_exits(self, stmts):
-        """Fill ``self.exits``: whether each loop's body holds a statement that can leave it early."""
-        pending = list(stmts)
-        order = []
-        while pending:
-            node = pending.pop()
-            order.append(node)
-            for field in ("body", "orelse", "finalbody"):
-                pending.extend(getattr(node, field, ()) if isinstance(getattr(node, field, None), list) else ())
-            for handler in getattr(node, "handlers", ()):
-                pending.append(handler)
-            for case in getattr(node, "cases", ()):
-                pending.append(case)
-        leaves = {}
-        for node in reversed(order):
+    def _note_exits(self):
+        """Fill ``self.exits``: whether each ``for`` body can leave the loop early or skip an item (a filter)."""
+        for node in ast.walk(self.tree):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                self.exits[id(node)] = self._leaves(node.body, False)
+
+    def _leaves(self, stmts, inner):
+        """Whether the statements can end the loop they sit in, or skip the rest of an item (a filter): a
+        ``return``, a ``raise``, an exit call, or a ``break`` / ``continue`` that is not a nested loop's own. A
+        branch that never runs does not count, and a nested function or class is another scope."""
+        for node in stmts:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                leaves[id(node)] = False
                 continue
-            leave = isinstance(node, (ast.Return, ast.Raise, ast.Break, ast.Continue))
+            if isinstance(node, (ast.Return, ast.Raise)):
+                return True
+            if isinstance(node, (ast.Break, ast.Continue)):
+                if not inner:
+                    return True
+                continue
             if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-                leave = self.qual(node.value.func) in _EXIT_CALLS
+                if self.qual(node.value.func) in _EXIT_CALLS:
+                    return True
+                continue
+            if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+                if self._leaves(node.body, True) or self._leaves(node.orelse, inner):
+                    return True
+                continue
+            if isinstance(node, ast.If):
+                truth = _truth(node.test)
+                if (truth is not False and self._leaves(node.body, inner)) \
+                        or (truth is not True and self._leaves(node.orelse, inner)):
+                    return True
+                continue
             for field in ("body", "orelse", "finalbody"):
                 children = getattr(node, field, None)
-                if isinstance(children, list):
-                    leave = leave or any(leaves.get(id(child), False) for child in children)
+                if isinstance(children, list) and self._leaves(children, inner):
+                    return True
             for group in (getattr(node, "handlers", ()), getattr(node, "cases", ())):
-                leave = leave or any(leaves.get(id(child), False) for child in group)
-            leaves[id(node)] = leave
-            if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
-                self.exits[id(node)] = any(leaves.get(id(child), False) for child in node.body)
+                if any(self._leaves(child.body, inner) for child in group):
+                    return True
+        return False
 
     def builtin(self, name):
         return name in _BUILTINS and name not in self.stores and name not in self.targets
@@ -2224,6 +2188,8 @@ class _EnvironmentReader:
     def bind(self, ctx, target, iterable):
         """The context inside ``for target in iterable``; names the target rebinds stop carrying values."""
         kind = self.env(iterable)
+        if kind is not None and len(ctx.keys) + len(ctx.values) + len(ctx.pairs) >= _MAX_NAMES:
+            return ctx                      # names past the cap are not tracked: a set copied per step stays cheap
         if kind is None:
             if not ctx.live():
                 return ctx
@@ -2289,8 +2255,7 @@ class _EnvironmentReader:
             if self._stream(file) and any(self._element_shows(a, ctx) for a in args):
                 return "print"
             return None
-        if made == "builtins.map" and id(call) in self.consumed and len(args) == 2 \
-                and self.qual(args[0]) == "builtins.print":
+        if made == "builtins.map" and len(args) == 2 and self.qual(args[0]) == "builtins.print":
             kind = self.env(args[1])
             return "print" if kind is not None and kind.in_iteration() else None
         if made in ("pprint.pprint", "pprint.pp"):
@@ -2473,8 +2438,6 @@ class _EnvironmentReader:
         elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
             inner = ctx
             self._expr(node.generators[0].iter, inner)      # the first iterable is evaluated at once, always
-            if isinstance(node, ast.GeneratorExp) and id(node) not in self.consumed:
-                return                      # a generator nothing runs does not execute the rest of itself
             for index, generator in enumerate(node.generators):
                 if index:
                     self._expr(generator.iter, inner)

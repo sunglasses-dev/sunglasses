@@ -474,12 +474,6 @@ R1_FIRES = {
 }
 
 R1_QUIET = {
-    # lazy values are not run: a map or a generator nothing consumes prints nothing
-    "map_stored": "import os\npending = map(print, os.environ.values())\n",
-    "map_bare_statement": "import os\nmap(print, os.environ.values())\n",
-    "generator_stored": "import os\npending = (print(v) for v in os.environ.values())\n",
-    "generator_bare_statement": "import os\n(print(v) for v in os.environ.values())\n",
-    "generator_passed_to_unknown_function": "import os\nconsume((print(v) for v in os.environ.values()))\n",
     # code that cannot run to the print
     "false_filter_in_comprehension": "import os\n[print(v) for v in os.environ.values() if False]\n",
     "false_filter_in_consumed_generator": "import os\nlist(print(v) for v in os.environ.values() if False)\n",
@@ -508,21 +502,39 @@ R1_QUIET = {
     "format_long_index_but_valid_digits": "import os\nprint('{1234567890}'.format(os.environ))\n",
 }
 
-R2_QUIET = {
-    # a generator runs its filters, later iterables and element only when something consumes it
+# The rule reads what the text holds, not what runs. A map or a generator that nothing runs, or that all() /
+# any() / next() / islice / a failing sum() stops, is reported like one that runs to the end: whether a lazy
+# value is ever drained is not followed. Each row is a stated limit and shows part or none of the environment.
+R3_FIRES = {
+    "map_stored": "import os\npending = map(print, os.environ.values())\n",
+    "map_bare_statement": "import os\nmap(print, os.environ.values())\n",
+    "generator_stored": "import os\npending = (print(v) for v in os.environ.values())\n",
+    "generator_bare_statement": "import os\n(print(v) for v in os.environ.values())\n",
+    "generator_passed_to_unknown_function": "import os\nconsume((print(v) for v in os.environ.values()))\n",
     "unused_generator_filter_prints": "import os\npending = (value for value in os.environ.values() if print(os.environ))\n",
     "unused_generator_later_iterable": "import os\npending = (value for value in [1] for other in [print(os.environ)])\n",
-    # nothing gets past a filter that is never true, in a list comprehension too
-    "false_filter_then_filter_prints": "import os\n[value for value in [1] if False if print(os.environ)]\n",
-    "false_filter_then_later_iterable": "import os\n[value for value in [1] if False for other in [print(os.environ)]]\n",
-    # a consumer that stops early, or one that fails on the first value, shows part of it
+    "unused_generator_first_iterable_is_lazy": "import os\npending = (v for v in map(print, os.environ.values()))\n",
     "all_stops_at_the_first_falsy": "import os\nall(print(value) for value in os.environ.values())\n",
     "any_stops_at_the_first_truthy": "import os\nany(print(value) or True for value in os.environ.values())\n",
+    "any_over_a_factory_call": "import os, logging\nany(logging.getLogger(print(v)) for v in os.environ.values())\n",
+    "next_of_a_printing_generator": "import os\nnext(print(v) for v in os.environ.values())\n",
     "for_break_over_map": "import os\nfor unused in map(print, os.environ.values()):\n    break\n",
     "dict_of_map_print_raises": "import os\ndict(map(print, os.environ.values()))\n",
     "sum_of_map_print_raises": "import os\nsum(map(print, os.environ.values()))\n",
     "min_of_map_print_raises": "import os\nmin(map(print, os.environ.values()))\n",
     "max_of_map_print_raises": "import os\nmax(map(print, os.environ.values()))\n",
+    "sum_of_json_dump_raises": "import os, sys, json\nsum(json.dump(v, sys.stdout) for v in os.environ.values())\n",
+    "dict_of_writes_raises": "import os, sys\ndict(sys.stdout.write(v) for v in os.environ.values())\n",
+    # a continue, an inner loop's break or a break that never runs does not stop the map: it prints it all
+    "for_over_map_with_continue": "import os\nfor unused in map(print, os.environ.values()):\n    continue\n",
+    "for_over_map_with_inner_break": "import os\nfor unused in map(print, os.environ.values()):\n    for i in [1]:\n        break\n",
+    "for_over_map_with_dead_break": "import os\nfor unused in map(print, os.environ.values()):\n    if False:\n        break\n",
+}
+
+R2_QUIET = {
+    # nothing gets past a filter that is never true, in a list comprehension too
+    "false_filter_then_filter_prints": "import os\n[value for value in [1] if False if print(os.environ)]\n",
+    "false_filter_then_later_iterable": "import os\n[value for value in [1] if False for other in [print(os.environ)]]\n",
     # a name bound again is not the logger any more
     "logger_rebound_to_another_object": "import os, logging\nlogger = logging.getLogger()\nclass Widget:\n    def setLevel(self, n):\n        pass\nlogger = Widget()\nlogger.setLevel(10)\nlogging.debug('%s', os.environ)\n",
     # a conditional on a negated constant
@@ -530,7 +542,6 @@ R2_QUIET = {
 }
 
 R2_FIRES = {
-    # the same shapes, consumed all the way, still show everything
     "consumed_generator_filter_prints": "import os\nlist(value for value in os.environ.values() if print(os.environ))\n",
     "consumed_generator_later_iterable": "import os\nlist(1 for value in [1] for other in [print(os.environ)])\n",
     "list_comprehension_first_iter_prints": "import os\n[value for value in [print(os.environ)]]\n",
@@ -539,9 +550,12 @@ R2_FIRES = {
     "sum_with_int_result_generator": "import os\nsum(len(print(v) or '') for v in os.environ.values())\n",
     "any_over_map_print_goes_on": "import os\nany(map(print, os.environ.values()))\n",
     "logger_bound_once_set_level": "import os, logging\nlogger = logging.getLogger()\nlogger.setLevel(10)\nlogging.debug('%s', os.environ)\n",
+    # an inner loop's break, or a break that never runs, does not make the outer loop a filter
+    "outer_loop_with_inner_break_still_prints": "import os\nfor k, v in os.environ.items():\n    for i in [1]:\n        break\n    print(k, v)\n",
+    "outer_loop_with_dead_break_still_prints": "import os\nfor k, v in os.environ.items():\n    if False:\n        break\n    print(k, v)\n",
 }
 
-ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES}
+ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES, **R2_FIRES, **R3_FIRES}
 ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET, **R2_QUIET}
 
 
@@ -850,12 +864,20 @@ def families(size):
         "log_calls": "log.info('%s', 1)\n",
     }
     out = {"long_literal": "import os\nx = [" + "1, " * (size // 3) + "]\n"}
+    out["wide_comprehension"] = "import os\nx = [0 " + "".join(
+        "for v%d in os.environ.values() " % i for i in range(size // 40)) + "]\n"
     for key, piece in unit.items():
         if piece is None:
             continue
         body = piece * max(1, size // len(piece))
         out[key] = ("environ\n" if key in ("fence_spam", "environ_words") else "import os\n") + body
     return out
+
+
+def test_names_past_the_cap_are_not_tracked_in_one_scope(validator):
+    clauses = "".join("for v%d in os.environ.values() " % i for i in range(300))
+    assert hits(validator, "import os\nx = [print(v0) %s]\n" % clauses) == [RULE]
+    assert hits(validator, "import os\nx = [print(v299) %s]\n" % clauses) == []     # a stated limit
 
 
 def best_of(call, runs=3):
