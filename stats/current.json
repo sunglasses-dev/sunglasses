@@ -1,5 +1,5 @@
 {
-  "version": "0.6.16",
+  "version": "0.6.17",
   "patterns_with_matcher": 1512,
   "listed_patterns": 1583,
   "keywords": 6675,
@@ -21,7 +21,7 @@
   "last_updated": "2026-10-30T15:36:08-07:00",
   "last_updated_by": "release.yml",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-10-30",
+  "released": "2026-10-31",
   "scan_speed": {
     "quickstart_median_ms": 1.538,
     "quickstart_input_chars": 18,

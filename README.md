@@ -77,7 +77,7 @@ And the same archive as JSON. Selected fields from the scan document, not the wh
 
 ```json
 {
-  "decision": "allow",
+  "decision": "not_inspected",
   "threat_found": false,
   "inspection_complete": false,
   "is_clean": false,
@@ -87,10 +87,11 @@ And the same archive as JSON. Selected fields from the scan document, not the wh
 }
 ```
 
-`decision: allow` with **`is_clean: false`**. Nothing matched because nothing was read, and
-the result says so. **Do not treat `decision: allow` alone as permission to proceed, this
-result is incomplete.** The document exposes the distinction; acting on it is the caller's
-job.
+`decision: not_inspected` with **`is_clean: false`**. Nothing matched because nothing was read, and
+the decision now says so itself (before 0.6.17 it said `allow` beside `is_clean: false`).
+**A caller that tests `decision == "allow"` stops here; one that tests `decision != "allow"`
+should read `threat_found` before treating this as a threat.** The document exposes the
+distinction; acting on it is the caller's job.
 
 *Timings and presentation vary. The demo checks the exit statuses and the ZIP coverage
 fields; report a mismatch against your installed version.*
@@ -790,7 +791,7 @@ Both runs print which engine they measured. `--installed` refuses to run when th
 
 Labeled dataset shipped in this repo: 38 real agent-input attacks (positives) + 77 famous open-source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte-identical results, sealed by a SHA-256 of the metrics block).
 
-| Metric (v0.6.16) | Value |
+| Metric (v0.6.17) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
