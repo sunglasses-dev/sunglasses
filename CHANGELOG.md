@@ -30,6 +30,21 @@ All notable changes to Sunglasses are documented here.
   statement before 3.10) is not read. A text the Python parser itself cannot take (too deep, parser
   stack full) is treated as not Python; a parsed tree too deep for the reader's own walk makes the
   scan report that inspection was not complete. The pattern count does not move. (C497)
+- `GLS-STRUCT-006` reports, for review (`quarantine`, never a block), a shell script that points npm,
+  pnpm, yarn or pip at a registry that is not a public one, with a `config set` command or by writing
+  the manager's own config file (`.npmrc`, `.yarnrc`, `.yarnrc.yml`, `pip.conf`, `pip.ini`,
+  `.pypirc`). Every later install in that scope then comes from that host. It reads the words of the
+  script as the hook-command rule does (quotes, `$(...)`, line continuations, heredoc bodies, simple
+  variables; fenced blocks in the same text read as one script, in order) and judges the host from the parsed URL, never from a prefix, so
+  `registry.npmjs.org.example` is not a public host and credentials in front of a public host are
+  just credentials. It stays quiet on a setting in the wrong manager's file, a commented setting, a
+  file name that only ends like a config file, a write with no content, and a registry that is
+  public. It does not read environment forms (`NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL`, `ENV`), the
+  `--registry` or `--index-url` flag of a single install, a config file shown on its own, group
+  redirects, `sed -i` / `cp` / `curl -o` into the file, other managers, values built by base64 or by
+  an unknown variable, or code in another language. A mirror a team really uses, or documentation
+  that shows the command, is reported the same way, because a script cannot be told apart from its
+  documentation. The pattern count does not move. (C499)
 
 ### Changed
 
