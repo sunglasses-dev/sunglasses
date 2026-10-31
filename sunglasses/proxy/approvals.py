@@ -125,7 +125,7 @@ def other_folders(root, command_stem, here, limit=3):
     found = []
     try:
         paths = sorted((pathlib.Path(root) / "approvals").glob("*.json"))
-    except OSError:
+    except (OSError, ValueError):   # ValueError: a NUL byte in the path
         return []
     for path in paths:
         try:

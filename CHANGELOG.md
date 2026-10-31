@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Listing the other folders that hold an approval for the same command no longer raises when the proxy state folder path contains a NUL byte; it lists none. The proxy start-up already refused such a folder, so only a direct call could hit it.
+
 ## [0.6.17] — 2026-10-31
 
 ### Added
