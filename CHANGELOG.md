@@ -25,6 +25,10 @@ All notable changes to Sunglasses are documented here.
   that shows the command, is reported the same way, because a script cannot be told apart from its
   documentation. The pattern count does not move. (C499)
 
+### Fixed
+
+- Listing the other folders that hold an approval for the same command no longer raises when the proxy state folder path contains a NUL byte; it lists none. The proxy start-up already refused such a folder, so only a direct call could hit it.
+
 ## [0.6.17] — 2026-10-31
 
 ### Added
