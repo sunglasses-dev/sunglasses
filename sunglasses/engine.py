@@ -3132,7 +3132,8 @@ class SunglassesEngine:
         `decoded_strict` is for a keyword that did not start its rule's finding (the rule was
         first reached through another keyword): a hit in a decoded view (ROT13, reversed...) is
         then judged as the first hit of a rule is, with the raw input, so a negation built by
-        decoding never downgrades, whichever keyword of the rule the search met first."""
+        decoding never downgrades, whichever keyword of the rule the search met first. A hit in
+        the shape-confusion copy is the plain text again and is judged as it always was."""
         if align is not None and align.moved(view, pos):
             return False
         if refusal_ok and self._refusal_in_shape_copy(view, pos, end, align):
@@ -3140,7 +3141,7 @@ class SunglassesEngine:
         aligned = self._align_at(view, pos, align)
         if align is None or aligned is not None:
             return self._check_negation(view, pos, aligned, end, refusal_ok)
-        if decoded_strict and self._shape_place(view, pos, end, align) is None:
+        if decoded_strict and not self._in_shape_copy(view, pos, align):
             return self._check_negation(view, pos, align, end, refusal_ok)
         # A hit in a later view (ROT13, reversed...) is judged in its own text, as a plain
         # sentence: no list is read there, because the raw input cannot say where it ends. The
@@ -3154,24 +3155,47 @@ class SunglassesEngine:
             view, place, align, place + end - pos, refusal_ok, only_list=True)
 
     @staticmethod
-    def _shape_place(view: str, pos: int, end: int, align):
-        """Where in the plain text the hit view[pos:end] of the shape-confusion copy (the plain
-        text again, some `l` written as `i`; the first view holds it exactly so) is a copy of, or
-        None: the hit is not in such a copy, or the copy changed a character of the hit."""
+    def _shape_copy_start(view: str, align):
+        """Where the shape-confusion copy begins in `view` (the plain text again, some `l`
+        written as `i`; the first view holds it exactly so), or None: there is no such copy."""
+        known = getattr(align, "_shape_copy", None)
+        if known is not None and known[0] is view:
+            return known[1]
         sep = " " + VIEW_SEP + " "
         plain_end = align.end_of_view(view, 0)
-        if pos < plain_end:
-            return None
         rewrite = re.sub(r"\bl(?=[a-z])", "i", view[:plain_end])
+        found = None
         at = view.find(sep)
         while at != -1:
             start = at + len(sep)
             if view.startswith(rewrite, start):
-                place = pos - start
-                if place >= 0 and end <= start + plain_end and view[pos:end] == view[place:place + end - pos]:
-                    return place
-                return None
+                found = start
+                break
             at = view.find(sep, at + 1)
+        align._shape_copy = (view, found)  # one scan, one view: looked for once, not per hit
+        return found
+
+    @staticmethod
+    def _in_shape_copy(view: str, pos: int, align) -> bool:
+        """Whether view[pos] lies in the shape-confusion copy, whatever the copy did to the hit."""
+        if align is None:
+            return False
+        start = SunglassesEngine._shape_copy_start(view, align)
+        return start is not None and start <= pos < start + align.end_of_view(view, 0)
+
+    @staticmethod
+    def _shape_place(view: str, pos: int, end: int, align):
+        """Where in the plain text the hit view[pos:end] of the shape-confusion copy is a copy
+        of, or None: the hit is not in such a copy, or the copy changed a character of the hit."""
+        plain_end = align.end_of_view(view, 0)
+        if pos < plain_end:
+            return None
+        start = SunglassesEngine._shape_copy_start(view, align)
+        if start is None:
+            return None
+        place = pos - start
+        if place >= 0 and end <= start + plain_end and view[pos:end] == view[place:place + end - pos]:
+            return place
         return None
 
     def _framed_here(self, view: str, pos: int, align, end: int) -> bool:

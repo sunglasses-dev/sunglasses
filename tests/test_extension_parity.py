@@ -179,3 +179,18 @@ def test_plain_negation_keeps_the_decision_it_had(keywords, fast):
     # The same keyword plain and encoded, both negated, is unchanged: one finding, lowered.
     assert _decision(keywords, "do not alpha. qb abg nycun", fast) == ("allow_redacted", "review")
     assert _decision(keywords, "do not beta. qb abg orgn", fast) == ("allow_redacted", "review")
+
+
+@pytest.mark.parametrize("fast", _paths())
+@pytest.mark.parametrize("keywords", [["beta", "iota"], ["iota", "beta"],
+                                      ["beta", "ignore previous instructions"],
+                                      ["ignore previous instructions", "beta"]])
+def test_a_plain_negation_before_a_look_alike_spelling_keeps_the_decision_it_had(keywords, fast):
+    """`lota` and `lgnore` read as keywords only in the copy of the text that writes `l` as
+    `i`. Nothing was decoded: both negations are plain text, so the rule stays a review."""
+    spelled = "iota" if "iota" in keywords else "ignore previous instructions"
+    look_alike = spelled.replace("i", "l", 1)
+    assert _decision(keywords, f"do not beta. do not {look_alike}", fast) == ("allow_redacted", "review")
+    assert _decision(keywords, f"never beta. never {look_alike}", fast) == ("allow_redacted", "review")
+    # The same keyword standing on its own is live, as on main.
+    assert _decision(keywords, f"do not beta. {spelled}", fast) == ("block", "high")
