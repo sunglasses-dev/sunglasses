@@ -16,16 +16,18 @@ What makes a new step fail here, and what does not:
 - call guard: a function normalize_with_length calls by bare name (builtins
   aside), and a preprocessor helper engine.py calls by bare name after a
   `from .preprocessor import` or `from sunglasses.preprocessor import` at any
-  level, aliases resolved, must be a row's function or a listed non-step.
-  Scopes are not tracked: a name imported as different helpers in different
-  places counts as a call to every one of them, so a shared name can also make
-  a row's function look called when only another helper is;
+  level, aliases resolved, must be a row's function or a listed non-step. A
+  wildcard import counts as importing every preprocessor function. Scopes are
+  not tracked: a name imported as different helpers in different places counts
+  as a call to every one of them, so a shared name can also make a row's
+  function look called when only another helper is;
 - fingerprint: FINGERPRINT pins the text of preprocessor.py's top-level
   statements other than its docstring and assignments to data names: every
   function with its decorators, every import, any module-level if, try, with or
   loop block with everything in it, and any assignment whose target names a
-  function or something imported or calls anything (`globals()[...]`); and
-  the engine's view builders (VIEW_BUILDERS). Any change to that text fails the
+  function, class or import anywhere in the module or calls anything
+  (`globals()[...]`); with a wildcard import in the module, every assignment;
+  and the engine's view builders (VIEW_BUILDERS). Any change to that text fails the
   fingerprint test until the value is updated. It is a review trigger: it says
   the text changed, not that the list was read again;
 - neither covers: preprocessor.py's top-level assignments to data names
@@ -233,13 +235,18 @@ def test_no_lane_calls_a_function_no_row_names():
     keyword_lane = _bare_calls(_top_level(PREPROCESSOR_TREE, "normalize_with_length")) - set(dir(builtins))
 
     # Scopes are not tracked, so a name imported as different helpers in
-    # different places stands for all of them.
+    # different places stands for all of them. A wildcard import stands for
+    # every preprocessor function, whatever __all__ says.
     local_names = {}
     for node in ast.walk(ENGINE_TREE):
         if isinstance(node, ast.ImportFrom) and (node.module, node.level) in (
                 ("preprocessor", 1), ("sunglasses.preprocessor", 0)):
             for alias in node.names:
-                local_names.setdefault(alias.asname or alias.name, set()).add(alias.name)
+                if alias.name == "*":
+                    for f in defined:
+                        local_names.setdefault(f, set()).add(f)
+                else:
+                    local_names.setdefault(alias.asname or alias.name, set()).add(alias.name)
     regex_lane = {f for n in _bare_calls(ENGINE_TREE) for f in local_names.get(n, ())}
 
     named = {f for functions in _rows().values() for f in functions}
@@ -261,12 +268,16 @@ def _pinned_statements(tree):
     body = tree.body
     if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
         body = body[1:]
-    code_names = {n.name for n in body if isinstance(n, ast.FunctionDef)}
-    code_names |= {a.asname or a.name.split(".")[0] for n in body
-                   if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names}
+    # Names of functions, classes and imports anywhere in the module, not
+    # only at the top; after a wildcard import any name may be imported.
+    imports = [a for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names]
+    wildcard = any(a.name == "*" for a in imports)
+    code_names = {n.name for n in ast.walk(tree)
+                  if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    code_names |= {a.asname or a.name.split(".")[0] for a in imports}
 
     def binds_data_only(n):
-        if not isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+        if wildcard or not isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
             return False
         targets = n.targets if isinstance(n, ast.Assign) else [n.target]
         return not any(isinstance(x, ast.Call) or isinstance(x, ast.Name) and x.id in code_names
