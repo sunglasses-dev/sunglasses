@@ -1,0 +1,15 @@
+{
+  "id": "GLS-STRUCT-006",
+  "name": "Shell points a package manager at a registry that is not public",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "supply_chain",
+  "severity": "medium",
+  "channel": [
+    "file",
+    "code"
+  ],
+  "description": "A shell script in this text points a package manager (npm, pnpm, yarn or pip) at a registry that is not one of the public ones, with a config-set command or by writing its config file, so the installs that use that setting come from that host. A project mirror looks the same as a hijack, so this is a finding for judgment, not proof of intent.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-006"
+}
