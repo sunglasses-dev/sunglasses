@@ -17,10 +17,11 @@ What makes a new step fail here, and what does not:
   aside), and a preprocessor helper engine.py calls by bare name after a
   `from .preprocessor import` or `from sunglasses.preprocessor import` at any
   level, aliases resolved, must be a row's function or a listed non-step. A
-  wildcard import counts as importing every preprocessor function. Scopes are
-  not tracked: a name imported as different helpers in different places counts
-  as a call to every one of them, so a shared name can also make a row's
-  function look called when only another helper is;
+  wildcard import counts as importing every name bound anywhere in
+  preprocessor.py (functions and classes at any depth, imports, assigned
+  names). Scopes are not tracked: a name imported as different helpers in
+  different places counts as a call to every one of them, so a shared name can
+  also make a row's function look called when only another helper is;
 - fingerprint: FINGERPRINT pins the text of preprocessor.py's top-level
   statements other than its docstring and assignments to data names: every
   function with its decorators, every import, any module-level if, try, with or
@@ -236,14 +237,20 @@ def test_no_lane_calls_a_function_no_row_names():
 
     # Scopes are not tracked, so a name imported as different helpers in
     # different places stands for all of them. A wildcard import stands for
-    # every preprocessor function, whatever __all__ says.
+    # every name bound anywhere in preprocessor.py, whatever __all__ says.
+    bound = {n.name for n in ast.walk(PREPROCESSOR_TREE)
+             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    bound |= {n.id for n in ast.walk(PREPROCESSOR_TREE)
+              if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+    bound |= {a.asname or a.name.split(".")[0] for n in ast.walk(PREPROCESSOR_TREE)
+              if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names if a.name != "*"}
     local_names = {}
     for node in ast.walk(ENGINE_TREE):
         if isinstance(node, ast.ImportFrom) and (node.module, node.level) in (
                 ("preprocessor", 1), ("sunglasses.preprocessor", 0)):
             for alias in node.names:
                 if alias.name == "*":
-                    for f in defined:
+                    for f in bound:
                         local_names.setdefault(f, set()).add(f)
                 else:
                     local_names.setdefault(alias.asname or alias.name, set()).add(alias.name)
