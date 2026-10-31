@@ -30,7 +30,8 @@ from . import __version__
 from . import baseline as _baseline
 from . import child_env
 from .engine import SunglassesEngine
-from .extractors.dispatch import UnreadableFile
+from .extractors import archive_listing
+from .extractors.dispatch import COMPILED_SUFFIXES, UnreadableFile, next_step
 from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .result import verdict_word
@@ -121,6 +122,8 @@ def print_result(result, verbose=False):
             fc = severity_colors.get(f["severity"], YELLOW)
             print(f"  {fc}{i}. [{f['severity'].upper()}] {f['name']}{RESET}")
             print(f"     {DIM}ID: {f['id']} | Category: {f['category']}{RESET}")
+            if f.get("location"):
+                print(f"     {DIM}Found in: {_printable_match(f['location'])}{RESET}")
             if f.get("matched_text"):
                 print(f"     {DIM}Matched: \"{_printable_match(f['matched_text'])}\"{RESET}")
             if f.get("also_matched"):
@@ -396,17 +399,24 @@ def _read_member(root, rel, root_fd=None, idents=None):
     return data
 
 
+# `.zip .jar .docx .xlsx` are not here: a ZIP is told by its first bytes, and the walker reads
+# it so the scan can list its members (see `extractors/archive_listing.py`).
 _BINARY_EXTENSIONS = {
     '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
     '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.webm',
-    '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
+    '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
     '.exe', '.dll', '.so', '.dylib', '.o', '.a',
     '.woff', '.woff2', '.ttf', '.eot', '.otf',
-    '.pyc', '.pyo', '.class', '.jar',
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+    '.pyc', '.pyo', '.class',
+    '.pdf', '.doc', '.xls',
     '.sqlite', '.db', '.sqlite3',
     '.DS_Store',
 }
+
+
+# Compiled code named by its suffix alone, without opening the file. `scan --file` reads the bytes
+# first, so a file with the CAFEBABE header of a Mach-O fat binary gets its longer name there.
+_COMPILED_SUFFIXES = COMPILED_SUFFIXES
 
 
 def _walk_repo_files(repo_dir):
@@ -527,6 +537,11 @@ def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, sk
             ext = os.path.splitext(name)[1].lower()
             if skip_lockfiles and name in _LOCKFILES:
                 skips.append((rel, _LOCKFILE_SKIP_REASON))
+                continue
+            if ext in _COMPILED_SUFFIXES:
+                skips.append((rel, f"{_COMPILED_SUFFIXES[ext]} ({ext}) — not inspected. SUNGLASSES does "
+                                   f"not extract this format, so nothing inside it was scanned. "
+                                   f"Scan its source instead."))
                 continue
             if ext in _BINARY_EXTENSIONS:
                 skips.append((rel, f"binary file type ({ext}) — not inspected"))
@@ -1081,6 +1096,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # finished first. With one file at a time `scans` runs each scan where it is asked for.
     scans = engine if isinstance(engine, _ScanPool) else _InlineScans(engine)
     pending = collections.deque()
+    name_scans = set()     # pending entries that are an archive's member names, not a file
     held = []              # progress lines waiting for the first answer; None once it has come
 
     def answered():
@@ -1128,7 +1144,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             return
 
         answered()
-        files_scanned += 1
+        if rel_path not in name_scans:      # the names inside an archive are not a file of their own
+            files_scanned += 1
         scan_result.source = rel_path
         repo_results.append(scan_result)
 
@@ -1242,11 +1259,26 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
         if route in ("opaque", "media"):
             # `--file` gives the same answer for these bytes (nothing here extracts them),
             # so the line says what is true and, for an archive, what does get it read.
-            hint = (" Unpack it and scan the files inside." if route == "opaque" else "")
+            hint = (" " + next_step(label)) if route == "opaque" and next_step(label) else ""
+            detail = ""
+            if label == "ZIP archive":
+                # The table of contents, not the members: nothing is extracted. The names are
+                # text, so they are scanned and reported under the archive they came from.
+                listing = archive_listing.read_listing(bytes(snapshot))
+                detail = " " + archive_listing.describe(
+                    listing, os.path.splitext(rel_path)[1].lower())
+                if listing.names:
+                    names_label = f"member name in {rel_path}"
+                    name_scans.add(names_label)
+                    pending.append((names_label, scans.submit(
+                        Member(archive_listing.name_text(listing).encode("utf-8", "replace"),
+                               "member-names"))))
+                    while pending and (len(pending) >= scans.limit or pending[0][1].ready()):
+                        settle()
             walker_skips.append((
                 rel_path,
                 f"{label} — not inspected. SUNGLASSES does not extract this format, "
-                f"so nothing inside it was scanned.{hint}"))
+                f"so nothing inside it was scanned.{detail}{hint}"))
             continue
 
         pending.append((rel_path, scans.submit(snapshot)))
@@ -2230,6 +2262,11 @@ def _run_scan(args):
                     finally:
                         if scanner is not engine:
                             scanner.close()
+                # What was scanned was an archive's member names, not file content: say so
+                # on each finding, the way a directory scan labels them.
+                if result.extraction_sources == ["member names"]:
+                    for finding in result.findings:
+                        finding["location"] = f"member name in {filepath}"
             except UnreadableFile as exc:
                 # The file exists but we could not read it. That is an operational
                 # failure (exit 2), never a finding: letting the OSError escape

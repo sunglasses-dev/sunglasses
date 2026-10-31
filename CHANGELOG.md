@@ -9,6 +9,11 @@ All notable changes to Sunglasses are documented here.
 
 - Listing the other folders that hold an approval for the same command no longer raises when the proxy state folder path contains a NUL byte; it lists none. The proxy start-up already refused such a folder, so only a direct call could hit it.
 
+### Changed
+
+- `scan --dir` and `scan --file` now read a ZIP archive's table of contents without extracting anything. The "not inspected" line for a ZIP (`.zip`, `.jar`, `.docx`, `.xlsx`, `.whl`, or a ZIP under a name the scan reads, such as `.txt` or `.bin`; in `scan --dir` a ZIP named like an image or a compiled file is still skipped by its name, while `scan --file` lists the bytes under any name; an empty ZIP gets no listing sentence; ordinary text named `.zip` is now read as text instead of being skipped unread) says how many members it lists, the total size the archive declares for them (its own claim, never used to decide how much to read), and the first few names; the member names are scanned as text and a name that matches a pattern is reported as "member name in <file>". A ZIP under a non-archive name says so. Reading is bounded: a table of contents over 8 MiB is refused, at most 1,000 names are scanned, a name is cut at 255 characters, and names are escaped before they are printed. When no member name matches a pattern the verdict stays `not_inspected` (exit 3); the contents of the members are never scanned.
+- Compiled files are named by what they are in the "not inspected" line: Python bytecode and Java class files, by suffix (`.pyc`, `.pyo`, `.class`) and by content, so a renamed one is no longer read as text, in both `scan --dir` and `scan --file`.
+
 ## [0.6.17] — 2026-10-31
 
 ### Added

@@ -82,13 +82,14 @@ And the same archive as JSON. Selected fields from the scan document, not the wh
   "inspection_complete": false,
   "is_clean": false,
   "extraction_warnings": [
-    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result."
+    "ZIP archive not inspected — SUNGLASSES does not extract this format, so no content from attachments.zip was scanned. This is not a clean result. It lists 2 members, 33 bytes declared by the archive (brief.txt, notes/summary.txt); the member names were scanned."
   ]
 }
 ```
 
-`decision: not_inspected` with **`is_clean: false`**. Nothing matched because nothing was read, and
-the decision now says so itself (before 0.6.17 it said `allow` beside `is_clean: false`).
+`decision: not_inspected` with **`is_clean: false`**. The archive's table of contents was read and its
+member names were scanned; the members themselves were not, and when no member name matches a pattern
+the decision says so itself (before 0.6.17 it said `allow` beside `is_clean: false`).
 **A caller that tests `decision == "allow"` stops here; one that tests `decision != "allow"`
 should read `threat_found` before treating this as a threat.** The document exposes the
 distinction; acting on it is the caller's job.

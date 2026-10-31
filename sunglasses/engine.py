@@ -208,6 +208,7 @@ class ScanResult:
                     "reason": f.get("description", ""),
                     "also_matched": f.get("also_matched", []),
                     "taxonomy": taxonomy.for_category(f["category"]),
+                    **({"location": f["location"]} if f.get("location") else {}),
                 }
                 for f in self.reported_findings()
             ],
