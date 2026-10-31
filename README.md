@@ -364,6 +364,7 @@ The proxy is a separate process with its own state. It keeps the approvals you g
 pip install sunglasses              # text scanning — zero dependencies
 pip install 'sunglasses[media]'     # + images (OCR/EXIF), PDFs, QR codes
 pip install 'sunglasses[all]'       # + audio & video scanning (installs Whisper)
+pip install 'sunglasses[fast]'      # + faster keyword search (Python 3.10+; a prebuilt wheel where one exists, otherwise a C compiler)
 # Keep the quotes. zsh reads [ ] as a file pattern and stops with "no matches found".
 # OCR needs tesseract, QR codes need zbar, audio and video need ffmpeg.
 
