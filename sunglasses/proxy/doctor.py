@@ -120,7 +120,7 @@ class Entry:
     state: str
     passed: bool = False
     detail: str = ""
-    # CU-M8. `passed` alone cannot say "never launched": False meant both that
+    # `passed` alone cannot say "never launched": False meant both that
     # and "launched and failed", and the JSON rendered the first as FAIL.
     result: str = NOT_RUN
 

@@ -1426,7 +1426,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     if files_incomplete or unread_skips or folder_gaps:
         # The banner introduces the list, so it is printed before it: a header
         # that promises a list of what went unread has to arrive before the list,
-        # not after the named skips.
+        # not after the named skips (the `banner_without_named_scope` assertion
+        # holds this).
         _print_coverage_banner("part of this repo was not read" if kind == "repo"
                                else "part of this directory was not read")
     if files_incomplete:
@@ -4431,7 +4432,7 @@ def cmd_doctor(args, _run=None):
         sys.exit(rendered["exit_code"])
 
     st = rendered["self_test"]
-    # CU-M8. A route's verdict is read from `per_wrapper`, the SAME field the
+    # A route's verdict is read from `per_wrapper`, the SAME field the
     # JSON prints, and never recomputed here.
     route_verdict = {(w["name"], w["source"]): w["result"]
                      for w in rendered["per_wrapper"]}
