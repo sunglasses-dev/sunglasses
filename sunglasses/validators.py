@@ -1904,13 +1904,15 @@ class _EnvironmentReader:
 
     def _consumers(self):
         """Fill ``self.consumed``: the lazy ``map`` calls and generator expressions that a ``for``, a list or tuple
-        built from them, ``any`` / ``all`` / ``sum`` and the like, or ``str.join`` run to the end. A bare
-        ``map(print, ...)`` or an unused generator prints nothing."""
+        built from them, ``any`` / ``all`` / ``sum`` and the like, ``*`` unpacking, ``yield from`` or ``str.join``
+        run to the end. A bare ``map(print, ...)`` or an unused generator prints nothing."""
         for node in ast.walk(self.tree):
             if isinstance(node, (ast.For, ast.AsyncFor)):
                 lazy = [node.iter]
             elif isinstance(node, ast.comprehension):
                 lazy = [node.iter]
+            elif isinstance(node, (ast.Starred, ast.YieldFrom)):
+                lazy = [node.value]         # ``f(*gen)`` unpacks it at once; ``yield from gen`` drains it
             elif isinstance(node, ast.Call):
                 made = self.qual(node.func)
                 joins = isinstance(node.func, ast.Attribute) and node.func.attr == "join" and _is_text(node.func.value)

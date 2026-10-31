@@ -457,6 +457,8 @@ R1_FIRES = {
     "generator_run_by_any": "import os\nany(print(v) for v in os.environ.values())\n",
     "generator_run_by_list": "import os\nlist(print(v) for v in os.environ.values())\n",
     "generator_run_by_for": "import os\nfor _ in (print(v) for v in os.environ.values()):\n    pass\n",
+    "generator_unpacked_into_call": "import os\nprint(*[1], *(print(v) for v in os.environ.values()))\n",
+    "generator_drained_by_yield_from": "import os\ndef f():\n    yield from (print(v) for v in os.environ.values())\nlist(f())\n",
     "generator_run_by_join": "import os\n''.join(str(print(v)) for v in os.environ.values())\n",
     "true_filter_still_prints": "import os\n[print(v) for v in os.environ.values() if True]\n",
     "true_and_prints": "import os\nTrue and print(os.environ)\n",
