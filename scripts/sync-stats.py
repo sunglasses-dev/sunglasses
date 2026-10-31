@@ -32,7 +32,7 @@ def get_real_stats():
     info = engine.info()
 
     patterns = PATTERNS
-    total = info["detecting_patterns"]
+    total = info["patterns_with_matcher"]
     categories = set(p["category"] for p in patterns)
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
@@ -154,7 +154,7 @@ def sync_website_index(stats):
 
 
 # The key each total goes by in stats/current.json (a total not listed is published as itself).
-PUBLISHED_KEY = {"patterns": "detecting_patterns"}
+PUBLISHED_KEY = {"patterns": "patterns_with_matcher"}
 
 
 def _previous_totals(stats):

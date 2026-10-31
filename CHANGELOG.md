@@ -8,6 +8,7 @@ All notable changes to Sunglasses are documented here.
 ### Added
 
 - A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and up to three folders with printable names where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders, showing a record the proxy would refuse as `INVALID` and one it could not read as `UNREADABLE` (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve that run's capture for the folder it is in. An approval written before this change shows its folder as unknown; a fresh capture from a new proxy run records one.
+- `pip install 'sunglasses[fast]'` adds an optional extension (pyahocorasick) that makes keyword search faster. It needs Python 3.10 or newer; on 3.9 the extra installs nothing and the scanner keeps using plain string search. A prebuilt wheel exists for common platforms; where there is none, installing it needs a C compiler.
 
 ### Changed
 
@@ -24,14 +25,20 @@ All notable changes to Sunglasses are documented here.
   keeps `--config` in the command. The line is not printed beside a failed check. Exit codes and
   `--json` are unchanged. The README's FAST row now says images, PDFs and QR codes need
   `pip install "sunglasses[media]"`. (C491)
-- The published pattern count is now the number of rules that can produce a finding: 1,512 of the 1,583
-  rules the ruleset lists. The other 71 (`GLS-SMP-008` and 70 `GLS-V3-*` rows) carry neither a regex nor a
-  keyword, so no scan can report them; they stay listed and are named in a test, and a new rule with no
-  matcher fails that test until it is named. `engine.info()` and `stats/current.json` replace `patterns`
-  with `detecting_patterns` (1,512) and `listed_patterns` (1,583), so code that still reads `patterns`
-  fails with a missing key instead of reading an old number. `sunglasses info` prints how many listed
-  rules have no matcher. The README and the `scanner_info` tool output carry the new keys. Scan results are
-  unchanged.
+- The README's normalization count now comes from the code. It said 17, a number nothing counted. `sunglasses/preprocessor.py` lists the steps in `NORMALIZATION_STEPS`, one row per technique, with the keyword lane's function and the regex lane's wider one in the same row: 16. `tools/gen_normalization_stats.py` writes the count into `stats/current.json`. `tests/test_normalization_steps.py` proves each row on a crafted input and checks that the input no longer folds with that row turned off; it also fails when either lane calls, by bare name, a function no row names (for the engine, a preprocessor helper it imports by name), and when the text of a preprocessor function, its imports, any other top-level code in it that is not a data table, or the engine's view builders changes, until a pinned value is updated. Data tables and the rest of the engine are not pinned; the test's docstring lists what is not covered. Scanning is unchanged.
+- The published pattern count is now the number of rules that carry a regex or a keyword matcher: 1,512 of the 1,583
+  rules the ruleset lists. The other 71 (`GLS-SMP-008` and 70 `GLS-V3-*` rows) carry neither, so no scan can report
+  them; they stay listed and are named in a test, and a new rule with no matcher fails that test until it is named.
+  The count says a rule has a matcher, not that every such rule fires; that is tracked separately. `engine.info()` and
+  `stats/current.json` replace `patterns` with `patterns_with_matcher` (1,512) and `listed_patterns` (1,583), so code
+  that reads `patterns` by key fails with a missing key instead of reading an old number; a reader that falls back to a
+  default will not notice, so check yours. `sunglasses info` prints how many listed rules have no matcher. The README
+  and the `scanner_info` tool output carry the new keys. Scan results are unchanged.
+
+### Fixed
+
+- A scan now reports the same findings, in the same order and with the same excerpt, whether or not the optional extension is installed. Before, the two keyword searches picked a rule's first hit differently, so the order of findings, and in rare cases the excerpt shown for a finding, could differ between two machines for the same input. On a plain install a few findings can now list in a different order, or show a different excerpt, than in 0.6.16.
+- A negation that was built by decoding no longer lowers a rule's finding because another keyword of the same rule was negated in plain text. For example, a plain "do not alpha" beside the ROT13 form of "do not beta" is now blocked for a rule that lists both words, with or without the optional extension. Before, a plain install blocked or reviewed it depending on which of the two words the rule listed first, and with the extension it was reviewed either way. Only the rule's other keywords are judged this way: a later occurrence of the same keyword, and negation written in plain text (including a plain word that reads as a keyword only once look-alike letters are folded), are judged with the same call as before. One plain-install result goes the other way, because both searches now take a rule's first hit in the same order: a rule that listed such a look-alike word before a plain-negated one (for example `iota` before `beta`) used to block `do not beta. do not lota` on a plain install, and the same rule listed the other way round, or any listing with the extension, reviewed it; it is now a review on both.
 
 ## [0.6.16] — 2026-10-30
 

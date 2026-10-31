@@ -2,8 +2,8 @@
 SUNGLASSES Preprocessor — Normalizes text before pattern matching.
 
 Strips Unicode tricks, decodes Base64/URL/HTML/hex/ROT13, collapses
-invisible characters, maps homoglyphs to ASCII. Defends against 17+
-known evasion techniques used to bypass prompt injection scanners.
+invisible characters, maps homoglyphs to ASCII. NORMALIZATION_STEPS at the
+end of this file lists what is undone, one row per technique.
 """
 
 import base64
@@ -517,3 +517,51 @@ def strip_delimiter_padding(text: str) -> str:
             collapsed_parts.append(collapsed)
     text = ''.join(collapsed_parts)
     return text
+
+
+# Every way of writing text that the scanner reads back before it matches, one
+# row per thing undone, so a public count of "normalization techniques" is
+# len(NORMALIZATION_STEPS) and not a number typed by hand. A row names
+# the functions that do it: the keyword lane's first, then the regex lane's
+# wider version of the same undo. Two functions undoing one thing are one
+# technique, not two; one function that undoes two things sits in both rows
+# (strip_ignorable deletes invisible characters and reads a gap between two
+# Braille cells as a space). An empty tuple means the step is written inline
+# in normalize_with_length. tests/test_normalization_steps.py proves each row
+# on a crafted input, with a control that turns the row off, and pins the
+# text of every function here (decorators included), this module's imports and
+# the engine's view builders, so a change to that text fails the test until the
+# value is updated, which is the moment to read this list again. Its docstring
+# lists what is not pinned;
+# tools/gen_normalization_stats.py writes the count into stats/current.json.
+NORMALIZATION_STEPS = (
+    # (step, what it undoes, functions)
+    ("shadow_ascii", "printable ASCII written as invisible Unicode tag characters",
+     ("decode_shadow_ascii",)),
+    ("hidden_separators",
+     "a control, invisible or blank-drawn character standing for the space between two words",
+     ("controls_as_spaces", "space_ignorable_between_words", "strip_ignorable", "replace_lookalikes")),
+    ("invisible_characters", "zero-width, bidi, control and other invisible characters inside a word",
+     ("strip_invisible", "strip_ignorable")),
+    ("compatibility_forms", "fullwidth, circled, mathematical and other compatibility forms (NFKC)",
+     ("normalize_unicode",)),
+    ("homoglyphs", "letters and signs from another script or symbol block that look like ASCII ones,"
+     " such as a Cyrillic i or a minus sign for a hyphen",
+     ("replace_homoglyphs", "replace_lookalikes")),
+    ("html_references", "HTML character references such as &#105;",
+     ("decode_html_entities", "decode_letter_references")),
+    ("url_encoding", "URL percent-encoding such as %69", ("decode_url_encoding",)),
+    ("hex_escapes", "hex escapes such as \\x69", ("decode_hex_escapes",)),
+    ("base64", "base64 blobs, up to three nested layers with the decoders above",
+     ("decode_base64_segments",)),
+    ("leetspeak", "digits and symbols standing in for letters, such as 1gn0r3", ("decode_leetspeak",)),
+    ("delimiter_padding", "letters split by dots, dashes, underscores or single spaces, such as i.g.n.o.r.e",
+     ("strip_delimiter_padding",)),
+    ("whitespace_runs", "runs of whitespace between words (spaces, tabs, line breaks, vertical tabs,"
+     " form feeds) read as one space, and whitespace at either end dropped",
+     ("collapse_whitespace", "strip_delimiter_padding")),
+    ("rot13", "ROT13, read as an extra view", ("decode_rot13",)),
+    ("reversed", "text written backwards, read as an extra view of short inputs", ()),
+    ("mixed_case", "mixed upper and lower case", ()),
+    ("l_for_i", "a lowercase l written for a capital I, read as an extra view of short inputs", ()),
+)

@@ -1,19 +1,21 @@
-"""A listed rule that can never produce a finding is not counted as a detecting one.
+"""A listed rule with no regex and no keyword is not counted as one that carries a matcher.
 
 71 of the listed rules carry no regex and no indexed keyword, so the engine compiles
-nothing for them and a scan can never report them. They stay listed (they are rows in
-the ruleset and in the attack database), but the figure the project publishes as its
-pattern count is the number that can fire.
+nothing for them and a scan cannot report them. They stay listed (they are rows in the
+ruleset and in the attack database), but the figure the project publishes as its pattern
+count is the number of rules that carry a matcher. This file measures matcher presence,
+not that every counted rule fires: a keyword the normalizer removes, or a regex no input
+satisfies, still counts.
 
 Three things are pinned here:
 
-* `info()` reports both numbers, and the detecting one is the listed rows minus the
-  named rows below. The engine's built-in mechanism rules are not listed rows and are
-  not in either number.
-* A row that cannot fire has to be named in `CANNOT_FIRE`. A new empty row fails here
-  until it is named, so the list cannot grow by accident.
-* The list only shrinks. When a named row gets a matcher, this fails until the row is
-  taken off the list, so the published count follows the rule instead of a stale name.
+* `info()` reports both numbers, and the matcher one is the listed rows minus the named
+  rows below. The engine's built-in mechanism rules are not listed rows and are not in
+  either number.
+* A row with no matcher has to be named in `NO_MATCHER`. A new empty row fails here until
+  it is named, so the list does not grow by accident (editing the list is a visible change).
+* When a named row gets a matcher, this fails until the row is taken off the list, so the
+  published count follows the rule instead of a stale name.
 """
 import json
 import pathlib
@@ -23,7 +25,7 @@ from sunglasses.patterns import PATTERNS
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-CANNOT_FIRE = frozenset([
+NO_MATCHER = frozenset([
     "GLS-SMP-008",
     "GLS-V3-005",
     "GLS-V3-008",
@@ -107,28 +109,28 @@ def _matchers(engine):
 def test_the_rows_without_a_matcher_are_exactly_the_named_ones():
     have = _matchers(SunglassesEngine())
     empty = {p["id"] for p in PATTERNS if p["id"] not in have}
-    assert empty == CANNOT_FIRE, (
-        f"new rows with no regex and no keyword: {sorted(empty - CANNOT_FIRE)}; "
-        f"named rows that now have a matcher (remove them from CANNOT_FIRE): "
-        f"{sorted(CANNOT_FIRE - empty)}")
+    assert empty == NO_MATCHER, (
+        f"new rows with no regex and no keyword: {sorted(empty - NO_MATCHER)}; "
+        f"named rows that now have a matcher (remove them from NO_MATCHER): "
+        f"{sorted(NO_MATCHER - empty)}")
 
 
-def test_info_counts_only_the_rows_that_can_fire():
+def test_info_counts_the_rows_that_carry_a_matcher():
     info = SunglassesEngine().info()
     assert info["listed_patterns"] == len(PATTERNS)
-    assert info["detecting_patterns"] == len(PATTERNS) - len(CANNOT_FIRE)
+    assert info["patterns_with_matcher"] == len(PATTERNS) - len(NO_MATCHER)
     assert "patterns" not in info
 
 
-def test_a_named_row_has_no_finding_to_give():
-    # Scanning a row's own name and description is the strongest chance the engine
-    # has to match it; none of the named rows may appear in the findings.
+def test_a_named_row_gives_no_finding_for_its_own_text():
+    # A small control: scanning a row's own name and description must not make the
+    # engine report a row that has no matcher.
     engine = SunglassesEngine()
     seen = set()
     for p in PATTERNS:
-        if p["id"] in CANNOT_FIRE:
+        if p["id"] in NO_MATCHER:
             result = engine.scan(f'{p["name"]}. {p["description"]}')
-            seen.update(f["id"] for f in result.findings if f["id"] in CANNOT_FIRE)
+            seen.update(f["id"] for f in result.findings if f["id"] in NO_MATCHER)
     assert not seen
 
 
@@ -138,12 +140,21 @@ def test_a_custom_ruleset_counts_its_own_rows():
     empty = {"id": "T-2", "name": "empty", "category": "x", "severity": "high",
              "channel": ["message"], "description": "d"}
     info = SunglassesEngine(patterns=[live, empty]).info()
-    assert (info["listed_patterns"], info["detecting_patterns"]) == (2, 1)
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 1)
 
 
 def test_the_published_stats_carry_both_numbers_and_not_the_old_key():
     stats = json.loads((ROOT / "stats" / "current.json").read_text())
     info = SunglassesEngine().info()
-    assert stats["detecting_patterns"] == info["detecting_patterns"]
+    assert stats["patterns_with_matcher"] == info["patterns_with_matcher"]
     assert stats["listed_patterns"] == info["listed_patterns"]
     assert "patterns" not in stats, "a reader of the old key must fail, not read a stale number"
+
+
+def test_a_custom_row_without_an_id_still_builds_and_is_not_counted():
+    live = {"id": "T-1", "name": "live", "category": "x", "severity": "high",
+            "channel": ["message"], "description": "d", "keywords": ["zzqx marker phrase"]}
+    no_id = {"name": "no id", "category": "x", "severity": "high",
+             "channel": ["message"], "description": "d"}
+    info = SunglassesEngine(patterns=[live, no_id]).info()
+    assert (info["listed_patterns"], info["patterns_with_matcher"]) == (2, 1)

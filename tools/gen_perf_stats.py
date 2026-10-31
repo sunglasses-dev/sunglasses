@@ -175,7 +175,7 @@ def main():
         from sunglasses.patterns import PATTERNS
         info = SunglassesEngine().info()
         stats.pop("patterns", None)
-        stats["detecting_patterns"] = info["detecting_patterns"]
+        stats["patterns_with_matcher"] = info["patterns_with_matcher"]
         stats["listed_patterns"] = info["listed_patterns"]
         stats["keywords"] = info["keywords"]
         stats["categories"] = len({(p.get("category") or "").strip()

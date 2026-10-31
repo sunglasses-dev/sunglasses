@@ -3,7 +3,7 @@
 The open collection of AI agent attack patterns that powers
 [Sunglasses](https://sunglasses.dev) — the runtime firewall for AI agents.
 
-**1,583 detection patterns across 117 attack categories.**
+**1,583 patterns across 117 attack categories.** These are the listed rules: 1,512 of them carry a regex or keyword matcher and 71 carry none yet.
 
 **Nobody owns this data. Everyone contributes. Everyone benefits.**
 
