@@ -3111,21 +3111,28 @@ class SunglassesEngine:
         return None
 
     def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None,
-                         refusal_ok: bool = False):
+                         refusal_ok: bool = False, decoded_strict: bool = False):
         """Offset of the first word-bounded occurrence of `keyword` at or after
         `begin` that is not negated, or None. `align` is the walk of the views
-        against the raw input (see _check_negation)."""
+        against the raw input (see _check_negation). `decoded_strict`: see _negated_here."""
         at = normalized.find(keyword, begin)
         while at != -1:
             if self._word_bounded(normalized, at, keyword) and \
-                    not self._negated_here(normalized, at, align, at + len(keyword), refusal_ok):
+                    not self._negated_here(normalized, at, align, at + len(keyword), refusal_ok,
+                                           decoded_strict):
                 return at
             at = normalized.find(keyword, at + 1)
         return None
 
-    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False) -> bool:
+    def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False,
+                      decoded_strict: bool = False) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
-        one that does not keep the offsets never is."""
+        one that does not keep the offsets never is.
+
+        `decoded_strict` is for a keyword that did not start its rule's finding (the rule was
+        first reached through another keyword): a hit in a decoded view (ROT13, reversed...) is
+        then judged as the first hit of a rule is, with the raw input, so a negation built by
+        decoding never downgrades, whichever keyword of the rule the search met first."""
         if align is not None and align.moved(view, pos):
             return False
         if refusal_ok and self._refusal_in_shape_copy(view, pos, end, align):
@@ -3133,6 +3140,8 @@ class SunglassesEngine:
         aligned = self._align_at(view, pos, align)
         if align is None or aligned is not None:
             return self._check_negation(view, pos, aligned, end, refusal_ok)
+        if decoded_strict and self._shape_place(view, pos, end, align) is None:
+            return self._check_negation(view, pos, align, end, refusal_ok)
         # A hit in a later view (ROT13, reversed...) is judged in its own text, as a plain
         # sentence: no list is read there, because the raw input cannot say where it ends. The
         # copy of the plain text with some `l` written as `i` is the plain text, so its hit is also
@@ -3750,7 +3759,8 @@ class SunglassesEngine:
                 held = negated_kw.get(pattern["id"])
                 if held is not None:
                     live = self._live_occurrence(normalized, keyword, 0, align,
-                                                 pattern["id"] in self._REFUSAL_STRING_RULES)
+                                                 pattern["id"] in self._REFUSAL_STRING_RULES,
+                                                 decoded_strict=True)
                     if live is not None:
                         self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
                         del negated_kw[pattern["id"]]

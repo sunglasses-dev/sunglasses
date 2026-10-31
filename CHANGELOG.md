@@ -11,7 +11,8 @@ All notable changes to Sunglasses are documented here.
 
 ### Fixed
 
-- A scan now reports the same findings, in the same order and with the same excerpt, whether or not the optional extension is installed. Before, the two keyword searches picked a rule's first hit differently, so the order of findings, and in rare cases the excerpt shown for a finding, could differ between two machines for the same input. Decisions, severities and which rules fire did not change. On a plain install a few findings can now list in a different order, or show a different excerpt, than in 0.6.16.
+- A scan now reports the same findings, in the same order and with the same excerpt, whether or not the optional extension is installed. Before, the two keyword searches picked a rule's first hit differently, so the order of findings, and in rare cases the excerpt shown for a finding, could differ between two machines for the same input. On a plain install a few findings can now list in a different order, or show a different excerpt, than in 0.6.16.
+- A negation that was built by decoding no longer lowers a rule's finding because another keyword of the same rule was negated in plain text. For example, a plain "do not alpha" beside the ROT13 form of "do not beta" is now blocked for a rule that lists both words, with or without the optional extension. Before, a plain install blocked or reviewed it depending on which of the two words the rule listed first, and with the extension it was reviewed either way. Negation written in plain text is judged as before.
 
 ### Changed
 

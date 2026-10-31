@@ -140,3 +140,42 @@ def test_a_keyword_cut_short_by_a_longer_word_does_not_claim_the_rule(fast):
     eng = _engine([("R-1", ["alpha", "beta"])], fast)
     finding = eng.scan("alphabet first, then a lone beta, then alpha").findings[0]
     assert "lone beta" in finding["matched_text"]
+
+
+# ----------------------------------------------- a negation built by decoding never downgrades
+# A rule's finding starts at its first keyword hit. A decoded negation ("do not alpha" written
+# in ROT13) must not lower it whichever of the rule's keywords the search meets first, so the
+# decision cannot depend on the order the rule lists them in, or on the extension. These
+# state the decision and severity themselves.
+
+LISTINGS = [pytest.param(["alpha", "beta"], id="alpha-first"),
+            pytest.param(["beta", "alpha"], id="beta-first")]
+
+
+def _decision(rule_keywords, text, fast):
+    result = _engine([("R-1", rule_keywords)], fast).scan(text)
+    return result.decision, result.severity
+
+
+@pytest.mark.parametrize("fast", _paths())
+@pytest.mark.parametrize("keywords", LISTINGS)
+def test_an_encoded_negation_beside_a_plain_one_does_not_lower_the_rule(keywords, fast):
+    for text in ("do not alpha. qb abg orgn",      # plain "do not alpha", ROT13 "do not beta"
+                 "do not beta. qb abg nycun",      # plain "do not beta", ROT13 "do not alpha"
+                 'do not beta. Rknzcyr: "nycun"',  # ROT13 of: Example: "alpha"
+                 "do not alpha. Rknzcyr: \"orgn\""):
+        assert _decision(keywords, text, fast) == ("block", "high"), text
+
+
+@pytest.mark.parametrize("fast", _paths())
+@pytest.mark.parametrize("keywords", LISTINGS)
+def test_plain_negation_keeps_the_decision_it_had(keywords, fast):
+    assert _decision(keywords, "do not alpha", fast) == ("allow_redacted", "review")
+    assert _decision(keywords, "do not beta", fast) == ("allow_redacted", "review")
+    # A second keyword that stands on its own is live.
+    assert _decision(keywords, "do not alpha. beta", fast) == ("block", "high")
+    assert _decision(keywords, "do not beta. alpha", fast) == ("block", "high")
+    assert _decision(keywords, "never alpha. beta", fast) == ("block", "high")
+    # The same keyword plain and encoded, both negated, is unchanged: one finding, lowered.
+    assert _decision(keywords, "do not alpha. qb abg nycun", fast) == ("allow_redacted", "review")
+    assert _decision(keywords, "do not beta. qb abg orgn", fast) == ("allow_redacted", "review")
