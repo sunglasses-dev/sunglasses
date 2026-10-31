@@ -1,0 +1,28 @@
+{
+  "id": "GLS-SC-041",
+  "name": "Package registry redirected to a non-public host",
+  "version": "1.0",
+  "category": "supply_chain",
+  "severity": "high",
+  "channels": [
+    "file",
+    "code"
+  ],
+  "description": "Code that points a package manager at a host that is not a public registry by writing the setting where the manager reads it: a heredoc, redirect or tee into .npmrc, .yarnrc, pip.conf or .pypirc whose body sets the registry or index URL, an echo or printf of that setting into one of those files, npm, yarn or pnpm config set of the registry, pip config set of the index, or a variable holding the URL that is then written into such a file. Every package the project installs afterwards comes from the named host. The registry hosts of npm, Yarn, PyPI and GitHub Packages, and the reserved documentation domains example.org, example.com and example.net, are left alone, and text that only mentions a registry (documentation, a README) is not matched, because the rule needs the write itself.",
+  "keywords": [],
+  "regex": [
+    "(?:>>?|\\btee\\s{1,8}(?:-a\\s{1,8})?)\\s{0,8}[\\\"']?[^\\s\\\"'|;&<>]{0,120}(?:\\.npmrc|\\.yarnrc(?:\\.yml)?|pip\\.conf|pip\\.ini|\\.pypirc)[\\\"']?[^\\n]{0,40}\\n(?:[^\\n]{0,200}\\n){0,4}?[^\\n]{0,80}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \\t]{0,8}[=: ][ \\t]{0,8}[\\\"']?https?://(?!(?:[\\w-]{1,40}\\.){0,3}(?:npmjs\\.(?:org|com)|yarnpkg\\.com|pypi\\.org|pythonhosted\\.org|npm\\.pkg\\.github\\.com|example\\.(?:org|com|net))(?![\\w-]))[\\w.-]{1,100}",
+    "\\b(?:echo|printf)\\b[^\\n]{0,60}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \\t]{0,8}[= ][ \\t]{0,8}\\\\?[\\\"']?https?://(?!(?:[\\w-]{1,40}\\.){0,3}(?:npmjs\\.(?:org|com)|yarnpkg\\.com|pypi\\.org|pythonhosted\\.org|npm\\.pkg\\.github\\.com|example\\.(?:org|com|net))(?![\\w-]))[\\w.-]{1,100}[^\\n]{0,80}?>>?\\s{0,8}[\\\"']?[^\\s\\\"'|;&<>]{0,120}(?:\\.npmrc|\\.yarnrc(?:\\.yml)?|pip\\.conf|pip\\.ini|\\.pypirc)",
+    "\\b(?:npm|yarn|pnpm)\\s{1,8}(?:config\\s{1,8})?set\\s{1,8}(?:--?[\\w-]{1,20}\\s{1,8}){0,2}(?:[\\w@/.-]{1,60}:)?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)\\s{1,8}[\\\"']?https?://(?!(?:[\\w-]{1,40}\\.){0,3}(?:npmjs\\.(?:org|com)|yarnpkg\\.com|pypi\\.org|pythonhosted\\.org|npm\\.pkg\\.github\\.com|example\\.(?:org|com|net))(?![\\w-]))[\\w.-]{1,100}",
+    "\\bpip3?\\s{1,8}config\\s{1,8}set\\s{1,8}(?:--?[\\w-]{1,20}\\s{1,8}){0,2}(?:global\\.)?(?:index-url|extra-index-url)\\s{1,8}[\\\"']?https?://(?!(?:[\\w-]{1,40}\\.){0,3}(?:npmjs\\.(?:org|com)|yarnpkg\\.com|pypi\\.org|pythonhosted\\.org|npm\\.pkg\\.github\\.com|example\\.(?:org|com|net))(?![\\w-]))[\\w.-]{1,100}",
+    "\\b([A-Z][A-Z_]{0,30}(?:REGISTRY|MIRROR|INDEX)[A-Z_]{0,20})=[\\\"']?https?://(?!(?:[\\w-]{1,40}\\.){0,3}(?:npmjs\\.(?:org|com)|yarnpkg\\.com|pypi\\.org|pythonhosted\\.org|npm\\.pkg\\.github\\.com|example\\.(?:org|com|net))(?![\\w-]))[\\w.-]{1,100}[\\s\\S]{0,1500}?(?:>>?|\\btee\\s{1,8}(?:-a\\s{1,8})?)\\s{0,8}[\\\"']?[^\\s\\\"'|;&<>]{0,120}(?:\\.npmrc|\\.yarnrc(?:\\.yml)?|pip\\.conf|pip\\.ini|\\.pypirc)[\\\"']?[^\\n]{0,40}\\n(?:[^\\n]{0,200}\\n){0,4}?[^\\n]{0,80}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \\t]{0,8}[=: ]?[ \\t]{0,8}[\\\"']?\\$\\{?\\1\\b"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-31",
+  "source": "patterns.py:GLS-SC-041"
+}

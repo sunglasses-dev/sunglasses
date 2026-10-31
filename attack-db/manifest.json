@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-24T09:20:47.173834Z",
+  "generated_at": "2026-10-31T02:13:47.499802Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1583,
+  "total_patterns": 1584,
   "categories": {
     "prompt-injection": 51,
     "data-exfiltration": 43,
@@ -15,7 +15,7 @@
     "unicode-evasion": 3,
     "rtl-obfuscation": 3,
     "code-switching": 4,
-    "supply-chain": 40,
+    "supply-chain": 41,
     "prompt-extraction": 3,
     "encoding-evasion": 3,
     "invisible-unicode": 4,

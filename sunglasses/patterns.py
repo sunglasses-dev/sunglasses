@@ -29533,6 +29533,25 @@ PATTERNS = [
         "description": "Text inside a tool result or fetched page that tells the agent to retrieve the user's records, files or account details and then send them to a named email address, URL or phone number. A tool result reports data. It has no business asking the agent to move the user's data somewhere."
     },
     {
+        "id": "GLS-SC-041",
+        "name": "Package registry redirected to a non-public host",
+        "category": "supply_chain",
+        "severity": "high",
+        "channel": ["file", "code"],
+        "regex": [
+            # Shell: a heredoc or redirect into a package-manager config file whose body sets the registry (or index) to a host that is not a public one.
+            r"""(?:>>?|\btee\s{1,8}(?:-a\s{1,8})?)\s{0,8}[\"']?[^\s\"'|;&<>]{0,120}(?:\.npmrc|\.yarnrc(?:\.yml)?|pip\.conf|pip\.ini|\.pypirc)[\"']?[^\n]{0,40}\n(?:[^\n]{0,200}\n){0,4}?[^\n]{0,80}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \t]{0,8}[=: ][ \t]{0,8}[\"']?https?://(?!(?:[\w-]{1,40}\.){0,3}(?:npmjs\.(?:org|com)|yarnpkg\.com|pypi\.org|pythonhosted\.org|npm\.pkg\.github\.com|example\.(?:org|com|net))(?![\w-]))[\w.-]{1,100}""",
+            # Shell: echo or printf of the setting, redirected into a package-manager config file.
+            r"""\b(?:echo|printf)\b[^\n]{0,60}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \t]{0,8}[= ][ \t]{0,8}\\?[\"']?https?://(?!(?:[\w-]{1,40}\.){0,3}(?:npmjs\.(?:org|com)|yarnpkg\.com|pypi\.org|pythonhosted\.org|npm\.pkg\.github\.com|example\.(?:org|com|net))(?![\w-]))[\w.-]{1,100}[^\n]{0,80}?>>?\s{0,8}[\"']?[^\s\"'|;&<>]{0,120}(?:\.npmrc|\.yarnrc(?:\.yml)?|pip\.conf|pip\.ini|\.pypirc)""",
+            # Shell: npm, yarn or pnpm `config set` of the registry, and pip `config set` of the index, to a non-public host.
+            r"""\b(?:npm|yarn|pnpm)\s{1,8}(?:config\s{1,8})?set\s{1,8}(?:--?[\w-]{1,20}\s{1,8}){0,2}(?:[\w@/.-]{1,60}:)?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)\s{1,8}[\"']?https?://(?!(?:[\w-]{1,40}\.){0,3}(?:npmjs\.(?:org|com)|yarnpkg\.com|pypi\.org|pythonhosted\.org|npm\.pkg\.github\.com|example\.(?:org|com|net))(?![\w-]))[\w.-]{1,100}""",
+            r"""\bpip3?\s{1,8}config\s{1,8}set\s{1,8}(?:--?[\w-]{1,20}\s{1,8}){0,2}(?:global\.)?(?:index-url|extra-index-url)\s{1,8}[\"']?https?://(?!(?:[\w-]{1,40}\.){0,3}(?:npmjs\.(?:org|com)|yarnpkg\.com|pypi\.org|pythonhosted\.org|npm\.pkg\.github\.com|example\.(?:org|com|net))(?![\w-]))[\w.-]{1,100}""",
+            # Shell: a variable set to a non-public URL, later used as the registry in a block written into a package-manager config file.
+            r"""\b([A-Z][A-Z_]{0,30}(?:REGISTRY|MIRROR|INDEX)[A-Z_]{0,20})=[\"']?https?://(?!(?:[\w-]{1,40}\.){0,3}(?:npmjs\.(?:org|com)|yarnpkg\.com|pypi\.org|pythonhosted\.org|npm\.pkg\.github\.com|example\.(?:org|com|net))(?![\w-]))[\w.-]{1,100}[\s\S]{0,1500}?(?:>>?|\btee\s{1,8}(?:-a\s{1,8})?)\s{0,8}[\"']?[^\s\"'|;&<>]{0,120}(?:\.npmrc|\.yarnrc(?:\.yml)?|pip\.conf|pip\.ini|\.pypirc)[\"']?[^\n]{0,40}\n(?:[^\n]{0,200}\n){0,4}?[^\n]{0,80}?(?:registry|index[-_]url|extra[-_]index[-_]url|npmRegistryServer)[ \t]{0,8}[=: ]?[ \t]{0,8}[\"']?\$\{?\1\b""",
+        ],
+        "description": "Code that points a package manager at a host that is not a public registry by writing the setting where the manager reads it: a heredoc, redirect or tee into .npmrc, .yarnrc, pip.conf or .pypirc whose body sets the registry or index URL, an echo or printf of that setting into one of those files, npm, yarn or pnpm config set of the registry, pip config set of the index, or a variable holding the URL that is then written into such a file. Every package the project installs afterwards comes from the named host. The registry hosts of npm, Yarn, PyPI and GitHub Packages, and the reserved documentation domains example.org, example.com and example.net, are left alone, and text that only mentions a registry (documentation, a README) is not matched, because the rule needs the write itself.",
+    },
+    {
         "id": "GLS-IP-006",
         "name": "Retrieved text gives orders about the agent's reply",
         "category": "indirect_prompt_injection",
