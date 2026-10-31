@@ -97,6 +97,10 @@ def test_doctor_names_a_record_the_store_would_refuse(tmp_path):
     assert approvals.approval_rows(root) == [_row("t" * 12, "INVALID")]
 
 
+def test_a_state_root_with_a_nul_byte_lists_no_other_folders(tmp_path):
+    assert approvals.other_folders(str(tmp_path / "a\x00b"), "stem-of-the-command", "/here") == []
+
+
 def test_a_record_with_only_a_folder_and_stem_is_invalid_not_approved(tmp_path):
     root = tmp_path / "root"
     (root / "approvals").mkdir(parents=True)
