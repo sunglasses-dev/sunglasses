@@ -5,6 +5,15 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- `sunglasses install <name>` in a folder with no MCP config now says there is no config file at that
+  path, that nothing was changed, and to run it next to the project's `.mcp.json` or pass
+  `--config <path>`. It used to print the raw `[Errno 2]` text twice. Exit code 2 is unchanged, and
+  every other read error keeps its own message. `sunglasses doctor` with no server entries now names
+  the next step (`sunglasses install <name>`); its exit code is unchanged. The README's FAST row now
+  says images, PDFs and QR codes need `pip install "sunglasses[media]"`. (C491)
+
 ## [0.6.16] — 2026-10-30
 
 ### Added

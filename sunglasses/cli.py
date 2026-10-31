@@ -4135,6 +4135,15 @@ def cmd_install(args):
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
     except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
+        # A first run in a folder with no MCP config read as a crash: the raw
+        # "[Errno 2] No such file or directory" twice over (C491). Only the
+        # absent file gets the plain sentence; every other read error keeps its own.
+        if isinstance(e.__cause__, FileNotFoundError):
+            print(f"\n  {RED}SUNGLASSES install failed{RESET} — there is no MCP "
+                  f"config file at {target}. Nothing was changed.")
+            print(f"  {DIM}run it in the folder that holds your project's .mcp.json, "
+                  f"or name the file with --config <path>{RESET}\n")
+            sys.exit(2)
         print(f"\n  {RED}SUNGLASSES install failed{RESET} — {e}")
         print(f"  {DIM}target: {target}{RESET}\n")
         sys.exit(2)
@@ -4372,6 +4381,9 @@ def cmd_doctor(args, _run=None):
             print(line + (f"  {YELLOW}{detail}{RESET}" if detail else ""))
     else:
         print(f"  {DIM}No server entries found.{RESET}")
+        # A first run has nothing wrapped, and the report alone does not say what to do next (C491).
+        print(f"  {DIM}Nothing is wrapped yet. Wrap a server with: "
+              f"sunglasses install <name>{RESET}")
 
     print()
     # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing

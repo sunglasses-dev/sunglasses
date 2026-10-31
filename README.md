@@ -742,7 +742,7 @@ result = scanner.scan_auto("any_file.ext")
 
 | Mode | What it scans | Speed | Runs in your call? |
 |------|--------------|-------|---------------|
-| **FAST** (always on) | Text, emails, images, PDFs, QR codes | <3 seconds for typical text, images and PDFs; large files scale with size | Yes, it returns when done |
+| **FAST** (always on) | Text and emails on the base install; images, PDFs and QR codes after `pip install "sunglasses[media]"` | <3 seconds for typical text, images and PDFs; large files scale with size | Yes, it returns when done |
 | **DEEP** (on request) | Audio, video | Depends on the media length and the Whisper model | Yes, it returns when done |
 
 ## Performance

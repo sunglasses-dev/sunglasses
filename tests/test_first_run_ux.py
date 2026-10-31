@@ -135,6 +135,41 @@ def test_doctor_on_a_fresh_install_says_nothing_failed_and_still_exits_one(tmp_p
     assert out.index("No check failed") < out.index("ROUTE_UNVERIFIED")
 
 
+def test_doctor_with_no_servers_names_the_next_step_and_keeps_its_exit(tmp_path):
+    # C491: a cold user saw "No server entries found." and nothing to do next.
+    proc = _run(tmp_path, ["doctor"])
+    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    out = proc.stdout
+    assert "No server entries found." in out
+    assert "Nothing is wrapped yet. Wrap a server with: sunglasses install <name>" in out
+    assert out.index("No server entries found.") < out.index("Nothing is wrapped yet.")
+
+
+# ---------------------------------------------------------------------------
+# install with no MCP config in the folder (C491)
+# ---------------------------------------------------------------------------
+
+def test_install_with_no_mcp_config_says_so_plainly_and_changes_nothing(tmp_path):
+    proc = _run(tmp_path, ["install", "filesystem"])
+    assert proc.returncode == 2, (proc.stdout, proc.stderr)
+    out = proc.stdout + proc.stderr
+    assert "there is no MCP config file at " + str(tmp_path / ".mcp.json") in out
+    assert "Nothing was changed." in out
+    assert "--config <path>" in out
+    assert "Errno" not in out and "No such file or directory" not in out
+    assert not (tmp_path / ".mcp.json").exists()
+
+
+def test_install_read_errors_other_than_absent_keep_their_own_wording(tmp_path):
+    # A config that exists but is not JSON is not "no config": its own message stays.
+    (tmp_path / ".mcp.json").write_text("{not json")
+    proc = _run(tmp_path, ["install", "filesystem"])
+    assert proc.returncode == 2, (proc.stdout, proc.stderr)
+    out = proc.stdout + proc.stderr
+    assert "there is no MCP config file" not in out
+    assert "is not usable JSON" in out
+
+
 # What `doctor --json` printed on a fresh install before this change, byte for byte (the same
 # bytes on main and on the patched tree). The report carries a measured duration, so the test
 # below runs the child with its monotonic clock held at zero; nothing else in it depends on the
