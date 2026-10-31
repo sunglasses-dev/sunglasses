@@ -33,6 +33,7 @@ from .engine import SunglassesEngine
 from .extractors.dispatch import UnreadableFile
 from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
+from .result import verdict_word
 from .sarif import to_sarif
 from .taxonomy import for_category
 
@@ -188,6 +189,59 @@ _SKIP_DIRS = {
     'vendor', 'dist', 'build', '.next', '.nuxt', 'coverage',
     '.tox', '.mypy_cache', '.pytest_cache', 'egg-info',
 }
+
+# Of the folders the walk does not enter, these are the ones WE produce: build output and caches
+# of the project being scanned. Code can sit in them (a committed `__pycache__` with a `.pyc`)
+# and nobody read it, so a scan that left one holding files did not come back clean. Every other
+# name in `_SKIP_DIRS` is somebody else's code or version-control state (a dependency tree, a
+# virtualenv, a nested `.git`): named in `excluded_folders` and counted, verdict unchanged.
+_FIRST_PARTY_OUTPUT_DIRS = {'__pycache__', 'build', 'dist', 'coverage', '.next', '.nuxt'}
+# Tool caches hold nothing an agent reads: named and counted on their own line, verdict unchanged.
+_TOOL_CACHE_DIRS = {'.mypy_cache', '.pytest_cache'}
+
+
+def _is_first_party_output_dir(rel):
+    name = os.path.basename(rel)
+    return name in _FIRST_PARTY_OUTPUT_DIRS or name.endswith('.egg-info') or name == 'egg-info'
+
+
+class _ExcludedFolders(list):
+    """The folders the walk did not enter, plus which of ours it could not prove empty."""
+
+    def __init__(self):
+        super().__init__()
+        self.unproven = set()
+
+
+def _output_folder_unproven(repo_dir, parts, root_fd, idents):
+    """True unless the folder, and every folder below it, is PROVEN to hold nothing.
+
+    Looks, never reads. It goes through the same held root and no-follow opens as the walk
+    (`_list_dir`), and each folder it goes through is checked against the (device, inode) the
+    walk saw, so a folder swapped for a link after the listing is not followed. A file, a link,
+    a special file, or a folder that cannot be listed counts as content: if emptiness cannot
+    be shown, the folder was not inspected. Where the platform has no descriptor-relative
+    opens there is no way to pin a folder to the one the walk saw, so nothing is listed and
+    the folder is not inspected.
+    """
+    if not _FD_SAFE:
+        return True
+    pending = [parts]
+    while pending:
+        here = pending.pop()
+        try:
+            entries = _list_dir(repo_dir, here, root_fd, idents)
+        except OSError:
+            return True
+        for name, st in entries:
+            if isinstance(st, OSError) or not stat.S_ISDIR(st.st_mode):
+                return True
+            child = here + (name,)
+            if idents is not None:
+                idents[child] = _ident(st)
+            pending.append(child)
+    return False
+
 
 # Generated dependency lists. Thousands of lines of hashes and URLs, no prose an agent
 # would read, and the biggest single cost of scanning a JavaScript repo. They are scanned
@@ -459,6 +513,12 @@ def _walk_pending(repo_dir, root_fd, idents, excluded, skip_lockfiles, files, sk
                     # is a folder of content the walk did not enter, so it is named.
                     if excluded is not None and (name != '.git' or len(child) > 1):
                         excluded.append(rel)
+                        unproven = getattr(excluded, "unproven", None)
+                        if unproven is not None and _is_first_party_output_dir(rel):
+                            if idents is not None:
+                                idents[child] = _ident(st)
+                            if _output_folder_unproven(repo_dir, child, root_fd, idents):
+                                unproven.add(rel)
                 else:
                     if idents is not None:
                         idents[child] = _ident(st)
@@ -1000,7 +1060,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # through the same path as `--file` instead of falling through to the human screen.
     repo_results = []
 
-    excluded_folders = []
+    excluded_folders = _ExcludedFolders()
     idents = {}
     walked, walker_skips = _walk_repo_files_with_skips(
         tmp_dir, excluded=excluded_folders,
@@ -1228,6 +1288,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # `files_skipped` is the half that used to vanish: every file the walker
     # declined, with the reason it declined it.
     summary["files_skipped"] = len(walker_skips)
+    # Everything in scope that no scanner read, whole or in part: the skipped files plus the
+    # files read only in part. One number for the verdict, the lists below for the names.
+    summary["files_not_inspected"] = len(walker_skips) + len(partially_read)
     summary["skipped"] = [{"file": f, "reason": r} for f, r in walker_skips]
     # The folders the walk does not enter: named, so a consumer can see what "clean" left out.
     summary["excluded_folders"] = excluded_folders
@@ -1239,7 +1302,23 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
     unread_skips = list(walker_skips)
-    incomplete = bool(files_incomplete or unread_skips or nothing_inspected)
+    # Our own output/cache folders that held files were not read, so the scan is not complete.
+    # Dependency and VCS folders stay named and counted, verdict unchanged.
+    folder_gaps = [
+        (rel, "first-party output/cache folder, not entered and not shown empty — not inspected")
+        for rel in excluded_folders
+        if rel in excluded_folders.unproven]
+    gap_names = {rel for rel, _reason in folder_gaps}
+    summary["folders_excluded_with_files"] = len(folder_gaps)
+    summary["excluded_not_inspected"] = [{"folder": f, "reason": r} for f, r in folder_gaps]
+    # The rest of the named folders, by what they are. An empty folder of our own is neither.
+    _named = [rel for rel in excluded_folders if rel not in gap_names
+              and not _is_first_party_output_dir(rel)]
+    n_tool_cache = sum(1 for rel in _named if os.path.basename(rel) in _TOOL_CACHE_DIRS)
+    n_dependency = len(_named) - n_tool_cache
+    summary["excluded_dependency_folders"] = n_dependency
+    summary["excluded_tool_cache_folders"] = n_tool_cache
+    incomplete = bool(files_incomplete or unread_skips or folder_gaps or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
     policy = None
@@ -1285,6 +1364,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             "threat_found": bool(total_threats),
             "extraction_complete": not incomplete,
             "warnings": ([f"{path}: {reason}" for path, reason in unread_skips]
+                         + [f"{path}: {reason}" for path, reason in folder_gaps]
                          + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
             "channel": "file",
@@ -1310,6 +1390,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                     res["suppressions"] = [{"kind": "external",
                                             "justification": "listed in the baseline"}]
         not_inspected = ([f"{path}: {reason}" for path, reason in unread_skips]
+                         + [f"{path}: {reason}" for path, reason in folder_gaps]
                          + [f"{path}: {reason}" for path, reason in partially_read])
         not_inspected += [
             f"{r.source}: not fully inspected"
@@ -1342,7 +1423,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{_printable(repo_name)}{RESET} ({_printable(repo_url)})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
     print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
-    if files_incomplete or unread_skips:
+    if files_incomplete or unread_skips or folder_gaps:
         # The banner introduces the list. Round 5: it was printed in the verdict
         # block BELOW, so a reader met the named skips first and the header last,
         # and a header that promises a list of what went unread has to arrive
@@ -1356,17 +1437,30 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(partially_read) > 10:
             print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
-    if excluded_folders:
-        shown = ", ".join(_printable(name) for name in excluded_folders[:10])
-        more = f" and {len(excluded_folders) - 10} more" if len(excluded_folders) > 10 else ""
-        print(f"  {DIM}Folders not entered (dependency/build): {shown}{more}{RESET}")
+    if folder_gaps:
+        print(f"  {YELLOW}Folders NOT inspected (output/cache holding files): {BOLD}{len(folder_gaps)}{RESET}")
+        for name, _reason in folder_gaps[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}{RESET}")
+        if len(folder_gaps) > 10:
+            print(f"    {DIM}... and {len(folder_gaps) - 10} more{RESET}")
+    dependency_named = [name for name in excluded_folders if name not in gap_names
+                        and not _is_first_party_output_dir(name)]
+    if dependency_named:
+        shown = ", ".join(_printable(name) for name in dependency_named[:10])
+        more = f" and {len(dependency_named) - 10} more" if len(dependency_named) > 10 else ""
+        print(f"  {DIM}Folders not entered (dependency/VCS/tool cache): {shown}{more}{RESET}")
     if walker_skips:
         print(f"  {YELLOW}Files NOT inspected: {BOLD}{len(walker_skips)}{RESET}")
         for name, reason in walker_skips[:10]:
             print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(walker_skips) > 10:
             print(f"    {DIM}... and {len(walker_skips) - 10} more{RESET}")
+    print(f"  Not inspected:   {BOLD}{len(walker_skips) + len(partially_read)}{RESET} files, "
+          f"{BOLD}{len(folder_gaps)}{RESET} folders  "
+          f"{DIM}(+ {n_dependency} dependency/VCS, {n_tool_cache} tool-cache folders named, "
+          f"not entered){RESET}")
     print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
+    print(f"  Decision:        {BOLD}{str(summary['decision']).upper()}{RESET}")
     if policy:
         print(f"  Known (baseline): {BOLD}{policy['known_count']}{RESET}   "
               f"New: {BOLD}{len(policy['new_severities'])}{RESET}   "
@@ -1765,6 +1859,7 @@ def _emit_scan_result(args, result, source):
     """
     if getattr(args, "report_to", None):
         held = result.to_dict()
+        held["decision"] = verdict_word(result.decision, result.threat_found, result.inspection_complete)
         held["source"] = source
         _annotate_single_policy(args, held)
         from_file = (getattr(args, "file", None) and source == args.file
@@ -1779,6 +1874,7 @@ def _emit_scan_result(args, result, source):
 
     if args.json:
         output = result.to_dict()
+        output["decision"] = verdict_word(result.decision, result.threat_found, result.inspection_complete)
         output["source"] = source
         _annotate_single_policy(args, output)
         print(json.dumps(output))
@@ -2001,6 +2097,8 @@ def _run_scan(args):
                     sys.exit(_scan_exit_code(result))
                 if args.json:
                     output = result.to_dict()
+                    output["decision"] = verdict_word(
+                        result.decision, result.threat_found, result.inspection_complete)
                     output["source"] = filepath
                     print(json.dumps(output))
                     _print_extraction_warnings(result, stream=sys.stderr)
