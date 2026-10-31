@@ -414,8 +414,47 @@ LIMITS = {
     "global_etc_npmrc": "echo registry=%s >> /etc/npmrc\n" % MIRROR,
 }
 
-ALL_FIRES = dict(FIRES)
-ALL_QUIET = {**QUIET, **LIMITS}
+# what the shell really does with these (ASTRA round 1, checked against bash): spellings the gate and the
+# reader must both follow, and writes that do not land where they look as if they did
+R2_FIRES = {
+    "quoted_key_in_the_middle": "npm config set reg'istry' %s\n" % MIRROR,
+    "backslash_newline_in_the_key": "npm config set reg\\\nistry %s\n" % MIRROR,
+    "key_built_from_a_variable": "K=reg; K=${K}istry; npm config set $K %s\n" % MIRROR,
+    "quoted_pip_key": "pip config set global.in'dex-url' %s\n" % PIP_MIRROR,
+    "exported_variable_reaches_sh": "export R=%s\nsh -c 'npm config set registry $R'\n" % MIRROR,
+    "inline_assignment_reaches_sh": "R=%s sh -c 'npm config set registry $R'\n" % MIRROR,
+    "last_redirect_is_the_file": "echo 'registry=%s' > notes > .npmrc\n" % MIRROR,
+    "stderr_redirect_after_the_file": "echo 'registry=%s' > .npmrc 2>&1\n" % MIRROR,
+    "printf_s": "printf 'registry=%%s\\n' %s > .npmrc\n" % MIRROR,
+    "printf_precision_longer_than_the_value": "printf 'registry=%%.200s\\n' %s > .npmrc\n" % MIRROR,
+    "unquoted_heredoc_joins_a_continued_line": "cat > .npmrc <<EOF\nreg\\\nistry=%s\nEOF\n" % MIRROR,
+    "unquoted_heredoc_runs_a_substitution": "cat <<EOF\n$(npm config set registry %s)\nEOF\n" % MIRROR,
+    "quoted_heredoc_delimiter_of_backticks": "cat > .npmrc <<'```'\nregistry=%s\n```\n" % MIRROR,
+    "python_isolated_mode": "python3 -I -m pip config set global.index-url %s\n" % PIP_MIRROR,
+    "several_npm_pairs": "npm config set foo=bar registry=%s\n" % MIRROR,
+    "pip_conf_install_section": heredoc("pip.conf", "[install]\nindex-url = %s" % PIP_MIRROR),
+    "cat_dash_keeps_the_pipe": "echo 'registry=%s' | cat - notes.txt > .npmrc\n" % MIRROR,
+    "console_blocks_share_variables": "```console\n$ R=%s\n```\n```console\n$ npm config set registry $R\n```\n" % MIRROR,
+    "the_host_is_after_the_last_at": "npm config set registry https://u@registry.npmjs.org@mirror.example/\n",
+}
+
+R2_QUIET = {
+    "file_then_another_redirect": "echo 'registry=%s' > .npmrc > notes\n" % MIRROR,
+    "file_then_standard_error": "echo 'registry=%s' > .npmrc 1>&2\n" % MIRROR,
+    "printf_d_is_not_read": "printf 'registry=%%d\\n' %s > .npmrc\n" % MIRROR,
+    "echo_upper_e_keeps_the_backslash": "echo -E 'x\\nregistry=%s' > .npmrc\n" % MIRROR,
+    "variable_not_exported_to_sh": "R=%s\nsh -c 'npm config set registry $R'\n" % MIRROR,
+    "subshell_variable_is_gone": "(R=%s)\nnpm config set registry $R\n" % MIRROR,
+    "pip_conf_without_a_section": heredoc("pip.conf", "index-url = %s" % PIP_MIRROR),
+    "pip_conf_unrelated_section": heredoc("pip.conf", "[unrelated]\nindex-url = %s" % PIP_MIRROR),
+    "pip_set_without_a_section": "pip config set index-url %s\n" % PIP_MIRROR,
+    "pip_set_with_surplus_arguments": "pip config set global.index-url %s extra\n" % PIP_MIRROR,
+    "the_host_before_the_last_at_is_public": "npm config set registry https://u@mirror.example@registry.npmjs.org/\n",
+    "fence_inside_a_quoted_heredoc_is_data": "cat <<'EOF'\n```sh\nnpm config set registry %s\n```\nEOF\n" % MIRROR,
+}
+
+ALL_FIRES = {**FIRES, **R2_FIRES}
+ALL_QUIET = {**QUIET, **LIMITS, **R2_QUIET}
 
 
 def test_the_tables_do_not_overlap():
@@ -604,12 +643,13 @@ def test_the_layer_can_be_switched_off_and_changes_nothing_else():
 
 # ------------------------------------------------------------------------------------ the pregate
 
-def test_the_pregate_wants_a_registry_word_and_a_config_word(validator):
+def test_the_pregate_wants_a_package_manager_or_its_config_file_by_name(validator):
     assert validator.pregate("npm config set registry x") is True
     assert validator.pregate("echo index-url=x > pip.conf") is True
     assert validator.pregate("npm set registry x") is True
     assert validator.pregate("echo hello") is False
-    assert validator.pregate("npm config list") is False
+    assert validator.pregate("npm config list") is True      # a package manager is all the gate asks for
+    assert validator.pregate("reg'istry' on its own") is False
     assert validator.pregate("registry only") is False
     assert validator.pregate("") is False
 
@@ -811,3 +851,32 @@ def test_the_validator_alone_grows_linearly_with_the_input(validator, family):
     t_large = best_of(lambda: validator.run(large), 2)
     # 16x the input; allow 3x slack for noise, never the 256x a quadratic walk would take
     assert t_large < 48 * t_small + 0.5, (family, t_small, t_large)
+
+
+# ---------------------------------------------------------------------- ASTRA round 1: found and exact
+
+def test_the_engine_names_the_rule_for_every_spelling_the_gate_must_pass(engine):
+    for name in ("quoted_key_in_the_middle", "backslash_newline_in_the_key", "key_built_from_a_variable",
+                 "quoted_pip_key", "unquoted_heredoc_joins_a_continued_line"):
+        assert RULE in ids(engine, R2_FIRES[name]), name
+
+
+def test_the_host_is_the_one_after_the_last_at(validator):
+    one = validator.run(R2_FIRES["the_host_is_after_the_last_at"])[0]
+    assert one["evidence"]["host"] == "mirror.example"
+
+
+def test_matched_text_does_not_carry_credentials(validator):
+    found = validator.run("npm config set registry https://user:secret@npm.mirror.example/\n")[0]
+    assert "secret" not in json.dumps(found) and "user:" not in json.dumps(found)
+
+
+def test_a_here_document_fed_shell_reports_the_line_of_its_own_command(validator):
+    text = "sh <<EOF\necho a\nnpm config set registry %s\nEOF\n" % MIRROR
+    assert validator.run(text)[0]["evidence"]["line"] == 3
+
+
+def test_an_env_split_string_reports_the_line_of_the_env_word(validator):
+    text = "echo a\nenv -S 'npm config set registry %s'\n" % MIRROR
+    one = validator.run(text)[0]
+    assert one["evidence"]["line"] == 2 and one["matched_text"].startswith("env")

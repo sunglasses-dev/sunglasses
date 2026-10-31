@@ -33,7 +33,8 @@ All notable changes to Sunglasses are documented here.
 - `GLS-STRUCT-006` reports, for review (`quarantine`, never a block), a shell script that points npm,
   pnpm, yarn or pip at a registry that is not a public one, with a `config set` command or by writing
   the manager's own config file (`.npmrc`, `.yarnrc`, `.yarnrc.yml`, `pip.conf`, `pip.ini`,
-  `.pypirc`). Every later install in that scope then comes from that host. It reads the words of the
+  `.pypirc`). The installs that use that setting (not a scoped registry's other scopes, an additional
+  index, or a publish-only `.pypirc`) then come from that host. It reads the words of the
   script as the hook-command rule does (quotes, `$(...)`, line continuations, heredoc bodies, simple
   variables; fenced blocks in the same text read as one script, in order) and judges the host from the parsed URL, never from a prefix, so
   `registry.npmjs.org.example` is not a public host and credentials in front of a public host are
