@@ -130,8 +130,9 @@ comparison, ``not``, ``and``/``or``, a conditional expression, a subscript or sl
 (``len``, ``.upper()``), a precision, names only, and ``json.dumps(os.environ)`` (which raises
 ``TypeError``) show nothing. A loop that tests the variables it prints (``if``, ``while``, ``match``, a
 comprehension ``if``), or can leave early (``break``, ``continue``, ``return``, ``raise``,
-``sys.exit``), is not a dump of every variable. Branches that cannot run (``if False``, code after
-``return``) are skipped; ``TYPE_CHECKING`` is a test like any other, so code under it is read.
+``sys.exit``), is not a dump of every variable. Only branches proven unable to run are skipped (a constant or ``not <constant>``
+test, the right side of ``False and`` / ``True or``, code after ``return``, the ``else`` of ``while True``). Any other test,
+``TYPE_CHECKING`` included, is unknown: code under it is read, and a loop with an exit under it is a filter.
 
 It is a judgment from syntax, not proof that the code runs: a function never called, a dump behind
 a flag, and a logging handler that discards the record are still reported. The grammar is the one of the
