@@ -17,11 +17,15 @@ All notable changes to Sunglasses are documented here.
   environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a value from an
   unfiltered loop over it. It stays quiet on one named variable, names only, a loop that tests the
   variable it prints, a precision that cuts the value away, `json.dumps(os.environ)` (which raises),
-  a plain `return`, a comment, a docstring, a test double, and shell or Node text. It is a judgment
+  a plain `return`, a comment, a docstring, a test double, a `map` or generator that nothing runs, a
+  branch that cannot run (`if False`, `False and ...`), output sent to `/dev/null`, and shell or Node
+  text. It is a judgment
   from syntax, not proof that the code runs: a function that is never called or a dump behind a flag
   is still reported, an environment copied into another name before it is shown is not followed, and
   syntax newer than the Python that runs the scan (a `match` statement before 3.10) is not read.
-  The pattern count does not move. (C497)
+  A text the Python parser itself cannot take (too deep, parser stack full) is treated as not Python;
+  a parsed tree too deep for the reader's own walk makes the scan report that inspection was not
+  complete. The pattern count does not move. (C497)
 
 ### Changed
 

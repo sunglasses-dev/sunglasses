@@ -138,7 +138,8 @@ a flag, and a logging handler that discards the record are still reported. The g
 interpreter that runs the scan, so syntax newer than that interpreter (a ``match`` statement before
 Python 3.10) makes the text not Python and it is not read. ``return`` and ``yield``
 of the environment are not output and are not reported. The finding is for review (medium); it
-reads ``file`` and ``code``. A tree too deep for the parser raises ``RecursionError``, which the
+reads ``file`` and ``code``. A text the parser itself cannot take (too deep, parser stack full) is not
+Python and is not read; the walk of a parsed tree that is too deep raises ``RecursionError``, which the
 engine reports as an inspection that is not complete.
 """
 from __future__ import annotations
@@ -1585,14 +1586,18 @@ class SettingsWithoutPrompts:
 # ----------------------------------------------------------------------- Python tree side
 
 _MAX_FENCES = 20
-_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*(?:python3?|py)(?![\w+-])", re.I)
+_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*([^\s`]*)")
+_PYTHON_TAG = re.compile(r"(?:python3?|py)(?![\w+-])", re.I)
 _FENCE_SHUT = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
 
 _BUILTINS = frozenset((
     "print", "open", "dict", "list", "tuple", "sorted", "str", "repr", "ascii", "format", "map",
-    "exit", "quit",
+    "any", "all", "sum", "min", "max", "set", "frozenset", "exit", "quit",
 ))
 _BARE_MODULES = frozenset(("os", "sys", "json", "logging", "requests", "httpx", "pprint"))
+_EAGER = frozenset(("builtins.list", "builtins.tuple", "builtins.sorted", "builtins.any", "builtins.all",
+                    "builtins.sum", "builtins.min", "builtins.max", "builtins.dict", "builtins.set",
+                    "builtins.frozenset", "collections.deque"))
 _EXIT_CALLS = frozenset(("sys.exit", "os._exit", "builtins.exit", "builtins.quit"))
 _LOG_HIGH = {"warning": 30, "warn": 30, "error": 40, "exception": 40, "critical": 50, "fatal": 50}
 _LOG_LOW = {"debug": 10, "info": 20}
@@ -1664,12 +1669,21 @@ def _fenced_python(text):
     blocks = []
     body = None
     fence = None
+    other = None            # the marker of an open fence that is not python: what it holds is not a block
     for line in text.splitlines():
+        if other is not None:
+            shut = _FENCE_SHUT.match(line)
+            if shut and shut.group(1)[0] == other[0] and len(shut.group(1)) >= len(other):
+                other = None
+            continue
         if body is None:
             opened = _FENCE_OPEN.match(line)
             if opened:
-                fence = opened.group(1)
-                body = []
+                if _PYTHON_TAG.match(opened.group(2)):
+                    fence = opened.group(1)
+                    body = []
+                else:
+                    other = opened.group(1)
             continue
         shut = _FENCE_SHUT.match(line)
         if shut and shut.group(1)[0] == fence[0] and len(shut.group(1)) >= len(fence):
@@ -1713,7 +1727,12 @@ def _is_text(node):
 
 
 def _empty_body(node):
-    """True for a request body that is absent, ``None`` or another falsy constant (requests then sends ``json=``)."""
+    """True for a request body that is absent, ``None``, another falsy constant or an empty list, tuple, set or
+    dict (requests then sends ``json=``)."""
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return not node.elts
+    if isinstance(node, ast.Dict):
+        return not node.keys
     return node is None or (isinstance(node, ast.Constant) and not node.value)
 
 
@@ -1776,7 +1795,9 @@ def _brace_slots(fmt):
         if field == "":
             key = auto
             auto += 1
-        elif field.isdigit():
+        elif field.isascii() and field.isdigit():
+            if len(field) > 9:
+                return None         # an index no argument list reaches; not converted (no unbounded int())
             key = int(field)
             explicit = True
         else:
@@ -1800,6 +1821,8 @@ class _EnvironmentReader:
         self.levels = []       # logging levels set anywhere: ints, None when not a literal
         self.logging_off = False
         self.exits = {}        # id(loop) -> the loop body can leave early
+        self.consumed = set()  # id of a map(...) call or generator expression that something runs to the end
+        self.replaced = False  # os.environ is assigned to in the file: it is no longer the process environment
         self._collect()
 
     # ------------------------------------------------------------------ name facts
@@ -1831,6 +1854,7 @@ class _EnvironmentReader:
                 self._store(node.name)
             elif type(node).__name__ == "MatchMapping" and getattr(node, "rest", None):
                 self._store(node.rest)
+        calls = []
         for node in ast.walk(self.tree):
             if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
                 self._note_binding(node.targets[0].id, node.value)
@@ -1839,7 +1863,13 @@ class _EnvironmentReader:
                     if isinstance(item.optional_vars, ast.Name):
                         self._note_binding(item.optional_vars.id, item.context_expr)
             elif isinstance(node, ast.Call):
-                self._note_logging_call(node)
+                calls.append(node)
+            elif isinstance(node, ast.Attribute) and isinstance(node.ctx, (ast.Store, ast.Del)) \
+                    and self.qual(node) == "os.environ":
+                self.replaced = True            # the program binds os.environ to something of its own
+        for call in calls:
+            self._note_logging_call(call)
+        self._consumers()
         self._note_exits(self.tree.body)
 
     def _note_binding(self, name, value):
@@ -1860,8 +1890,38 @@ class _EnvironmentReader:
             for keyword in call.keywords:
                 if keyword.arg == "level":
                     self.levels.append(self._level(keyword.value))
-        elif isinstance(call.func, ast.Attribute) and call.func.attr == "setLevel" and call.args:
+        elif isinstance(call.func, ast.Attribute) and call.func.attr == "setLevel" and call.args \
+                and self._is_logger(call.func.value):
             self.levels.append(self._level(call.args[0]))
+
+    def _is_logger(self, node):
+        """A logger the file made with ``getLogger`` (or the root logger), not some object with a ``setLevel``."""
+        if isinstance(node, ast.Call):
+            return self.qual(node.func) == "logging.getLogger"
+        if isinstance(node, ast.Name):
+            return node.id in self.loggers
+        return self.qual(node) == "logging.root"
+
+    def _consumers(self):
+        """Fill ``self.consumed``: the lazy ``map`` calls and generator expressions that a ``for``, a list or tuple
+        built from them, ``any`` / ``all`` / ``sum`` and the like, or ``str.join`` run to the end. A bare
+        ``map(print, ...)`` or an unused generator prints nothing."""
+        for node in ast.walk(self.tree):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                lazy = [node.iter]
+            elif isinstance(node, ast.comprehension):
+                lazy = [node.iter]
+            elif isinstance(node, ast.Call):
+                made = self.qual(node.func)
+                joins = isinstance(node.func, ast.Attribute) and node.func.attr == "join" and _is_text(node.func.value)
+                lazy = node.args if (made in _EAGER or joins) else []
+            else:
+                continue
+            for item in lazy:
+                if isinstance(item, ast.Starred):
+                    item = item.value
+                if isinstance(item, (ast.GeneratorExp, ast.Call)):
+                    self.consumed.add(id(item))
 
     def _level(self, node):
         if isinstance(node, ast.Constant):
@@ -1944,7 +2004,7 @@ class _EnvironmentReader:
     def env(self, node):
         """The ``_Kind`` of an expression made from ``os.environ``, or None."""
         if isinstance(node, (ast.Name, ast.Attribute)):
-            return _Kind("map", False, True) if self.qual(node) == "os.environ" else None
+            return _Kind("map", False, True) if self.qual(node) == "os.environ" and not self.replaced else None
         if isinstance(node, ast.Dict):
             for key, value in zip(node.keys, node.values):
                 if key is None and (inner := self.env(value)) is not None and inner.shape == "map":
@@ -2117,15 +2177,11 @@ class _EnvironmentReader:
                 or any(k.arg is None for k in call.keywords):
             return False
         keyword = {k.arg: k.value for k in call.keywords}
+        for key, _plain, _needs_text in slots:      # a field with no argument raises before anything is shown
+            if (key >= len(call.args)) if isinstance(key, int) else (key not in keyword):
+                return False
         for key, plain, needs_text in slots:
-            if isinstance(key, int):
-                if key >= len(call.args):
-                    return False
-                argument = call.args[key]
-            else:
-                if key not in keyword:
-                    return False
-                argument = keyword[key]
+            argument = call.args[key] if isinstance(key, int) else keyword[key]
             if plain and self.shows(argument, ctx) and (not needs_text or self._is_value(argument, ctx)):
                 return True
         return False
@@ -2208,11 +2264,12 @@ class _EnvironmentReader:
             if self._stream(file) and any(self._element_shows(a, ctx) for a in args):
                 return "print"
             return None
-        if made == "builtins.map" and len(args) == 2 and self.qual(args[0]) == "builtins.print":
+        if made == "builtins.map" and id(call) in self.consumed and len(args) == 2 \
+                and self.qual(args[0]) == "builtins.print":
             kind = self.env(args[1])
             return "print" if kind is not None and kind.in_iteration() else None
         if made in ("pprint.pprint", "pprint.pp"):
-            stream = next((k.value for k in call.keywords if k.arg == "stream"), None)
+            stream = next((k.value for k in call.keywords if k.arg == "stream"), args[1] if len(args) > 1 else None)
             if args and not isinstance(args[0], ast.Starred) and self._stream(stream) and self.shows(args[0], ctx):
                 return "pprint"
             return None
@@ -2228,6 +2285,9 @@ class _EnvironmentReader:
                 return "write" if self.string_valued(args[0], ctx) and self.shows(args[0], ctx) else None
             if func.attr == "write_text" and args and isinstance(func.value, ast.Call) \
                     and self.qual(func.value.func) == "pathlib.Path" and not isinstance(args[0], ast.Starred):
+                where = func.value.args[0] if func.value.args else None
+                if (isinstance(where, ast.Constant) and where.value == "/dev/null") or self.qual(where) == "os.devnull":
+                    return None
                 return "write_text" if self.string_valued(args[0], ctx) and self.shows(args[0], ctx) else None
             receiver = func.value
             logger = self._bound_once(receiver, self.loggers) \
@@ -2342,9 +2402,12 @@ class _EnvironmentReader:
             self._expr(node.subject, ctx)
             inner = _NO_CTX if ctx.live() and _count_loads(node.subject, ctx.names()) else ctx
             for case in node.cases:
+                body = inner
                 if case.guard is not None:
                     self._expr(case.guard, inner)
-                self._block(case.body, inner)
+                    if inner.live() and _count_loads(case.guard, inner.names()):
+                        body = _NO_CTX          # the guard picks which names get this case
+                self._block(case.body, body)
         elif isinstance(node, (ast.With, ast.AsyncWith)):
             for item in node.items:
                 self._expr(item.context_expr, ctx)
@@ -2368,24 +2431,34 @@ class _EnvironmentReader:
                               "shape": "loop" if ctx.live() else "whole_environment"})
         if isinstance(node, ast.IfExp):
             self._expr(node.test, ctx)
+            truth = _truth(node.test)
             inner = _NO_CTX if ctx.live() and _count_loads(node.test, ctx.names()) else ctx
-            self._expr(node.body, inner)
-            self._expr(node.orelse, inner)
+            if truth is not False:
+                self._expr(node.body, inner)
+            if truth is not True:
+                self._expr(node.orelse, inner)
         elif isinstance(node, ast.BoolOp):
             inner = ctx
             for value in node.values:
                 self._expr(value, inner)
+                if _truth(value) is isinstance(node.op, ast.Or):
+                    break                   # the rest is never evaluated
                 if inner.live() and _count_loads(value, inner.names()):
                     inner = _NO_CTX
         elif isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
             inner = ctx
+            runs = True
             for generator in node.generators:
                 self._expr(generator.iter, inner)
                 inner = self.bind(inner, generator.target, generator.iter)
                 for cond in generator.ifs:
                     self._expr(cond, inner)
+                    if _truth(cond) is False:
+                        runs = False        # nothing gets past a filter that is never true
                     if inner.live() and _count_loads(cond, inner.names()):
                         inner = _NO_CTX
+            if not runs or (isinstance(node, ast.GeneratorExp) and id(node) not in self.consumed):
+                return                      # a generator nothing runs does not execute its body
             for part in ((node.key, node.value) if isinstance(node, ast.DictComp) else (node.elt,)):
                 self._expr(part, inner)
         elif isinstance(node, ast.Lambda):
