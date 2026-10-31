@@ -501,7 +501,7 @@ _L63 = "a" * 63
     (f"https://{_L63}.example/x", f"{_L63}.example"),
     ("https://" + ".".join([_L63] * 3 + ["a" * 61]) + "/x", ".".join([_L63] * 3 + ["a" * 61])),
     ("https://h.example/a b", "h.example"),
-    ("https://h.example/a\tb", "h.example"),
+    ("https://xn--bcher-kva.example/x", "xn--bcher-kva.example"),
     # anything else is a question mark
     ("https://host\\SECRET/path", "?"),
     ("https://host%2fSECRET/path", "?"),
@@ -521,6 +521,21 @@ _L63 = "a" * 63
     ("http://[zzz]/x", "?"),
     ("https://[SECRET@host.example/x", "?"),
     ("https://", "?"),
+    # a control character anywhere refuses the whole string (the parser would erase it)
+    ("https://h.example/a\tb", "?"),
+    ("https:/\t/host\tSECRET/PATHSECRET", "?"),
+    ("https:/\n/host\nSECRET/PATHSECRET", "?"),
+    ("https:/\r/host\rSECRET/PATHSECRET", "?"),
+    ("https:/\t/host\tSECRET/path//safe", "?"),
+    ("https://h.example/a\x00b", "?"),
+    (" https://h.example/x", "?"),
+    ("https://h.example/x ", "?"),
+    # a later "//" never lends its words to the host
+    ("https:/host\tSECRET/path//safe.example/x", "?"),
+    # an xn-- label is checked by decoding it back
+    ("https://xn--a.example/x", "?"),
+    ("https://xn--.example/x", "?"),
+    ("https://xn--bcher-kvb.example/x", "?"),
 ])
 def test_a_host_is_shown_only_when_it_is_a_host_name(world, url, shown):
     home, project = world

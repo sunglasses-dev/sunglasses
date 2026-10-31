@@ -267,21 +267,23 @@ def _host(url):
     """The URL's host name when it is one, else `?`.
 
     The parser's hostname is not a check: it keeps a backslash, an encoded slash, an
-    `=` or a space inside what it calls the host, it erases a tab or a line break
-    before anything can look at it, and the secret a caller put there would be shown.
-    So the raw authority is looked at first (no control character, no space), then
-    each label is checked on its own: letters, digits and inner hyphens, 1 to 63
-    characters, 253 in all. A name with other letters is shown in its ASCII (punycode)
-    form. An IP literal in square brackets must parse as an address.
+    `=` or a space inside what it calls the host, and it erases a tab or a line break
+    before anything can look at it, so a secret placed there would be shown. So the
+    string is refused whole if it holds any control character (the parser is never
+    given the chance to strip one), the authority is the one the parser itself found,
+    and each label is checked on its own: letters, digits and inner hyphens, 1 to 63
+    characters, 253 in all. A name with other letters is shown in its ASCII
+    (punycode) form, and an `xn--` label must survive a decode and re-encode. An IP
+    literal in square brackets must parse as an address.
     """
-    rest = url.split("//", 1)[1] if "//" in url else ""
-    authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
-    if any(ch == " " or not ch.isprintable() for ch in authority):
+    if url != url.strip() or not url.isprintable():
         return "?"
     try:
         parts = urlsplit(url)
         host = parts.hostname or ""
     except ValueError:
+        return "?"
+    if " " in parts.netloc:
         return "?"
     if not host:
         return "?"
@@ -301,8 +303,16 @@ def _host(url):
         ascii_host = ascii_host[:-1]
     if not ascii_host or len(ascii_host) > 253:
         return "?"
-    if not all(_LABEL.match(label) for label in ascii_host.split(".")):
+    labels = ascii_host.split(".")
+    if not all(_LABEL.match(label) for label in labels):
         return "?"
+    for label in labels:
+        if label.startswith("xn--"):
+            try:
+                if label.encode("ascii").decode("idna").encode("idna").decode("ascii") != label:
+                    return "?"
+            except UnicodeError:
+                return "?"
     return ascii_host
 
 
