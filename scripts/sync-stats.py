@@ -32,7 +32,7 @@ def get_real_stats():
     info = engine.info()
 
     patterns = PATTERNS
-    total = info["patterns"]
+    total = info["patterns_with_matcher"]
     categories = set(p["category"] for p in patterns)
     keyword_count = info["keywords"]  # unique keywords from engine
     regex_count = info["regex_patterns"]
@@ -54,6 +54,7 @@ def get_real_stats():
 
     return {
         "patterns": total,
+        "listed_patterns": info["listed_patterns"],
         "categories": len(categories),
         "keywords": keyword_count,
         # The README states both: the DECLARED count (table row, and in brackets on the
@@ -102,26 +103,46 @@ def sync_readme(stats):
         # the DECLARED count leads, the pre-screen index (stats["keywords"]) appears
         # only where the row says "index holds", and the excluded count is their
         # difference, so the row cannot contradict itself after a sync.
-        (r'\| Patterns \| [\d,]+ \|', f'| Patterns | {stats["patterns"]:,} |'),
+        # The patterns cell is the number that carry a matcher, with the listed total
+        # beside it; the old bare-number form is still read, so a stale one is rewritten.
+        (r'\| Patterns \| [\d,]+(?: carry a matcher \([\d,]+ listed\))? \|',
+         f'| Patterns | {stats["patterns"]:,} carry a matcher ({stats["listed_patterns"]:,} listed) |'),
         (r'\| Keywords \| [\d,]+ unique declared \([\d,]+ entries across all patterns\); '
          r'the pre-screen index holds [\d,]+ \([\d,]+ generic keywords',
          f'| Keywords | {stats["keywords_declared"]:,} unique declared '
          f'({stats["keyword_entries"]:,} entries across all patterns); '
          f'the pre-screen index holds {stats["keywords"]:,} ('
          f'{stats["keywords_declared"] - stats["keywords"]:,} generic keywords'),
-        (r'\| Attack categories \| [\d,]+ \|', f'| Attack categories | {stats["categories"]:,} |'),
+        (r'\| Attack categories \| [\d,]+(?: listed)? \|', f'| Attack categories | {stats["categories"]:,} listed |'),
         # What Works Today header
         (r'What Works Today \(v[\d.]+\)', f'What Works Today (v{stats["version"]})'),
+        # The opening line and the sentence under the table state the same split.
+        (r'with [\d,]+ patterns that carry a matcher \([\d,]+ are listed\) across [\d,]+ listed categories',
+         f'with {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} are listed) '
+         f'across {stats["categories"]:,} listed categories'),
+        (r'The ruleset lists [\d,]+; the other [\d,]+ carry neither\.',
+         f'The ruleset lists {stats["listed_patterns"]:,}; the other '
+         f'{stats["listed_patterns"] - stats["patterns"]:,} carry neither.'),
         # What Works Today line. It must match the README as written (thousands
         # separators, no language count), or the replacement is a silent no-op, which
         # it was from #147 until this pattern was fixed. It leads with the index count,
         # the number version.json and `sunglasses info` publish, and names the declared
         # count beside it, so the line never reads as a second "keywords" figure.
-        (r'Text scanning: [\d,]+ patterns, [\d,]+ indexed keywords \([\d,]+ declared\), [\d,]+ attack categories',
-         f'Text scanning: {stats["patterns"]:,} patterns, {stats["keywords"]:,} indexed keywords '
-         f'({stats["keywords_declared"]:,} declared), {stats["categories"]:,} attack categories'),
+        (r'Text scanning: [\d,]+ patterns(?: that carry a matcher \([\d,]+ listed\))?, [\d,]+ indexed keywords '
+         r'\([\d,]+ declared\), [\d,]+ (?:attack|listed) categories',
+         f'Text scanning: {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} listed), '
+         f'{stats["keywords"]:,} indexed keywords '
+         f'({stats["keywords_declared"]:,} declared), {stats["categories"]:,} listed categories'),
     ]
-    return update_file(readme, replacements, "README.md")
+    ok = update_file(readme, replacements, "README.md")
+    # attack-db/README.md states the same split in its opening sentence.
+    attack_db = REPO_ROOT / "attack-db" / "README.md"
+    split = [(r'\*\*[\d,]+ patterns across [\d,]+ attack categories\.\*\* These are the listed rules: '
+              r'[\d,]+ of them carry a regex or keyword matcher and [\d,]+ carry none\.',
+              f'**{stats["listed_patterns"]:,} patterns across {stats["categories"]:,} attack categories.** '
+              f'These are the listed rules: {stats["patterns"]:,} of them carry a regex or keyword matcher '
+              f'and {stats["listed_patterns"] - stats["patterns"]:,} carry none.')]
+    return update_file(attack_db, split, "attack-db/README.md") or ok
 
 
 def sync_website_index(stats):
@@ -140,7 +161,11 @@ def sync_website_index(stats):
         # JSON-LD
         (r'"version": "[\d.]+"', f'"version": "{stats["version"]}"'),
         (r'"dateModified": "[\d-]+"', f'"dateModified": "{stats["date"]}"'),
-        (r'("name": "detectionPatterns", "value": )\d+', rf'\g<1>{stats["patterns"]}'),
+        # The number written here is the patterns that carry a matcher (stats["patterns"] is
+        # the published `patterns_with_matcher`); it says nothing about which of them fire.
+        # The old name goes with the old meaning, so the name is rewritten too.
+        (r'"name": "(?:detectionPatterns|patternsWithMatcher)", "value": \d+',
+         f'"name": "patternsWithMatcher", "value": {stats["patterns"]}'),
         (r'("name": "attackCategories", "value": )\d+', rf'\g<1>{stats["categories"]}'),
         (r'("name": "trackedKeywords", "value": )\d+', rf'\g<1>{stats["keywords"]}'),
         # Meta tags
@@ -150,6 +175,10 @@ def sync_website_index(stats):
         (r'(sunglasses:version" content=")[\d.]+"', rf'\g<1>{stats["version"]}"'),
     ]
     return update_file(index, replacements, "website/index.html")
+
+
+# The key each total goes by in stats/current.json (a total not listed is published as itself).
+PUBLISHED_KEY = {"patterns": "patterns_with_matcher"}
 
 
 def _previous_totals(stats):
@@ -163,7 +192,7 @@ def _previous_totals(stats):
         pass
     out = {}
     for key in ("patterns", "keywords", "categories"):
-        raw = stats.get(f"_prev_{key}", recorded.get(key))
+        raw = stats.get(f"_prev_{key}", recorded.get(PUBLISHED_KEY.get(key, key), recorded.get(key)))
         try:
             out[key] = int(str(raw).replace(",", ""))
         except (TypeError, ValueError):
@@ -199,22 +228,29 @@ def sync_website_pages(stats):
     # looked at and left alone, so a skipped stale total is visible in the receipt, not silent.
     prev = _previous_totals(stats)
     shape = {
-        "patterns": r"({n}|{nc}) ((?:detection )?patterns)\b",
+        "patterns": r"({n}|{nc}) ((?:detection )?patterns(?: that carry a matcher)?)\b",
         "keywords": r"({n}|{nc}) (keywords)\b",
-        "categories": r"({n}|{nc}) ((?:threat |attack )?categories)\b",
+        "categories": r"({n}|{nc}) ((?:threat |attack |listed )?categories)\b",
     }
     generic_any = {
         "patterns": r"([\d,]{3,6}) ((?:detection )?patterns)\b",
         "keywords": r"([\d,]{3,6}) (keywords)\b",
-        "categories": r"(\d{2,3}) ((?:threat |attack )?categories)\b",
+        "categories": r"(\d{2,3}) ((?:threat |attack |listed )?categories)\b",
     }
 
     def _style(old_text, value):
         return f"{value:,}" if "," in old_text else str(value)
 
+    # The total is rewritten together with the words that said what it counted: the
+    # patterns that carry a matcher (not "detection patterns"), the listed categories
+    # (a "threat categories" phrase is some other count and keeps its words).
+    _LABEL = {"patterns": lambda old: "patterns that carry a matcher",
+              "keywords": lambda old: old,
+              "categories": lambda old: old if old.startswith("threat ") else "listed categories"}
+
     def _rewrite_for(key):
         def repl(m):
-            return f"{_style(m.group(1), stats[key])} {m.group(2)}"
+            return f"{_style(m.group(1), stats[key])} {_LABEL[key](m.group(2))}"
         return repl
 
     generic_replacements = []

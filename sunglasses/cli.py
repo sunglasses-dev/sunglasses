@@ -1985,7 +1985,7 @@ def _deliver_report(args, token):
     pattern_count = None
     if held:
         try:
-            pattern_count = SunglassesEngine().info()["patterns"]
+            pattern_count = SunglassesEngine().info()["patterns_with_matcher"]
         except Exception:
             pass
     report_to.deliver(args.report_to, held, source_name=args.report_source,
@@ -2310,7 +2310,7 @@ def cmd_check(args):
     print(f"  {GREEN}✓{RESET} SUNGLASSES core installed")
     engine = SunglassesEngine()
     info = engine.info()
-    print(f"    {DIM}{info['patterns']} patterns, {info['keywords']} keywords, {info['regex_patterns']} regex{RESET}")
+    print(f"    {DIM}{info['patterns_with_matcher']} patterns, {info['keywords']} keywords, {info['regex_patterns']} regex{RESET}")
 
     # Tesseract (OCR for images)
     if shutil.which("tesseract"):
@@ -3507,7 +3507,10 @@ def cmd_info(args):
     info = engine.info()
     print(f"\n  {BOLD}SUNGLASSES v{info['version']}{RESET}")
     print(f"  {DIM}{'─' * 40}{RESET}")
-    print(f"  Patterns loaded:  {CYAN}{info['patterns']}{RESET}")
+    print(f"  Patterns loaded:  {CYAN}{info['patterns_with_matcher']}{RESET}")
+    unmatched = info["listed_patterns"] - info["patterns_with_matcher"]
+    if unmatched:
+        print(f"  {DIM}{info['listed_patterns']:,} listed, {unmatched:,} without a matcher{RESET}")
     print(f"  Keywords:         {CYAN}{info['keywords']}{RESET}")
     print(f"  Regex patterns:   {CYAN}{info['regex_patterns']}{RESET}")
     print(f"  Channels:         {', '.join(info['channels'])}")

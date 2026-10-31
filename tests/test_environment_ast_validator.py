@@ -705,7 +705,9 @@ def test_the_module_lists_the_validator_the_engine_runs():
 def test_the_layer_is_counted_apart_from_the_patterns():
     info = SunglassesEngine().info()
     assert info["validators"] == len(VALIDATORS)
-    assert info["patterns"] == SunglassesEngine(validators=False).info()["patterns"]
+    bare = SunglassesEngine(validators=False).info()
+    for key in ("patterns_with_matcher", "listed_patterns"):
+        assert info[key] == bare[key], key
 
 
 # --------------------------------------------------------------------------------- channels
