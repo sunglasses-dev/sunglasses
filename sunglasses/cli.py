@@ -4553,7 +4553,7 @@ def cmd_doctor(args, _run=None):
 def _print_agents(rows):
     """The `doctor --agents` block. A file we could not open is named, never left out."""
     print(f"  {BOLD}Other agents' MCP configs{RESET}  "
-          f"{DIM}(read-only: nothing was changed or started; a server listed here is not routed "
+          f"{DIM}(read-only: nothing was changed or started; only a WRAPPED server runs "
           f"through Sunglasses){RESET}")
     for row in rows:
         label = f" ({row['label']})" if row["label"] else ""

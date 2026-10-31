@@ -30,7 +30,7 @@ SECRET = "sk-live-0123456789SECRETVALUE"
 
 
 def _doctor(*args, home, cwd):
-    env = {**os.environ, "PYTHONPATH": REPO, "HOME": str(home)}
+    env = {**os.environ, "PYTHONPATH": REPO, "HOME": str(home), "USERPROFILE": str(home)}
     env.pop("XDG_CONFIG_HOME", None)
     return subprocess.run([sys.executable, "-m", "sunglasses.cli", "doctor", *args],
                           capture_output=True, text=True, cwd=str(cwd), env=env)
@@ -96,11 +96,11 @@ def test_a_file_with_no_servers_key_is_present_with_none_and_says_so(world):
     assert (row["state"], row["servers"], row["reason"]) == ("present", [], "no mcpServers key")
 
 
-def test_an_entry_with_no_command_and_no_url_is_listed_unverified_not_dropped(world):
+def test_an_entry_with_no_command_and_no_url_is_listed_not_dropped(world):
     home, project = world
     _write(home / ".cursor" / "mcp.json", {"mcpServers": {"odd": {"note": "x"}, "bad": 7}})
     assert [(s["name"], s["state"]) for s in _servers(home, project, "cursor", "user")["servers"]] == [
-        ("bad", "UNVERIFIED"), ("odd", "UNVERIFIED")]
+        ("bad", "UNVERIFIED"), ("odd", "DIRECT")]
 
 
 def test_nothing_configured_is_absent_everywhere(world):
@@ -121,7 +121,7 @@ def test_the_order_is_fixed(world):
     assert keys == sorted(keys)
 
 
-def test_the_windsurf_devin_path_the_current_docs_no_longer_name_is_not_read(world):
+def test_the_older_windsurf_path_the_current_docs_no_longer_name_is_not_read(world):
     home, project = world
     _write(home / ".config" / "devin" / "mcp_config.json", {"mcpServers": {"ghost": {"command": "x"}}})
     assert "ghost" not in json.dumps(agent_discovery.discover(home=home, cwd=project))
@@ -250,7 +250,8 @@ def test_the_flag_exists_and_prints_the_block(world):
     proc = _doctor("--agents", home=home, cwd=project)
     assert "unrecognized arguments" not in proc.stderr, proc.stderr
     assert "Other agents' MCP configs" in proc.stdout
-    assert "not routed through Sunglasses" in proc.stdout
+    assert "only a WRAPPED server runs through Sunglasses" in proc.stdout
+    assert "not routed through" not in proc.stdout
     assert "~/.cursor/mcp.json" in proc.stdout and "DIRECT" in proc.stdout and "files" in proc.stdout
     assert "absent" in proc.stdout
 
@@ -308,3 +309,175 @@ def test_an_unreadable_file_is_never_reported_as_absent_by_the_command(world):
     out = _doctor("--agents", home=home, cwd=project).stdout
     line = next(l for l in out.splitlines() if "~/.gemini/settings.json" in l)
     assert "UNREADABLE" in line and "absent" not in line
+
+
+# 6. Round-2 repairs: what the reader may open ----------------------------------
+
+@pytest.mark.parametrize("command, shown", [
+    ("/private/SECRET folder/run", "?"),
+    ("C:\\SECRET\\bin\\run.exe", "run.exe"),
+    ("C:\\Program Files\\SECRET\\run.exe", "?"),
+    ('"C:\\SECRET\\bin\\run.exe"', 'run.exe"'),
+    ("/usr/local/bin/npx", "npx"),
+    ("C:run.exe", "run.exe"),
+    ("/usr/bin/", "?"),
+    ("API_KEY=sk-0123 npx", "?"),
+])
+def test_the_command_shown_is_a_file_name_or_a_question_mark(world, command, shown):
+    home, project = world
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {"a": {"command": command}}})
+    for extra in ([], ["--json"]):
+        out = _doctor("--agents", *extra, home=home, cwd=project).stdout
+        assert "SECRET" not in out and "sk-0123" not in out and "Program Files" not in out
+    assert _servers(home, project, "cursor", "user")["servers"][0]["via"] == shown
+
+
+@pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
+def test_a_link_in_a_parent_folder_that_leaves_home_is_unreadable(world, tmp_path):
+    home, project = world
+    outside = tmp_path / "elsewhere" / "cursor"
+    _write(outside / "mcp.json", {"mcpServers": {"OUTSIDE": {"command": "x"}}})
+    (home / ".cursor").symlink_to(outside)
+    for extra in ([], ["--json"]):
+        assert "OUTSIDE" not in _doctor("--agents", *extra, home=home, cwd=project).stdout
+    row = _servers(home, project, "cursor", "user")
+    assert (row["state"], row["servers"]) == ("UNREADABLE", [])
+
+
+@pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
+def test_a_file_swapped_for_an_outside_link_just_before_it_is_opened_is_not_read(world, tmp_path, monkeypatch):
+    home, project = world
+    path = _write(home / ".cursor" / "mcp.json", {"mcpServers": {"safe": {"command": "x"}}})
+    outside = _write(tmp_path / "elsewhere.json", {"mcpServers": {"OUTSIDE": {"command": "x"}}})
+    real_open = os.open
+
+    def swap_then_open(target, *args, **kwargs):
+        if str(target).endswith("mcp.json") and not os.path.islink(path):
+            os.unlink(path)
+            os.symlink(outside, path)
+        return real_open(target, *args, **kwargs)
+
+    monkeypatch.setattr(agent_discovery.os, "open", swap_then_open)
+    row = _servers(home, project, "cursor", "user")
+    assert "OUTSIDE" not in json.dumps(row)
+    assert row["state"] == "UNREADABLE"
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs here")
+def test_a_pipe_in_place_of_the_file_is_reported_and_never_waited_on(world):
+    home, project = world
+    (home / ".cursor").mkdir()
+    os.mkfifo(home / ".cursor" / "mcp.json")
+    proc = _doctor("--agents", home=home, cwd=project)  # a hang would raise on the harness timeout
+    line = next(l for l in proc.stdout.splitlines() if "~/.cursor/mcp.json" in l)
+    assert "UNREADABLE" in line and "not a regular file" in line
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs here")
+def test_a_link_to_a_pipe_is_reported_and_never_waited_on(world):
+    home, project = world
+    os.mkfifo(home / "pipe")
+    (home / ".cursor").mkdir()
+    (home / ".cursor" / "mcp.json").symlink_to(home / "pipe")
+    assert _servers(home, project, "cursor", "user")["reason"] == "not a regular file"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
+def test_a_link_loop_is_unreadable_on_every_python(world):
+    home, project = world
+    (home / ".cursor").mkdir()
+    (home / ".cursor" / "mcp.json").symlink_to(home / ".cursor" / "mcp.json")
+    row = _servers(home, project, "cursor", "user")
+    assert row["state"] == "UNREADABLE" and row["servers"] == []
+
+
+@pytest.mark.skipif(agent_discovery._tomllib is None, reason="no TOML reader on this Python")
+def test_deeply_nested_toml_is_unreadable_not_a_crash(world):
+    home, project = world
+    _write(home / ".codex" / "config.toml", "x = " + "[" * 5000 + "]" * 5000 + "\n")
+    proc = _doctor("--agents", home=home, cwd=project)
+    assert "Traceback" not in proc.stderr
+    assert _servers(home, project, "codex", "user")["state"] == "UNREADABLE"
+
+
+def test_a_path_with_a_nul_is_unreadable_not_a_crash(world):
+    home, project = world
+    raw, reason, ident = agent_discovery._read(home / "a\0b", home, project)
+    assert raw is None and reason and ident is None
+
+
+# 7. Round-2 repairs: classification, duplicates, size ----------------------------
+
+def test_every_state_is_installs_own_classification(world, tmp_path):
+    from sunglasses import install as inst
+    home, project = world
+    artifact = tmp_path / "proxy_main.py"
+    artifact.write_text("print('proxy')\n")
+    cfg = _write(home / ".cursor" / "mcp.json", {"mcpServers": {"files": {"command": "npx", "args": ["x"]}}})
+    inst.install(cfg, "files", artifact=artifact, home=home)
+    entries = json.loads(cfg.read_text())["mcpServers"]
+    entries["marker-no-command"] = {inst.MARKER: {"artifact": str(artifact), "sha256": "0" * 64}, "command": "npx"}
+    entries["plain"] = {"command": "npx"}
+    entries["listed"] = {"command": ["a", "b"]}
+    entries["empty"] = {}
+    entries["scalar"] = "x"
+    cfg.write_text(json.dumps({"mcpServers": entries}))
+    row = [r for r in agent_discovery.discover(home=home, cwd=project, artifact=artifact)
+           if r["agent"] == "cursor" and r["scope"] == "user"][0]
+    got = {s["name"]: s["state"] for s in row["servers"]}
+    assert got == {name: inst.classify(spec, artifact=artifact) for name, spec in entries.items()}
+    assert got["files"] == "WRAPPED" and "WRAPPED" not in (got["plain"], got["marker-no-command"])
+
+
+def test_a_second_name_for_the_same_file_is_one_row(world, tmp_path):
+    home, project = world
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {"a": {"command": "x"}}})
+    alias = tmp_path / "alias"
+    if os.name == "nt":
+        pytest.skip("links need privileges on Windows")
+    alias.symlink_to(home)
+    rows = [r for r in agent_discovery.discover(home=home, cwd=alias) if r["agent"] == "cursor"]
+    assert len(rows) == 1 and rows[0]["state"] == "present"
+
+
+def test_each_listed_path_is_read_once(world, monkeypatch):
+    home, project = world
+    seen = []
+    real = agent_discovery._read
+    monkeypatch.setattr(agent_discovery, "_read", lambda p, h, c: seen.append(str(p)) or real(p, h, c))
+    agent_discovery.discover(home=home, cwd=home)
+    assert len(seen) == len(set(seen)) == 7
+
+
+def test_two_long_names_that_share_their_start_stay_two_rows(world):
+    home, project = world
+    stem = "n" * 100
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {stem + "a": {"command": "x"}, stem + "b": {"command": "x"}}})
+    names = [s["name"] for s in _servers(home, project, "cursor", "user")["servers"]]
+    assert len(names) == len(set(names)) == 2 and all(len(n) <= agent_discovery._NAME_LIMIT for n in names)
+
+
+def test_a_file_with_thousands_of_servers_lists_a_bounded_number_and_says_so(world):
+    home, project = world
+    many = {f"s{i:05d}": {"command": "x"} for i in range(agent_discovery.MAX_SERVERS + 25)}
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": many})
+    row = _servers(home, project, "cursor", "user")
+    assert len(row["servers"]) == agent_discovery.MAX_SERVERS and row["reason"] == "25 more servers not listed"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="replacing an open path differs on Windows")
+def test_a_file_replaced_by_another_file_between_the_check_and_the_open_is_not_read(world, monkeypatch):
+    home, project = world
+    path = _write(home / ".cursor" / "mcp.json", {"mcpServers": {"first": {"command": "x"}}})
+    other = _write(home / "other.json", {"mcpServers": {"second": {"command": "x"}}})
+    real_open = os.open
+
+    def replace_then_open(target, *args, **kwargs):
+        if str(target).endswith("mcp.json") and not getattr(replace_then_open, "done", False):
+            replace_then_open.done = True
+            os.replace(other, path)
+        return real_open(target, *args, **kwargs)
+
+    monkeypatch.setattr(agent_discovery.os, "open", replace_then_open)
+    row = _servers(home, project, "cursor", "user")
+    assert (row["state"], row["reason"], row["servers"]) == ("UNREADABLE", "changed while it was being opened", [])

@@ -12,17 +12,23 @@ Three rules carry the whole module:
 * Nothing a config file holds for a server is shown except its name, how it is
   reached, the command's file name or the URL's host. `env`, `args` and `headers`
   values are never read into a row, so they cannot reach the output.
-* A server found in another agent's file is DIRECT or UNVERIFIED. Only the Claude
-  install marker can make an entry WRAPPED, and that path is `doctor`'s own report.
+* A server's state is `install.classify`'s answer, the same one `doctor` gives for
+  the Claude files: WRAPPED only for an entry that really runs this install's proxy.
+* A file is read only when it resolves to a regular file inside the home folder or
+  the project, and is opened without blocking, so a link out of those folders or a
+  FIFO cannot make the list read or hang on something else.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import pathlib
+import re
 import stat
 from urllib.parse import urlsplit
 
 from .. import install as _install
+from . import doctor as _doctor
 
 try:  # Python 3.11 and newer; older versions have no TOML reader in the standard library
     import tomllib as _tomllib
@@ -37,7 +43,9 @@ DIRECT = "DIRECT"
 UNVERIFIED = "UNVERIFIED"
 
 MAX_BYTES = 1 << 20          # a config larger than this is reported, not parsed
+MAX_SERVERS = 500            # servers listed per file; the rest are counted
 _NAME_LIMIT = 80
+_LEAVES = "a link that leaves the home folder and the project"
 
 JSON = "json"
 TOML = "toml"
@@ -73,56 +81,38 @@ def _escape(ch):
 
 
 def _safe(value, limit=_NAME_LIMIT):
-    """Text from a config file is data: escape control characters, cap the length."""
-    out = "".join(_escape(ch) for ch in (value if isinstance(value, str) else ""))
-    return out if len(out) <= limit else out[:limit - 1] + "…"
+    """Text from a config file is data: escape control characters, cap the length.
+
+    A name cut to the limit ends in a short digest of the whole name, so two long
+    names that share their first characters stay two different rows.
+    """
+    full = value if isinstance(value, str) else ""
+    out = "".join(_escape(ch) for ch in full)
+    if len(out) <= limit:
+        return out
+    tag = hashlib.sha1(full.encode("utf-8", "surrogatepass")).hexdigest()[:6]
+    return out[:limit - 8] + "…~" + tag
 
 
 def _shown(path, home, cwd, scope):
     """The path as a reader would type it: `./` for the project, `~/` for home."""
     order = ((home, "~/"), (cwd, "./")) if scope == "user" else ((cwd, "./"), (home, "~/"))
-    for base, prefix in order:
+    for base, lead in order:
         try:
-            return prefix + path.relative_to(base).as_posix()
+            return lead + path.relative_to(base).as_posix()
         except ValueError:
             continue
     return str(path)
 
 
-def _under(path, base):
-    try:
-        path.relative_to(base)
-        return True
-    except ValueError:
-        return False
-
-
-def _read(path, home, cwd):
-    """(bytes, "") or (None, reason). A missing file is (None, "") and only that."""
-    try:
-        info = os.lstat(path)
-    except FileNotFoundError:
-        return None, ""
-    except OSError as error:
-        return None, _os_reason(error)
-    if stat.S_ISLNK(info.st_mode):
+def _inside(real, roots):
+    for root in roots:
         try:
-            target = path.resolve(strict=True)
-        except OSError:
-            return None, "a link whose target cannot be read"
-        roots = [r.resolve() for r in (home, cwd)]
-        if not any(_under(target, root) for root in roots):
-            return None, "a link that leaves the home folder and the project"
-    try:
-        with open(path, "rb") as handle:
-            raw = handle.read(MAX_BYTES + 1)
-    except FileNotFoundError:
-        return None, ""
-    except OSError as error:
-        return None, _os_reason(error)
-    if len(raw) > MAX_BYTES:
-        return None, "larger than 1 MiB"
-    return raw, None
+            if os.path.commonpath([real, root]) == root:
+                return True
+        except ValueError:  # a different drive
+            continue
+    return False
 
 
 def _os_reason(error):
@@ -131,6 +121,90 @@ def _os_reason(error):
     if isinstance(error, IsADirectoryError):
         return "a folder, not a file"
     return "could not be opened"
+
+
+
+def _open_flags():
+    """Open flags this platform has: no blocking, no final link, binary, close-on-exec."""
+    flags = 0
+    try:
+        flags |= os.O_NONBLOCK
+    except AttributeError:
+        pass
+    try:
+        flags |= os.O_NOFOLLOW
+    except AttributeError:
+        pass
+    try:
+        flags |= os.O_BINARY
+    except AttributeError:
+        pass
+    try:
+        flags |= os.O_CLOEXEC
+    except AttributeError:
+        pass
+    return flags
+
+
+_OPEN_FLAGS = _open_flags()
+
+def _read(path, home, cwd):
+    """(bytes, None, id), (None, "", None) for a file that is not there, or
+    (None, reason, None). Absent is a missing file and nothing else.
+
+    The path is resolved in full, every component, and must land inside the home
+    folder or the project; it is then opened without following a final link and
+    without blocking, and the descriptor, not the name, is checked to be a regular
+    file before a byte is read.
+    """
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None, "", None
+    except (OSError, ValueError, RuntimeError) as error:
+        return None, _os_reason(error), None
+    linked = stat.S_ISLNK(info.st_mode)
+    try:
+        roots = [os.path.realpath(root) for root in (home, cwd)]
+        real = os.path.realpath(path)
+        if not _inside(real, roots):
+            return None, _LEAVES, None
+        target = os.stat(real)
+    except FileNotFoundError:
+        return None, ("a link whose target cannot be read" if linked else ""), None
+    except (OSError, ValueError, RuntimeError) as error:
+        return None, _os_reason(error), None
+    if stat.S_ISDIR(target.st_mode):
+        return None, "a folder, not a file", None
+    if not stat.S_ISREG(target.st_mode):
+        return None, "not a regular file", None
+    flags = os.O_RDONLY | _OPEN_FLAGS
+    try:
+        fd = os.open(real, flags)
+    except FileNotFoundError:
+        return None, "", None
+    except (OSError, ValueError) as error:
+        return None, _os_reason(error), None
+    try:
+        handle = os.fdopen(fd, "rb")
+    except OSError:
+        os.close(fd)
+        return None, "could not be opened", None
+    with handle:
+        try:
+            opened = os.fstat(handle.fileno())
+            if not stat.S_ISREG(opened.st_mode):
+                return None, "not a regular file", None
+            if not os.path.samestat(target, opened):
+                return None, "changed while it was being opened", None
+            if os.path.realpath(path) != real:
+                return None, "changed while it was being opened", None
+            raw = handle.read(MAX_BYTES + 1)
+        except (OSError, ValueError, RuntimeError) as error:
+            return None, _os_reason(error), None
+    if len(raw) > MAX_BYTES:
+        return None, "larger than 1 MiB", None
+    return raw, None, (target.st_dev, target.st_ino)
 
 
 def _servers(doc, key, required, fmt):
@@ -147,19 +221,37 @@ def _servers(doc, key, required, fmt):
     return found, ""
 
 
-def _server_row(name, spec):
+def _command_name(command):
+    """The command's file name, or `?` when it cannot be told from the string alone.
+
+    A command that holds a space or an `=` may be a path with a folder name in it or
+    a value placed in front of the program, so nothing of it is shown. A path in
+    either separator style is cut at its last component.
+    """
+    if not command or "=" in command or any(ch.isspace() for ch in command):
+        return "?"
+    name = re.split(r"[\\/:]", command)[-1]
+    return _safe(name) if name else "?"
+
+
+def _state(spec, artifact):
+    """`install.classify`'s answer, so this block and `doctor` never disagree."""
+    try:
+        return _install.classify(spec, artifact=artifact)
+    except (TypeError, ValueError, AttributeError, OSError):
+        return UNVERIFIED
+
+
+def _server_row(name, spec, artifact):
     """One server: name, how it is reached, command file name or URL host. Nothing else."""
     row = {"name": _safe(name if isinstance(name, str) else str(name)),
-           "transport": "unknown", "via": "", "state": UNVERIFIED}
+           "transport": "unknown", "via": "", "state": _state(spec, artifact)}
     if not isinstance(spec, dict):
         return row
     command = spec.get("command")
     if isinstance(command, str) and command.strip():
         row["transport"] = "stdio"
-        first = command.split()[0]
-        # `KEY=value prog` puts a value in the command string: show no name rather than the value.
-        row["via"] = "?" if "=" in first else _safe(os.path.basename(first))
-        row["state"] = DIRECT
+        row["via"] = _command_name(command)
         return row
     for field in ("url", "httpUrl", "serverUrl"):
         url = spec.get(field)
@@ -170,53 +262,67 @@ def _server_row(name, spec):
                 host = ""
             row["transport"] = "remote"
             row["via"] = _safe(host) if host else "?"
-            row["state"] = DIRECT
             return row
     return row
 
 
-def _row(agent, scope, label, path, home, cwd, fmt, key, required):
+def _row(agent, scope, label, path, home, cwd, fmt, key, required, artifact):
+    """(row, id). The id is the file's device and inode, for telling two names of one file apart."""
     base = {"agent": agent, "scope": scope, "label": label,
             "path": _shown(path, home, cwd, scope), "state": ABSENT, "reason": "", "servers": []}
-    raw, problem = _read(path, home, cwd)
+    raw, problem, ident = _read(path, home, cwd)
     if raw is None and problem == "":
-        return base
+        return base, None
     if raw is None:
-        return {**base, "state": UNREADABLE, "reason": problem}
+        return {**base, "state": UNREADABLE, "reason": problem}, None
     if fmt == TOML:
         if _tomllib is None:
             return {**base, "state": UNREADABLE,
-                    "reason": "toml parser unavailable on this Python"}
+                    "reason": "toml parser unavailable on this Python"}, ident
         try:
             doc = _tomllib.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
-            return {**base, "state": UNREADABLE, "reason": "not valid TOML"}
+            return {**base, "state": UNREADABLE, "reason": "not valid TOML"}, ident
+        except RecursionError:
+            return {**base, "state": UNREADABLE, "reason": "nested too deeply to read"}, ident
     else:
         try:
             doc = _install._parse(raw, path)
         except (OSError, _install.ConfigIOError):
             return {**base, "state": UNREADABLE,
-                    "reason": "not valid JSON (comments are not accepted)"}
+                    "reason": "not valid JSON (comments are not accepted)"}, ident
+        except RecursionError:
+            return {**base, "state": UNREADABLE, "reason": "nested too deeply to read"}, ident
     servers, problem = _servers(doc, key, required, fmt)
     if servers is None:
-        return {**base, "state": UNREADABLE, "reason": problem}
-    rows = [_server_row(name, spec) for name, spec in servers.items()]
+        return {**base, "state": UNREADABLE, "reason": problem}, ident
+    names = sorted(servers, key=lambda n: str(n))
+    rows = [_server_row(n, servers[n], artifact) for n in names[:MAX_SERVERS]]
     rows.sort(key=lambda r: r["name"])
     reason = f"no {key} key" if key not in doc else ""
-    return {**base, "state": PRESENT, "reason": reason, "servers": rows}
+    if len(names) > MAX_SERVERS:
+        reason = f"{len(names) - MAX_SERVERS} more servers not listed"
+    return {**base, "state": PRESENT, "reason": reason, "servers": rows}, ident
 
 
-def discover(home=None, cwd=None):
+def discover(home=None, cwd=None, artifact=None):
     """Every listed file, in a fixed order, each as one row."""
     home = pathlib.Path(home) if home is not None else pathlib.Path.home()
     cwd = pathlib.Path(cwd) if cwd is not None else pathlib.Path.cwd()
-    rows, seen = [], set()
+    artifact = artifact if artifact is not None else _doctor.artifact_path()[0]
+    rows, seen, seen_ids = [], set(), set()
     for agent, scope, label, path, fmt, key, required in _files(home, cwd):
         # In the home folder the project file and the user file are one file.
-        identity = os.path.abspath(path)
-        if identity in seen:
+        name = os.path.abspath(path)
+        if name in seen:
             continue
-        seen.add(identity)
-        rows.append(_row(agent, scope, label, path, home, cwd, fmt, key, required))
+        seen.add(name)
+        row, ident = _row(agent, scope, label, path, home, cwd, fmt, key, required, artifact)
+        # Two names for one file (a link, or a case difference) are one row.
+        if ident is not None:
+            if ident in seen_ids:
+                continue
+            seen_ids.add(ident)
+        rows.append(row)
     rows.sort(key=lambda r: (r["agent"], r["scope"], r["path"]))
     return rows
