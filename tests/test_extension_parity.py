@@ -83,3 +83,60 @@ def test_findings_are_byte_identical_with_and_without_the_extension():
     assert plain["extension_in_use"] is False
     assert fast["texts"] == plain["texts"]
     assert json.dumps(fast["results"], sort_keys=True) == json.dumps(plain["results"], sort_keys=True)
+
+
+# ---------------------------------------------------------------- the order itself
+# Equality between the two searches cannot show the order is the intended one: both use
+# the same sort, so a wrong key passes it. These cases state the order and the excerpt.
+
+def _engine(rules, fast):
+    from sunglasses.engine import SunglassesEngine
+    patterns = [{"id": rid, "severity": "high", "category": "prompt_injection",
+                 "description": "order probe", "channel": ["message"], "keywords": kws}
+                for rid, kws in rules]
+    eng = SunglassesEngine(patterns=patterns, mechanisms=False, validators=False)
+    if not fast:
+        eng._automaton = None
+    elif eng._automaton is None:
+        pytest.skip("pyahocorasick is not installed")
+    return eng
+
+
+def _paths():
+    return [pytest.param(False, id="plain"), pytest.param(True, id="extension")]
+
+
+@pytest.mark.parametrize("fast", _paths())
+def test_a_rule_reports_the_keyword_that_stands_first_not_the_one_listed_first(fast):
+    eng = _engine([("R-1", ["alpha", "beta"])], fast)
+    finding = eng.scan("beta comes first and alpha after it").findings[0]
+    assert finding["matched_text"].startswith("beta")
+
+
+@pytest.mark.parametrize("fast", _paths())
+def test_findings_follow_where_their_keywords_stand_not_their_spelling_or_listing(fast):
+    eng = _engine([("R-A", ["alpha"]), ("R-Z", ["zeta"])], fast)
+    assert [f["id"] for f in eng.scan("zeta is named before alpha here").findings] == ["R-Z", "R-A"]
+    assert [f["id"] for f in eng.scan("alpha is named before zeta here").findings] == ["R-A", "R-Z"]
+
+
+@pytest.mark.parametrize("fast", _paths())
+def test_a_hit_that_starts_earlier_comes_first_even_when_it_ends_later(fast):
+    eng = _engine([("R-LONG", ["zulu yankee"]), ("R-INNER", ["yankee"])], fast)
+    assert [f["id"] for f in eng.scan("zulu yankee").findings] == ["R-LONG", "R-INNER"]
+    # The inner hit also ends first, so ordering by end would put it ahead of the longer one.
+    eng = _engine([("R-LONG", ["zulu yankee xray"]), ("R-INNER", ["yankee"])], fast)
+    assert [f["id"] for f in eng.scan("zulu yankee xray").findings] == ["R-LONG", "R-INNER"]
+
+
+@pytest.mark.parametrize("fast", _paths())
+def test_of_two_hits_that_start_together_the_shorter_comes_first(fast):
+    eng = _engine([("R-LONG", ["xray yankee"]), ("R-SHORT", ["xray"])], fast)
+    assert [f["id"] for f in eng.scan("xray yankee").findings] == ["R-SHORT", "R-LONG"]
+
+
+@pytest.mark.parametrize("fast", _paths())
+def test_a_keyword_cut_short_by_a_longer_word_does_not_claim_the_rule(fast):
+    eng = _engine([("R-1", ["alpha", "beta"])], fast)
+    finding = eng.scan("alphabet first, then a lone beta, then alpha").findings[0]
+    assert "lone beta" in finding["matched_text"]
