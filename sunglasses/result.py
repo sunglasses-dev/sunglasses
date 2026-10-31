@@ -95,6 +95,23 @@ def _worst_severity(findings: list) -> str:
     return best
 
 
+NOT_INSPECTED = "not_inspected"
+
+
+def verdict_word(decision: str, threat_found: bool, inspection_complete: bool) -> str:
+    """The decision as a DOCUMENT says it: never ``allow`` over input that was not all read.
+
+    ``ScanResult.decision`` stays what the engine decided about the bytes it did read
+    (``threat_found`` is ``decision != "allow"``, so a new value there would turn an unread
+    file into a threat). A document that sits next to ``inspection_complete: false`` says
+    ``not_inspected`` instead. A finding keeps its own word: ``block``, ``quarantine`` and
+    ``allow_redacted`` are never rewritten.
+    """
+    if decision == "allow" and not threat_found and not inspection_complete:
+        return NOT_INSPECTED
+    return decision
+
+
 def _findings_of(obj: Any) -> list:
     """Findings, wherever this particular shape happens to keep them.
 
@@ -138,7 +155,9 @@ def _normalize_scanresult(obj: Any, source: Optional[str]) -> dict:
         "truncated": truncated,
         "warnings": warnings,
         "findings": findings,
-        "decision": getattr(obj, "decision", "block" if threat_found else "allow"),
+        "decision": verdict_word(
+            getattr(obj, "decision", "block" if threat_found else "allow"),
+            threat_found, inspection_complete),
         "severity": getattr(obj, "severity", None) or _worst_severity(findings),
         "source": source if source is not None else getattr(obj, "source", None),
         "channel": getattr(obj, "channel", None) or "file",
@@ -158,7 +177,8 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
     if threat_found is None:
         # Two other tells for the same fact, in order of directness.
         decision = obj.get("decision")
-        threat_found = bool(findings) or (decision is not None and decision != "allow")
+        threat_found = bool(findings) or (
+            decision is not None and decision not in ("allow", NOT_INSPECTED))
     threat_found = bool(threat_found)
 
     warnings = _as_list(obj.get("warnings"))
@@ -206,7 +226,9 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
         "truncated": truncated,
         "warnings": warnings,
         "findings": list(findings),
-        "decision": obj.get("decision") or ("block" if threat_found else "allow"),
+        "decision": verdict_word(
+            obj.get("decision") or ("block" if threat_found else "allow"),
+            threat_found, inspection_complete),
         "severity": obj.get("severity") or _worst_severity(findings),
         "source": source if source is not None else obj.get("file") or obj.get("source"),
         "channel": obj.get("channel") or "file",
