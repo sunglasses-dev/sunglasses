@@ -9,6 +9,27 @@ All notable changes to Sunglasses are documented here.
 
 - A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and up to three folders with printable names where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders, showing a record the proxy would refuse as `INVALID` and one it could not read as `UNREADABLE` (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve that run's capture for the folder it is in. An approval written before this change shows its folder as unknown; a fresh capture from a new proxy run records one.
 - `pip install 'sunglasses[fast]'` adds an optional extension (pyahocorasick) that makes keyword search faster. It needs Python 3.10 or newer; on 3.9 the extra installs nothing and the scanner keeps using plain string search. A prebuilt wheel exists for common platforms; where there is none, installing it needs a C compiler.
+- `GLS-STRUCT-005` reports, for review (`quarantine`, never a block), Python code that reads as
+  printing, logging, writing or sending every environment variable together with its value, where an
+  agent or whoever reads the output will see the secrets (API keys, tokens). It reads the syntax
+  tree of a whole Python text, or of each fenced `python` block in a document (up to 20), and
+  follows the names the file imports. It reports `print`, `pprint`, `sys.stdout.write`, a write to a
+  file the program opened for writing, `json.dump`, logging calls that would be shown, and the
+  `data=` or `params=` (or a dict passed as `json=`) of a `requests` or `httpx` call, when what is
+  shown is the environment (`os.environ`, `dict(os.environ)`, its `.items()` or `.values()`) or a
+  value from an unfiltered loop over it. It stays quiet on one named variable, names only, a loop
+  that tests the variable it prints, a precision that cuts the value away, `json.dumps(os.environ)`
+  (which raises), a plain `return`, a comment, a docstring, a test double, a branch it can prove cannot run (a constant or `not <constant>` test of an `if`, `while`, filter or `match` guard, the right side of `False and ...`, code after `return`, the `else` of a `while True` or of a loop over a
+  non-empty literal that always leaves; comparisons, compound tests and empty containers are not folded), output sent to
+  `/dev/null`, and shell or Node text. It is a judgment from syntax, not proof that the code runs: a
+  function that is never called or a dump behind a flag is still reported, an environment copied
+  into another name before it is shown is not followed, code under `if TYPE_CHECKING:` is read like any other (no name is taken for the typing flag), a `map` or generator is read for what it
+  holds, not for whether anything runs it to the end (an unused one, or one that `all`, `any`,
+  `next`, `islice` or a failing `sum` stops, is reported like one that is drained), no more than
+  256 environment names are tracked in one scope, and syntax newer than the Python that runs the scan (a `match`
+  statement before 3.10) is not read. A text the Python parser itself cannot take (too deep, parser
+  stack full) is treated as not Python; a parsed tree too deep for the reader's own walk makes the
+  scan report that inspection was not complete. The pattern count does not move. (C497)
 
 ### Changed
 

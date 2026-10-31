@@ -1,0 +1,15 @@
+{
+  "id": "GLS-STRUCT-005",
+  "name": "Python program prints or sends the whole environment",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channel": [
+    "file",
+    "code"
+  ],
+  "description": "Python code that reads as one that prints, logs, writes or sends every environment variable, with its value, where an agent or whoever reads the output will see the secrets (API keys, tokens). It is a judgment from the syntax tree, not proof that the code runs: a debug helper that dumps the environment is the dump it is, so this is a finding to look at, not a block.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-005"
+}
