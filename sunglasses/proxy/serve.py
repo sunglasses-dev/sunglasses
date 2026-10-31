@@ -225,7 +225,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         stderr.write(USAGE)
         return EXIT_USAGE
 
-    # R28. Build the pattern set NOW, before the first frame is read. Its first
+    # Build the pattern set NOW, before the first frame is read. Its first
     # use was the activation scan of the server's first tools/list page, which
     # runs inside snapshot.collect's list deadline: a cold build (~10 s of CPU)
     # on a busy machine ran the list past it, the activation came back
@@ -367,7 +367,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         # is cut to the kill grace; the thread is a daemon and the process
         # leaves without it.
         stalled = session.closed_with()
-        # Ruling 64 (b): a thread that could not be started is not joined,
+        # A thread that could not be started is not joined,
         # or the join's own RuntimeError would skip the stop below.
         if reader.ident is not None:
             reader.join(timeout=bounds.KILL_GRACE_MS / 1000

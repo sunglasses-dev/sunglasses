@@ -920,7 +920,7 @@ class PDFExtractor:
     # halfway is not a PDF we read.
     failures: List[str] = []
 
-    # Bounds for the containers added for finding A3 (form values, scripts,
+    # Bounds for the added containers (form values, scripts,
     # attachments). Passing a bound is RECORDED in `failures`, not silent.
     MAX_FORM_FIELDS = 10_000
     MAX_ACTIONS = 256
@@ -1024,7 +1024,7 @@ class PDFExtractor:
                         if text.strip():
                             results.append((f"page:{i+1}:{label}", text))
 
-                # 4-6. Content outside the page text (finding A3): form field
+                # 4-6. Content outside the page text: form field
                 # values, JavaScript actions and embedded files. Appended after the
                 # three groups above so a PDF without them is reported exactly as
                 # before. Each reader records what it could not read.
@@ -1052,7 +1052,7 @@ class PDFExtractor:
 
         return results
 
-    # ----- A3 helpers: form values, scripts, attachments ------------------
+    # ----- helpers: form values, scripts, attachments ---------------------
 
     _resolve = staticmethod(_resolve)
 
@@ -1934,7 +1934,7 @@ def scan_pdf(pdf_path: str, engine=None) -> dict:
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # Invariant B. A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -1943,8 +1943,8 @@ def scan_pdf(pdf_path: str, engine=None) -> dict:
     _probe_readable(pdf_path)
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
-    # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # traceback -- the same contract `dispatch` already applies to these formats.
+    # Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:

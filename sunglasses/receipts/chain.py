@@ -89,7 +89,7 @@ class Chain:
         with self._locked():
             tail = self._read_tail()
             if tail is not None and tail.producer not in (None, self._producer):
-                # One chain per LOG (R15): both producers sign with the user's
+                # One chain per LOG: both producers sign with the user's
                 # one key, so another producer's seal verifies here too and
                 # would be continued. The directory is theirs; nothing is written.
                 raise ValueError(

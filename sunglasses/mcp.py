@@ -195,7 +195,7 @@ def _tool_scan_text(arguments):
     """Execute scan_text tool."""
     channel = arguments.get("channel", "message")
 
-    # v0.5.6 round 4: `if not text` collapsed two different situations into one
+    # v0.5.6: `if not text` collapsed two different situations into one
     # error. A MISSING `text` argument is a usage error -- the caller broke the
     # tool's API contract and nothing was submitted. An EMPTY STRING is content:
     # the caller submitted a document that happens to have no bytes in it, and the

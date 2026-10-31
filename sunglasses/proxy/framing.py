@@ -125,7 +125,7 @@ class Frame:
         self.budget = budget
         self.detail = detail
         self.bytes = size
-        # R-CLOSE-KIND. WHICH malformation, from the frozen catalog in
+        # WHICH malformation, from the frozen catalog in
         # `session.py`. Produced HERE, where the fault is recognised, because
         # the two sites that close on a parse result cannot know which of the
         # eight MALFORMED returns produced it -- and a kind chosen by the

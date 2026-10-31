@@ -608,7 +608,7 @@ class ImageExtractor:
             try:
                 # Snapshot AT this position. The iterator hands back the shared
                 # object, so anything that defers the actual read until after the
-                # next `seek` would read the wrong frame -- which is J1 exactly.
+                # next `seek` would read the wrong frame.
                 target = frame.convert("RGB")
             except Exception as exc:
                 self.failures.append(
@@ -711,7 +711,7 @@ class ImageExtractor:
                 f"— only the first frame's metadata was inspected")
 
         if iterator is None:
-            # The I1 shape on the metadata side: the sequence is unreadable, the
+            # The unreadable-sequence shape on the metadata side: the sequence is unreadable, the
             # frame PIL already holds is not, and that is where a known finding can
             # live. Read it rather than returning nothing.
             try:
@@ -1397,7 +1397,7 @@ def scan_image(image_path: str, engine=None) -> dict:
     if engine is None:
         engine = SunglassesEngine()
 
-    # Invariant B (round 3), extended to these five in round 4. A public entry
+    # Invariant B. A public entry
     # point probes readability BEFORE it routes, so an unreadable, missing or
     # non-regular path is an OPERATIONAL failure here exactly as it is on
     # `scan_fast`, `scan_deep` and the retained helpers. Without it these returned
@@ -1406,8 +1406,8 @@ def scan_image(image_path: str, engine=None) -> dict:
     _probe_readable(image_path)
 
     # A decoder that gives up costs COVERAGE, never the scan, and never a
-    # traceback -- the same contract `dispatch` has applied to these formats since
-    # round 3. Until round 4 these five let ImportError and decoder errors escape
+    # traceback -- the same contract `dispatch` already applies to these formats.
+    # Without it these five let ImportError and decoder errors escape
     # to the caller, so "no traceback on any supported path" had an exemption for
     # the public API a user is most likely to call first.
     try:

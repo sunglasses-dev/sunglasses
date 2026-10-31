@@ -55,7 +55,7 @@ ROUTE_UNVERIFIED = "ROUTE_UNVERIFIED"
 EXIT_VERIFIED = 0
 EXIT_FAILED = 1
 EXIT_DOUBT = 3
-EXIT_OPERATIONAL = 2   # R-DOCTOR-R3a: we could not open it. Not doubt, not clean.
+EXIT_OPERATIONAL = 2   # we could not open it. Not doubt, not clean.
 
 # ── the self-test ───────────────────────────────────────────────────────
 SELF_TEST_CHECKS = ("initialized", "s1_forward_byte_equal", "s2_block_schema",
@@ -68,7 +68,7 @@ SKIPPED_INVOCATION_CONTROL = "skipped_invocation"
 # "never asked" is that bug with stakes.
 REQUIRED_CONTROLS = ("constant_allow", "constant_deny", SKIPPED_INVOCATION_CONTROL)
 
-# R-DOCTOR-R3b. The contract's figure. Not an argument, not an environment
+# The contract's figure. Not an argument, not an environment
 # variable: a bound a caller can move is not a bound. A miss is a FAIL like any
 # other check, and the honesty lives in the printed figure rather than in a
 # softer number or a retry.
@@ -78,7 +78,7 @@ SCHEMA = "SCHEMA"
 CONTROL_MUST_BE = "FAIL"
 CHECK_RESULTS = ("PASS", "FAIL", "SKIPPED")
 SELF_TEST_UNAVAILABLE = "SELF_TEST_UNAVAILABLE"
-# R-DOCTOR-R3c. OUR word about OUR build, and deliberately NOT in
+# OUR word about OUR build, and deliberately NOT in
 # CHECK_RESULTS: `_safe_checks` allowlists what an upstream process is allowed
 # to say about itself, and a spawned proxy that can report its own checks as
 # NOT_RUN can describe away a failure it just produced. This value is only ever
@@ -120,7 +120,7 @@ class Entry:
     state: str
     passed: bool = False
     detail: str = ""
-    # CU-M8. `passed` alone cannot say "never launched": False meant both that
+    # `passed` alone cannot say "never launched": False meant both that
     # and "launched and failed", and the JSON rendered the first as FAIL.
     result: str = NOT_RUN
 
@@ -269,10 +269,10 @@ def _route_result(passed) -> str:
 
 # ── classification, path AND hash ───────────────────────────────────────
 
-# ONE classifier, install's (R-DOCTOR-OWNER). Re-exported rather than
+# ONE classifier, install's. Re-exported rather than
 # redefined. The original lived here with a different signature, unreachable
 # from inside this module and perfectly reachable as `doctor.classify(...)`
-# from outside, which is the disagreement the ruling exists to prevent.
+# from outside, which is exactly the disagreement a single classifier prevents.
 classify = _install.classify
 
 
@@ -332,14 +332,14 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
     entries, unreadable = [], []
     for label, path in sources:
         path = Path(path)
-        # R-DOCTOR-R2(1). ABSENCE IS ENOENT AND NOTHING ELSE. This used to be
+        # ABSENCE IS ENOENT AND NOTHING ELSE. This used to be
         # `if not path.exists(): continue`, and `Path.exists()` answers False
         # for EACCES and ENOTDIR as well as for a file that is not there. So a
         # real config inside a directory with search permission removed was
         # reported as ABSENT: never named, never counted unreadable, and the
         # run exited 0 while the other source read WRAPPED. "I could not look"
         # collapsed into "there was nothing to see", which is the single
-        # collapse R3 exists to prevent, and it collapsed the safe way round.
+        # collapse this rule exists to prevent, and it collapsed the safe way round.
         #
         # We probe by READING. An error on a real path is operational, is
         # named, and drives exit 2.
@@ -453,7 +453,7 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                                        artifact_sha=artifact_sha,
                                        hash_of=hash_of)
 
-    # R-DOCTOR-R2(3). MEASURED HERE, so the figure in the report is one we
+    # MEASURED HERE, so the figure in the report is one we
     # took rather than one we were handed. `deadline_line` existed, was called
     # by nothing, and my own control exercised the formatter alone -- so it
     # passed while the product emitted neither the measurement nor the bound.
@@ -478,7 +478,7 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     for entry in entries:
         if entry.state != WRAPPED:
             continue
-        # R-DOCTOR-R2(2). `route_result` and not `checks`. This loop used to
+        # `route_result` and not `checks`. This loop used to
         # assign the launcher's checks to the SAME local that held the
         # self-test's, so `self_test_checks` below stored the LAST route's
         # checks: the rendered self-test said its deadline check PASSED while
@@ -528,7 +528,7 @@ def render(report) -> dict:
     return {
         "self_test": {"valid": report.self_test_ok,
                       "controls": report.self_test_controls,
-                      # R-DOCTOR-R3c. An empty dict renders as no information,
+                      # An empty dict renders as no information,
                       # and a reader fills that in with whatever they already
                       # believed. The five names carrying NOT_RUN say the true
                       # thing out loud instead.
@@ -541,7 +541,7 @@ def render(report) -> dict:
                       "detail": (report.self_test_detail
                                  if report.self_test_detail in DETAILS else ""),
                       # Measured beside the bound, both as the number and as
-                      # the line an operator reads. R-DOCTOR-R3b asked for the
+                      # the line an operator reads. The contract asks for the
                       # figure, and a figure the product never prints is not a
                       # figure anybody gets.
                       "measured_ms": report.self_test_measured_ms,

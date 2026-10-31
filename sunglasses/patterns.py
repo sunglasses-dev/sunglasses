@@ -123,7 +123,7 @@ PATTERNS = [
 
 
     # =========================================================================
-    # api_response / log_memory / agent_input SIBLINGS (2026-09-11, WO-P1B round 4)
+    # api_response / log_memory / agent_input SIBLINGS (2026-09-11, WO-P1B)
     #
     # Three rounds tried to give the six parent rules one safe regex covering every
     # channel at once. Each was rejected, and the last two for REGRESSIONS on the

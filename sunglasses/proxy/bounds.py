@@ -16,25 +16,25 @@ OVER_BUDGET, per contract row 4.7 v5.1. A deadline is not a budget breach, and s
 from __future__ import annotations
 
 # ── the frozen values ──────────────────────────────────────────────────────
-WIRE_FRAME_BYTES = 4_194_304          # R1, incl. LF
-CONTENT_BYTES = 262_144               # R2, inclusive
-FRAME_ASSEMBLY_MS = 2_000             # R3
-INSPECTION_MS = 2_000                 # R4
-KILL_GRACE_MS = 250                   # R4
-UPSTREAM_RESPONSE_MS = 60_000         # R5
-OUTSTANDING = 8                       # R6
-QUEUED_BYTES = 16 * 1024 * 1024       # R6
-WORKER_STDOUT_BYTES = 1024 * 1024     # R7
-STDERR_PER_MESSAGE = 256 * 1024       # R8
-STDERR_PER_MINUTE = 1024 * 1024       # R8
-WRITE_STALL_MS = 5_000                # R9
-WATCHDOG_SLACK_MS = 3_000             # R10
-MAX_DEPTH = 64                        # R11
-MAX_NODES = 100_000                   # R11
-SNAPSHOT_PAGES = 64                   # R13
-SNAPSHOT_TOOLS = 512                  # R13
-SNAPSHOT_BYTES = 4 * 1024 * 1024      # R13
-SNAPSHOT_DEADLINE_MS = 10_000         # R13
+WIRE_FRAME_BYTES = 4_194_304          # incl. LF
+CONTENT_BYTES = 262_144               # inclusive
+FRAME_ASSEMBLY_MS = 2_000
+INSPECTION_MS = 2_000
+KILL_GRACE_MS = 250
+UPSTREAM_RESPONSE_MS = 60_000
+OUTSTANDING = 8
+QUEUED_BYTES = 16 * 1024 * 1024
+WORKER_STDOUT_BYTES = 1024 * 1024
+STDERR_PER_MESSAGE = 256 * 1024
+STDERR_PER_MINUTE = 1024 * 1024
+WRITE_STALL_MS = 5_000
+WATCHDOG_SLACK_MS = 3_000
+MAX_DEPTH = 64
+MAX_NODES = 100_000
+SNAPSHOT_PAGES = 64
+SNAPSHOT_TOOLS = 512
+SNAPSHOT_BYTES = 4 * 1024 * 1024
+SNAPSHOT_DEADLINE_MS = 10_000
 
 # Each deadline is named and separate. One shared constant would make four
 # different promises the same number, and 2,000 ms to assemble a frame is not
@@ -68,10 +68,10 @@ class Breach:
         # that put this in evidence. `budget` cannot carry it: contract row 4.7 v5.1 says
         # budget is populated ONLY for OVER_BUDGET, and OVERLOADED is not a
         # budget breach. `detail` cannot carry it either -- it is prose, and
-        # prose is what receipts exclude by name. R6 has two limits under one
-        # reason, so without this a receipt cannot say which one fired.
+        # prose is what receipts exclude by name. OUTSTANDING and QUEUED_BYTES are two
+        # limits under one reason, so without this a receipt cannot say which one fired.
         self.bound = bound
-        # R-CLOSE-KIND. WHICH fault, for the sites that close on a breach.
+        # WHICH fault, for the sites that close on a breach.
         # Produced HERE, where the reason is produced, exactly as `framing.py`
         # and `handshake.py` produce theirs: a caller that takes the reason
         # from this object can take the kind from the same object, and a kind
