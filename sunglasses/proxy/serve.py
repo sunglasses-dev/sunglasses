@@ -116,7 +116,7 @@ def install_records_home(override=None):
     return state_root(override).parent
 
 
-def approval_notice(stderr, root=None):
+def approval_notice(stderr, root=None, command_stem=None):
     """The one line a person needs when a server's tools are withheld.
 
     It is the same command `sunglasses proxy approve` documents, with the two
@@ -136,7 +136,20 @@ def approval_notice(stderr, root=None):
     the launch configuration, so such a root is never echoed; the line says so
     and leaves the flag to the person.
     """
-    shown = os.path.join(os.getcwd(), str(root)) if root else None
+    # Read when the proxy starts, with the identity: a folder deleted afterwards still reads
+    # as the folder this run was started in, and the command line above is never lost to it.
+    started_in = approvals.current_folder()
+    here = (approvals.folder_text(started_in) if started_in
+            else "unavailable (the folder can no longer be read)")
+    unresolved = False
+    if not root:
+        shown = None
+    elif os.path.isabs(str(root)):
+        shown = str(root)
+    elif started_in:
+        shown = os.path.join(started_in, str(root))
+    else:
+        shown, unresolved = None, True
     unsafe = shown is not None and not shown.isprintable()
 
     def notice(server_id, snapshot_sha256):
@@ -145,14 +158,31 @@ def approval_notice(stderr, root=None):
                      "control characters, so it is not printed: add the same "
                      "--state-root to the command)")
             tail = ""
+        elif unresolved:
+            where = (" (this proxy was started with a relative --state-root and its folder "
+                     "can no longer be read, so the path is not printed: add the same "
+                     "--state-root to the command)")
+            tail = ""
         else:
             where = ""
             tail = f" --state-root {shlex.quote(shown)}" if shown else ""
+        # An approval is bound to the folder the server is started from. Say which folder this
+        # is on the same line, and (below) where an approval for the same command already
+        # exists, so a run from the wrong folder reads as that and not as a server with no
+        # tools. Our stderr only: the reply the agent gets is unchanged.
         stderr.write(
             "sunglasses proxy: this server's tools are withheld until you approve "
             "them. At a terminal, run: sunglasses proxy approve "
             f"{server_id} --snapshot {snapshot_sha256}{tail} "
-            f"(it shows the tools and asks before approving){where}\n")
+            f"(it shows the tools and asks before approving){where}; an approval is "
+            f"bound to the folder the server is started from, and this run is in "
+            f"{here}\n")
+        elsewhere = approvals.other_folders(state_root(root), command_stem, started_in)
+        if elsewhere:
+            stderr.write(
+                "sunglasses proxy: this server is already approved from "
+                + ", ".join(elsewhere)
+                + "; start it from there, or approve this run's capture with the command above\n")
         stderr.flush()
     return notice
 
@@ -170,8 +200,9 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
     decorative.
     """
     identity = _identity(upstream_argv)
+    stem = _command_stem(upstream_argv)
     if store is None:
-        store = approvals.Store(state_root(root), server_id=identity)
+        store = approvals.Store(state_root(root), server_id=identity, command_stem=stem)
     # contract row 2.6's channel. Without it the route refuses a tools/list rather than
     # forwarding it, which is correct but useless: this is what lets the proxy
     # run its own list and therefore what lets a human ever approve a server.
@@ -185,7 +216,7 @@ def build_route(*, session, log, upstream_argv, upstream_write, client_write,
                            upstream_write=upstream_write,
                            client_write=client_write, approvals=store,
                            control=channel, server_identity=identity,
-                           approval_notice=(approval_notice(stderr, root)
+                           approval_notice=(approval_notice(stderr, root, stem)
                                             if stderr is not None else None),
                            **extra)
     except BaseException as error:
@@ -257,7 +288,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     # the log's own refusal still comes first and this one is written down.
     try:
         store = approvals.Store(state_root(root),
-                                server_id=_identity(upstream_argv))
+                                server_id=_identity(upstream_argv),
+                                command_stem=_command_stem(upstream_argv))
     except (OSError, ValueError) as failure:
         where = getattr(failure, "filename", None) or state_root(root)
         what = ("capture store" if pathlib.Path(where).name == "captures"
@@ -659,6 +691,12 @@ def _exit_code(session, child):
     except subprocess.TimeoutExpired:
         code = None
     return EXIT_OK if code in (None, 0) else int(code)
+
+
+def _command_stem(upstream_argv):
+    """`_identity` without the folder: the command and its arguments only."""
+    material = "\x00".join([os.path.realpath(upstream_argv[0])] + list(upstream_argv[1:]))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:32]
 
 
 def _identity(upstream_argv):

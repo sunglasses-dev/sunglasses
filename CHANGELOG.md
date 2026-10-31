@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- A proxy approval now records the folder it was approved from. `sunglasses proxy approve` says which folder the approval is bound to, the notice the proxy writes to stderr when a server is not approved names the folder it was started from and up to three folders with printable names where the same command is already approved, and `sunglasses doctor` lists the approvals with their folders, showing a record the proxy would refuse as `INVALID` and one it could not read as `UNREADABLE` (the JSON gains an `approvals` key only when there are any). Starting a server from another folder is no longer a silent mismatch: the message says where to start it, or to approve that run's capture for the folder it is in. An approval written before this change shows its folder as unknown; a fresh capture from a new proxy run records one.
+
 ### Changed
 
 - `scan --dir`, `scan --repo` and `scan --file` now put the word `not_inspected` in `decision` when part of the input was not read: an archive or compiled file, a file that could not be opened, or a build or cache folder of the project (`__pycache__`, `build`, `dist`, `coverage`, `.next`, `.nuxt`, `*.egg-info`) that held files or could not be shown empty (unreadable, holding a link to a folder, or on a platform where the folder cannot be pinned to the one the walk saw, where even an empty such folder makes the scan incomplete). They used to print `allow` beside `inspection_complete: false` and exit 3. For those cases the exit code is unchanged; a scan whose project has a build or cache folder that held files used to exit 0 and now exits 3. The text report prints `Decision: NOT_INSPECTED` and a `Not inspected:` line with the file and folder counts. The JSON gains `files_not_inspected`, `folders_excluded_with_files`, `excluded_not_inspected`, `excluded_dependency_folders` and `excluded_tool_cache_folders`. Dependency, version-control and tool-cache folders (`node_modules`, `.venv`, `venv`, `vendor`, `.tox`, a nested `.git`, `.mypy_cache`, `.pytest_cache`) are still named and counted, and still leave the verdict unchanged.

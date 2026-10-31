@@ -176,6 +176,9 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     stored = json.loads(capture.read_text())
     tools = stored.get("tools_by_name") or {}
     stdout.write(f"server {server_id}\nsnapshot {snapshot}\n")
+    folder = approvals.folder_text(stored.get("folder"))
+    stdout.write(f"approval bound to folder {folder}; to use another folder, start the proxy "
+                 f"from it and approve the capture that run prints\n")
     stdout.write(f"{len(tools)} tool(s) in this capture\n")
     for tool_name in sorted(tools):
         digest = (tools[tool_name] or {}).get("descriptor_sha256") or "?"

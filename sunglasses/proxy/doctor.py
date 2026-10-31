@@ -162,6 +162,9 @@ class Report:
     # prints. Our own sentence, never anything an upstream process said.
     receipts_key: str = "OFF"
     receipts_key_cause: str = ""
+    # Each stored approval with the folder it is bound to. A server started from another
+    # folder has another identity and finds none of these.
+    approvals: list = field(default_factory=list)
 
 
 # ── an instrument that cannot fail proves nothing ───────────────────────
@@ -442,7 +445,7 @@ def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False) 
 
 
 def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
-        self_test=None, launcher=None, home=None) -> Report:
+        self_test=None, launcher=None, home=None, approvals_root=None) -> Report:
     """Read, classify, self-test, launch every wrapped route, then aggregate.
 
     Every part above is called from here. On 2026-09-13 a review of this lane
@@ -493,7 +496,15 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     outcome = aggregate(sources_readable=not unreadable, entries=entries,
                         unreadable=unreadable)
     key_status, key_cause = receipts_key_status(home)
+    from . import approvals as _approvals
+    if approvals_root is None:
+        # The proxy's own tree (`state_root()`), unless this report was given a home of its
+        # own, in which case that home's `proxy` folder: a throwaway home reads itself.
+        from .serve import state_root
+        approvals_root = (pathlib.Path(home) / "proxy") if home is not None else state_root()
+    approval_list = _approvals.approval_rows(approvals_root)
     return Report(outcome=outcome,
+                  approvals=approval_list,
                   exit_code=process_exit_code(
                       outcome, self_test_ok, unreadable=unreadable,
                       key_unusable=key_status == "KEY_UNUSABLE"),
@@ -525,7 +536,7 @@ def _safe_checks(checks) -> dict:
 def render(report) -> dict:
     """The three lines plus the self-test, as data, carrying nothing that came
     from an upstream process except an allowlisted verdict."""
-    return {
+    rendered = {
         "self_test": {"valid": report.self_test_ok,
                       "controls": report.self_test_controls,
                       # An empty dict renders as no information,
@@ -555,6 +566,11 @@ def render(report) -> dict:
                          "cause": report.receipts_key_cause},
         "exit_code": report.exit_code,
     }
+    # Only when there are approvals to show: a machine with none prints the document it always
+    # printed, byte for byte.
+    if report.approvals:
+        rendered["approvals"] = report.approvals
+    return rendered
 
 
 # ── install and uninstall ───────────────────────────────────────────────
