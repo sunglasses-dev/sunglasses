@@ -146,6 +146,7 @@ engine reports as an inspection that is not complete.
 from __future__ import annotations
 
 import ast
+import bisect
 import ipaddress
 import json
 import re
@@ -252,20 +253,30 @@ def _hook_commands(value):
 
 # ---------------------------------------------------------------------------- shell side
 
+class _TooBig(Exception):
+    """An expansion would pass ``_MAX_VALUE``."""
+
+
 class _Syntax(Exception):
     """The command is not something a shell would run (unbalanced quote or bracket)."""
 
 
 class _Tok:
-    __slots__ = ("kind", "value", "subs", "lead")
+    __slots__ = ("kind", "value", "subs", "lead", "body", "expand", "at", "body_at", "sub_at")
 
     def __init__(self, kind, value, subs=(), lead=False):
         self.kind = kind      # 'w' word | 'ps' process substitution | 'redir' | 'op'
         self.value = value    # word text with quotes removed; ps/command body; operator text
         self.subs = subs      # bodies of $(...) and backticks inside a word
         self.lead = lead      # a substitution is the first thing in the word
+        self.body = None      # a here-document delimiter: the lines up to the delimiter (script reader only)
+        self.expand = True    # a here-document delimiter: False when it was quoted, so the body is literal
+        self.at = 0           # offset in the text where the token starts (script reader only)
+        self.body_at = 0      # a here-document delimiter: offset where its body starts (script reader only)
+        self.sub_at = ()      # offsets from the token start where each of ``subs`` begins (script reader only)
 
 
+_DOLLAR = "\x00"         # a '$' the shell leaves alone (single quotes, backslash); only the script reader asks for it
 _WS = re.compile(r"[ \t\r\f\v]+")
 _PLAIN = re.compile(r"[^\s'\"\\`$|&;<>()]+")
 _DQ_RUN = re.compile(r'[^"\\$`]+')
@@ -339,14 +350,32 @@ def _balanced(s, i):
             pos = _closing_backtick(s, at) + 1
 
 
-def _word(s, i):
-    """Read one shell word at ``s[i]``; returns (token, next index)."""
+class _Sized(list):
+    """A list of strings that knows how long they are together."""
+
+    n = 0
+
+    def append(self, text):
+        self.n += len(text)
+        list.append(self, text)
+
+
+def _word(s, i, literal=False, trace=None):
+    """Read one shell word at ``s[i]``; returns (token, next index).
+
+    With ``literal`` a ``$`` that quoting or a backslash protects is returned as ``_DOLLAR``. With a ``trace`` list
+    it gets one ``(offset in s, length of the word's text so far, source characters the construct drops before
+    its text)`` per construct, then one for the end: where each source character lands in the value."""
     n = len(s)
-    parts, subs = [], []
+    made = list if trace is None else _Sized
+    parts, subs, where = made(), [], []
+    origin = i
     lead = False
     seen = False
     while i < n:
         c = s[i]
+        if trace is not None:
+            trace.append((i, parts.n, 1 if c in "'\\" else 2 if s.startswith("$'", i) else 0))
         plain = _PLAIN.match(s, i)
         if plain:
             parts.append(plain.group())
@@ -357,24 +386,26 @@ def _word(s, i):
             end = s.find("'", i + 1)
             if end < 0:
                 raise _Syntax
-            parts.append(s[i + 1:end])
+            parts.append(s[i + 1:end].replace("$", _DOLLAR) if literal else s[i + 1:end])
             seen = True
             i = end + 1
         elif c == '"':
             seen = True
             i += 1
-            buf = []
+            buf = made()
             while True:
                 if i >= n:
                     raise _Syntax
                 c = s[i]
+                if trace is not None:
+                    trace.append((i, parts.n + buf.n, c == "\\"))
                 if c == '"':
                     i += 1
                     break
                 if c == "\\":
                     nxt = s[i + 1:i + 2]
                     if nxt in ('"', "\\", "$", "`"):
-                        buf.append(nxt)
+                        buf.append(_DOLLAR if literal and nxt == "$" else nxt)
                         i += 2
                     elif nxt == "\n":
                         i += 2
@@ -386,6 +417,7 @@ def _word(s, i):
                     if not parts and not buf:
                         lead = True
                     subs.append(s[i + 2:end - 1])
+                    where.append(i + 2 - origin)
                     buf.append(s[i:end])
                     i = end
                 elif c == "`":
@@ -393,6 +425,7 @@ def _word(s, i):
                     if not parts and not buf:
                         lead = True
                     subs.append(s[i + 1:end])
+                    where.append(i + 1 - origin)
                     buf.append(s[i:end + 1])
                     i = end + 1
                 else:
@@ -407,7 +440,7 @@ def _word(s, i):
         elif c == "\\":
             if i + 1 < n:
                 if s[i + 1] != "\n":
-                    parts.append(s[i + 1])
+                    parts.append(_DOLLAR if literal and s[i + 1] == "$" else s[i + 1])
                     seen = True
                 i += 2
             else:
@@ -419,6 +452,7 @@ def _word(s, i):
             if not parts:
                 lead = True
             subs.append(s[i + 1:end])
+            where.append(i + 1 - origin)
             parts.append(s[i:end + 1])
             seen = True
             i = end + 1
@@ -428,6 +462,7 @@ def _word(s, i):
                 if not parts:
                     lead = True
                 subs.append(s[i + 2:end - 1])
+                where.append(i + 2 - origin)
                 parts.append(s[i:end])
                 i = end
             elif s.startswith("${", i):
@@ -452,7 +487,11 @@ def _word(s, i):
             break
     if not seen:
         raise _Syntax
-    return _Tok("w", "".join(parts), tuple(subs), lead), i
+    if trace is not None:
+        trace.append((i, parts.n, 0))
+    word = _Tok("w", "".join(parts), tuple(subs), lead)
+    word.sub_at = tuple(where)
+    return word, i
 
 
 def _lex(cmd):
@@ -512,13 +551,15 @@ def _lex(cmd):
 
 
 class _Segment:
-    __slots__ = ("words", "redirs", "sep_before", "sep_after")
+    __slots__ = ("words", "redirs", "sep_before", "sep_after", "opens", "closes")
 
     def __init__(self, sep_before):
         self.words = []
         self.redirs = []        # (operator, target word)
         self.sep_before = sep_before
         self.sep_after = None
+        self.opens = 0          # '(' that open a group before this command (script reader only)
+        self.closes = 0         # ')' that close a group after it
 
 
 def _segments(toks):
@@ -535,6 +576,10 @@ def _segments(toks):
                 current.sep_after = tok.value
                 segments.append(current)
                 current = _Segment(None)
+            if tok.value == "(":
+                current.opens += 1
+            elif tok.value == ")" and segments:
+                segments[-1].closes += 1
             if tok.value in ("(", ")"):
                 if pending is None:
                     pending = ";"
@@ -602,20 +647,107 @@ def _starts_one_of(name, options):
     return len(name) > 2 and any(option.startswith(name) for option in options)
 
 
+def _env_cluster(value):
+    """The short-option word ``value`` of ``env``, its letters read in order: (kind, index of the letter).
+
+    ``i`` and ``v`` take nothing, and a dash inside the word is let through as the system ``env`` does; ``u``
+    ``C`` and ``P`` take a value, ``S`` splits a string, and any other letter (``0`` among them: ``env``
+    refuses a command with it) makes ``env`` exit before it runs anything."""
+    for i, ch in enumerate(value[1:], 1):
+        if ch in "uCP":
+            return "value", i
+        if ch == "S":
+            return "split", i
+        if ch not in "iv-":
+            return "bad", i
+    return "plain", 0
+
+
 def _split_string(stack):
     """``env -S STRING`` in any spelling at the top of the stack: (the string, words used) or (None, 0)."""
     value = stack[-1].value
     nxt = stack[-2] if len(stack) > 1 else None
-    if value in ("-S", "--split-string"):
+    if value == "--split-string":
         return (nxt.value, 2) if nxt is not None and nxt.kind == "w" else ("", 1)
     if value.startswith("--split-string="):
         return value.partition("=")[2], 1
-    if value.startswith("-S") and not value.startswith("--") and len(value) > 2:
-        return value[2:], 1
-    if value.startswith("-") and not value.startswith("--") and len(value) > 2 \
-            and value.endswith("S") and value[1:].isalpha():
-        return (nxt.value, 2) if nxt is not None and nxt.kind == "w" else ("", 1)
+    if value.startswith("-") and not value.startswith("--") and len(value) > 1:
+        kind, i = _env_cluster(value)
+        if kind == "split":
+            if i < len(value) - 1:
+                return value[i + 1:], 1             # the string is attached
+            return (nxt.value, 2) if nxt is not None and nxt.kind == "w" else ("", 1)
     return None, 0
+
+
+_ENV_ESCAPES = {"f": "\f", "n": "\n", "r": "\r", "t": "\t", "v": "\v", "\\": "\\", "#": "#", "\"": "\"",
+                "'": "'", "$": _DOLLAR}
+_ENV_SPACE = " \t\n\r\f\v"
+
+
+def _env_words(string):
+    """The words ``env -S`` makes of ``string``. Raises _Syntax where ``env`` refuses the string.
+
+    A string with no backslash is read as the shell lexer reads it. With one, ``env``'s own rules apply:
+    blanks separate, ``\\_`` is a blank (a plain space inside double quotes), ``\\c`` ends the string, ``\\f`` ``\\n``
+    ``\\r`` ``\\t`` ``\\v`` are control characters, ``\\#`` ``\\$`` ``\\"`` ``\\'`` ``\\\\`` are themselves, any other
+    backslash is refused, single quotes keep everything but ``\\\\`` and ``\\'``, and ``#`` starts a comment
+    where a word could start."""
+    if "\\" not in string:
+        return _lex(string)
+    words, cur, quote, i, n = [], None, "", 0, len(string)      # cur: the pieces of the word being built, or None
+    while i < n:
+        ch = string[i]
+        if ch == "\\":
+            i += 1
+            if i >= n:
+                raise _Syntax()
+            esc = string[i]
+            i += 1
+            if esc == "c":
+                if quote:
+                    raise _Syntax()
+                break
+            if esc == "_":
+                if quote:
+                    cur = cur or []
+                    cur.append(" ")
+                elif cur is not None:
+                    words.append("".join(cur))
+                    cur = None
+                continue
+            if quote == "'" and esc not in "\\'":
+                piece = "\\" + esc
+            elif esc in _ENV_ESCAPES:
+                piece = _ENV_ESCAPES[esc]
+            else:
+                raise _Syntax()
+            cur = cur or []
+            cur.append(piece)
+            continue
+        if quote:
+            if ch == quote:
+                quote = ""
+            else:
+                cur.append(_DOLLAR if ch == "$" else ch)
+        elif ch in "'\"":
+            quote = ch
+            cur = cur or []
+        elif ch in _ENV_SPACE:
+            if cur is not None:
+                words.append("".join(cur))
+                cur = None
+        elif ch == "#" and cur is None:
+            break
+        else:
+            cur = cur or []
+            cur.append(_DOLLAR if ch == "$" else ch)
+        i += 1
+    if quote:
+        raise _Syntax()
+    if cur is not None:
+        words.append("".join(cur))
+    return [_Tok("w", w) for w in words]
 
 
 def _skip_wrapper(name, stack):
@@ -644,14 +776,20 @@ def _skip_wrapper(name, stack):
             if name == "command" and not value.startswith("--") and ("v" in value or "V" in value):
                 return False
             if name == "env":
+                if not value.startswith("--") and _env_cluster(value)[0] == "bad":
+                    return False                    # env exits before it runs anything
                 string, used = _split_string(stack)
                 if used:
                     try:
-                        lexed = _lex(string)
+                        lexed = _env_words(string)
                     except _Syntax:
                         return False
+                    anchor = stack[-2].at if used == 2 else stack[-1].at     # the string's own word
                     del stack[-used:]
-                    stack.extend(t if t.kind == "w" else _Tok("w", t.value) for t in reversed(lexed))
+                    made = [t if t.kind == "w" else _Tok("w", t.value) for t in lexed]
+                    for t in made:
+                        t.at = anchor
+                    stack.extend(reversed(made))
                     continue
             if noexec_short and not value.startswith("--"):
                 for ch in value[1:]:
@@ -659,7 +797,13 @@ def _skip_wrapper(name, stack):
                         return False
                     if "-" + ch in takes:
                         break
-            del stack[-2 if value in takes else -1:]
+            consumes = value in takes
+            if name == "env" and not consumes and not value.startswith("--"):
+                for i, ch in enumerate(value[1:], 1):
+                    if ch in "uCP":                 # a value-taking letter at the end of a cluster takes the next word
+                        consumes = i == len(value) - 1
+                        break
+            del stack[-2 if consumes else -1:]
             continue
         break
     if name == "timeout" and stack and stack[-1].kind == "w" and _DURATION.match(stack[-1].value):
@@ -1668,11 +1812,19 @@ _NO_CTX = _Ctx()
 
 def _fenced_python(text):
     """The bodies of the fenced blocks tagged python; one pass over the lines."""
+    return _fenced_blocks(text, _PYTHON_TAG)
+
+
+def _fenced_blocks(text, wanted, starts=None):
+    """The bodies of the fenced blocks whose tag matches ``wanted``; one pass over the lines.
+
+    ``starts``, when given, receives the 1-based line of each body's first line.
+    """
     blocks = []
     body = None
     fence = None
     other = None            # the marker of an open fence that is not python: what it holds is not a block
-    for line in text.splitlines():
+    for number, line in enumerate(text.splitlines(), 1):
         if other is not None:
             shut = _FENCE_SHUT.match(line)
             if shut and shut.group(1)[0] == other[0] and len(shut.group(1)) >= len(other):
@@ -1681,9 +1833,11 @@ def _fenced_python(text):
         if body is None:
             opened = _FENCE_OPEN.match(line)
             if opened:
-                if _PYTHON_TAG.match(opened.group(2)):
+                if wanted.match(opened.group(2)):
                     fence = opened.group(1)
                     body = []
+                    if starts is not None:
+                        starts.append(number + 1)
                 else:
                     other = opened.group(1)
             continue
@@ -2544,4 +2698,1197 @@ class EnvironmentDumpedByPython:
         return []
 
 
-VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentDumpedByPython())
+# ------------------------------------------------------------------- registry redirect, shell side
+
+_MAX_NESTED = 22            # scripts read inside the one being read: $(...), sh -c strings, heredoc-fed shells
+_MAX_NESTING = 3
+_MAX_VALUE = 1 << 16        # the most (UTF-8 bytes) one expansion, or one command's printed text, may hold; more is not read
+_WORK_BUDGET = 1 << 26      # the most (UTF-8 bytes) all expansions of one scan may bring in together
+
+
+def _size(text):
+    """The length of ``text`` in UTF-8 bytes (what every cap here counts)."""
+    return len(text) if text.isascii() else len(text.encode("utf-8", "surrogatepass"))
+
+
+def _char_size(char):
+    """The UTF-8 bytes of one character (a lone surrogate takes three, as ``surrogatepass`` writes it)."""
+    code = ord(char)
+    return 1 if code < 0x80 else 2 if code < 0x800 else 3 if code < 0x10000 else 4
+
+
+def _slice(text, start, end, room, ascii_only):
+    """(``text[start:end]``, its UTF-8 size), or ``_TooBig`` when it would not fit ``room`` bytes. No piece
+    larger than what is left is ever built: a long range is taken in steps that each fit. ``ascii_only`` is
+    ``text.isascii()``, asked once by the caller."""
+    if end - start > room:
+        raise _TooBig                       # a character is at least one byte
+    if ascii_only:
+        return text[start:end], end - start
+    parts = []
+    used = 0
+    pos = start
+    while pos < end:
+        step = min((room - used) // 4, 4096)  # this many characters fit even at four bytes each (and are counted cheaply)
+        if step < 1:
+            size = _char_size(text[pos])    # too little room for a blind step: size the next character first
+            if used + size > room:
+                raise _TooBig
+            parts.append(text[pos])
+            used += size
+            pos += 1
+            continue
+        part = text[pos:min(pos + step, end)]
+        used += _size(part)
+        if used > room:
+            raise _TooBig
+        parts.append(part)
+        pos += step
+    return "".join(parts), used
+_MAX_BAD_LINES = 8          # lines the lexer may skip before it reads the rest one line at a time
+_UNKNOWN = "\x01"           # stands for a value the script does not let us read (command output, unset variable)
+_SHELL_TAG = re.compile(r"(?:sh|bash|shell|zsh|console|dockerfile)(?![\w+-])", re.I)
+_PROMPT = re.compile(r"(?m)^([ \t]*)\$ ")
+_VARIABLE = re.compile(r"\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?[-=+?])([^}]*))?\})")
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+_AUTHORITY = re.compile(r"[^/?#\\]*")
+_LEAD_WORDS = frozenset(("RUN", "ONBUILD", "-", "run:"))
+
+_CONFIG_FILES = {
+    ".npmrc": "npm", ".yarnrc": "yarn", ".yarnrc.yml": "yarn_berry",
+    "pip.conf": "pip", "pip.ini": "pip", ".pypirc": "pypirc",
+}
+_FILE_MANAGER = {"yarn_berry": "yarn", "pypirc": "pip"}
+_PUBLIC_HOSTS = frozenset((
+    "registry.npmjs.org", "registry.yarnpkg.com", "npm.pkg.github.com",
+    "pypi.org", "files.pythonhosted.org", "pypi.python.org",
+))
+_PUBLIC_UPLOAD_HOSTS = frozenset(("upload.pypi.org", "test.pypi.org"))
+_DOCUMENTATION_HOSTS = ("example.com", "example.org", "example.net")      # reserved: nobody can own a name under them
+_MANAGERS = {"npm": "npm", "pnpm": "pnpm", "yarn": "yarn", "pip": "pip", "pip3": "pip"}
+_PIP_NAME = re.compile(r"pip3(?:\.\d+)?\Z")
+_MANAGER_VALUE_OPTIONS = frozenset((
+    "--prefix", "--userconfig", "--globalconfig", "--workspace", "-w", "--cache", "--loglevel", "--location",
+    "--registry", "--scope", "--otp", "--tag", "--dir", "-C", "--filter", "-F", "--file", "--config", "--cwd",
+    "--cafile", "--ca", "--proxy", "--https-proxy", "--before", "--mutex",
+))
+# The long options of `pip` (before its command) and of `pip config` (after it), as the option parser of pip 26
+# declares them: name -> whether it takes a value. A unique prefix of one is that option; `--opt=v` gives a value.
+_PIP_GENERAL = {
+    "--help": False, "--debug": False, "--isolated": False, "--require-virtualenv": False, "--require-venv": False,
+    "--python": True, "--verbose": False, "--version": False, "--quiet": False, "--log": True, "--log-file": True,
+    "--local-log": True, "--no-input": False, "--keyring-provider": True, "--proxy": True, "--no-proxy-env": False,
+    "--retries": True, "--timeout": True, "--default-timeout": True, "--exists-action": True, "--trusted-host": True,
+    "--cert": True, "--client-cert": True, "--cache-dir": True, "--no-cache-dir": False,
+    "--disable-pip-version-check": False, "--no-color": False, "--no-python-version-warning": False,
+    "--use-feature": True, "--use-deprecated": True, "--resume-retries": True,
+}
+# The options whose value pip checks (an int, a float, or one of a list); every other value is any word.
+_PIP_CHECKED = {
+    "--retries": "int", "--resume-retries": "int", "--timeout": "float", "--default-timeout": "float",
+    "--exists-action": ("s", "i", "w", "b", "a"), "--keyring-provider": ("auto", "disabled", "import", "subprocess"),
+    "--use-deprecated": ("legacy-resolver", "legacy-certs"),
+    "--use-feature": ("fast-deps", "inprocess-build-deps", "venv-isolation", "truststore",
+                      "no-binary-enable-wheel-cache", "build-constraint"),
+}
+
+
+def _pip_value_ok(name, value):
+    """Whether pip's option parser takes ``value`` for ``name``: a number the way optparse reads one, or a choice."""
+    kind = _PIP_CHECKED.get(name)
+    if kind is None or _UNKNOWN in value:
+        return True
+    try:
+        if kind == "float":
+            float(value)
+        elif kind == "int":
+            low = value[:2].lower()
+            if low == "0x":
+                int(value, 16)
+            elif low == "0b":
+                int(value[2:] or "0", 2)
+            else:
+                int(value, 8 if value[:1] == "0" else 10)
+        else:
+            return value in kind
+    except ValueError:
+        return False
+    return True
+
+
+_PIP_CONFIG = dict(_PIP_GENERAL, **{"--editor": True, "--global": False, "--user": False, "--site": False})
+_PIP_SHORT = frozenset("hvVq")      # -h -v -V -q, which can be written together (-vq)
+_NPM_KEY = re.compile(r"(?:registry|@[^\s:]+:registry)\Z")
+_YARN_KEY = re.compile(r"(?:registry|@[^\s:]+:registry|npmRegistryServer|npmScopes\.[^.\s]+\.npmRegistryServer)\Z")
+_PIP_SECTIONS = ("global", "install", "download", "wheel", "list", "index", "lock")  # where pip reads index settings
+_PIP_KEY = re.compile(r"(?:%s)\.(?:extra[-_])?index[-_]url\Z" % "|".join(_PIP_SECTIONS), re.I)
+_NPMRC_LINE = re.compile(r"\s*(registry|@[^\s:=]+:registry)\s*=(.*)")
+_YARNRC_LINE = re.compile(r"\s*\"?(registry|@[^\s:\"=]+:registry)\"?(?:\s*[:=]\s*|\s+)(.*)")
+_BERRY_LINE = re.compile(r"\s*[\"']?npmRegistryServer[\"']?\s*:(.*)")
+_PIP_LINE = re.compile(r"\s*(index[-_]url|extra[-_]index[-_]url)\s*[=:](.*)", re.I)
+_PYPIRC_LINE = re.compile(r"\s*repository\s*[=:](.*)", re.I)
+_PRINTF_TOKEN = re.compile(
+    r"%(-?)(\d*)(?:\.(\d*))?(.?)|\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{1,4}|U|[0-7]{1,3}|.?)", re.S)
+_HEREDOC_ESCAPE = re.compile(r"\\(\n|\\|\$)")
+_NEWLINE = re.compile("\n")
+_MAX_DESCRIPTOR_DIGITS = 4
+_DESCRIPTOR = re.compile(r"[0-9]+")
+_WORD_END = " \t\r\f\v\n;|&<>()"
+
+
+def _bare_dash(text, at):
+    """Whether the word that starts at offset ``at`` of ``text`` ends in a `-` the shell sees as its last
+    character: written bare or escaped (`3\\-`), with line continuations joined. A dash that closes a quote
+    (`"3-"`) or that comes from a variable is not written there, and `>&3-` from those is a file name."""
+    quote = None
+    dash = False
+    i, n = at, len(text)
+    while i < n:
+        c = text[i]
+        if quote == "'":
+            quote = None if c == "'" else quote
+        elif quote == '"':
+            if c == "\\":
+                i += 1
+            elif c == '"':
+                quote = None
+        elif c in _WORD_END:
+            break
+        elif c == "\\":
+            if text.startswith("\n", i + 1):       # a continuation joins the lines and is not part of the word
+                i += 1
+            else:
+                dash = text.startswith("-", i + 1)  # an escaped dash is still the last character the shell sees
+                i += 1
+        elif c in "'\"":
+            quote = c
+            dash = False
+        else:
+            dash = c == "-"
+        i += 1
+    return dash and quote is None
+_TERMINAL = object()    # where standard output goes when it is not a file we read
+_BACKTICKS = re.compile(r"`([^`\\]*)`")
+_CREDENTIALS = re.compile(r"(://)[^/?#\s'\"]*@")
+_SECTION = re.compile(r"\s*\[([^\]]*)\]")
+_PYTHON_FLAGS = frozenset("IEsSuBbOqvRPdx")
+_QUOTE_STRIP = {ord(c): None for c in "'\"\\"}
+_CONTINUATION = re.compile(r"\\\n")
+_MANAGER_WORD = re.compile(r"(?<![a-z0-9_])(?:npm|pnpm|yarn|pip[0-9.]*|python[0-9.]*|\.?npmrc|\.?yarnrc|pypirc)(?![a-z0-9_])")
+# `env -S"npm ..."` reads as `-Snpm ...` once its quotes are gone: the name follows the S of a short-option cluster
+_MANAGER_AFTER_SPLIT = re.compile(r"(?<![a-z0-9_-])-[iv-]*s(?:npm|pnpm|yarn|pip[0-9.]*|python[0-9.]*|\.?npmrc|\.?yarnrc|pypirc)(?![a-z0-9_])")
+
+
+def _heredoc_body(text, i, opener, strip, base=0):
+    """Read the lines of a here-document from ``text[i]`` to its delimiter; returns the index after it.
+
+    The body of an unquoted here-document has its backslash-newlines joined before the delimiter is
+    looked for, so `EO\\` + newline + `F` ends it and `registry=x\\` + newline + `EOF` does not."""
+    n = len(text)
+    opener.body_at = base + i
+    lines = []
+    while i < n:
+        pieces = []
+        while True:
+            end = text.find("\n", i)
+            line = text[i:n if end < 0 else end]
+            i = n if end < 0 else end + 1
+            if strip:
+                line = line.lstrip("\t")
+            pieces.append(line)
+            if not (opener.expand and i < n and (len(line) - len(line.rstrip("\\"))) % 2):
+                break
+        logical = pieces[0] if len(pieces) == 1 else "".join(p[:-1] for p in pieces[:-1]) + pieces[-1]
+        if logical == opener.value:
+            break
+        lines.extend(pieces)
+    opener.body = "\n".join(lines)
+    return i
+
+
+def _lex_script(text, base=0, alone=False, fences=None):
+    """``_lex`` for a whole script.
+
+    It keeps the body of each here-document on its delimiter token, records where every token starts, and
+    skips a line it cannot read, so one bad line (a stray apostrophe in prose) does not hide the rest.
+    After ``_MAX_BAD_LINES`` such lines the rest is read one line at a time, which keeps a text of
+    unclosed brackets from costing a scan to the end for every line.
+
+    ``fences``, when a list, makes a markdown fence line a line to skip, and receives the offset of each
+    one. Only a line that starts a command is a fence: the same characters inside a here-document or a
+    quoted string are part of it."""
+    toks = []
+    n = len(text)
+    i = 0
+    openers = []
+    bad = 0
+    while i < n:
+        if fences is not None and (i == 0 or text[i - 1] == "\n"):
+            end = text.find("\n", i)
+            if _FENCE_OPEN.match(text[i:n if end < 0 else end]):
+                fences.append(base + i)
+                i = n if end < 0 else end
+                continue
+        c = text[i]
+        if c in " \t\r\f\v":
+            i = _WS.match(text, i).end()
+            continue
+        if c == "\\" and text.startswith("\n", i + 1):
+            i += 2
+            continue
+        if c == "#":
+            end = text.find("\n", i)
+            i = n if end < 0 else end
+            continue
+        if c == "\n":
+            tok = _Tok("op", "\n")
+            tok.at = base + i
+            toks.append(tok)
+            i += 1
+            for opener, strip in openers:
+                i = _heredoc_body(text, i, opener, strip, base)
+            openers = []
+            continue
+        start = i
+        made = []
+        try:
+            if c in "<>" and text.startswith("(", i + 1):
+                end = _balanced(text, i + 1)
+                made.append(_Tok("ps", text[i + 2:end - 1]))
+                i = end
+            else:
+                redir = _REDIR.match(text, i)
+                op = _OP.match(text, i) if not redir else None
+                if redir:
+                    made.append(_Tok("redir", redir.group()))
+                    i = redir.end()
+                    here = _redirect_parts(redir.group())[1] in ("<<", "<<-")
+                    if here:
+                        while i < n and text[i] in " \t":
+                            i += 1
+                        word, j = _word(text, i, True)
+                        word.expand = not any(ch in text[i:j] for ch in "'\"\\")
+                        word.at = base + i
+                        made.append(word)
+                        i = j
+                        openers.append((word, redir.group().endswith("<<-")))
+                elif op:
+                    made.append(_Tok("op", op.group()))
+                    i = op.end()
+                else:
+                    word, i = _word(text, i, True)
+                    made.append(word)
+        except (_Syntax, RecursionError):
+            bad += 1
+            if bad > _MAX_BAD_LINES and not alone:
+                pos = start
+                while pos < n:
+                    end = text.find("\n", pos)
+                    end = n if end < 0 else end
+                    toks.extend(_lex_script(text[pos:end], base + pos, True, fences))
+                    if end < n:
+                        newline = _Tok("op", "\n")
+                        newline.at = base + end
+                        toks.append(newline)
+                    pos = end + 1
+                return toks
+            end = text.find("\n", start)
+            i = n if end < 0 else end
+            continue
+        made[0].at = base + start
+        toks.extend(made)
+    return toks
+
+
+def _expand(value, env, depth=0):
+    """``value`` with the variables the script set replaced; what it cannot read becomes ``_UNKNOWN``."""
+    return _expand_marked(value, env, depth, ())[0]
+
+
+def _expand_marked(value, env, depth, marks):
+    """(``_expand(value, env, depth)``, where the offsets ``marks`` of ``value`` land in it). A mark inside a
+    variable reference lands after the text that reference becomes."""
+    if "$" not in value and "`" not in value and _DOLLAR not in value:
+        return value, list(marks)
+    work = getattr(env, "work", None)
+    if work is not None and work[0] <= 0:
+        return _UNKNOWN, [0] * len(marks)           # the scan has expanded all it will
+    used = 0
+
+    def fill(match):
+        nonlocal used
+        piece = grow(match)             # a fallback has already charged what it expanded; the piece is charged again
+        cost = _size(piece)
+        used += cost
+        if used > _MAX_VALUE or (work is not None and cost > work[0]):
+            raise _TooBig               # refused before the text is joined: the scan never holds more than it may
+        if work is not None:
+            work[0] -= cost
+        return piece
+
+    def grow(match):
+        name = match.group(1) or match.group(2)
+        mode, word = match.group(3), match.group(4)
+        current = env.get(name)
+        assigned = name in env
+        if mode is None:
+            return current if assigned else _UNKNOWN
+        colon = mode.startswith(":")
+        sign = mode[-1]
+        usable = assigned and (current != "" or not colon)
+        if sign == "+":
+            return _expand(word, env, depth + 1) if usable and depth < 4 else ""
+        if usable:
+            return current
+        if sign == "?":
+            return _UNKNOWN
+        fallback = _expand(word, env, depth + 1) if depth < 4 else _UNKNOWN
+        if sign == "=":
+            env[name] = fallback
+        return fallback
+
+    try:
+        result, moved = _fill_in(value, marks, fill)
+    except _TooBig:
+        if work is not None:
+            work[0] = max(work[0] - _MAX_VALUE, 0)
+        return _UNKNOWN, [0] * len(marks)           # a value this large is not read
+    return result.replace("$", _UNKNOWN).replace("`", _UNKNOWN).replace(_DOLLAR, "$"), moved
+
+
+def _fill_in(value, marks, fill):
+    """(``value`` with every variable reference replaced by ``fill(match)``, where ``marks`` land in it)."""
+    if marks:
+        out = []
+        moved = []
+        pos = size = at = 0
+        count = len(marks)
+        for found in _VARIABLE.finditer(value):
+            start, end = found.start(), found.end()
+            while at < count and marks[at] < start:
+                moved.append(size + marks[at] - pos)
+                at += 1
+            out.append(value[pos:start])
+            size += start - pos
+            out.append(fill(found))
+            size += len(out[-1])
+            pos = end
+            while at < count and marks[at] < (end if marks[at] % 1 == 0 else end - 0.5):
+                moved.append(size - 0.5)          # a break inside a reference lands after the text it became
+                at += 1
+        while at < count:
+            moved.append(size + marks[at] - pos)
+            at += 1
+        out.append(value[pos:])
+        result = "".join(out)
+    else:
+        moved = []
+        result = _VARIABLE.sub(fill, value)
+    return result, moved
+
+
+def _registry_host(url, public=_PUBLIC_HOSTS):
+    """(host, quiet) of an ``scheme://authority/...`` value, or None when it is not a readable URL.
+
+    The authority runs to the first ``/ ? # \\``; user-info is everything up to the last ``@`` in it. A
+    host is quiet when it is exactly one of ``public`` (after one ``www.``), or a name under a reserved
+    documentation domain; never by its prefix."""
+    scheme = _SCHEME.match(url)
+    if not scheme:
+        return None
+    authority = _AUTHORITY.match(url, scheme.end()).group()
+    if _UNKNOWN in authority or "$" in authority:
+        return None
+    hostport = authority.rpartition("@")[2]
+    if hostport.startswith("["):
+        host = hostport[:hostport.find("]") + 1] if "]" in hostport else hostport
+    else:
+        head, colon, port = hostport.rpartition(":")
+        host = head if colon and (port.isdigit() or not port) else hostport
+    host = urllib.parse.unquote(host).lower()
+    if host.endswith("."):
+        host = host[:-1]
+    bare = host[4:] if host.startswith("www.") else host
+    return host, host in public or bare in public or host.endswith(_DOCUMENTATION_HOSTS) and (
+        host in _DOCUMENTATION_HOSTS or host.endswith(tuple("." + d for d in _DOCUMENTATION_HOSTS)))
+
+
+def _setting_value(raw):
+    raw = raw.strip()
+    if raw[:1] in ("'", '"'):
+        end = raw.find(raw[0], 1)
+        return raw[1:end] if end > 0 else raw[1:]
+    return raw.split(None, 1)[0] if raw else ""
+
+
+def _file_settings(kind, content):
+    """(key, value) of each registry setting in ``content``, read as the config file ``kind``.
+
+    A pip config file keeps its index settings in ``[global]`` or the section of a command that takes an
+    index, and a ``.pypirc`` keeps its ``repository`` in the section of one index server (not
+    ``[distutils]``); the same pip line outside those sections is no setting."""
+    follows = False
+    section = None
+    for line in content.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped[0] in "#;":
+            continue
+        header = _SECTION.match(line)
+        if header and kind in ("pip", "pypirc"):
+            section = header.group(1).strip().lower()
+            follows = False
+            continue
+        if kind == "npm":
+            found = _NPMRC_LINE.match(line)
+            if found:
+                yield found.group(1), _setting_value(found.group(2))
+        elif kind == "yarn":
+            found = _YARNRC_LINE.match(line)
+            if found:
+                yield found.group(1), _setting_value(found.group(2))
+        elif kind == "yarn_berry":
+            found = _BERRY_LINE.match(line)
+            if found:
+                yield "npmRegistryServer", _setting_value(found.group(1))
+        elif kind == "pip":
+            found = _PIP_LINE.match(line) if section in _PIP_SECTIONS else None
+            if found:
+                follows = True
+                yield found.group(1).lower(), _setting_value(found.group(2))
+            elif follows and line[0] in " \t" and _SCHEME.match(stripped):
+                yield "extra-index-url", _setting_value(stripped)
+            else:
+                follows = False
+        elif section not in (None, "distutils"):
+            found = _PYPIRC_LINE.match(line)
+            if found:
+                yield "repository", _setting_value(found.group(1))
+
+
+def _lead_words(words):
+    """The words of a command line past the lead words of a Dockerfile / CI list item."""
+    i = 0
+    while i < len(words) and words[i].kind == "w" and words[i].value in _LEAD_WORDS:
+        i += 1
+    if i and words[i - 1].value in ("RUN", "ONBUILD"):
+        while i < len(words) and words[i].kind == "w" and words[i].value.startswith("--"):
+            i += 1
+    return words[i:] if i else words
+
+
+def _assignments(words):
+    """(name, value word) of the leading assignments of a command, and whether a command follows them."""
+    found = []
+    i = 0
+    while i < len(words) and words[i].kind == "w":
+        value = words[i].value
+        if value in _KEYWORDS:
+            i += 1
+        elif _ASSIGN.match(value):
+            found.append((value.partition("=")[0], value.partition("=")[2]))
+            i += 1
+        else:
+            break
+    return found, i < len(words)
+
+
+# The backslash escapes a shell reads are not one language: `printf FORMAT` reads `\NNN` (up to three octal
+# digits, the leading zero counted) and has no `\c`; `printf %b` and `echo -e` read `\0NNN` (the zero and up to
+# three digits) and stop at `\c`; `echo -e` has no `\NNN` for NNN not starting with 0. An escape that makes a
+# character never starts a conversion.
+_ESCAPE_DIALECTS = {
+    "format": re.compile(r"\\(x[0-9a-fA-F]{1,2}|[uU]|[0-7]{1,3}|.?)", re.S),
+    "operand": re.compile(r"\\(c|x[0-9a-fA-F]{1,2}|[uU]|0[0-7]{0,3}|[1-7][0-7]{0,2}|.?)", re.S),
+    "echo": re.compile(r"\\(c|x[0-9a-fA-F]{1,2}|[uU]|0[0-7]{0,3}|.?)", re.S),
+}
+_ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", "r": "\r", "a": "\a", "b": "\b", "f": "\f", "v": "\v"}
+_FORMAT_ONLY = {"'": "'", '"': '"', "?": "?"}      # `\'`, `\"` and `\?` are the plain character in a printf format only
+
+
+class _Unreadable(Exception):
+    """An escape whose character depends on the shell's version or locale: the output is not read."""
+
+
+def _escaped(code, dialect):
+    """The text of the escape ``\\<code>``, or None when it stops the output (`\\c`)."""
+    if code == "c":
+        return "\\c" if dialect == "format" else None
+    if code[:1] in ("u", "U") and code or code == "x":
+        raise _Unreadable           # bash builds differ on `\u` and `\U`; a `\x` without hex digits is not an escape
+    if code[:1] == "x" and len(code) > 1:
+        return chr(int(code[1:], 16))
+    if code and code[0] in "01234567" and (code[0] == "0" or dialect != "echo"):
+        return chr(int(code, 8) & 255)
+    if code in _ESCAPES:
+        return _ESCAPES[code]
+    if code in ("e", "E") and dialect != "echo":
+        return "\x1b"
+    if dialect == "format" and code in _FORMAT_ONLY:
+        return _FORMAT_ONLY[code]
+    return "\\" + code
+
+
+def _unescape(text, dialect, room=None):
+    """(``text`` with its backslash escapes read in ``dialect``, whether a `\\c` ended the output). With a
+    ``room`` (UTF-8 bytes) it raises ``_TooBig`` before it builds a piece that would pass it."""
+    out = []
+    pos = 0
+    left = room
+    plain = text.isascii()
+    for m in _ESCAPE_DIALECTS[dialect].finditer(text):
+        if left is None:
+            gap = text[pos:m.start()]
+        else:
+            gap, size = _slice(text, pos, m.start(), left, plain)
+            left -= size
+        pos = m.end()
+        piece = _escaped(m.group(1), dialect)
+        if piece is not None and left is not None:
+            left -= _size(piece)
+            if left < 0:
+                raise _TooBig
+        out.append(gap)
+        if piece is None:
+            return "".join(out), True
+        out.append(piece)
+    if left is None:
+        out.append(text[pos:])
+    else:
+        out.append(_slice(text, pos, len(text), left, plain)[0])
+    return "".join(out), False
+
+
+def _expand_joined(body, breaks, env):
+    """(``_expand(body, env)``, its line breaks): ``breaks`` are the offsets of ``body`` where a physical line
+    ends (a newline at its own offset, a joined line end half an offset before the text that followed it); the
+    newlines a variable's value brings are not source lines and are left out."""
+    if "$" not in body and "`" not in body and _DOLLAR not in body:
+        return body, breaks
+    if breaks is None:
+        breaks = [m.start() for m in _NEWLINE.finditer(body)]
+    return _expand_marked(body, env, 0, breaks)
+
+
+class _Env(dict):
+    """The variables a script has set; ``exported`` are the names a shell it starts inherits."""
+
+    __slots__ = ("exported", "work")
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.exported = set()
+        self.work = [_WORK_BUDGET]      # shared by every copy: what the scan may still expand
+
+    def snapshot(self):
+        copy = _Env(self)
+        copy.exported = set(self.exported)
+        copy.work = self.work
+        return copy
+
+    def restore(self, saved):
+        self.clear()
+        self.update(saved)
+        self.exported = set(saved.exported)
+
+    def child(self, inline=()):
+        """What a started shell sees: the exported variables, and the command's own assignments."""
+        made = _Env({k: v for k, v in self.items() if k in self.exported})
+        made.exported = set(made)
+        made.work = self.work
+        for name, value in inline:
+            made[name] = value
+            made.exported.add(name)
+        return made
+
+
+def _printf(fmt, args):
+    """What ``printf FORMAT ARGS`` writes for a format of ``%s``, ``%b`` and ``%%`` (with ``-``, a width and
+    a precision), or None for any other conversion, whose output is not read here."""
+    tokens = list(_PRINTF_TOKEN.finditer(fmt))
+    specs = [m for m in tokens if m.group(1) is not None]
+    for m in specs:
+        kind, width, precision = m.group(4), m.group(2), m.group(3)
+        if kind not in ("s", "b", "%") or len(width) > 4 or len(precision or "") > 4:
+            return None
+        if kind == "%" and (m.group(1) or width or precision is not None):
+            return None
+        if len(width) > 1 and width[0] == "0":          # a zero flag pads with zeros
+            return None
+    slots = sum(1 for m in specs if m.group(4) != "%")
+    room = [_MAX_VALUE]
+    plain = fmt.isascii()
+
+    def need(size):
+        if size > room[0]:
+            raise _TooBig                   # the text it would write is too large to read
+
+    def put(out, piece):
+        need(_size(piece))
+        room[0] -= _size(piece)
+        out.append(piece)
+
+    def put_range(out, start, end):
+        piece, size = _slice(fmt, start, end, room[0], plain)
+        room[0] -= size
+        out.append(piece)
+
+    def render(chunk):
+        taken = iter(chunk)
+        out = []
+        pos = 0
+        for m in tokens:
+            put_range(out, pos, m.start())
+            pos = m.end()
+            if m.group(1) is None:
+                put(out, _escaped(m.group(5), "format"))
+                continue
+            kind = m.group(4)
+            if kind == "%":
+                put(out, "%")
+                continue
+            value = next(taken, "")
+            if kind == "b":
+                value, stopped = _unescape(value, "operand", room[0])
+            else:
+                stopped = False
+            if m.group(3) is not None:
+                keep = min(int(m.group(3) or 0), len(value))
+                value = _slice(value, 0, keep, room[0], value.isascii())[0]      # taken only if it fits what is left
+            width = int(m.group(2) or 0)
+            need(_size(value) + max(width - len(value), 0))      # the padding is decided before it is built
+            put(out, value.ljust(width) if m.group(1) else value.rjust(width))
+            if stopped:
+                return "".join(out), True
+        put_range(out, pos, len(fmt))
+        return "".join(out), False
+
+    if not slots:
+        return render(())[0]
+    written = []
+    for first in range(0, max(len(args), 1), slots):
+        text, stopped = render(args[first:first + slots])
+        written.append(text)
+        if stopped:
+            break
+    return "".join(written)
+
+
+def _heredoc_unescape(body):
+    """(an unquoted here-document's backslash escapes read, its line breaks or None): a joined line end is a
+    break half an offset before the text that followed it, so every later token keeps its physical line."""
+    out = []
+    shifts = []
+    pos = size = 0
+    for m in _HEREDOC_ESCAPE.finditer(body):
+        out.append(body[pos:m.start()])
+        size += m.start() - pos
+        pos = m.end()
+        if m.group(1) == "\n":
+            shifts.append(size)
+        else:
+            out.append({"\\": "\\", "$": _DOLLAR}[m.group(1)])
+            size += 1
+    out.append(body[pos:])
+    text = "".join(out)
+    if not shifts:
+        return text, None
+    return text, sorted([m.start() for m in _NEWLINE.finditer(text)] + [at - 0.5 for at in shifts])
+
+
+class _ShellReader:
+    """Reads a shell script for the commands that point a package manager at another registry."""
+
+    def __init__(self):
+        self.nested = _MAX_NESTED
+        self.work = [_WORK_BUDGET]      # what the whole scan may still expand, whichever way the text is read
+        self._newlines = {}     # id(text) -> (text, offsets of its newlines): a line number is a bisect, not a count
+        self._breaks = {}       # id(text) -> (text, offsets where a physical line ends), for text made from a here-document
+
+    def read(self, text, line=1, depth=0, env=None, fences=None):
+        """Read ``text`` as one script; raises ``_Found`` at the first redirect to a non-public registry."""
+        if env is None:
+            env = _Env()
+            env.work = self.work
+        previous = None
+        scopes = []
+        for seg in _segments(_lex_script(text, fences=fences)):
+            for _ in range(seg.opens):
+                scopes.append(env.snapshot())       # a ( ... ) group is a subshell: what it sets is gone after it
+            staged = env.snapshot() if "|" in (seg.sep_before, seg.sep_after) or "|&" in (seg.sep_before, seg.sep_after) else None
+            previous = self._segment(seg, previous, text, line, depth, env)
+            if staged is not None:
+                env.restore(staged)         # what a pipeline stage sets is gone with its shell
+            for _ in range(seg.closes):
+                if scopes:
+                    env.restore(scopes.pop())
+                previous = None
+
+    def _segment(self, seg, previous, text, line, depth, env):
+        """Read one command; returns the text it leaves on the pipe, or None."""
+        if seg.sep_before not in ("|", "|&"):
+            previous = None
+        words = _lead_words(seg.words)
+        for tok in words + [t for _, t in seg.redirs if t is not None]:
+            for body, inside in (zip(tok.subs, tok.sub_at) if tok.kind == "w" else ((tok.value, 2),)):
+                self._nested(text, tok.at + inside, body, line, depth, env.snapshot(), True)
+        assigned, has_command = _assignments(words)
+        inline = [(name, _expand(value, env)) for name, value in assigned]
+        if not has_command:
+            for name, value in inline:
+                env[name] = value
+            return None
+        program = _program(words)
+        if program is None:
+            return None
+        word, args = program
+        name = _base(word.value)
+        stdin, stdin_line = self._stdin(seg, previous, env, text, line, depth)
+        if name in ("export", "declare", "local", "readonly", "typeset"):
+            flags = [a.value for a in args if a.kind == "w" and a.value[:1] in "-+" and len(a.value) > 1]
+            unexports = any(f.startswith("+") and "x" in f for f in flags) or (
+                name == "export" and any(f.startswith("-") and "n" in f for f in flags))
+            exports = not unexports and (name == "export" or any(f.startswith("-") and "x" in f for f in flags))
+            for arg in args:
+                if arg.kind != "w" or arg.value.startswith("-"):
+                    continue
+                key, equals, value = arg.value.partition("=")
+                if equals and _ASSIGN.match(arg.value):
+                    env[key] = _expand(value, env)
+                if exports and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                    env.exported.add(key)
+                elif unexports:
+                    env.exported.discard(key)
+        elif name == "unset":
+            for arg in args:
+                env.pop(arg.value, None)
+                env.exported.discard(arg.value)
+        elif name in ("read", "for"):
+            for arg in args[:1] if name == "for" else args:
+                if arg.kind == "w" and not arg.value.startswith("-") and _ASSIGN.match(arg.value + "="):
+                    env[arg.value] = _UNKNOWN
+        elif name in _MANAGERS or _PIP_NAME.match(name) or _PYTHON.match(name):
+            self._manager(name, args, env, word, text, line)
+        elif name in _SHELLS:
+            self._shell(args, stdin, stdin_line, text, line, depth, env, inline)
+        else:
+            shown = self._printed(name, args, stdin, env)
+            self._writes(name, seg, args, shown, env, text, line)
+            return None if _stdout_redirects(seg) else shown
+        return None
+
+    def _number(self, text, at, line):
+        """The line number of offset ``at`` in ``text``, which starts at line ``line``."""
+        known = self._breaks.get(id(text))
+        if known is not None and known[0] is text:
+            return line + bisect.bisect_left(known[1], at)
+        seen = self._newlines.get(id(text))
+        if seen is None or seen[0] is not text:
+            if len(self._newlines) >= _MAX_NESTED + 64:
+                return line + text.count("\n", 0, at)
+            seen = self._newlines[id(text)] = (text, [m.start() for m in _NEWLINE.finditer(text)])
+        return line + bisect.bisect_left(seen[1], at)
+
+    def _remember(self, text, breaks):
+        """Keep where the physical lines of ``text``, made from a here-document, end."""
+        if breaks is not None and len(self._breaks) < _MAX_NESTED + 64:
+            self._breaks[id(text)] = (text, breaks)
+
+    def _line(self, text, at, line):
+        """(line number, the line's text) of offset ``at`` in ``text``, which starts at line ``line``."""
+        start = text.rfind("\n", 0, at) + 1
+        end = text.find("\n", at)
+        end = len(text) if end < 0 else end
+        return self._number(text, at, line), _CREDENTIALS.sub(r"\1***@", text[start:end].strip())[:50]
+
+    def _into(self, body, number, depth, env):
+        """Read ``body``, a script that starts on line ``number``, with the variables ``env``."""
+        if depth >= _MAX_NESTING or self.nested <= 0 or not body:
+            return
+        self.nested -= 1
+        self.read(body, number, depth + 1, env)
+
+    def _substitutions(self, body, number, depth, env):
+        """Read the ``$(...)`` and backtick commands in the text of an unquoted here-document."""
+        pos = 0
+        while self.nested > 0:
+            at = body.find("$(", pos)
+            if at < 0:
+                break
+            if body.startswith("((", at + 1):
+                pos = at + 3
+                continue
+            try:
+                end = _balanced(body, at + 1)
+            except (_Syntax, RecursionError):
+                break
+            self._slice(body, at + 2, end - 1, number, depth, env)
+            pos = end
+        for found in _BACKTICKS.finditer(body):
+            self._slice(body, found.start(1), found.end(1), number, depth, env)
+
+    def _slice(self, body, start, end, number, depth, env):
+        """Read ``body[start:end]``, a command inside a here-document, with the joined line ends it holds."""
+        piece = body[start:end]
+        self._carry(body, piece, start)
+        self._into(piece, self._number(body, start, number), depth, env.snapshot())
+
+    def _carry(self, text, piece, start):
+        """Give ``piece``, which sits at offset ``start`` of ``text``, the line breaks ``text`` has in it."""
+        known = self._breaks.get(id(text))
+        if known is not None and known[0] is text:
+            breaks = known[1]
+            low = bisect.bisect_left(breaks, start)
+            high = bisect.bisect_left(breaks, start + len(piece))
+            self._remember(piece, [x - start for x in breaks[low:high]])
+
+    def _nested(self, text, at, body, line, depth, env, exact=False):
+        """Read ``body``, a command inside ``text``, with ``text``'s line breaks. ``at`` is where ``body`` starts
+        when ``exact``; otherwise only where the word that holds it starts (its text was changed on the way)."""
+        if depth >= _MAX_NESTING or self.nested <= 0 or not body:
+            return
+        if exact:
+            self._carry(text, body, at)
+        self._into(body, self._number(text, at, line), depth, env)
+
+    def _value(self, text, word, env):
+        """``_expand(word.value, env)`` for a word of ``text``, and register where its physical lines end: the
+        line breaks of ``text`` inside the word are carried through quote removal, line-continuation removal
+        and variable expansion (a newline a variable brings is not a source line)."""
+        trace = []
+        try:
+            again, end = _word(text, word.at, True, trace)
+        except (_Syntax, RecursionError):
+            return _expand(word.value, env)
+        if again.value != word.value or len(trace) < 2:
+            return _expand(word.value, env)
+        known = self._breaks.get(id(text))
+        if known is not None and known[0] is text:
+            low = bisect.bisect_left(known[1], word.at)
+            high = bisect.bisect_left(known[1], end)
+            inside = known[1][low:high]
+        else:
+            inside = [m.start() for m in _NEWLINE.finditer(text, word.at, end)]
+        starts = [t[0] for t in trace]
+        breaks = []
+        for found in inside:
+            after = int(found) + 1 if found == int(found) else int(found + 0.5)     # where the next line starts
+            k = min(bisect.bisect_right(starts, after) - 1, len(trace) - 1)
+            source, out, lead = trace[k]
+            span = trace[k + 1][1] - out if k + 1 < len(trace) else 0
+            into = after - source - lead
+            # a character the quoting drops lands where the text after it does
+            breaks.append(out + (into if 0 <= into < span else max(min(into, span), 0)) - 0.5)
+        shown, breaks = _expand_marked(word.value, env, 0, sorted(breaks))
+        if shown is not _UNKNOWN:
+            self._remember(shown, breaks)
+        return shown
+
+    def _stdin(self, seg, previous, env, text, line, depth):
+        """(the text a command reads on standard input, the line it starts on): its here-document or
+        here-string, else the pipe."""
+        redirect = _stdin_redirect(seg)
+        for operator, target in seg.redirs:
+            op = _redirect_parts(operator)[1]
+            if (op in ("<<", "<<-") and target is not None and target.kind == "w" and target.body is not None
+                    and target.expand and (redirect is None or target is not redirect[1])):
+                body, breaks = _heredoc_unescape(target.body)       # the shell runs its commands whatever takes it
+                self._remember(body, breaks)
+                self._substitutions(body, self._number(text, target.body_at, line), depth, env)
+        if redirect is None:
+            return previous, line
+        op, target = redirect
+        if target is None or target.kind != "w":
+            return None, line
+        if op in ("<<", "<<-") and target.body is not None:
+            number = self._number(text, target.body_at, line)
+            if not target.expand:
+                return target.body, number
+            body, breaks = _heredoc_unescape(target.body)
+            self._remember(body, breaks)
+            self._substitutions(body, number, depth, env)
+            shown, breaks = _expand_joined(body, breaks, env)
+            self._remember(shown, breaks)
+            return shown, number
+        if op == "<<<":
+            return self._value(text, target, env), self._number(text, target.at, line)
+        return None, line
+
+    def _shell(self, args, stdin, stdin_line, text, line, depth, env, inline):
+        """A shell the script starts: it inherits the exported variables and the command's own assignments."""
+        run = _run_shell(args)
+        child = env.child(inline)
+        if run.mode == "inline" and run.inline is not None:
+            self._nested(text, run.inline.at, self._value(text, run.inline, env), line, depth, child)
+        elif run.mode == "stdin" and stdin:
+            self._into(stdin, stdin_line, depth, child)
+
+    def _printed(self, name, args, stdin, env):
+        """The text a content command writes to standard output, or None when we cannot know it."""
+        words = [a for a in args if a.kind == "w"]
+        if name == "echo":
+            i = 0
+            escapes = False
+            while i < len(words) and re.match(r"-[neE]+\Z", words[i].value):
+                for ch in words[i].value[1:]:
+                    if ch in "eE":
+                        escapes = ch == "e"
+                i += 1
+            room = _MAX_VALUE
+            expanded = []
+            for w in words[i:]:
+                expanded.append(_expand(w.value, env))
+                room -= _size(expanded[-1]) + 1
+                if room < 0:
+                    return None             # the text it would write is too large to read
+            shown = " ".join(expanded)
+            try:
+                return _unescape(shown, "echo")[0] if escapes else shown
+            except _Unreadable:
+                return None
+        if name == "printf":
+            if not words:
+                return None
+            values = []
+            room = 4 * _MAX_VALUE
+            for w in words:
+                values.append(_expand(w.value, env))
+                room -= _size(values[-1])
+                if room < 0:
+                    return None             # operands too large to read
+            if values[0] == "--":
+                values = values[1:]         # the end of the options: what follows is the format, whatever it starts with
+            elif len(values[0]) > 1 and values[0].startswith("-"):
+                return None                 # an option (`-v VAR` stores the text instead of writing it)
+            if not values:
+                return None
+            try:
+                return _printf(values[0], values[1:])
+            except (_Unreadable, _TooBig):
+                return None
+        if name == "tee":
+            return stdin
+        if name == "cat":
+            files = [w for w in words if not w.value.startswith("-") or w.value == "-"]
+            if any(w.value != "-" for w in files):
+                return stdin if any(w.value == "-" for w in files) else None
+            return stdin
+        return None
+
+    def _writes(self, name, seg, args, shown, env, text, line):
+        """A command that writes what it prints to a package-manager config file."""
+        if shown is None:
+            return
+        targets = []
+        table = {0: _TERMINAL, 1: _TERMINAL, 2: _TERMINAL}      # descriptor -> the file word it writes, _TERMINAL, or absent = closed
+        for operator, target in seg.redirs:
+            fd, op = _redirect_parts(operator)
+            if target is None or target.kind != "w" or not (fd == "" or fd.isdigit()):
+                continue
+            if len(fd) > _MAX_DESCRIPTOR_DIGITS:
+                return                              # not a descriptor the shell has: the command does not run
+            n = int(fd) if fd else (0 if op.startswith("<") else 1)
+            if op in ("&>", "&>>") and not fd:
+                table[1] = table[2] = target
+            elif op in (">", ">>", ">|", "<>"):
+                table[n] = target
+            elif op in ("<", "<<", "<<-", "<<<"):
+                table[n] = _TERMINAL                # opened for reading: nothing the command prints goes there
+            elif op in (">&", "<&"):
+                value = _expand(target.value, env)
+                if _UNKNOWN in value:
+                    return                          # a word we cannot read: whether the redirect works is unknown
+                move = (value.endswith("-") and _DESCRIPTOR.fullmatch(value[:-1]) is not None
+                        and _bare_dash(text, target.at))
+                digits = value[:-1] if move else value
+                if _DESCRIPTOR.fullmatch(digits):
+                    if len(digits) > _MAX_DESCRIPTOR_DIGITS or int(digits) not in table:
+                        return                      # a descriptor that is closed: the shell reports it and runs nothing
+                    source = int(digits)
+                    table[n] = table[source]
+                    if move and source != n:
+                        del table[source]
+                elif value == "-":
+                    table.pop(n, None)
+                elif op == ">&" and n == 1:
+                    table[1] = table[2] = target    # `>&file` writes the file; so does `1>&file`, however it is spelled
+                else:
+                    return                          # any other descriptor, or `<&file`: an ambiguous redirect
+        if table.get(1) not in (None, _TERMINAL):
+            targets.append(table[1])
+        if name == "tee":
+            for arg in args:
+                if arg.kind == "w" and not arg.value.startswith("-"):
+                    targets.append(arg)
+        for target in targets:
+            path = _expand(target.value, env)
+            kind = _CONFIG_FILES.get(path.rsplit("/", 1)[-1])
+            if kind is None:
+                continue
+            public = _PUBLIC_HOSTS | _PUBLIC_UPLOAD_HOSTS if kind == "pypirc" else _PUBLIC_HOSTS
+            for key, value in _file_settings(kind, shown):
+                self._judge("file_write", _FILE_MANAGER.get(kind, kind), key, value, public, target, text, line)
+
+    def _pip_words(self, args, env):
+        """The words of a ``pip config ...`` command line that are not options, or None when the line is not a
+        command that runs: pip rejects an option it does not have (or an ambiguous prefix, or a value given to
+        a flag), and prints help or its version instead of running one."""
+        words = []
+        longs = _PIP_GENERAL
+        command = ended = False
+        i = 0
+        while i < len(args) and args[i].kind == "w":
+            tok = args[i]
+            i += 1
+            value = _expand(tok.value, env)
+            if not ended and value == "--":
+                ended = True
+            elif not ended and len(value) > 1 and value[0] == "-":
+                if value.startswith("--"):
+                    name, equals, given = value.partition("=")
+                    found = [name] if name in longs else [k for k in longs if k.startswith(name)]
+                    if len(found) != 1 or (equals and not longs[found[0]]):
+                        return None
+                    if found[0] == "--help" or (found[0] == "--version" and not command):
+                        return None
+                    if longs[found[0]]:
+                        if not equals:
+                            if i >= len(args) or args[i].kind != "w":
+                                return None             # the option needs a value and there is none
+                            given = _expand(args[i].value, env)
+                            i += 1                      # the next word is its value, whatever it starts with
+                        if not _pip_value_ok(found[0], given):
+                            return None
+                elif not set(value[1:]) <= _PIP_SHORT or "h" in value or ("V" in value and not command):
+                    return None
+            else:
+                words.append((value, tok))
+                if not command:
+                    if value != "config":
+                        return None
+                    command, longs, ended = True, _PIP_CONFIG, False
+        return words
+
+    def _manager(self, name, args, env, word, text, line):
+        """``npm|pnpm|yarn|pip config set <registry key> <value>`` (``python -m pip`` included)."""
+        if _PYTHON.match(name):
+            options = [a for a in args if a.kind == "w"]
+            i = 0
+            while i < len(options) and options[i].value != "-m":
+                flag = options[i].value
+                if flag in ("-W", "-X"):
+                    i += 2
+                elif len(flag) > 1 and flag[0] == "-" and set(flag[1:]) <= _PYTHON_FLAGS:
+                    i += 1
+                else:
+                    return
+            if i + 1 < len(options) and options[i + 1].value == "pip":
+                args = args[args.index(options[i + 1]) + 1:]
+                name = "pip"
+            else:
+                return
+        manager = _MANAGERS.get(name) or "pip"
+        if manager == "pip":
+            words = self._pip_words(args, env)
+            if words is None:
+                return
+        else:
+            words = []
+            i, ended = 0, False
+            while i < len(args) and args[i].kind == "w":
+                tok = args[i]
+                i += 1
+                value = _expand(tok.value, env)
+                if not ended and value == "--":
+                    ended = True
+                elif not ended and len(value) > 1 and value[0] == "-":
+                    if value in ("--help", "-h"):
+                        return
+                    if value in _MANAGER_VALUE_OPTIONS:
+                        i += 1
+                else:
+                    words.append((value, tok))
+        values = [v for v, _ in words]
+        if manager in ("npm", "pnpm") and values[:1] == ["set"]:
+            rest = values[1:]
+        elif values[:1] in (["config"], ["c"]) and values[1:2] == ["set"] and (values[0] == "config" or manager == "npm"):
+            rest = values[2:]
+        else:
+            return
+        if manager in ("pip", "yarn") and len(rest) != 2:
+            return
+        pairs = []
+        i = 0
+        while i < len(rest):
+            if "=" in rest[i] and manager in ("npm", "pnpm"):
+                key, _, value = rest[i].partition("=")
+                i += 1
+            else:
+                key, value = rest[i], rest[i + 1] if i + 1 < len(rest) else ""
+                i += 2
+            pairs.append((key, value))
+        keys = {"npm": _NPM_KEY, "pnpm": _NPM_KEY, "yarn": _YARN_KEY, "pip": _PIP_KEY}[manager]
+        for key, value in pairs:
+            if keys.match(key) and value:
+                self._judge("config_set", manager, key, value, _PUBLIC_HOSTS, word, text, line)
+
+    def _judge(self, sink, manager, key, value, public, tok, text, line):
+        parsed = _registry_host(value, public)
+        if parsed is None or parsed[1]:
+            return
+        number, shown = self._line(text, tok.at, line)
+        raise _Found({"sink": sink, "manager": manager, "key": key, "host": parsed[0][:80], "line": number}, shown)
+
+
+class RegistryRedirectInShell:
+    """GLS-STRUCT-006: a shell script points a package manager at a registry that is not public."""
+
+    id = "GLS-STRUCT-006"
+    name = "Shell points a package manager at a registry that is not public"
+    category = "supply_chain"
+    severity = "medium"
+    channel = ["file", "code"]
+    description = ("A shell script in this text points a package manager (npm, pnpm, yarn or pip) at a "
+                   "registry that is not one of the public ones, with a config-set command or by writing "
+                   "its config file, so the installs that use that setting come from that host. A project mirror "
+                   "looks the same as a hijack, so this is a finding for judgment, not proof of intent.")
+
+    def pregate(self, text):
+        # a package manager or one of its config files, spelled with its quotes and continuations removed:
+        # the shell reads `n'p'm` and `.npm\\` + newline + `rc` as those names
+        seen = _CONTINUATION.sub("", text.lower()).replace("\\_", " ").translate(_QUOTE_STRIP)   # env -S reads \_ as a blank
+        return _MANAGER_WORD.search(seen) is not None or _MANAGER_AFTER_SPLIT.search(seen) is not None
+
+    def run(self, text):
+        reader = _ShellReader()
+        try:
+            fence_at = []
+            reader.read(text, fences=fence_at)
+            fences, seen, number = set(), 0, 1
+            for at in fence_at:
+                number += text.count("\n", seen, at)
+                seen = at
+                fences.add(number)
+            starts = []
+            env = _Env()
+            env.work = reader.work
+            for block, start in zip(_fenced_blocks(text, _SHELL_TAG, starts), starts):
+                if start - 1 in fences:
+                    reader.read(_PROMPT.sub(r"\1", block), start, env=env)
+        except _Found as found:
+            evidence, shown = found.args
+            return [{
+                "id": self.id,
+                "name": self.name,
+                "category": self.category,
+                "severity": self.severity,
+                "channel": list(self.channel),
+                "description": self.description,
+                "matched_text": shown,
+                "structural": True,
+                "evidence": evidence,
+            }]
+        return []
+
+
+VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentDumpedByPython(),
+              RegistryRedirectInShell())
