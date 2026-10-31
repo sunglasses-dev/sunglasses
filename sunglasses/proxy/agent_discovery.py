@@ -106,13 +106,29 @@ def _shown(path, home, cwd, scope):
 
 
 def _inside(real, roots):
+    """True when `real` lies under a root, by name or by being the same folder.
+
+    The second test is for storage that ignores case: a link to `HOME/a.json` is the
+    file under `home/` although the two names differ.
+    """
     for root in roots:
         try:
             if os.path.commonpath([real, root]) == root:
                 return True
         except ValueError:  # a different drive
             continue
-    return False
+    here = os.path.dirname(real)
+    while True:
+        for root in roots:
+            try:
+                if os.path.samefile(here, root):
+                    return True
+            except (OSError, ValueError):
+                continue
+        above = os.path.dirname(here)
+        if above == here:
+            return False
+        here = above
 
 
 def _os_reason(error):
@@ -224,11 +240,12 @@ def _servers(doc, key, required, fmt):
 def _command_name(command):
     """The command's file name, or `?` when it cannot be told from the string alone.
 
-    A command that holds a space or an `=` may be a path with a folder name in it or
-    a value placed in front of the program, so nothing of it is shown. A path in
+    A command that holds a space, a quote or an `=` may be a path with a folder name in
+    it or a value placed in front of the program, so nothing of it is shown. A path in
     either separator style is cut at its last component.
     """
-    if not command or "=" in command or any(ch.isspace() for ch in command):
+    if not command or "=" in command or '"' in command or "'" in command \
+            or any(ch.isspace() for ch in command):
         return "?"
     name = re.split(r"[\\/:]", command)[-1]
     return _safe(name) if name else "?"
@@ -240,6 +257,29 @@ def _state(spec, artifact):
         return _install.classify(spec, artifact=artifact)
     except (TypeError, ValueError, AttributeError, OSError):
         return UNVERIFIED
+
+
+_HOST = re.compile(r"[a-z0-9]([a-z0-9._-]*[a-z0-9])?\Z")
+_HOST_V6 = re.compile(r"[0-9a-f:.]+\Z")
+
+
+def _host(url):
+    """The URL's host name when it is one, else `?`.
+
+    The parser's hostname is not a check: it keeps a backslash, an encoded slash, an
+    `=` or a space inside what it calls the host, and the secret a caller put there
+    would be shown. Only letters, digits, dots and hyphens (or an IP literal) pass.
+    """
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname or ""
+    except ValueError:
+        return "?"
+    if not host:
+        return "?"
+    if "[" in parts.netloc:
+        return host if _HOST_V6.match(host) else "?"
+    return host if _HOST.match(host) else "?"
 
 
 def _server_row(name, spec, artifact):
@@ -256,14 +296,37 @@ def _server_row(name, spec, artifact):
     for field in ("url", "httpUrl", "serverUrl"):
         url = spec.get(field)
         if isinstance(url, str) and url.strip():
-            try:
-                host = urlsplit(url).hostname or ""
-            except ValueError:
-                host = ""
             row["transport"] = "remote"
-            row["via"] = _safe(host) if host else "?"
+            row["via"] = _host(url)
             return row
     return row
+
+
+def _tell_apart(rows):
+    """Rows are in the order of their raw names; give two that print alike a number each.
+
+    A control character and its escape, or two long names cut to the same digest, print
+    the same. Numbering them in raw-name order keeps every row its own and the output
+    the same on every run.
+    """
+    count = {}
+    for row in rows:
+        count[row["name"]] = count.get(row["name"], 0) + 1
+    used = {row["name"] for row in rows if count[row["name"]] == 1}
+    seen = {}
+    for row in rows:
+        shown = row["name"]
+        if count[shown] == 1:
+            continue
+        number = seen.get(shown, 0)
+        while True:
+            number += 1
+            candidate = f"{shown} #{number}"
+            if candidate not in used:
+                break
+        seen[shown] = number
+        used.add(candidate)
+        row["name"] = candidate
 
 
 def _row(agent, scope, label, path, home, cwd, fmt, key, required, artifact):
@@ -298,6 +361,7 @@ def _row(agent, scope, label, path, home, cwd, fmt, key, required, artifact):
         return {**base, "state": UNREADABLE, "reason": problem}, ident
     names = sorted(servers, key=lambda n: str(n))
     rows = [_server_row(n, servers[n], artifact) for n in names[:MAX_SERVERS]]
+    _tell_apart(rows)
     rows.sort(key=lambda r: r["name"])
     reason = f"no {key} key" if key not in doc else ""
     if len(names) > MAX_SERVERS:

@@ -33,7 +33,7 @@ def _doctor(*args, home, cwd):
     env = {**os.environ, "PYTHONPATH": REPO, "HOME": str(home), "USERPROFILE": str(home)}
     env.pop("XDG_CONFIG_HOME", None)
     return subprocess.run([sys.executable, "-m", "sunglasses.cli", "doctor", *args],
-                          capture_output=True, text=True, cwd=str(cwd), env=env)
+                          capture_output=True, text=True, cwd=str(cwd), env=env, timeout=60)
 
 
 @pytest.fixture
@@ -317,7 +317,8 @@ def test_an_unreadable_file_is_never_reported_as_absent_by_the_command(world):
     ("/private/SECRET folder/run", "?"),
     ("C:\\SECRET\\bin\\run.exe", "run.exe"),
     ("C:\\Program Files\\SECRET\\run.exe", "?"),
-    ('"C:\\SECRET\\bin\\run.exe"', 'run.exe"'),
+    ('"C:\\SECRET\\bin\\run.exe"', "?"),
+    ("'/opt/SECRET/bin/run'", "?"),
     ("/usr/local/bin/npx", "npx"),
     ("C:run.exe", "run.exe"),
     ("/usr/bin/", "?"),
@@ -379,7 +380,9 @@ def test_a_link_to_a_pipe_is_reported_and_never_waited_on(world):
     os.mkfifo(home / "pipe")
     (home / ".cursor").mkdir()
     (home / ".cursor" / "mcp.json").symlink_to(home / "pipe")
-    assert _servers(home, project, "cursor", "user")["reason"] == "not a regular file"
+    proc = _doctor("--agents", "--json", home=home, cwd=project)  # the child has a kill deadline
+    row = next(r for r in json.loads(proc.stdout)["agents"] if r["path"] == "~/.cursor/mcp.json")
+    assert row["state"] == "UNREADABLE" and row["reason"] == "not a regular file"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
@@ -481,3 +484,88 @@ def test_a_file_replaced_by_another_file_between_the_check_and_the_open_is_not_r
     monkeypatch.setattr(agent_discovery.os, "open", replace_then_open)
     row = _servers(home, project, "cursor", "user")
     assert (row["state"], row["reason"], row["servers"]) == ("UNREADABLE", "changed while it was being opened", [])
+
+
+# 7. Round-3 repairs: what a row may show --------------------------------------------
+
+@pytest.mark.parametrize("url, shown", [
+    ("https://api.example.com/mcp", "api.example.com"),
+    ("https://API.Example.com:8443/mcp", "api.example.com"),
+    ("http://[::1]:9000/x", "::1"),
+    ("https://127.0.0.1/mcp", "127.0.0.1"),
+    ("https://host\\SECRET/path", "?"),
+    ("https://host%2fSECRET/path", "?"),
+    ("https://KEY=SECRET/x", "?"),
+    ("https://ho st/SECRET", "?"),
+    ("https://-bad-.example.com/x", "?"),
+    ("https://", "?"),
+])
+def test_a_host_is_shown_only_when_it_is_a_host_name(world, url, shown):
+    home, project = world
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {"a": {"url": url}}})
+    row = _servers(home, project, "cursor", "user")["servers"][0]
+    assert row["via"] == shown
+    for extra in ([], ["--json"]):
+        assert "SECRET" not in _doctor("--agents", *extra, home=home, cwd=project).stdout
+
+
+def test_two_long_names_with_the_same_digest_stay_two_rows(world):
+    home, project = world
+    a, b = "n" * 100 + "3662", "n" * 100 + "4356"
+    assert agent_discovery._safe(a) == agent_discovery._safe(b)  # the digest is short on purpose
+    _write(home / ".cursor" / "mcp.json", {"mcpServers": {a: {"command": "x"}, b: {"command": "y"}}})
+    names = [r["name"] for r in _servers(home, project, "cursor", "user")["servers"]]
+    assert len(names) == 2 and len(set(names)) == 2
+    again = [r["name"] for r in _servers(home, project, "cursor", "user")["servers"]]
+    assert names == again
+
+
+def test_a_control_character_and_its_spelling_stay_two_rows(world):
+    home, project = world
+    _write(home / ".cursor" / "mcp.json",
+           {"mcpServers": {"x\n": {"command": "a"}, "x\\x0a": {"command": "b"}}})
+    rows = _servers(home, project, "cursor", "user")["servers"]
+    assert len({r["name"] for r in rows}) == 2
+    assert {r["via"] for r in rows} == {"a", "b"}
+
+
+def test_a_numbered_name_never_takes_the_place_of_a_real_one(world):
+    home, project = world
+    a, b = "n" * 100 + "3662", "n" * 100 + "4356"
+    taken = agent_discovery._safe(a) + " #1"
+    _write(home / ".cursor" / "mcp.json",
+           {"mcpServers": {a: {"command": "x"}, b: {"command": "y"}, taken: {"command": "z"}}})
+    names = [r["name"] for r in _servers(home, project, "cursor", "user")["servers"]]
+    assert len(names) == 3 and len(set(names)) == 3
+
+
+def _case_insensitive(tmp):
+    probe = tmp / "CaseProbe"
+    probe.write_text("")
+    return (tmp / "caseprobe").exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
+def test_a_link_to_the_home_folder_under_another_spelling_is_not_a_false_outside(world, tmp_path):
+    home, project = world
+    if not _case_insensitive(tmp_path):
+        pytest.skip("this storage tells upper and lower case apart")
+    other = home.parent / "HOME"
+    assert other != home and other.exists()
+    (home / "a.json").write_text(json.dumps({"mcpServers": {"s": {"command": "npx"}}}))
+    (home / ".cursor").mkdir()
+    (home / ".cursor" / "mcp.json").symlink_to(other / "a.json")
+    row = _servers(home, project, "cursor", "user")
+    assert row["state"] == agent_discovery.PRESENT and row["servers"][0]["name"] == "s"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="links need privileges on Windows")
+def test_a_link_to_a_file_outside_is_still_outside_after_the_same_folder_test(world, tmp_path):
+    home, project = world
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (outside / "a.json").write_text(json.dumps({"mcpServers": {"OUTSIDE": {"command": "npx"}}}))
+    (home / ".cursor").mkdir()
+    (home / ".cursor" / "mcp.json").symlink_to(outside / "a.json")
+    row = _servers(home, project, "cursor", "user")
+    assert row["state"] == "UNREADABLE" and "OUTSIDE" not in json.dumps(row)
