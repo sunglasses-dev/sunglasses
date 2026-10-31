@@ -1473,14 +1473,22 @@ def test_env_split_strings_env_refuses_report_nothing(validator, engine, script)
 
 def test_a_long_split_string_with_escapes_costs_linear_time():
     from sunglasses import validators as mod
-    import time
+    import gc
+
     def cost(n):
         words = "a\\_" * n
-        start = time.perf_counter()
-        mod._env_words(words)
-        return time.perf_counter() - start
-    small, large = cost(1 << 14), cost(1 << 18)
-    assert large < small * 64 + 0.05
+        return best_of(lambda: mod._env_words(words))
+
+    # The collector is off while timing: the call makes one object per word, and a full collection that
+    # falls inside one sample of a large process is a cost of that process, not of the reader.
+    was_on = gc.isenabled()
+    gc.disable()
+    try:
+        small, large = cost(1 << 14), cost(1 << 18)
+    finally:
+        if was_on:
+            gc.enable()
+    assert large < small * 64 + 0.05, (small, large)
 
 
 def test_one_scan_has_one_work_budget_whichever_way_the_text_is_read(monkeypatch):
