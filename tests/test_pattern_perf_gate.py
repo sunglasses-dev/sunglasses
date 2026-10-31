@@ -46,10 +46,22 @@ def run(base, head, waivers_base=_NONE, waivers_head=None, **kw):
     return g.gate(base, head, {} if waivers_base is _NONE else waivers_base, waivers_head or {}, **kw)
 
 
+# The text a quadratic expression is slow on: a run of `a` with no `b` or `c` after it. Any other text costs it only
+# a little, so a gate that times an expression on the units picked for another one sees no growth and fails the test.
+OWN_WORKLOAD = {QUADRATIC: "aaaa", r"a+c": "aaaa"}
+OTHER_UNITS_S = 1e-12
+
+
 def _by_shape(monkeypatch, shapes):
-    """time_once that answers from the regex's pattern: seconds = k * len(text) ** power, per pattern."""
+    """time_once that answers from the regex's pattern and the text it is given: seconds = k * len(text) ** power when
+    the text is that pattern's own workload (OWN_WORKLOAD; any text where none is named), a small cost per character
+    otherwise."""
     def fake(rxs, text, cap=g.RUN_CAP_S):
-        return sum(k * len(text) ** power for k, power in (shapes[rx.pattern] for rx in rxs))
+        seconds = 0.0
+        for rx in rxs:
+            k, power = shapes[rx.pattern]
+            seconds += k * len(text) ** power if text.startswith(OWN_WORKLOAD.get(rx.pattern, "")) else OTHER_UNITS_S * len(text)
+        return seconds
     monkeypatch.setattr(g, "time_once", fake)
 
 
@@ -66,6 +78,8 @@ GATE_BY_ANOTHER_NAME = g.gate
 TIMER_BY_ANOTHER_NAME = g.time_once
 GROWTH_FLOOR_NAME = "growth" + "_floor"
 RATIO_FLOOR_NAME = "ratio" + "_floor"
+# Where `judge` takes its two floors, by position in its local names: a copy with other local names still takes them there.
+JUDGE_FLOORS_AT = tuple(REAL_JUDGE.__code__.co_varnames.index(n) for n in (GROWTH_FLOOR_NAME, RATIO_FLOOR_NAME))
 
 
 def _below(floors):
@@ -100,10 +114,12 @@ class ClockWatch:
     to either setter taken before this module's fixture ran, or through the C interface; a function whose bytecode,
     global names or constants differ from the two (a patched copy); and a `time_once` call with no caller that holds
     both floors, which has no floors to compare. The xunit hooks and a floor named in a code string are refused
-    statically."""
+    statically, and so is any use of the low-level thread interface (`_thread`, which a thread profile
+    function does not reach). A call of `judge` whose floors cannot be read is a violation ("unreadable") and does not
+    switch the watch off."""
 
     def __init__(self):
-        self.violations = []          # (test id, floors or None, "measured", "judged" or "replaced")
+        self.violations = []          # (test id, floors or None, "measured", "judged", "replaced" or "unreadable")
         self.checked = 0              # how many of them a test or module teardown has already reported
         self.real_in = set()          # ids of the tests in which the real time_once ran (setup, call and teardown count as one test)
         self.muted = False
@@ -166,6 +182,15 @@ class ClockWatch:
         return None
 
     @staticmethod
+    def _judge_floors(frame):
+        """The floors `judge` was called with, read by position; None where they cannot be read."""
+        names, held = frame.f_code.co_varnames, frame.f_locals
+        try:
+            return tuple(held[names[i]] for i in JUDGE_FLOORS_AT)
+        except (IndexError, KeyError):
+            return None
+
+    @staticmethod
     def _test():
         return os.environ.get("PYTEST_CURRENT_TEST", "").rsplit(" (", 1)[0]
 
@@ -182,20 +207,27 @@ class ClockWatch:
 
     def _hook(self, frame, event, arg):
         if event == "call" and not self.muted:
-            kind = self._kind(frame.f_code)
-            if kind == "timer":
-                self.real_in.add(self._test())
-                floors = self._floors_in_force(frame.f_back)
-                if floors is not None and _below(floors):
-                    self._record(floors, "measured")
-            elif kind == "judge" and self._test() in self.real_in:
-                held = frame.f_locals
-                floors = (held[GROWTH_FLOOR_NAME], held[RATIO_FLOOR_NAME])
-                if _below(floors):
-                    self._record(floors, "judged")
+            try:
+                self._look_at(frame)
+            except Exception:                    # an exception out of a profile function switches the profiler off
+                self._record(None, "unreadable")
         previous = self._previous if threading.get_ident() == self._owner else self._thread_previous
         if previous is not None:
             previous(frame, event, arg)
+
+    def _look_at(self, frame):
+        kind = self._kind(frame.f_code)
+        if kind == "timer":
+            self.real_in.add(self._test())
+            floors = self._floors_in_force(frame.f_back)
+            if floors is not None and _below(floors):
+                self._record(floors, "measured")
+        elif kind == "judge" and self._test() in self.real_in:
+            floors = self._judge_floors(frame)
+            if floors is None:
+                self._record(None, "unreadable")
+            elif _below(floors):
+                self._record(floors, "judged")
 
 
 WATCH = ClockWatch()
@@ -203,7 +235,8 @@ WATCH = ClockWatch()
 
 def _message(records):
     replaced = [r for r in records if r[2] == "replaced"]
-    timed = [r for r in records if r[2] != "replaced"]
+    unreadable = [r for r in records if r[2] == "unreadable"]
+    timed = [r for r in records if r[2] not in ("replaced", "unreadable")]
     parts = []
     if timed:
         floors = sorted({r[1] for r in timed}, key=str)
@@ -214,6 +247,9 @@ def _message(records):
         parts.append(f"{len(replaced)} replacement(s) of the profile function through sys.setprofile in "
                      f"{sorted({r[0] for r in replaced})[:3]}: a measurement made while it was away could not be seen, "
                      "so no test here may replace it")
+    if unreadable:
+        parts.append(f"{len(unreadable)} call(s) in {sorted({r[0] for r in unreadable})[:3]} whose floors the watch could "
+                     "not read: the verdict function was called in a shape it does not know")
     return "; ".join(parts)
 
 
@@ -1555,6 +1591,28 @@ def test_the_watch_sees_the_same_function_under_another_code_object():
     assert len(_measured(watch)) == 3
 
 
+def test_the_watch_reads_the_floors_of_a_judge_whose_local_names_are_all_different():
+    code = REAL_JUDGE.__code__
+    renamed = types.FunctionType(code.replace(co_varnames=tuple(f"v{i}" for i in range(len(code.co_varnames)))),
+                                 g.__dict__, argdefs=REAL_JUDGE.__defaults__)
+    samples = {1000: 0.001, 2000: 0.002}
+    with _watching() as watch:
+        _measure_at_zero_floors(REAL_TIME_ONCE)                    # a real measurement in this test, so a verdict counts
+        renamed(None, samples, (1000, 2000), 0, 0)
+        assert watch.alive()
+    assert [v[2] for v in watch.violations] == ["measured", "judged"]
+    assert watch.violations[-1][1] == (0, 0)
+
+
+def test_a_judge_whose_floors_cannot_be_read_is_recorded_and_the_watch_stays_on():
+    unknown_shape = types.SimpleNamespace(f_code=REAL_JUDGE.__code__, f_locals={}, f_back=None)     # no floor to read
+    with _watching() as watch:
+        _measure_at_zero_floors(REAL_TIME_ONCE)
+        watch._hook(unknown_shape, "call", None)
+        assert watch.alive()
+    assert [v[2] for v in watch.violations] == ["measured", "unreadable"]
+
+
 def test_a_fixed_timer_that_is_called_time_once_is_not_the_real_timer(monkeypatch):
     def time_once(rxs, text, cap=None):
         return 0.001
@@ -1639,6 +1697,38 @@ def test_the_watch_hands_every_event_on_to_the_profiler_it_found():
             local.uninstall()
             sys.setprofile(module_hook)
     assert ("call", "<lambda>") in seen
+
+
+LOW_LEVEL_THREAD_STARTERS = {"start_new_thread", "start_joinable_thread", "_start_new_thread", "_start_joinable_thread"}
+
+
+def _low_level_thread_routes(tree):
+    """Where a tree starts a thread below `threading`, which `threading.setprofile` does not reach."""
+    found = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            found += [a.name for a in n.names if a.name.split(".")[0] == "_thread"]
+        elif isinstance(n, ast.ImportFrom) and (n.module or "").split(".")[0] == "_thread":
+            found.append(n.module)
+        elif isinstance(n, ast.Attribute) and n.attr in LOW_LEVEL_THREAD_STARTERS:
+            found.append(n.attr)
+        elif isinstance(n, ast.Name) and n.id in LOW_LEVEL_THREAD_STARTERS:
+            found.append(n.id)
+    return found
+
+
+@pytest.mark.parametrize("source", [
+    "import _thread\n",
+    "from _thread import start_new_thread\n",
+    "import threading\nthreading._start_new_thread(f, ())\n",
+    "def f(t):\n    t.start_joinable_thread(g)\n",
+])
+def test_the_low_level_thread_guard_sees_each_way_in(source):
+    assert _low_level_thread_routes(ast.parse(source))
+
+
+def test_no_test_starts_a_thread_below_threading():
+    assert _low_level_thread_routes(ast.parse(pathlib.Path(__file__).read_text())) == []
 
 
 def test_no_test_measures_where_the_watch_cannot_see():
