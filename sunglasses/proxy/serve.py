@@ -138,6 +138,11 @@ def approval_notice(stderr, root=None, command_stem=None):
     """
     shown = os.path.join(os.getcwd(), str(root)) if root else None
     unsafe = shown is not None and not shown.isprintable()
+    # Read when the proxy starts, with the identity: a folder deleted afterwards still reads
+    # as the folder this run was started in, and the command line above is never lost to it.
+    started_in = approvals.current_folder()
+    here = (approvals.folder_text(started_in) if started_in
+            else "unavailable (the folder can no longer be read)")
 
     def notice(server_id, snapshot_sha256):
         if unsafe:
@@ -152,15 +157,14 @@ def approval_notice(stderr, root=None, command_stem=None):
         # is on the same line, and (below) where an approval for the same command already
         # exists, so a run from the wrong folder reads as that and not as a server with no
         # tools. Our stderr only: the reply the agent gets is unchanged.
-        here = os.getcwd()
         stderr.write(
             "sunglasses proxy: this server's tools are withheld until you approve "
             "them. At a terminal, run: sunglasses proxy approve "
             f"{server_id} --snapshot {snapshot_sha256}{tail} "
             f"(it shows the tools and asks before approving){where}; an approval is "
             f"bound to the folder the server is started from, and this run is in "
-            f"{approvals.folder_text(here)}\n")
-        elsewhere = approvals.other_folders(state_root(root), command_stem, here)
+            f"{here}\n")
+        elsewhere = approvals.other_folders(state_root(root), command_stem, started_in)
         if elsewhere:
             stderr.write(
                 "sunglasses proxy: this server is already approved from "
@@ -271,7 +275,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     # the log's own refusal still comes first and this one is written down.
     try:
         store = approvals.Store(state_root(root),
-                                server_id=_identity(upstream_argv))
+                                server_id=_identity(upstream_argv),
+                                command_stem=_command_stem(upstream_argv))
     except (OSError, ValueError) as failure:
         where = getattr(failure, "filename", None) or state_root(root)
         what = ("capture store" if pathlib.Path(where).name == "captures"

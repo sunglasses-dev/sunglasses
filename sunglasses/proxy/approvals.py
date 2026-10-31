@@ -99,6 +99,14 @@ def _record_of(text):
     return record, None
 
 
+def current_folder():
+    """The working directory, or None when it can no longer be read (the folder was deleted)."""
+    try:
+        return os.getcwd()
+    except OSError:
+        return None
+
+
 def folder_text(folder):
     """A folder as a line may print it: never a name with a control character in it."""
     if not isinstance(folder, str) or not folder:
@@ -190,6 +198,9 @@ class Store:
         # The identity without its folder: the same server started from another folder shares
         # it, which is how a refusal can say "approved, but from over there".
         self.command_stem = command_stem
+        # The folder the proxy was started from, read once: it is the folder the identity was
+        # made from, and it is still the right answer when that folder is deleted later.
+        self.folder = current_folder()
         self.pending_snapshot = None
         self.approvals = self.root / "approvals"
         self.captures = self.root / "captures"
@@ -216,7 +227,8 @@ class Store:
         includes it: an approval is bound to that folder, and `proxy approve` and `doctor`
         say which one. The folder is not part of the sha a human approves.
         """
-        payload = {**payload, "folder": os.getcwd()}
+        if self.folder:
+            payload = {**payload, "folder": self.folder}
         if self.command_stem:
             payload["command_stem"] = self.command_stem
         (self.captures / f"{self.server_id}.{snapshot_sha256}.json").write_text(

@@ -314,3 +314,66 @@ def test_the_agent_facing_envelope_has_no_folder_in_it():
                              inspected_utf8_bytes=0, observed_content_bytes=0, elapsed_ms=0,
                              server_id="s" * 32, snapshot_sha256=SHA, folder="/work/secret")
     assert "folder" not in json.dumps(body) and "/work/secret" not in json.dumps(body)
+
+
+def test_a_folder_deleted_after_the_proxy_started_costs_the_notice_nothing(tmp_path):
+    started_in, elsewhere = tmp_path / "started", tmp_path / "elsewhere"
+    started_in.mkdir()
+    elsewhere.mkdir()
+    old = os.getcwd()
+    os.chdir(started_in)
+    try:
+        err = io.StringIO()
+        notice = serve.approval_notice(err, tmp_path / "root", serve._command_stem(ARGV))
+        os.chdir(elsewhere)
+        started_in.rmdir()
+        notice("i" * 32, SHA)
+    finally:
+        os.chdir(old)
+    text = err.getvalue()
+    assert len(text.splitlines()) == 1 and f"approve {'i' * 32} --snapshot {SHA}" in text
+    assert f"this run is in {started_in}" in text
+
+
+def test_a_folder_that_cannot_be_read_when_the_proxy_starts_is_said_so(tmp_path, monkeypatch):
+    monkeypatch.setattr(approvals.os, "getcwd", lambda: (_ for _ in ()).throw(FileNotFoundError()))
+    err = io.StringIO()
+    serve.approval_notice(err, None, serve._command_stem(ARGV))("i" * 32, SHA)
+    text = err.getvalue()
+    assert len(text.splitlines()) == 1 and f"approve {'i' * 32} --snapshot {SHA}" in text
+    assert "this run is in unavailable (the folder can no longer be read)" in text
+
+
+def test_the_store_the_proxy_really_starts_with_knows_the_command_and_the_folder(tmp_path, monkeypatch):
+    """`serve.main` builds the Store the proxy runs with; it must carry the command stem and
+    the startup folder, or a capture made through it records neither and the 'already
+    approved from' line can never appear."""
+    import sys
+    import threading
+    made = []
+    real = approvals.Store
+
+    class Spy(real):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            made.append(self)
+
+    monkeypatch.setattr(approvals, "Store", Spy)
+    monkeypatch.setattr(serve, "_FINISHED", threading.Event())
+    upstream = [sys.executable, "-c", "import sys; sys.stdin.buffer.read()"]
+    here = tmp_path / "here"
+    here.mkdir()
+    monkeypatch.chdir(here)
+    serve.main(["--state-root", str(tmp_path / "state"), "--", *upstream],
+               stdin=io.BytesIO(b""), stdout=io.BytesIO(), stderr=io.StringIO())
+    assert made and all(s.command_stem == serve._command_stem(upstream) for s in made)
+    assert all(s.folder == str(here) for s in made)
+    made[0].capture(SHA, {"sha256": SHA, "tools_by_name": TOOLS})
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert approvals.other_folders(tmp_path / "state", serve._command_stem(upstream),
+                                   str(elsewhere)) == []  # nothing approved yet
+    _approve(tmp_path / "state", made[0].server_id)
+    assert approvals.other_folders(tmp_path / "state", serve._command_stem(upstream),
+                                   str(elsewhere)) == [str(here)]
