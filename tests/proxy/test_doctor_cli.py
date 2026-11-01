@@ -30,6 +30,7 @@ import pytest
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, REPO)
 
+from sunglasses import cli  # noqa: E402
 from sunglasses.proxy import doctor  # noqa: E402
 
 
@@ -160,18 +161,34 @@ def test_exit_code_is_three_on_this_build_because_the_self_test_is_absent(tmp_pa
     assert _run_cli("doctor", "--config", str(empty), cwd=str(tmp_path)).returncode == 3
 
 
-def test_output_distinguishes_an_absent_self_test_from_a_failed_one(tmp_path):
+def test_output_distinguishes_an_absent_self_test_from_a_failed_one(tmp_path, monkeypatch, capsys):
     """The difference an operator acts on.
 
     `render()` reports failure_class SCHEMA with all five checks listed as
     failed, which read alone says "your proxy failed five checks". None of them
     ran. The command must say so in words, or it tells every user on every
-    machine that something broke when nothing did.
+    machine that something broke when nothing did. A self-test that cannot run
+    here (no process groups) is injected: the live one runs on this machine.
     """
     cfg = _config(tmp_path, {"github": {"command": "npx", "args": ["server"]}})
-    out = _run_cli("doctor", "--config", str(cfg), cwd=str(tmp_path)).stdout.lower()
-    assert "self-test" in out or "self test" in out
-    assert "not" in out and ("build" in out or "available" in out), out
+    (tmp_path / "home").mkdir(exist_ok=True)
+    report = doctor.run(sources=[("project", cfg)], home=tmp_path / "home",
+                        self_test=lambda: (False, {}))
+    args = type("A", (), {"config": None, "json": False})()
+    with pytest.raises(SystemExit) as raised:
+        cli.cmd_doctor(args, _run=lambda **kw: report)
+    out = capsys.readouterr().out.lower()
+    assert raised.value.code == 3
+    assert "self-test not run" in out and "cannot run it" in out, out
+    assert "no check failed" in out and "self-test failed" not in out
+
+
+def test_a_live_self_test_that_passes_is_named_and_a_wired_route_still_exits_three(tmp_path):
+    """The live self-test runs: the report says PASSED, and with no route verified the exit stays 3."""
+    cfg = _config(tmp_path, {"github": {"command": "npx", "args": ["server"]}})
+    out = _run_cli("doctor", "--config", str(cfg), cwd=str(tmp_path))
+    assert out.returncode == 3, out.stdout
+    assert "Self-test PASSED" in out.stdout and "NOT RUN" not in out.stdout
 
 
 @pytest.mark.parametrize("code", [0, 2, 3])

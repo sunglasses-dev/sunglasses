@@ -98,7 +98,8 @@ atexit.register(shutil.rmtree, _WORK.parent, True)
 
 ROOT = _WORK
 TARGET = ROOT / "sunglasses/proxy/doctor.py"
-SUITE = "tests/proxy/test_doctor_reconciled.py tests/proxy/test_doctor_selftest.py"
+SUITE = ("tests/proxy/test_doctor_reconciled.py tests/proxy/test_doctor_selftest.py "
+         "tests/proxy/test_live_selftest.py")
 
 # (id, the defect, old source, mutated source, the control that must fail)
 MUTATIONS = [
@@ -148,7 +149,7 @@ MUTATIONS = [
      '    if False:\n        return EXIT_DOUBT',
      'test_an_unavailable_self_test_is_never_zero_even_when_every_route_says_pass'),
     ('UNAVAILABLE-NOT-PASSED-ON', 'run() stops telling the exit code the self-test never ran',
-     '    self_test_unavailable = (not ok) and verdict.failure_class == SELF_TEST_UNAVAILABLE',
+     '    self_test_unavailable = (not ok) and failure_class == SELF_TEST_UNAVAILABLE',
      '    self_test_unavailable = False',
      'test_an_unavailable_self_test_exits_three_not_one'),
     ('DEADLINE-CLASS', 'a deadline miss is reported as an ordinary schema failure',
@@ -183,6 +184,34 @@ MUTATIONS = [
      '        return pathlib.Path(_install.__file__).resolve().parent / "proxy" / "__main__.py", False',
      '        return pathlib.Path(sys.executable), True',
      'test_a_build_with_no_entry_point_verifies_nothing'),
+    ('LIVE-TIMING', "the live self-test's own timing is ignored and the whole call is charged to the bound",
+     '            measured_ms = int(info["deadline_ms"])',
+     '            pass',
+     'test_a_deadline_failure_after_initialize_is_a_failure_and_prints_the_figure'),
+    ('LIVE-DETAIL', 'a self-test that never came up loses its reason',
+     '    detail = info.get("detail") or ("" if controls else SELF_TEST_UNAVAILABLE)',
+     '    detail = "" if controls else SELF_TEST_UNAVAILABLE',
+     'test_not_coming_up_is_named_and_exits_three_not_one'),
+    ('LIVE-ALLOWLIST', 'the no-initialize reason is not on the allowlist of details',
+     'DETAILS = ("", SELF_TEST_UNAVAILABLE, SELF_TEST_NO_INITIALIZE,\n           SELF_TEST_COULD_NOT_START, SELF_TEST_OUT_OF_TIME)',
+     'DETAILS = ("", SELF_TEST_UNAVAILABLE,\n           SELF_TEST_COULD_NOT_START, SELF_TEST_OUT_OF_TIME)',
+     'test_not_coming_up_is_named_and_exits_three_not_one'),
+    ('LIVE-ALLOWLIST-START', 'the refused-folder reason is not on the allowlist of details',
+     'DETAILS = ("", SELF_TEST_UNAVAILABLE, SELF_TEST_NO_INITIALIZE,\n           SELF_TEST_COULD_NOT_START, SELF_TEST_OUT_OF_TIME)',
+     'DETAILS = ("", SELF_TEST_UNAVAILABLE, SELF_TEST_NO_INITIALIZE,\n           SELF_TEST_OUT_OF_TIME)',
+     'test_a_refused_temp_folder_is_a_named_unavailable_not_a_traceback'),
+    ('UNRUN-CONTROL-VOIDS', 'a control that could not start no longer makes the self-test unavailable',
+     '    if not_run_controls:\n        ok = False',
+     '    if False:\n        ok = False',
+     'test_a_control_that_cannot_start_is_not_run_and_voids_the_whole_report'),
+    ('UNRUN-CONTROL-NAMED', 'the report stops naming the control that did not start',
+     '        rendered["self_test"]["not_run_controls"] = list(report.self_test_not_run_controls)',
+     '        pass',
+     'test_a_control_that_cannot_start_is_not_run_and_voids_the_whole_report'),
+    ('UNRUN-CHECKS-REAL', 'an unavailable self-test hides the state its checks really had',
+     '                                 and not report.self_test_checks\n',
+     '',
+     'test_a_control_that_cannot_start_does_not_hide_a_check_that_really_failed'),
 ]
 
 

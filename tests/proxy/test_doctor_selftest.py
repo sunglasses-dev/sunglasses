@@ -151,7 +151,7 @@ def test_a_check_verdict_carrying_an_exception_string_is_dropped():
 # ─────────────────────── R-DOCTOR-R3c · absent is not failed (a reviewer, 2026-09-21)
 #
 # The defect these pin, measured on 164bca7 before the fix: the seam returns
-# `(False, {})` on every build that has no live self-test, `judge_self_test({},
+# `(False, {})` on every build that had no live self-test, `judge_self_test({},
 # {})` then marks all five checks failed because none of them equals "PASS",
 # and `render` publishes failure_class SCHEMA. An operator reads "your proxy
 # failed five checks" when not one of them ran. Exit 1 is correct and STANDS

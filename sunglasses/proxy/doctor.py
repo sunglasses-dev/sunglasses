@@ -21,15 +21,16 @@ An instrument that never ran is doubt, not a failure: a self-test that was not
 run is 3, and only a self-test that ran and did not pass is 1.
 
 WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: contract row
-10.1's live self-test spawns `sys.executable -m sunglasses.proxy` against a
-bundled echo server. Both artifacts exist in the package. What is still absent
-is the spawn itself.
-`default_self_test` and `default_launcher` therefore still report that nothing
-ran, with failure_class SELF_TEST_UNAVAILABLE and the five checks rendered
-NOT_RUN, and `run()` exits 3 (not verifiable), never 0: a doctor that
-cannot demonstrate mediation must never imply it. They are the seam the real
-spawn lands in, and they are injectable so the decision logic above them is
-exercised today.
+10.2's per-route launch. `default_self_test` now spawns `sys.executable -m
+sunglasses.proxy` against the bundled echo server (`live_selftest`), but
+`default_launcher` still reports that nothing was launched, so every wrapped route
+is NOT_RUN and `run()` exits 3 (not verifiable), never 0: a doctor that cannot
+demonstrate mediation of a route must never imply it. Where the self-test cannot
+come up (no process groups, the system refuses its folder or a process, it runs out
+of time, or the proxy never answers `initialize`) it reports
+that nothing ran, with failure_class SELF_TEST_UNAVAILABLE and the five checks
+rendered NOT_RUN. Both are injectable so the decision logic above them is
+exercised without a spawn.
 """
 from __future__ import annotations
 
@@ -80,6 +81,16 @@ SCHEMA = "SCHEMA"
 CONTROL_MUST_BE = "FAIL"
 CHECK_RESULTS = ("PASS", "FAIL", "SKIPPED")
 SELF_TEST_UNAVAILABLE = "SELF_TEST_UNAVAILABLE"
+# The live self-test started the proxy and it never answered `initialize`
+# (no answer in time, or it exited first). The instrument did not come up:
+# nothing was checked, so nothing failed. Doubt, with the reason printed.
+SELF_TEST_NO_INITIALIZE = "SELF_TEST_NO_INITIALIZE"
+# The self-test could not make its private folder or start a process (the
+# operating system refused), or it spent its whole allowance with nothing yet
+# red. Neither is a completed check, so neither is a failure: doubt, with the
+# reason printed.
+SELF_TEST_COULD_NOT_START = "SELF_TEST_COULD_NOT_START"
+SELF_TEST_OUT_OF_TIME = "SELF_TEST_OUT_OF_TIME"
 # OUR word about OUR build, and deliberately NOT in
 # CHECK_RESULTS: `_safe_checks` allowlists what an upstream process is allowed
 # to say about itself, and a spawned proxy that can report its own checks as
@@ -95,7 +106,8 @@ ROUTE_RESULTS = ("PASS", "FAIL", NOT_RUN)
 # string, because `detail` is the field a future caller reaches for when it has
 # an exception to explain, and the doctor's report is read in a terminal by the
 # operator who must never be shown upstream stderr.
-DETAILS = ("", SELF_TEST_UNAVAILABLE)
+DETAILS = ("", SELF_TEST_UNAVAILABLE, SELF_TEST_NO_INITIALIZE,
+           SELF_TEST_COULD_NOT_START, SELF_TEST_OUT_OF_TIME)
 
 # The module a wrapped command has to be invoking for the entry to be ours.
 PROXY_MODULE = "sunglasses.proxy"
@@ -157,6 +169,9 @@ class Report:
     route_checks: dict = field(default_factory=dict)
     self_test_failure_class: str = ""
     self_test_failed_checks: list = field(default_factory=list)
+    # Required controls whose process could not be started: absent from
+    # `self_test_controls` because they neither failed nor passed.
+    self_test_not_run_controls: list = field(default_factory=list)
     # The self-test's own wall duration, measured in `run`. A field rather than
     # a formatted string so the number can be compared as well as read.
     self_test_measured_ms: int = 0
@@ -248,10 +263,14 @@ def self_test_valid(controls) -> bool:
 
 
 def default_self_test():
-    """The seam contract row 10.1's live self-test lands in. See the module
-    docstring: the spawn it has to perform is not built, so this reports
-    failure rather than an empty pass."""
-    return False, {}
+    """The seam contract row 10.1's live self-test lands in.
+
+    Spawns the installed proxy in front of the bundled echo server
+    (`live_selftest`). Where processes cannot be grouped (Windows) it reports
+    `(False, {})`, which is "never ran", never an empty pass.
+    """
+    from . import live_selftest
+    return live_selftest.run()
 
 
 def default_launcher(entry):
@@ -473,20 +492,40 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     result = (self_test or default_self_test)()
     measured_ms = (time.monotonic_ns() - started) // 1_000_000
     # 2-tuple is the seam's original shape; 3-tuple adds the named checks so a
-    # deadline miss is distinguishable from a schema miss in the report.
-    if len(result) == 3:
+    # deadline miss is distinguishable from a schema miss in the report; the
+    # 4th is the live self-test's own timing and reason, which are ours to
+    # take from it: a whole-call figure would charge the spawns to the bound.
+    info = {}
+    if len(result) == 4:
+        ok, controls, checks, info = result
+        info = dict(info or {})
+        if "deadline_ms" in info:
+            measured_ms = int(info["deadline_ms"])
+    elif len(result) == 3:
         ok, controls, checks = result
     else:
         ok, controls = result
         checks = {}
     controls = dict(controls or {})
     verdict = judge_self_test(checks, controls)
-    self_test_ok = bool(ok) and verdict.ok
     # Never ran, as against ran and did not pass: the seam said "not ok" and
     # reported neither checks nor controls. An instrument that claims ok with
     # nothing to show for it is contradicting itself, and stays a failure.
-    self_test_unavailable = (not ok) and verdict.failure_class == SELF_TEST_UNAVAILABLE
-    detail = "" if controls else SELF_TEST_UNAVAILABLE
+    # A control whose process could not be started was not run, which is neither
+    # a catch nor a miss: the checks beside it ran against an instrument nobody
+    # could vouch for. The whole self-test is then unavailable, and every check
+    # keeps the state it really had.
+    not_run_controls = [name for name in (info.get("not_run_controls") or ())
+                        if name in REQUIRED_CONTROLS]
+    failure_class = verdict.failure_class
+    failed_checks = list(verdict.failed_checks)
+    if not_run_controls:
+        ok = False
+        failure_class = SELF_TEST_UNAVAILABLE
+        failed_checks = []
+    self_test_ok = bool(ok) and verdict.ok and not not_run_controls
+    self_test_unavailable = (not ok) and failure_class == SELF_TEST_UNAVAILABLE
+    detail = info.get("detail") or ("" if controls else SELF_TEST_UNAVAILABLE)
 
     launch = launcher or default_launcher
     route_checks = {}
@@ -527,8 +566,9 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                   self_test_controls={k: v for k, v in controls.items()
                                       if v in CHECK_RESULTS},
                   self_test_checks=_safe_checks(checks),
-                  self_test_failure_class=verdict.failure_class,
-                  self_test_failed_checks=list(verdict.failed_checks),
+                  self_test_failure_class=failure_class,
+                  self_test_failed_checks=failed_checks,
+                  self_test_not_run_controls=not_run_controls,
                   self_test_detail=detail,
                   self_test_measured_ms=measured_ms,
                   route_checks=route_checks)
@@ -559,6 +599,7 @@ def render(report) -> dict:
                       "checks": ({name: NOT_RUN for name in SELF_TEST_CHECKS}
                                  if report.self_test_failure_class
                                  == SELF_TEST_UNAVAILABLE
+                                 and not report.self_test_checks
                                  else report.self_test_checks),
                       "failed": report.self_test_failed_checks,
                       "failure_class": report.self_test_failure_class,
@@ -579,6 +620,8 @@ def render(report) -> dict:
                          "cause": report.receipts_key_cause},
         "exit_code": report.exit_code,
     }
+    if report.self_test_not_run_controls:
+        rendered["self_test"]["not_run_controls"] = list(report.self_test_not_run_controls)
     # Only when there are approvals to show: a machine with none prints the document it always
     # printed, byte for byte.
     if report.approvals:
