@@ -4656,9 +4656,6 @@ PATTERNS = [
         "severity": "critical",
         "channel": ["file", "web_content", "tool_output"],
         "keywords": [
-            "new system directive ignore",
-            "supersede safety policy",
-            "override guardrails reveal",
             "dtmf override",
             "dot dash instruction",
             "phonetic code ignore",
@@ -4668,9 +4665,27 @@ PATTERNS = [
             "asr transcript override",
         ],
         "regex": [
-            r'(?is)(?!.*\b(?:security\s+guidance|prompt\s+injection\s+attempt|press\s+1\s+for\s+billing|morse\s+rhythm.*lecture)\b)(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|new\s+system\s+directive|supersede\s+safety\s+policy|override\s+guardrails?|(?:reveal|print|dump|expose|return)\s+(?:the\s+)?(?:hidden\s+)?(?:system\s*prompt|token|credential|secret|a-?p-?i\s*key)|(?:dtmf|dot\s*dash|phonetic).{0,120}(?:override|ignore|reveal|print|dump|return)|run\s+connector\s+silently|execute\s+tool\s+in\s+background|quiet\s+mode\s+enabled.{0,120}dump\s+secret)',
+            r'(?is)(?!.*\b(?:security\s+guidance|prompt\s+injection\s+attempt|press\s+1\s+for\s+billing|morse\s+rhythm.*lecture)\b)(?:(?:dtmf|dot\s*dash|phonetic).{0,120}(?:override|ignore|reveal|print|dump|return)|run\s+connector\s+silently|execute\s+tool\s+in\s+background|quiet\s+mode\s+enabled.{0,120}dump\s+secret)',
         ],
-        "description": "Detects audio-derived instructions combining supersession language with sensitive targets or covert-action intent, including phonetic masking, DTMF-like tones, and Morse-style speech attacks.",
+        "description": "Detects audio-derived instructions: DTMF-like tones, Morse-style (dot-dash) speech and phonetic spelling that carry an override, ignore, reveal or dump verb, and covert-action phrases such as running a connector silently. Generic injection phrases are other rules' job.",
+    },
+
+    # --- GLS-PI-026: Directive supersession phrases ---
+    {
+        "id": "GLS-PI-026",
+        "name": "Directive supersession phrases",
+        "category": "prompt_injection",
+        "severity": "high",
+        "channel": ["file", "web_content", "tool_output"],
+        "keywords": [
+            "new system directive ignore",
+            "supersede safety policy",
+            "override guardrails reveal",
+        ],
+        "regex": [
+            r'(?is)(?=(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|new\s+system\s+directive|supersede\s+safety\s+policy|override\s+guardrails?|(?:reveal|print|dump|expose|return)\s+(?:the\s+)?(?:hidden\s+)?(?:system\s*prompt|token|credential|secret|a-?p-?i\s*key)))(?!.*\b(?:security\s+guidance|prompt\s+injection\s+attempt|press\s+1\s+for\s+billing)\b)(?!(?:(?!\bmorse\s+rhythm).)*\bmorse\s+rhythm(?:(?!lecture\b).)*lecture\b)(?:ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions|new\s+system\s+directive|supersede\s+safety\s+policy|override\s+guardrails?|(?:reveal|print|dump|expose|return)\s+(?:the\s+)?(?:hidden\s+)?(?:system\s*prompt|token|credential|secret|a-?p-?i\s*key))',
+        ],
+        "description": "Detects plain-text supersession language: ignoring previous or prior instructions, a new system directive, superseding a safety policy, overriding guardrails, or asking to reveal, print, dump, expose or return the system prompt, a token, a credential, a secret or an API key.",
     },
 
     # --- GLS-SC-PKG-207: Agent-targeted package supply chain ---
