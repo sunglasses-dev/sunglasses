@@ -114,12 +114,12 @@ def test_a_route_nothing_launched_is_not_run_and_never_fail(wrapped, tmp_path):
     assert "FAIL" not in text
 
 
-def test_exit_stays_one_on_the_shipped_build_and_the_aggregate_is_unverified(
+def test_exit_is_three_on_the_shipped_build_and_the_aggregate_is_unverified(
         wrapped, tmp_path):
-    """The fix must not soften the exit: 1 because the self-test is absent."""
+    """The exit is never 0 here: 3 (not verifiable) because the self-test is absent."""
     proc = _cli(["doctor", "--config", str(wrapped), "--json"], tmp_path)
     data = json.loads(proc.stdout)
-    assert proc.returncode == 1 and data["exit_code"] == 1
+    assert proc.returncode == 3 and data["exit_code"] == 3
     assert data["aggregate"] == doctor.ROUTE_UNVERIFIED
 
 

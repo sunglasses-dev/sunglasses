@@ -179,12 +179,22 @@ def test_a_clean_direct_inventory_is_still_3_not_2(cfg, artifact):
 
 def test_a_failed_self_test_outranks_an_unreadable_source(tmp_path, artifact):
     """Precedence 1 > 2 > 3 > 0. A reviewer's rule, kept: an instrument that failed has
-    no standing to report on anything else."""
+    no standing to report on anything else. The self-test here RAN (valid controls) and
+    one check did not pass; a self-test that never ran is a different fact (3 below)."""
+    p = tmp_path / ".mcp.json"
+    p.write_bytes(b"{ not json")
+    report = doctor.run(sources=[("project", p)], artifact=artifact,
+                        self_test=lambda: (False, _CONTROLS, dict(_PASSING, initialized="FAIL")))
+    assert report.exit_code == 1
+
+
+def test_a_self_test_that_never_ran_does_not_outrank_an_unreadable_source(tmp_path, artifact):
+    """Never ran is doubt (3), so a file it could not open (2) still outranks it."""
     p = tmp_path / ".mcp.json"
     p.write_bytes(b"{ not json")
     report = doctor.run(sources=[("project", p)], artifact=artifact,
                         self_test=lambda: (False, {}))
-    assert report.exit_code == 1
+    assert report.exit_code == 2
 
 
 # ───────────────────────────── one implementation, enforced not just intended

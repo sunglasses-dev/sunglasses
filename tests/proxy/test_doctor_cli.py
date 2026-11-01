@@ -145,18 +145,19 @@ def test_unreadable_config_is_named_in_the_output(tmp_path):
 # 3. The exit code is the module's, not the CLI's
 # ---------------------------------------------------------------------------
 
-def test_exit_code_is_one_on_this_build_because_the_self_test_is_absent(tmp_path):
+def test_exit_code_is_three_on_this_build_because_the_self_test_is_absent(tmp_path):
     """TODAY'S MEASURED TRUTH, and it is a fact about the build, not the config.
 
-    Two configs that differ in every way the doctor reads still exit 1, because
-    R3's precedence puts the self-test above everything. When R1's live self-test
-    lands, this row is expected to change and should be changed deliberately.
+    Two configs that differ in every way the doctor reads still exit 3 (not
+    verifiable), because a self-test that never ran is doubt, not a failure.
+    When R1's live self-test lands, this row is expected to change and should be
+    changed deliberately.
     """
     wired = _config(tmp_path, {"github": {"command": "npx", "args": ["server"]}})
     empty = tmp_path / "empty.json"
     empty.write_text(json.dumps({"mcpServers": {}}))
-    assert _run_cli("doctor", "--config", str(wired), cwd=str(tmp_path)).returncode == 1
-    assert _run_cli("doctor", "--config", str(empty), cwd=str(tmp_path)).returncode == 1
+    assert _run_cli("doctor", "--config", str(wired), cwd=str(tmp_path)).returncode == 3
+    assert _run_cli("doctor", "--config", str(empty), cwd=str(tmp_path)).returncode == 3
 
 
 def test_output_distinguishes_an_absent_self_test_from_a_failed_one(tmp_path):
@@ -257,7 +258,7 @@ def test_the_control_a_real_path_still_scopes_and_a_real_default_still_discovers
     assert [r["name"] for r in scoped["inventory"]] == ["scoped-only"]
 
     bare = _run_cli("doctor", "--json", cwd=str(tmp_path))
-    assert bare.returncode == 1
+    assert bare.returncode == 3
     assert "inventory" in bare.stdout
 
 

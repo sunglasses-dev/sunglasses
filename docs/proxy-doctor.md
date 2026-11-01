@@ -19,10 +19,14 @@ questions and refuses to fold them into one:
 
 | code | meaning |
 |---|---|
-| `1` | a real failure: the self-test failed, or a launched route failed |
+| `1` | a real failure: the self-test ran and did not pass, or a launched route failed |
 | `2` | operational: a file we could not open |
-| `3` | incomplete: genuine doubt about a route |
+| `3` | incomplete: genuine doubt about a route, or this build has no live self-test to run |
 | `0` | clean |
+
+**A self-test that never ran is 3, not 1** (`test_an_unavailable_self_test_exits_three_not_one`):
+an instrument that was not run did not fail in front of us, and it is never 0 either.
+One that ran and did not pass stays 1 (`test_a_self_test_that_ran_and_did_not_pass_still_exits_one`).
 
 **A clean inventory in which every route is direct is 3, not 0 and not 2**
 (`test_a_clean_direct_inventory_is_still_3_not_2`). A tool that returns 0 there
