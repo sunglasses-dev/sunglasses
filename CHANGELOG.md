@@ -14,6 +14,26 @@ All notable changes to Sunglasses are documented here.
 - `scan --dir` and `scan --file` now read a ZIP archive's table of contents without extracting anything. The "not inspected" line for a ZIP (`.zip`, `.jar`, `.docx`, `.xlsx`, `.whl`, or a ZIP under a name the scan reads, such as `.txt` or `.bin`; in `scan --dir` a ZIP named like an image or a compiled file is still skipped by its name, while `scan --file` lists the bytes under any name; an empty ZIP gets no listing sentence; ordinary text named `.zip` is now read as text instead of being skipped unread) says how many members it lists, the total size the archive declares for them (its own claim, never used to decide how much to read), and the first few names; the member names are scanned as text and a name that matches a pattern is reported as "member name in <file>". A ZIP under a non-archive name says so. Reading is bounded: a table of contents over 8 MiB is refused, at most 1,000 names are scanned, a name is cut at 255 characters, and names are escaped before they are printed. When no member name matches a pattern the verdict stays `not_inspected` (exit 3); the contents of the members are never scanned.
 - Compiled files are named by what they are in the "not inspected" line: Python bytecode and Java class files, by suffix (`.pyc`, `.pyo`, `.class`) and by content, so a renamed one is no longer read as text, in both `scan --dir` and `scan --file`.
 
+### Added
+
+- `GLS-STRUCT-006` reports, for review (`quarantine`, never a block), a shell script that points npm,
+  pnpm, yarn or pip at a registry that is not a public one, with a `config set` command or by writing
+  the manager's own config file (`.npmrc`, `.yarnrc`, `.yarnrc.yml`, `pip.conf`, `pip.ini`,
+  `.pypirc`). The installs that use that setting (not a scoped registry's other scopes, an additional
+  index, or a publish-only `.pypirc`) then come from that host. It reads the words of the
+  script as the hook-command rule does (quotes, `$(...)`, line continuations, heredoc bodies, simple
+  variables; fenced blocks in the same text read as one script, in order) and judges the host from the parsed URL, never from a prefix, so
+  `registry.npmjs.org.example` is not a public host and credentials in front of a public host are
+  just credentials. It stays quiet on a setting in the wrong manager's file, a commented setting, a
+  file name that only ends like a config file, a write with no content, and a registry that is
+  public. It does not read environment forms (`NPM_CONFIG_REGISTRY`, `PIP_INDEX_URL`, `ENV`), the
+  `--registry` or `--index-url` flag of a single install, a config file shown on its own, group
+  redirects, `sed -i` / `cp` / `curl -o` into the file, other managers, values built by base64, a value whose
+  scheme or host comes from a variable that is not set, a `printf` width, `printf` precision or file
+  descriptor number over four digits, an escape bash 3.2 cannot read, a host with no `://` scheme, or code in another language. Reading is bounded: shell nested in `sh -c`, `$(...)` or a here-document-fed shell is read to depth 3 and at most 22 nested scripts, and at most 20 fenced blocks are read on their own. One variable expansion brings in at most 64 KiB, the text one `echo` or `printf` would write is read up to 64 KiB (sizes are UTF-8 bytes, and a `%b` operand, a literal piece or a padded width is built only while it fits), and one scan expands at most 64 MiB in all (a fallback such as `${V:-$A}` is charged for what it expands and again for the text it fills in); past that the value is unknown. ANSI-C `$'...'` strings are read as written, and a setting inside an `env -S` string is reported on the line where the word that holds the string starts (the string's own word for `-S STRING` and `--split-string STRING`; the option word for `-SSTRING` and `--split-string=STRING`, so a continuation inside that word is not counted) plus the newlines the command's text still holds (a line continuation inside the string is not counted). `env` short options are read in order, so `-uS` names a variable and `-iS` splits a string; an `env` that exits before it runs a command (`-0`, or a letter it does not have) reports nothing, and a split string is read with `env`'s own rules when it holds a backslash (`\_` is a blank, `\c` ends the string, an escape `env` refuses reports nothing). The split-string rules are those of the `env` this was checked against; another build may differ on an escape. The `env -S` reader has three known gaps: (1) a split string that itself holds another attached `-S` string (`env -S'-Snpm config set ...'`) is not reported; (2) a long option that starts `--` and that `env` does not have (`--invalid`, `--0`) is skipped, so a setting after it is reported although the real `env` exits before it runs anything; (3) inside single quotes within a split string, `\c` and `\_` are read as escapes and not as literal text, so a setting whose operand holds them is missed. A mirror a team really uses, or documentation
+  that shows the command, is reported the same way, because a script cannot be told apart from its
+  documentation. The pattern count does not move. (C499)
+
 ## [0.6.17] — 2026-10-31
 
 ### Added
