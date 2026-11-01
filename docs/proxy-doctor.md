@@ -57,13 +57,13 @@ unwrapped entry reads direct (`test_an_unwrapped_entry_reads_direct`).
 What counts as the artifact is the proxy entry point, not the interpreter that
 would run it (`test_artifact_identity_is_the_proxy_entry_point_not_the_interpreter`).
 **A build with no entry point verifies nothing, and says so**
-(`test_a_build_with_no_entry_point_verifies_nothing`) — which is the state this
-release ships in.
+(`test_a_build_with_no_entry_point_verifies_nothing`).
 
 ## The self-test, and what makes a run valid at all
 
-Before reporting on anything, the doctor runs its own checks against controls
-that are supposed to FAIL. A run is valid only when **all checks pass and all
+When a live or injected self-test is available, the doctor runs its own checks
+against controls that are supposed to FAIL before reporting on anything. In that
+contract a run is valid only when **all checks pass and all
 controls fail** (`test_all_checks_pass_and_all_controls_fail_is_the_only_valid_run`).
 
 - A control that PASSES voids the whole run

@@ -13,9 +13,9 @@ ladder, which needs a self-test this build does not have; those rows inject
 through `cmd_doctor`'s seam and say so at the use site.
 
 WHAT THIS BUILD CANNOT DO, pinned here so nobody reads a green suite as more
-than it is: `default_self_test` returns `(False, {})`, so `doctor.run()` exits 1
-on every machine with detail SELF_TEST_UNAVAILABLE. R1's live self-test is a
-separate row. The rows below therefore assert 1 as TODAY'S measured truth and
+than it is: `default_self_test` returns `(False, {})`, so `doctor.run()` exits 3
+(not verifiable) on every machine with detail SELF_TEST_UNAVAILABLE. R1's live
+self-test is a separate row. The rows below therefore assert 3 as TODAY'S measured truth and
 assert separately that the words distinguish "this build has no self-test" from
 "your routes failed" — which is the whole difference an operator acts on.
 """

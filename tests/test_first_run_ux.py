@@ -4,7 +4,7 @@ A first-run report (C101, gaps 1 and 7) found that a correct install looked brok
 `check` put a cross next to Whisper and pyzbar with no word saying they are optional,
 and `doctor` printed five NOT RUN lines and `exit 1` with nothing saying that nothing
 had failed. The reports below must say what each cross and each exit 1 means. Exit
-codes keep their meaning: `check` still exits 0, `doctor` still exits 1 on this build.
+codes keep their meaning: `check` still exits 0, `doctor` exits 3 (not verifiable) on this build.
 
 Seven cases run the real CLI entry point in a child interpreter; five call `cmd_doctor`
 with an injected report. The "fresh install" shape of the child is made, not assumed: PATH

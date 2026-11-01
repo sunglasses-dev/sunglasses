@@ -4429,7 +4429,7 @@ def cmd_doctor(args, _run=None):
     removed the line. This wires it.
 
     `_run` is a TEST SEAM and not a flag: the exit ladder has codes this build
-    cannot reach (an unavailable self-test outranks everything at 1), and the
+    cannot reach (a self-test that ran and failed is 1 and outranks the rest), and the
     alternative ways to reach them from a test are an undeclared environment
     read or a hidden argument, both of which are switches in a shipped wheel
     that anything in the process tree can flip.
@@ -4590,8 +4590,8 @@ def cmd_doctor(args, _run=None):
         print()
     if "agents" in rendered:
         _print_agents(rendered["agents"])
-    # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
-    # was tried and nothing failed. Say which it is, only when that is exactly the
+    # Five NOT RUN lines beside a nonzero exit read as "broken" on a machine where nothing
+    # was tried and nothing failed (the exit is 3 here, not 1). Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
     # wrong. Any FAIL, unreadable source or unusable key keeps its own wording.
     only_unproven = (
