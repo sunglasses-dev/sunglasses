@@ -25,6 +25,7 @@ carried in the return value rather than swallowed.
 import os
 import stat
 
+from . import archive_listing
 from .member import Member, display_name
 
 IMAGE_EXTENSIONS = {
@@ -332,7 +333,6 @@ _MAGIC_OPAQUE = [
     (b"ustar", 257, "tar archive"),
     (b"\x7fELF", 0, "ELF executable"),
     (b"MZ", 0, "PE/DOS executable"),
-    (b"\xca\xfe\xba\xbe", 0, "Mach-O fat binary"),
     (b"\xcf\xfa\xed\xfe", 0, "Mach-O executable"),
     (b"\xce\xfa\xed\xfe", 0, "Mach-O executable"),
     (b"\xd0\xcf\x11\xe0", 0, "OLE compound document"),
@@ -351,6 +351,34 @@ _MAGIC_MEDIA = [
     (b"\x1a\x45\xdf\xa3", 0, "Matroska/WebM"),
     (b"FORM", 0, "AIFF audio"),
 ]
+
+
+def _is_pyc(head: bytes) -> bool:
+    """Compiled Python: a 2-byte version magic, then CR LF, then a flags word.
+
+    PEP 552 lays the header out as four 32-bit words: magic number, a bit field of which
+    only bits 0 and 1 are defined, then the timestamp and size (or a source hash). The
+    version magic changes with every Python minor, so it is not matched; the CR LF at
+    offset 2 and a flags word of 0..3 are the same in all of them, and a text file has no
+    NUL bytes to fill the top three bytes of that word.
+    """
+    return len(head) >= 8 and head[2:4] == b"\r\n" and head[4] <= 3 and head[5:8] == b"\0\0\0"
+
+
+def _cafebabe_label(head: bytes):
+    """Label for the 4 bytes 0xCAFEBABE, which open two unrelated formats.
+
+    A Java class file follows them with minor_version and major_version (2 bytes each) and
+    the JVM specification (section 4.1) puts the lowest supported major at 45. A Mach-O fat
+    binary follows them with `nfat_arch`, a 32-bit count of architectures (mach-o/fat.h),
+    which is a handful, so its low two bytes sit far below 45. When those two bytes are 45
+    or more it is a class file; below that the bytes cannot say, and the label names both.
+    """
+    if head[:4] != b"\xca\xfe\xba\xbe":
+        return None
+    if len(head) >= 8 and int.from_bytes(head[6:8], "big") >= 45:
+        return "Java class file"
+    return "Mach-O fat binary or Java class file"
 
 _SNIFF_BYTES = 512
 
@@ -414,6 +442,12 @@ def _is_webp(head: bytes) -> bool:
     return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
 
 
+# Compiled code is named for what it is, by its bytes when they say so and by its suffix when they
+# do not. `scan --file` reads the bytes first; `scan --dir` names these suffixes without opening the
+# file, so the two can differ for a file whose header disagrees with its suffix.
+COMPILED_SUFFIXES = {'.pyc': 'Python bytecode', '.pyo': 'Python bytecode', '.class': 'Java class file'}
+
+
 def identify(path: str):
     """Return (kind, label) where kind is pdf | image | media | opaque | text.
 
@@ -429,6 +463,11 @@ def identify(path: str):
     for magic, offset in _MAGIC_IMAGE:
         if _matches(head, magic, offset):
             return "image", "image"
+    if _is_pyc(head):
+        return "opaque", "Python bytecode"
+    cafe = _cafebabe_label(head)
+    if cafe:
+        return "opaque", cafe
     for magic, offset, label in _MAGIC_OPAQUE:
         if _matches(head, magic, offset):
             return "opaque", label
@@ -439,6 +478,8 @@ def identify(path: str):
     # No signature. Fall back to the suffix so an extension-named PDF/image with an
     # unusual header still reaches its extractor, exactly as before this change.
     ext = os.path.splitext(display_name(path))[1].lower()
+    if ext in COMPILED_SUFFIXES:
+        return "opaque", COMPILED_SUFFIXES[ext]
     if ext in PDF_EXTENSIONS:
         return "pdf", "PDF document"
     if ext in IMAGE_EXTENSIONS:
@@ -446,14 +487,37 @@ def identify(path: str):
     return "text", "text"
 
 
+_ARCHIVE_LABELS = ("ZIP archive", "empty ZIP archive", "spanned ZIP archive", "gzip stream",
+                   "bzip2 stream", "xz stream", "7-Zip archive", "RAR archive", "tar archive")
+_COMPILED_LABELS = ("Python bytecode", "Java class file", "Mach-O fat binary or Java class file",
+                    "ELF executable", "PE/DOS executable", "Mach-O executable")
+
+
+def next_step(label: str) -> str:
+    """What a reader can do about a file we did not open: unpack an archive, find the source of code."""
+    if label in _ARCHIVE_LABELS:
+        return "Unpack it and scan the files inside."
+    if label in _COMPILED_LABELS:
+        return "Scan its source instead."
+    return ""
+
+
 def _opaque_result(path: str, label: str) -> ExtractionResult:
-    """We identified it, we cannot read it, and we say so."""
-    return ExtractionResult(
-        [],
-        [f"{label} not inspected — SUNGLASSES does not extract this format, so no "
-         f"content from {display_name(path)} was scanned. This is not a clean result."],
-        complete=False,
-    )
+    """We identified it, we cannot read it, and we say so.
+
+    For a ZIP the archive's own table of contents is read (no member is extracted) and its
+    member names are scanned as text, the same way a repo scan does.
+    """
+    warning = (f"{label} not inspected — SUNGLASSES does not extract this format, so no "
+               f"content from {display_name(path)} was scanned. This is not a clean result.")
+    sources = []
+    if label == "ZIP archive":
+        listing = archive_listing.read_listing(path if not isinstance(path, Member) else bytes(path))
+        suffix = os.path.splitext(display_name(path))[1].lower()
+        warning += " " + archive_listing.describe(listing, suffix)
+        if listing.names:
+            sources.append(("member names", archive_listing.name_text(listing)))
+    return ExtractionResult(sources, [warning], complete=False)
 
 
 def extract_file_sources(path: str) -> ExtractionResult:
