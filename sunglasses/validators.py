@@ -152,6 +152,7 @@ import json
 import re
 import string
 import textwrap
+import threading
 import urllib.parse
 import warnings
 
@@ -259,6 +260,13 @@ class _TooBig(Exception):
 
 class _Syntax(Exception):
     """The command is not something a shell would run (unbalanced quote or bracket)."""
+
+
+class ReadLimit(Exception):
+    """A reader stopped at a limit and the text had nothing else to report; the engine records the scan as incomplete."""
+
+
+_stopped = threading.local()        # set by a reader that stopped at a limit, read by the validator that started it
 
 
 class _Tok:
@@ -663,14 +671,68 @@ def _env_cluster(value):
     return "plain", 0
 
 
+# The long options of GNU env: name and whether it takes a value ("must": the next word when no `=`;
+# "may": only after `=`).
+_ENV_LONG = (("ignore-environment", "no"), ("env0-from", "must"), ("null", "no"), ("unset", "must"),
+             ("chdir", "must"), ("argv0", "must"), ("debug", "no"), ("split-string", "must"), ("block-signal", "may"),
+             ("default-signal", "may"), ("ignore-signal", "may"), ("list-signal-handling", "no"),
+             ("help", "no"), ("version", "no"))
+
+
+# A split string whose words hold another split string is read again from the shorter text. A run of attached
+# ``-S`` in one plain word is peeled in a single step (``_peel_split_run``); a string with quotes or blanks in it is
+# read at most this many levels deep. Past that the reader stops and the validator, when it has no finding,
+# reports the scan as incomplete (``ReadLimit``): the work does not grow with the depth, and a reader that cannot
+# finish never reports the text clean.
+_ENV_SPLIT_LIMIT = 16
+
+
+class _Made(_Tok):
+    """A word made by splitting a string; ``depth`` is how many split strings it came out of."""
+    __slots__ = ("depth",)
+
+
+def _peel_split_run(string):
+    """``string`` without its leading run of attached ``-S``, when the string is one plain word.
+
+    ``env -S-S-Sx`` reads the string ``-S-Sx``, which is one word that is itself ``-S`` with the string ``-Sx``
+    attached, and so on: the string left after the run is the one the last of them reads. The last ``-S`` of a
+    string that is only ``-S`` stays, because it takes the word after it."""
+    if _PLAIN.fullmatch(string) is None:
+        return string
+    at = 0
+    while string.startswith("-S", at) and at + 2 < len(string):
+        at += 2
+    return string[at:]
+
+
+def _env_long(value):
+    """The long option word ``value`` of ``env``, read the way getopt_long reads it: "split", "value" (the
+    next word is its value unless an ``=`` carries it), "plain", or "exit".
+
+    ``env`` exits before it runs anything on an option it does not have, on a prefix that fits two options,
+    on a flag given a value, and on ``--null`` with a command; ``--help`` and ``--version`` only print."""
+    name, eq, _ = value[2:].partition("=")
+    hits = [o for o in _ENV_LONG if o[0] == name] or [o for o in _ENV_LONG if o[0].startswith(name)]
+    if len(hits) != 1:
+        return "exit"
+    full, takes = hits[0]
+    if full in ("null", "help", "version") or (takes == "no" and eq):
+        return "exit"
+    if full == "split-string":
+        return "split"
+    return "value" if takes == "must" else "plain"
+
+
 def _split_string(stack):
     """``env -S STRING`` in any spelling at the top of the stack: (the string, words used) or (None, 0)."""
     value = stack[-1].value
     nxt = stack[-2] if len(stack) > 1 else None
-    if value == "--split-string":
+    if value.startswith("--") and len(value) > 2 and _env_long(value) == "split":
+        head, eq, rest = value.partition("=")
+        if eq:
+            return rest, 1
         return (nxt.value, 2) if nxt is not None and nxt.kind == "w" else ("", 1)
-    if value.startswith("--split-string="):
-        return value.partition("=")[2], 1
     if value.startswith("-") and not value.startswith("--") and len(value) > 1:
         kind, i = _env_cluster(value)
         if kind == "split":
@@ -704,6 +766,9 @@ def _env_words(string):
                 raise _Syntax()
             esc = string[i]
             i += 1
+            if quote == "'" and esc not in "\\'":
+                cur.append("\\" + esc)               # `\c` and `\_` are plain text inside single quotes
+                continue
             if esc == "c":
                 if quote:
                     raise _Syntax()
@@ -716,9 +781,7 @@ def _env_words(string):
                     words.append("".join(cur))
                     cur = None
                 continue
-            if quote == "'" and esc not in "\\'":
-                piece = "\\" + esc
-            elif esc in _ENV_ESCAPES:
+            if esc in _ENV_ESCAPES:
                 piece = _ENV_ESCAPES[esc]
             else:
                 raise _Syntax()
@@ -778,17 +841,26 @@ def _skip_wrapper(name, stack):
             if name == "env":
                 if not value.startswith("--") and _env_cluster(value)[0] == "bad":
                     return False                    # env exits before it runs anything
+                if value.startswith("--") and len(value) > 2 and _env_long(value) == "exit":
+                    return False
                 string, used = _split_string(stack)
                 if used:
+                    source = stack[-2] if used == 2 else stack[-1]          # the string's own word
+                    depth = getattr(source, "depth", 0) + 1
+                    if depth > _ENV_SPLIT_LIMIT:
+                        _stopped.at_limit = True
+                        return False
                     try:
-                        lexed = _env_words(string)
+                        lexed = _env_words(_peel_split_run(string))
                     except _Syntax:
                         return False
-                    anchor = stack[-2].at if used == 2 else stack[-1].at     # the string's own word
+                    anchor = source.at
                     del stack[-used:]
-                    made = [t if t.kind == "w" else _Tok("w", t.value) for t in lexed]
-                    for t in made:
-                        t.at = anchor
+                    made = []
+                    for t in lexed:
+                        m = _Made(t.kind, t.value, t.subs, t.lead) if t.kind == "w" else _Made("w", t.value)
+                        m.at, m.depth = anchor, depth
+                        made.append(m)
                     stack.extend(reversed(made))
                     continue
             if noexec_short and not value.startswith("--"):
@@ -798,6 +870,8 @@ def _skip_wrapper(name, stack):
                     if "-" + ch in takes:
                         break
             consumes = value in takes
+            if name == "env" and value.startswith("--") and len(value) > 2:
+                consumes = _env_long(value) == "value" and "=" not in value
             if name == "env" and not consumes and not value.startswith("--"):
                 for i, ch in enumerate(value[1:], 1):
                     if ch in "uCP":                 # a value-taking letter at the end of a cluster takes the next word
@@ -1644,6 +1718,7 @@ class HookFetchAndRun:
         return has_key and has_command
 
     def run(self, text):
+        _stopped.at_limit = False
         commands = []
         for candidate in _json_candidates(text):
             commands.extend(_hook_commands(candidate))
@@ -1663,6 +1738,8 @@ class HookFetchAndRun:
                 "structural": True,
                 "evidence": evidence,
             })
+        if _stopped.at_limit and not findings:
+            raise ReadLimit(self.id)
         return findings
 
 
@@ -2876,7 +2953,7 @@ _QUOTE_STRIP = {ord(c): None for c in "'\"\\"}
 _CONTINUATION = re.compile(r"\\\n")
 _MANAGER_WORD = re.compile(r"(?<![a-z0-9_])(?:npm|pnpm|yarn|pip[0-9.]*|python[0-9.]*|\.?npmrc|\.?yarnrc|pypirc)(?![a-z0-9_])")
 # `env -S"npm ..."` reads as `-Snpm ...` once its quotes are gone: the name follows the S of a short-option cluster
-_MANAGER_AFTER_SPLIT = re.compile(r"(?<![a-z0-9_-])-[iv-]*s(?:npm|pnpm|yarn|pip[0-9.]*|python[0-9.]*|\.?npmrc|\.?yarnrc|pypirc)(?![a-z0-9_])")
+_MANAGER_AFTER_SPLIT = re.compile(r"(?<![a-z0-9_-])-[iv-]*s(?:-[iv-]*s)*(?:npm|pnpm|yarn|pip[0-9.]*|python[0-9.]*|\.?npmrc|\.?yarnrc|pypirc)(?![a-z0-9_])")
 
 
 def _heredoc_body(text, i, opener, strip, base=0):
@@ -3859,6 +3936,7 @@ class RegistryRedirectInShell:
         return _MANAGER_WORD.search(seen) is not None or _MANAGER_AFTER_SPLIT.search(seen) is not None
 
     def run(self, text):
+        _stopped.at_limit = False
         reader = _ShellReader()
         try:
             fence_at = []
@@ -3887,6 +3965,8 @@ class RegistryRedirectInShell:
                 "structural": True,
                 "evidence": evidence,
             }]
+        if _stopped.at_limit:
+            raise ReadLimit(self.id)
         return []
 
 

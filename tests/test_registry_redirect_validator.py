@@ -31,6 +31,7 @@ from sunglasses.validators import RegistryRedirectInShell, VALIDATORS
 HERE = os.path.dirname(os.path.abspath(__file__))
 RULE = "GLS-STRUCT-006"
 MIRROR = "https://npm.mirror.example/"
+NEUTRAL = "https://mirror.example/"
 PIP_MIRROR = "https://pypi.mirror.example/simple"
 
 
@@ -80,6 +81,32 @@ FIRES = {
     "chained_without_space": "cd app&&npm config set registry %s\n" % MIRROR,
     "then_branch": "if [ -f package.json ]; then npm config set registry %s; fi\n" % MIRROR,
     "env_dispatch_wrapper": "env CI=1 npm config set registry %s\n" % MIRROR,
+    # env's long options are read the way env reads them: a unique prefix resolves and a value-taking one takes its word
+    "env_long_split_prefix": "env --s 'npm config set registry %s'\n" % MIRROR,
+    "env_long_unset_prefix": "env --unse X npm config set registry %s\n" % MIRROR,
+    "env_long_chdir_prefix": "env --chd /tmp npm config set registry %s\n" % MIRROR,
+    "env_long_argv0": "env --argv0 X npm config set registry %s\n" % MIRROR,
+    "env_long_optional_value": "env --block-signal npm config set registry %s\n" % MIRROR,
+    "env_long_flag_prefix": "env --ignore-e npm config set registry %s\n" % MIRROR,
+    "env_long_env0_from": "env --env0-from=/dev/null npm config set registry %s\n" % MIRROR,
+    "env_long_env0_from_word": "env --env0-from /dev/null npm config set registry %s\n" % MIRROR,
+    "env_long_env0_from_prefix": "env --e /dev/null npm config set registry %s\n" % MIRROR,
+    # a split string that starts with another attached -S string
+    # the host has no manager word in it, so only the split-string gate decides whether these lines are read
+    "env_split_in_split": "env -S'-Snpm config set registry %s'\n" % NEUTRAL,
+    "env_split_in_split_twice": "env -S'-S-Snpm config set registry %s'\n" % NEUTRAL,
+    "env_split_chain_at_limit": "env " + "-S" * 16 + "npm config set registry %s\n" % NEUTRAL,
+    # a longer chain of attached -S, and as many separate empty strings, are read the same way
+    "env_split_chain_17": "env " + "-S" * 17 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_chain_18": "env " + "-S" * 18 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_chain_32": "env " + "-S" * 32 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_chain_10000": "env " + "-S" * 10000 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_chain_17_manager_host": "env " + "-S" * 17 + "npm config set registry %s\n" % MIRROR,
+    "env_split_empty_16": "env " + "-S '' " * 16 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_empty_17": "env " + "-S '' " * 17 + "npm config set registry %s\n" % NEUTRAL,
+    "env_split_empty_5000": "env " + "-S '' " * 5000 + "npm config set registry %s\n" % NEUTRAL,
+    # inside single quotes of a split string only \\ and \' are escapes: \c is plain text there, not the end of the string
+    "env_split_single_quote_c": "env -S \"npm config set registry '%sa\\cb'\"\n" % MIRROR,
     "command_wrapper": "command npm config set registry %s\n" % MIRROR,
     "absolute_path": "/usr/local/bin/npm config set registry %s\n" % MIRROR,
     "quoted_key": 'npm config set "registry" %s\n' % MIRROR,
@@ -264,6 +291,13 @@ QUIET = {
     "pypirc_test_host": heredoc(".pypirc", "[testpypi]\nrepository: https://test.pypi.org/legacy/"),
     "variable_public": 'REG="https://registry.npmjs.org"\ncat > .npmrc << EOF\nregistry=${REG}\nEOF\n',
     # -- commands that read, list, delete or ask for help set nothing
+    # env exits before it runs anything on these, so the setting after them never runs
+    "env_long_unknown": "env --invalid npm config set registry %s\n" % MIRROR,
+    "env_long_digit": "env --0 npm config set registry %s\n" % MIRROR,
+    "env_long_ambiguous_prefix": "env --i npm config set registry %s\n" % MIRROR,
+    "env_long_ambiguous_ignore": "env --ignore npm config set registry %s\n" % MIRROR,
+    "env_long_null_with_command": "env --null npm config set registry %s\n" % MIRROR,
+    "env_long_flag_with_value": "env --debug=1 npm config set registry %s\n" % MIRROR,
     "npm_config_get": "npm config get registry\n",
     "npm_config_list": "npm config list\n",
     "npm_config_delete": "npm config delete registry\n",
@@ -1507,3 +1541,75 @@ def test_one_scan_has_one_work_budget_whichever_way_the_text_is_read(monkeypatch
     text = "# npm\n```sh\n" + block + "```\n"
     assert check.run(text) == []
     assert len(seen) == 1 and seen[0].work[0] == 0
+
+
+@pytest.mark.parametrize("string,words", [
+    ("printf '%s' 'a\\_b'", ["printf", "%s", "a\\_b"]),            # \_ is text inside single quotes
+    ("printf '%s' 'a\\cb'", ["printf", "%s", "a\\cb"]),            # \c is text inside single quotes
+    ("printf '%s' 'a\\\\b' 'c\\'d'", ["printf", "%s", "a\\b", "c'd"]),   # \\ and \' are the escapes there
+    ("printf %s a\\_b", ["printf", "%s", "a", "b"]),                # unquoted \_ is a blank
+    ("printf %s a\\cb", ["printf", "%s", "a"]),                     # unquoted \c ends the string
+    ('printf %s "a\\_b"', ["printf", "%s", "a b"]),                 # double-quoted \_ is a space
+])
+def test_the_split_string_reader_reads_backslashes_as_env_does(string, words):
+    assert [t.value for t in validators_module._env_words(string)] == words
+
+
+def test_a_backslash_c_inside_double_quotes_is_refused():
+    with pytest.raises(validators_module._Syntax):
+        validators_module._env_words('printf %s "a\\cb"')
+
+
+
+@pytest.mark.parametrize("groups", [17, 400, 5000])
+def test_a_long_chain_of_attached_split_strings_is_read_once_and_reaches_the_command(monkeypatch, groups):
+    # a run of attached -S in one plain word is peeled in a single step: one string is lexed, however long the run
+    calls = []
+    real = validators_module._env_words
+    monkeypatch.setattr(validators_module, "_env_words", lambda string: calls.append(len(string)) or real(string))
+    stack = [validators_module._Tok("w", "-S" * groups + "npm")]
+    assert validators_module._skip_wrapper("env", stack) is True
+    assert [t.value for t in stack] == ["npm"]
+    assert len(calls) == 1
+
+
+def nested(depth):
+    """``npm config set registry`` inside ``depth`` levels of attached ``-S`` with a double-quoted string, the way
+    ``env`` reads it: the backslashes double at each level, so the text is 2**depth characters long."""
+    def escape(s):
+        return s.replace("\\", "\\\\").replace('"', '\\"')
+    text = "npm config set registry %s" % NEUTRAL
+    for _ in range(depth):
+        text = '-S"' + escape(text) + '"'
+    return "env " + text + "\n"
+
+
+@pytest.mark.parametrize("depth", [1, 2, validators_module._ENV_SPLIT_LIMIT])
+def test_a_quoted_chain_within_the_depth_limit_is_found(validator, depth):
+    assert len(validator.run(nested(depth))) == 1
+
+
+@pytest.mark.parametrize("depth", [validators_module._ENV_SPLIT_LIMIT + 1, validators_module._ENV_SPLIT_LIMIT + 2])
+def test_a_quoted_chain_past_the_depth_limit_makes_the_scan_incomplete_not_clean(engine, validator, depth):
+    text = nested(depth)
+    with pytest.raises(validators_module.ReadLimit):
+        validator.run(text)
+    result = engine.scan(text, channel="file")
+    assert not any(f["id"] == validator.id if isinstance(f, dict) else f.id == validator.id for f in result.findings)
+    assert result.inspection_complete is False
+    assert result.is_clean is False
+    assert any(validator.id in w for w in result.extraction_warnings), result.extraction_warnings
+
+
+def test_a_finding_beside_a_chain_past_the_depth_limit_is_still_reported(validator):
+    deep = nested(validators_module._ENV_SPLIT_LIMIT + 1)
+    plain = "npm config set registry %s\n" % NEUTRAL
+    assert len(validator.run(deep + plain)) == 1
+    assert len(validator.run(plain + deep)) == 1
+
+
+def test_the_depth_limit_stops_one_text_only(validator):
+    with pytest.raises(validators_module.ReadLimit):
+        validator.run(nested(validators_module._ENV_SPLIT_LIMIT + 1))
+    assert validator.run("npm config set registry %s\n" % NEUTRAL) != []
+    assert validator.run("npm config get registry\n") == []
