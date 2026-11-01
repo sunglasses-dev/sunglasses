@@ -17,14 +17,16 @@ this tool can say.
 Three codes, and they are three different statements. 0 says verified. 3 says
 doubt, some part of the picture is unknown. 1 says a thing we ran failed in
 front of us, which is not doubt, and contract row 10.3 gives it precedence over both.
+An instrument that never ran is doubt, not a failure: a self-test that was not
+run is 3, and only a self-test that ran and did not pass is 1.
 
 WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: contract row
 10.1's live self-test spawns `sys.executable -m sunglasses.proxy` against a
 bundled echo server. Both artifacts exist in the package. What is still absent
 is the spawn itself.
-`default_self_test` and `default_launcher` therefore still report failure, with
-failure_class SELF_TEST_UNAVAILABLE and the five checks rendered NOT_RUN, and
-`run()` exits 1, which is the safe direction: a doctor that
+`default_self_test` and `default_launcher` therefore still report that nothing
+ran, with failure_class SELF_TEST_UNAVAILABLE and the five checks rendered
+NOT_RUN, and `run()` exits 3 (not verifiable), never 0: a doctor that
 cannot demonstrate mediation must never imply it. They are the seam the real
 spawn lands in, and they are injectable so the decision logic above them is
 exercised today.
@@ -212,9 +214,10 @@ def judge_self_test(checks, controls) -> SelfTestVerdict:
     # missing from it is a real miss that stays SCHEMA. Absence is only ever
     # the whole instrument.
     #
-    # `ok` is untouched, so `process_exit_code` returns 1 here:
-    # a doctor that cannot demonstrate mediation must
-    # never imply it. The exit code is honest; the words must be too.
+    # `ok` is untouched, so the self-test still does not count as passed and
+    # `process_exit_code` returns 3 here (doubt, never 0): a doctor that cannot
+    # demonstrate mediation must never imply it. The exit code is honest; the
+    # words must be too.
     if not checks and not controls:
         return SelfTestVerdict(ok=False,
                                failed_checks=[],
@@ -419,19 +422,22 @@ def receipts_key_status(home=None):
     return "ON", ""
 
 
-def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False) -> int:
+def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False,
+                      self_test_unavailable=False) -> int:
     """Contract row 10.3's precedence as this function applies it: a failure
     we know about is 1, an operational error is 2, doubt about a route is 3, and
     a clean run is 0.
 
-    A failed self-test is 1 regardless of how clean the inventory reads, because
-    an instrument that failed has no standing to report on anything else, and a
-    launched route that failed is 1 because we watched it fail. A file we could
-    not open is 2: an operational error about our own access, not doubt about a
-    route, and it must never read as 3 and never as 0. Only what is genuinely
-    unknown about a route gets the doubt code.
+    A self-test that ran and did not pass is 1 regardless of how clean the
+    inventory reads, because an instrument that failed has no standing to report
+    on anything else, and a launched route that failed is 1 because we watched it
+    fail. A self-test that never ran (`self_test_unavailable`) is not a failure
+    we watched: it is doubt, 3, and it is never 0 whatever the routes say. A file
+    we could not open is 2: an operational error about our own access, not doubt
+    about a route, and it must never read as 3 and never as 0. Only what is
+    genuinely unknown about a route gets the doubt code.
     """
-    if not self_test_ok:
+    if not self_test_ok and not self_test_unavailable:
         return EXIT_FAILED
     if any(w["result"] == "FAIL" for w in outcome.per_wrapper):
         return EXIT_FAILED
@@ -441,6 +447,8 @@ def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False) 
         return EXIT_FAILED
     if unreadable:
         return EXIT_OPERATIONAL
+    if self_test_unavailable:
+        return EXIT_DOUBT
     return outcome.exit_code
 
 
@@ -474,6 +482,10 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     controls = dict(controls or {})
     verdict = judge_self_test(checks, controls)
     self_test_ok = bool(ok) and verdict.ok
+    # Never ran, as against ran and did not pass: the seam said "not ok" and
+    # reported neither checks nor controls. An instrument that claims ok with
+    # nothing to show for it is contradicting itself, and stays a failure.
+    self_test_unavailable = (not ok) and verdict.failure_class == SELF_TEST_UNAVAILABLE
     detail = "" if controls else SELF_TEST_UNAVAILABLE
 
     launch = launcher or default_launcher
@@ -507,7 +519,8 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
                   approvals=approval_list,
                   exit_code=process_exit_code(
                       outcome, self_test_ok, unreadable=unreadable,
-                      key_unusable=key_status == "KEY_UNUSABLE"),
+                      key_unusable=key_status == "KEY_UNUSABLE",
+                      self_test_unavailable=self_test_unavailable),
                   receipts_key=key_status,
                   receipts_key_cause=key_cause,
                   self_test_ok=self_test_ok,

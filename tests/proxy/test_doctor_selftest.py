@@ -212,7 +212,49 @@ def test_NOT_RUN_can_never_arrive_from_an_upstream_process():
     assert d._safe_checks({"deadline": d.NOT_RUN}) == {}
 
 
-def test_an_unavailable_self_test_still_exits_one():
-    """R-DOCTOR-R3a is untouched by R3c. The class changed; the code did not."""
+def test_an_unavailable_self_test_exits_three_not_one():
+    """An instrument that never ran is doubt, not a failure we watched: 3, never 1 and never 0."""
     report = d.run(sources=[], self_test=lambda: (False, {}))
+    assert report.exit_code == d.EXIT_DOUBT == 3
+    assert d.render(report)["exit_code"] == 3
+
+
+def test_a_self_test_that_ran_and_did_not_pass_still_exits_one():
+    """The other half: controls reported, so the run happened, and a check missed. That is 1."""
+    controls = {c: "FAIL" for c in d.REQUIRED_CONTROLS}
+    checks = {c: "PASS" for c in d.SELF_TEST_CHECKS}
+    checks["s2_block_schema"] = "FAIL"
+    report = d.run(sources=[], self_test=lambda: (False, controls, checks))
+    assert report.exit_code == d.EXIT_FAILED == 1
+
+
+def test_a_self_test_that_claims_ok_and_shows_nothing_stays_a_failure():
+    """True with no checks and no controls contradicts itself; that is not the same as not running."""
+    report = d.run(sources=[], self_test=lambda: (True, {}))
     assert report.exit_code == d.EXIT_FAILED
+
+
+@pytest.mark.parametrize("kwargs, expected", [
+    ({}, 3),                                          # unavailable alone: doubt
+    ({"unreadable": ("x.json",)}, 2),                 # a file it could not open outranks doubt
+    ({"key_unusable": True}, 1),                      # a failure it knows outranks both
+])
+def test_precedence_with_an_unavailable_self_test(kwargs, expected):
+    verified = d.Outcome(aggregate=d.ROUTE_VERIFIED, exit_code=d.EXIT_VERIFIED, per_wrapper=[], inventory=[])
+    assert d.process_exit_code(verified, False, self_test_unavailable=True, **kwargs) == expected
+
+
+def test_an_unavailable_self_test_is_never_zero_even_when_every_route_says_pass():
+    verified = d.Outcome(aggregate=d.ROUTE_VERIFIED, exit_code=d.EXIT_VERIFIED, per_wrapper=[], inventory=[])
+    assert d.process_exit_code(verified, False, self_test_unavailable=True) == 3
+
+
+def test_a_failed_route_outranks_an_unavailable_self_test():
+    out = d.Outcome(aggregate=d.ROUTE_UNVERIFIED, exit_code=d.EXIT_DOUBT,
+                    per_wrapper=[{"result": "FAIL"}], inventory=[])
+    assert d.process_exit_code(out, False, self_test_unavailable=True) == 1
+
+
+def test_without_the_flag_a_self_test_that_did_not_pass_is_one():
+    out = d.Outcome(aggregate=d.ROUTE_UNVERIFIED, exit_code=d.EXIT_DOUBT, per_wrapper=[], inventory=[])
+    assert d.process_exit_code(out, False) == 1

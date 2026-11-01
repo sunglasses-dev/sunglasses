@@ -1171,7 +1171,7 @@ classifies each entry `WRAPPED` / `DIRECT` / `UNVERIFIED` against the recorded
 entry point and its digest, and names every source it could not open instead of
 omitting it. What it cannot do in this release is the live self-test (spawning
 the proxy against the bundled echo server), so it reports its five self-test
-checks as `NOT RUN` and **exits `1` on every machine**:
+checks as `NOT RUN` and **exits `3` (not verifiable) on a machine with nothing else wrong**:
 
 ```
   Self-test NOT RUN — this build has no live self-test, so nothing below is
@@ -1183,10 +1183,10 @@ checks as `NOT RUN` and **exits `1` on every machine**:
   Servers
     DIRECT     github  (config)
 
-  ROUTE_UNVERIFIED  exit 1
+  ROUTE_UNVERIFIED  exit 3
 ```
 
-That exit `1` means *"I could not prove it"*, not *"your routes failed"*, and the
+That exit `3` means *"I could not prove it"*, not *"your routes failed"*, and the
 report distinguishes the two in words. The alternative, reporting `0` because
 the config looked tidy, is the one sentence this tool must never say. A doctor
 that cannot demonstrate mediation must never imply it.
@@ -1207,7 +1207,7 @@ code.
 | code | meaning |
 |---|---|
 | `0` | every route it knows about is wrapped and every one passed a live check |
-| `1` | something it ran FAILED in front of it, or its own self-test did not pass |
+| `1` | something it ran FAILED in front of it, or its own self-test ran and did not pass |
 | `2` | it could not open a config or a record. It names the file. |
 | `3` | **not installed, or not verifiable.** A fact, not a failure. |
 
@@ -1217,15 +1217,16 @@ different facts from "everything is fine", and a tool that collapses them into
 `0` is telling you that you are safe because it did not check. `0` and `3` never
 mean the same thing here.
 
-**In this release you will not see `3` from `doctor`.** The live self-test is
-not built, `1` outranks everything, and so `1` is what every machine gets. The
-table is the ladder `doctor` applies, not a menu of codes this build can
-currently reach, and an unavailable self-test is reported as `NOT RUN` with no
-check marked failed, because "this wheel has no self-test" and "your self-test
-failed" are different facts too.
+**In this release `3` is what `doctor` returns when nothing else is wrong.** The
+live self-test is not built, so it can never say `0`, and an unavailable
+self-test is reported as `NOT RUN` with no check marked failed, because "this
+wheel has no self-test" and "your self-test failed" are different facts too. A
+failure it saw (`1`) or a file it could not open (`2`) still outranks the `3`.
+A script that tested for `== 1` on a machine with nothing wired now sees `3`.
 
-A failed self-test is always `1`, whatever the rest of the report says, because
-an instrument that failed has no standing to report on anything else.
+A self-test that ran and did not pass is always `1`, whatever the rest of the
+report says, because an instrument that failed has no standing to report on
+anything else.
 
 `install` keeps a copy of your original config and a record of what it changed,
 under `~/.sunglasses/proxy/installs/`. `uninstall` reads that record, checks the

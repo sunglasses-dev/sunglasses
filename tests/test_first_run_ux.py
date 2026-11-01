@@ -4,7 +4,7 @@ A first-run report (C101, gaps 1 and 7) found that a correct install looked brok
 `check` put a cross next to Whisper and pyzbar with no word saying they are optional,
 and `doctor` printed five NOT RUN lines and `exit 1` with nothing saying that nothing
 had failed. The reports below must say what each cross and each exit 1 means. Exit
-codes keep their meaning: `check` still exits 0, `doctor` still exits 1 on this build.
+codes keep their meaning: `check` still exits 0, `doctor` exits 3 (not verifiable) on this build.
 
 Seven cases run the real CLI entry point in a child interpreter; five call `cmd_doctor`
 with an injected report. The "fresh install" shape of the child is made, not assumed: PATH
@@ -123,22 +123,22 @@ def test_check_help_says_a_cross_is_not_a_failure_and_documents_the_exit(tmp_pat
 # doctor
 # ---------------------------------------------------------------------------
 
-def test_doctor_on_a_fresh_install_says_nothing_failed_and_still_exits_one(tmp_path):
+def test_doctor_on_a_fresh_install_says_nothing_failed_and_exits_three(tmp_path):
     proc = _run(tmp_path, ["doctor"])
-    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
     assert "No check failed, and none could run." in out
-    assert 'Exit 1 here means "not proven", not "failed".' in out
+    assert 'Exit 3 here means "not proven", not "failed".' in out
     # the five lines and the aggregate are all still there: the sentence adds, it removes nothing
     assert out.count(": NOT RUN") == 5
-    assert "ROUTE_UNVERIFIED  exit 1" in out
+    assert "ROUTE_UNVERIFIED  exit 3" in out
     assert out.index("No check failed") < out.index("ROUTE_UNVERIFIED")
 
 
-def test_doctor_with_no_servers_names_the_next_step_and_keeps_its_exit(tmp_path):
-    # C491: a cold user saw "No server entries found." and nothing to do next.
+def test_doctor_with_no_servers_names_the_next_step_and_exits_three(tmp_path):
+    # A cold user saw "No server entries found." and nothing to do next.
     proc = _run(tmp_path, ["doctor"])
-    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
     assert "No server entries found." in out
     step = ("The configs checked list no MCP servers, so nothing in them is wrapped. "
@@ -154,7 +154,7 @@ def test_doctor_with_a_dangling_default_config_link_names_the_file_install_will_
     gone = tmp_path / "elsewhere" / "gone.json"
     (tmp_path / ".mcp.json").symlink_to(gone)
     proc = _run(tmp_path, ["doctor"])
-    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
     assert "No server entries found." in out
     behind = (tmp_path / ".mcp.json").resolve()
@@ -174,7 +174,7 @@ def test_doctor_with_a_default_config_link_to_an_empty_file_names_that_file(tmp_
     real.write_text('{"mcpServers":{}}')
     (tmp_path / ".mcp.json").symlink_to(real)
     proc = _run(tmp_path, ["doctor"])
-    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
     behind = real.resolve()
     assert f"./.mcp.json is a link to {behind}." in out
@@ -191,7 +191,7 @@ def test_doctor_scoped_to_an_empty_config_speaks_only_of_that_file(tmp_path):
     empty = tmp_path / "empty.json"
     empty.write_text('{"mcpServers":{}}')
     proc = _run(tmp_path, ["doctor", "--config", str(empty)])
-    assert proc.returncode == 1, (proc.stdout, proc.stderr)
+    assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
     assert f"{empty} lists no MCP servers, so nothing in it is wrapped." in out
     assert f"sunglasses install <name> --config {empty}" in out
@@ -205,7 +205,7 @@ def test_doctor_onboarding_line_is_never_printed_beside_a_failed_self_test(tmp_p
     out, _ = _text(report, monkeypatch, capsys)
     assert "The configs checked list no MCP servers" in out      # control: same report, no failure
     out, code = _text(report, monkeypatch, capsys, _a_failed_self_test_check)
-    assert code == 1
+    assert code == 3        # the mutation edits the rendered report; it does not recompute the exit
     assert "No server entries found." in out
     assert "no MCP servers" not in out and "Nothing is wrapped" not in out
 
@@ -276,8 +276,8 @@ def test_install_read_errors_other_than_absent_keep_their_own_wording(tmp_path):
     assert "is not usable JSON" in out
 
 
-# What `doctor --json` printed on a fresh install before this change, byte for byte (the same
-# bytes on main and on the patched tree). The report carries a measured duration, so the test
+# What `doctor --json` prints on a fresh install, byte for byte (it differs from the earlier
+# release only in `exit_code`: 3, where it was 1). The report carries a measured duration, so the test
 # below runs the child with its monotonic clock held at zero; nothing else in it depends on the
 # machine.
 _DOCTOR_JSON_FRESH = """{
@@ -306,7 +306,7 @@ _DOCTOR_JSON_FRESH = """{
     "status": "OFF",
     "cause": ""
   },
-  "exit_code": 1
+  "exit_code": 3
 }
 """
 
@@ -314,13 +314,13 @@ _DOCTOR_JSON_FRESH = """{
 def test_doctor_json_is_byte_for_byte_the_report_it_was(tmp_path):
     # text=False: the bytes the process wrote, not text with its line endings translated
     proc = _run(tmp_path, ["doctor", "--json"], child=_CHILD_CLOCK_AT_ZERO, text=False)
-    assert proc.returncode == 1
+    assert proc.returncode == 3
     assert proc.stdout == _DOCTOR_JSON_FRESH.encode("utf-8")
 
 
-def test_doctor_help_still_documents_exit_one_as_not_proven(tmp_path):
+def test_doctor_help_documents_exit_three_as_not_proven(tmp_path):
     proc = _run(tmp_path, ["doctor", "--help"])
-    assert 'Exit 1 here means "I could not prove it"' in proc.stdout
+    assert 'Exit 3 here means "I could not prove it"' in proc.stdout
 
 
 def _unavailable_report(tmp_path):
@@ -364,15 +364,15 @@ def _a_failed_self_test_check(rendered):
 
 def test_the_sentence_is_printed_when_that_is_the_whole_story(tmp_path, monkeypatch, capsys):
     out, code = _text(_unavailable_report(tmp_path), monkeypatch, capsys)
-    assert code == 1
+    assert code == 3
     assert "No check failed, and none could run." in out
 
 
 @pytest.mark.parametrize("mutate", [_fail_a_route, _an_unusable_signing_key,
                                     _an_unreadable_source, _a_failed_self_test_check])
 def test_the_sentence_is_never_printed_beside_a_real_failure(tmp_path, monkeypatch, capsys, mutate):
-    """Reassurance is only true when the unavailable self-test is the only reason for exit 1."""
+    """Reassurance is only true when the unavailable self-test is the only reason for the exit code."""
     out, code = _text(_unavailable_report(tmp_path), monkeypatch, capsys, mutate)
-    assert code == 1
+    assert code == 3        # the mutation edits the rendered report; it does not recompute the exit
     assert "No check failed" not in out
-    assert "exit 1" in out
+    assert "exit 3" in out

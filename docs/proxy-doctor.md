@@ -19,10 +19,14 @@ questions and refuses to fold them into one:
 
 | code | meaning |
 |---|---|
-| `1` | a real failure: the self-test failed, or a launched route failed |
+| `1` | a real failure: the self-test ran and did not pass, or a launched route failed |
 | `2` | operational: a file we could not open |
-| `3` | incomplete: genuine doubt about a route |
+| `3` | incomplete: genuine doubt about a route, or this build has no live self-test to run |
 | `0` | clean |
+
+**A self-test that never ran is 3, not 1** (`test_an_unavailable_self_test_exits_three_not_one`):
+an instrument that was not run did not fail in front of us, and it is never 0 either.
+One that ran and did not pass stays 1 (`test_a_self_test_that_ran_and_did_not_pass_still_exits_one`).
 
 **A clean inventory in which every route is direct is 3, not 0 and not 2**
 (`test_a_clean_direct_inventory_is_still_3_not_2`). A tool that returns 0 there
@@ -53,13 +57,13 @@ unwrapped entry reads direct (`test_an_unwrapped_entry_reads_direct`).
 What counts as the artifact is the proxy entry point, not the interpreter that
 would run it (`test_artifact_identity_is_the_proxy_entry_point_not_the_interpreter`).
 **A build with no entry point verifies nothing, and says so**
-(`test_a_build_with_no_entry_point_verifies_nothing`) — which is the state this
-release ships in.
+(`test_a_build_with_no_entry_point_verifies_nothing`).
 
 ## The self-test, and what makes a run valid at all
 
-Before reporting on anything, the doctor runs its own checks against controls
-that are supposed to FAIL. A run is valid only when **all checks pass and all
+When a live or injected self-test is available, the doctor runs its own checks
+against controls that are supposed to FAIL before reporting on anything. In that
+contract a run is valid only when **all checks pass and all
 controls fail** (`test_all_checks_pass_and_all_controls_fail_is_the_only_valid_run`).
 
 - A control that PASSES voids the whole run

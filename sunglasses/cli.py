@@ -4404,14 +4404,15 @@ WHAT IT CHECKS
 WHAT IT CANNOT DO IN THIS RELEASE
   It cannot demonstrate that a wrapped route actually mediates traffic. The
   live self-test that spawns the proxy against a bundled echo server is not
-  built yet, so `doctor` reports its self-test as NOT RUN and exits 1 on every
-  machine. That is deliberate: a doctor that cannot demonstrate mediation must
-  never imply it. Exit 1 here means "I could not prove it", not "your routes
-  failed" -- the report says which.
+  built yet, so `doctor` reports its self-test as NOT RUN and exits 3 (not
+  verifiable) on a machine with nothing else wrong. That is deliberate: a
+  doctor that cannot demonstrate mediation must never imply it.
+  Exit 3 here means "I could not prove it", not "your routes failed" -- the
+  report says which.
 
 EXIT CODES
   0  every route it knows about is wrapped and passed a live check
-  1  something it ran FAILED in front of it, or its own self-test did not pass
+  1  something it ran FAILED in front of it, or its own self-test ran and did not pass
   2  it could not open a config or a record. It names the file.
   3  not installed, or not verifiable. A fact, not a failure.
 
@@ -4428,7 +4429,7 @@ def cmd_doctor(args, _run=None):
     removed the line. This wires it.
 
     `_run` is a TEST SEAM and not a flag: the exit ladder has codes this build
-    cannot reach (an unavailable self-test outranks everything at 1), and the
+    cannot reach (a self-test that ran and failed is 1 and outranks the rest), and the
     alternative ways to reach them from a test are an undeclared environment
     read or a hidden argument, both of which are switches in a shipped wheel
     that anything in the process tree can flip.
@@ -4589,8 +4590,8 @@ def cmd_doctor(args, _run=None):
         print()
     if "agents" in rendered:
         _print_agents(rendered["agents"])
-    # `exit 1` with five NOT RUN lines reads as "broken" on a machine where nothing
-    # was tried and nothing failed. Say which it is, only when that is exactly the
+    # Five NOT RUN lines beside a nonzero exit read as "broken" on a machine where nothing
+    # was tried and nothing failed (the exit is 3 here, not 1). Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
     # wrong. Any FAIL, unreadable source or unusable key keeps its own wording.
     only_unproven = (
@@ -4601,7 +4602,7 @@ def cmd_doctor(args, _run=None):
         and not any(row.get("detail") for row in rendered["inventory"]))
     if only_unproven:
         print(f"  {BOLD}No check failed, and none could run.{RESET} This build has no live self-test, so "
-              f"`doctor` cannot show that a route goes through the proxy. Exit 1 here means "
+              f"`doctor` cannot show that a route goes through the proxy. Exit 3 here means "
               f"\"not proven\", not \"failed\".")
         print()
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
