@@ -902,13 +902,44 @@ def families(size):
     return out
 
 
-@pytest.mark.parametrize("family", sorted(families(1000)))
+# The two families whose cost is the lexing of an `env` split string are bounded by counting
+# the text handed to the lexer (below), not by a ratio of two timings.
+COUNTED_FAMILIES = ("split_wrapper", "split_wrapper_chain")
+
+
+@pytest.mark.parametrize("family", [f for f in sorted(families(1000)) if f not in COUNTED_FAMILIES])
 def test_the_layer_costs_a_bounded_multiple_of_the_scan_without_it(family):
     text = families(1 << 20)[family]
     on, off = SunglassesEngine(), SunglassesEngine(validators=False)
     with_layer = best_of(lambda: on.scan(text, channel="file"))
     without = best_of(lambda: off.scan(text, channel="file"))
     assert with_layer <= 1.5 * without + 0.35, (family, with_layer, without)
+
+
+def lexed_characters(monkeypatch, text):
+    """Characters one scan hands to the shell lexer and to the split-string reader."""
+    seen = [0]
+    with monkeypatch.context() as patch:
+        for name in ("_lex", "_env_words"):
+            def counting(value, _inner=getattr(validators_module, name)):
+                seen[0] += len(value)
+                return _inner(value)
+            patch.setattr(validators_module, name, counting)
+        SunglassesEngine().scan(text, channel="file")
+    return seen[0]
+
+
+@pytest.mark.parametrize("family", COUNTED_FAMILIES)
+def test_a_split_wrapper_text_is_lexed_a_bounded_number_of_times(monkeypatch, family):
+    small_size, large_size = 1 << 14, 1 << 18
+    small_text, large_text = families(small_size)[family], families(large_size)[family]
+    small = lexed_characters(monkeypatch, small_text)
+    # a text is lexed a fixed number of times over, never once per group in it
+    assert 0 < small <= 3 * len(small_text), (family, small, len(small_text))
+    large = lexed_characters(monkeypatch, large_text)
+    assert large <= 3 * len(large_text), (family, large, len(large_text))
+    # 16x the input: 16x the work, with a margin of one for the fixed part
+    assert large <= 17 * small, (family, small, large)
 
 
 @pytest.mark.parametrize("family", ["many_commands", "deep_open", "pipe_spam", "long_command", "brace_spam",
