@@ -41,7 +41,7 @@ main()
 
 
 # The same child with the monotonic clock held at zero, for output that prints a measured duration.
-_CHILD_CLOCK_AT_ZERO = "import time\ntime.monotonic_ns = lambda: 0\n" + _CHILD
+_CHILD_CLOCK_AT_ZERO = "import time\ntime.monotonic_ns = lambda: 0\ntime.monotonic = lambda: 0.0\n" + _CHILD
 
 
 def _run(tmp_path, args, blocked="whisper,pyzbar", path_dirs=(), pythonpath=(), child=_CHILD, text=True):
@@ -123,16 +123,16 @@ def test_check_help_says_a_cross_is_not_a_failure_and_documents_the_exit(tmp_pat
 # doctor
 # ---------------------------------------------------------------------------
 
-def test_doctor_on_a_fresh_install_says_nothing_failed_and_exits_three(tmp_path):
+def test_doctor_on_a_fresh_install_runs_the_self_test_and_says_there_is_no_route_to_verify(tmp_path):
     proc = _run(tmp_path, ["doctor"])
     assert proc.returncode == 3, (proc.stdout, proc.stderr)
     out = proc.stdout
-    assert "No check failed, and none could run." in out
-    assert 'Exit 3 here means "not proven", not "failed".' in out
-    # the five lines and the aggregate are all still there: the sentence adds, it removes nothing
-    assert out.count(": NOT RUN") == 5
+    assert "Self-test PASSED" in out
+    assert "self-test passed; no route to verify" in out
+    # nothing was left unrun, so there is no "could not run" wording to soften
+    assert "NOT RUN" not in out and "No check failed" not in out
     assert "ROUTE_UNVERIFIED  exit 3" in out
-    assert out.index("No check failed") < out.index("ROUTE_UNVERIFIED")
+    assert out.index("self-test passed; no route to verify") < out.index("ROUTE_UNVERIFIED")
 
 
 def test_doctor_with_no_servers_names_the_next_step_and_exits_three(tmp_path):
@@ -276,24 +276,28 @@ def test_install_read_errors_other_than_absent_keep_their_own_wording(tmp_path):
     assert "is not usable JSON" in out
 
 
-# What `doctor --json` prints on a fresh install, byte for byte (it differs from the earlier
-# release only in `exit_code`: 3, where it was 1). The report carries a measured duration, so the test
+# What `doctor --json` prints on a fresh install, byte for byte, when the live self-test passes.
+# The report carries a measured duration, so the test
 # below runs the child with its monotonic clock held at zero; nothing else in it depends on the
 # machine.
 _DOCTOR_JSON_FRESH = """{
   "self_test": {
-    "valid": false,
-    "controls": {},
+    "valid": true,
+    "controls": {
+      "constant_allow": "FAIL",
+      "constant_deny": "FAIL",
+      "skipped_invocation": "FAIL"
+    },
     "checks": {
-      "initialized": "NOT_RUN",
-      "s1_forward_byte_equal": "NOT_RUN",
-      "s2_block_schema": "NOT_RUN",
-      "deadline": "NOT_RUN",
-      "disconnect": "NOT_RUN"
+      "initialized": "PASS",
+      "s1_forward_byte_equal": "PASS",
+      "s2_block_schema": "PASS",
+      "deadline": "PASS",
+      "disconnect": "PASS"
     },
     "failed": [],
-    "failure_class": "SELF_TEST_UNAVAILABLE",
-    "detail": "SELF_TEST_UNAVAILABLE",
+    "failure_class": "",
+    "detail": "",
     "measured_ms": 0,
     "bound_ms": 2250,
     "deadline": "deadline 0 ms measured against a 2250 ms bound"
@@ -327,7 +331,8 @@ def _unavailable_report(tmp_path):
     (tmp_path / "home").mkdir(exist_ok=True)
     cfg = tmp_path / ".mcp.json"
     cfg.write_text(json.dumps({"mcpServers": {"demo": {"command": "python3", "args": ["x.py"]}}}))
-    return doctor.run(sources=[("project", cfg)], home=tmp_path / "home")
+    return doctor.run(sources=[("project", cfg)], home=tmp_path / "home",
+                      self_test=lambda: (False, {}))
 
 
 def _text(report, monkeypatch, capsys, mutate=None):
@@ -366,6 +371,18 @@ def test_the_sentence_is_printed_when_that_is_the_whole_story(tmp_path, monkeypa
     out, code = _text(_unavailable_report(tmp_path), monkeypatch, capsys)
     assert code == 3
     assert "No check failed, and none could run." in out
+
+
+def test_a_self_test_that_never_came_up_says_why_and_exits_three(tmp_path, monkeypatch, capsys):
+    # The proxy it started never answered `initialize`: nothing was checked, so nothing failed.
+    (tmp_path / "home").mkdir(exist_ok=True)
+    report = doctor.run(sources=[], home=tmp_path / "home", self_test=lambda: (
+        False, {}, {}, {"detail": doctor.SELF_TEST_NO_INITIALIZE, "deadline_ms": 0}))
+    out, code = _text(report, monkeypatch, capsys)
+    assert code == 3
+    assert "Self-test NOT RUN" in out and "did not answer `initialize`" in out
+    assert "No check failed, and none could run." in out
+    assert "FAILED" not in out and "Self-test SCHEMA" not in out
 
 
 @pytest.mark.parametrize("mutate", [_fail_a_route, _an_unusable_signing_key,

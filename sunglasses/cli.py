@@ -4402,11 +4402,18 @@ WHAT IT CHECKS
   exit code is not changed by this block.
 
 WHAT IT CANNOT DO IN THIS RELEASE
-  It cannot demonstrate that a wrapped route actually mediates traffic. The
-  live self-test that spawns the proxy against a bundled echo server is not
-  built yet, so `doctor` reports its self-test as NOT RUN and exits 3 (not
-  verifiable) on a machine with nothing else wrong. That is deliberate: a
-  doctor that cannot demonstrate mediation must never imply it.
+  It cannot yet demonstrate that one of YOUR wrapped routes mediates traffic:
+  it does not start your servers. What it does run is a live self-test of the
+  proxy itself, in a private temporary folder against a bundled echo server:
+  it starts the proxy, checks that the request bytes arrive unchanged, that a
+  withheld reply has the documented shape, that replies come back inside the
+  bound, and that closing the connection leaves no process in the proxy's or the
+  echo server's process group. It runs
+  before any approval exists and writes none, so it does not exercise the
+  content scan. When the self-test passes and no route has been verified, the
+  report says "self-test passed; no route to verify" and exits 3 (not
+  verifiable). That is deliberate: a doctor that cannot demonstrate mediation
+  of your route must never imply it.
   Exit 3 here means "I could not prove it", not "your routes failed" -- the
   report says which.
 
@@ -4491,7 +4498,12 @@ def cmd_doctor(args, _run=None):
             sys.exit(2)
         sources = [("config", target)]
 
-    report = (_run or _doc.run)(sources=sources)
+    try:
+        report = (_run or _doc.run)(sources=sources)
+    except KeyboardInterrupt:
+        # Ctrl-C ends the run with one line and the shell's own code for it.
+        print("sunglasses doctor: interrupted.", file=sys.stderr)
+        sys.exit(130)
     rendered = _doc.render(report)
     # Opt-in, and a separate block: the headline and the exit code above are about the
     # Claude Code route and do not change with what other agents' files hold.
@@ -4510,14 +4522,32 @@ def cmd_doctor(args, _run=None):
                      for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
-        # A build with no live self-test says so plainly, in the one place an operator reads.
+        # A self-test that could not come up says so plainly, in the one place an operator reads.
+        if st["detail"] == _doc.SELF_TEST_NO_INITIALIZE:
+            why = ("the proxy it started did not answer `initialize` (no answer in time, or it"
+                   " exited first), so nothing was checked")
+        elif st["detail"] == _doc.SELF_TEST_COULD_NOT_START:
+            not_run = st.get("not_run_controls") or []
+            if not_run:
+                why = (f"the control {', '.join(not_run)} could not be started, so the checks"
+                       " below ran against an instrument nobody could vouch for")
+            else:
+                why = "the operating system would not let it make its private folder or start a process"
+        elif st["detail"] == _doc.SELF_TEST_OUT_OF_TIME:
+            why = "it used its whole time allowance before it could finish"
+        else:
+            why = "this Python cannot run it (it needs process groups)"
         print(f"  {YELLOW}Self-test NOT RUN{RESET} "
-              f"{DIM}— this build has no live self-test, so nothing below is"
+              f"{DIM}— {why}; nothing below is"
               f" proof that a wrapped route mediates traffic.{RESET}")
         for name in _doc.SELF_TEST_CHECKS:
-            print(f"    {DIM}{name}: NOT RUN{RESET}")
+            # The state the check really had; NOT RUN only where it never ran.
+            state = st["checks"].get(name, _doc.NOT_RUN).replace("_", " ")
+            print(f"    {DIM}{name}: {state}{RESET}")
     elif st["valid"]:
         print(f"  {GREEN}Self-test PASSED{RESET} {DIM}{st['deadline']}{RESET}")
+        if not any(row["state"] == _doc.WRAPPED for row in rendered["inventory"]):
+            print(f"    {DIM}self-test passed; no route to verify{RESET}")
     else:
         klass = st["failure_class"] or "FAILED"
         print(f"  {RED}Self-test {klass}{RESET} {DIM}{st['deadline']}{RESET}")
@@ -4545,7 +4575,7 @@ def cmd_doctor(args, _run=None):
         # do next (C491). Said only of the sources read, and never beside a failure.
         # `install` wraps an entry that is already in the file, so the step is to
         # list a server first, in the same file `--config` named.
-        if not st["failed"] and st["failure_class"] in (None, _doc.SELF_TEST_UNAVAILABLE) \
+        if not st["failed"] and (st["valid"] or st["failure_class"] in (None, _doc.SELF_TEST_UNAVAILABLE)) \
                 and rendered.get("receipts_key", {}).get("status") != "KEY_UNUSABLE":
             import pathlib as _pl
             import shlex as _shlex
@@ -4600,10 +4630,14 @@ def cmd_doctor(args, _run=None):
         and all(w["result"] != "FAIL" for w in rendered["per_wrapper"])
         and rendered["receipts_key"]["status"] != "KEY_UNUSABLE"
         and not any(row.get("detail") for row in rendered["inventory"]))
-    if only_unproven:
-        print(f"  {BOLD}No check failed, and none could run.{RESET} This build has no live self-test, so "
-              f"`doctor` cannot show that a route goes through the proxy. Exit 3 here means "
-              f"\"not proven\", not \"failed\".")
+    if only_unproven and all(state == _doc.NOT_RUN for state in st["checks"].values()):
+        print(f"  {BOLD}No check failed, and none could run.{RESET} `doctor` cannot show that a route "
+              f"goes through the proxy. Exit 3 here means \"not proven\", not \"failed\".")
+        print()
+    elif only_unproven:
+        # The checks ran and are shown as they ran; what could not be run is a control.
+        print(f"  {BOLD}The checks above are shown as they ran, and prove nothing.{RESET} A control "
+              f"could not be started. Exit 3 here means \"not proven\", not \"failed\".")
         print()
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
     print()

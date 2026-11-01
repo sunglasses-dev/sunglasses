@@ -1165,23 +1165,26 @@ sunglasses doctor --config ~/some/other.json
 sunglasses doctor --json
 ```
 
-**`doctor` tells you what is wired. It does not yet prove that a wrapped route
-mediates anything, and it says so on every run.** It reads your config,
-classifies each entry `WRAPPED` / `DIRECT` / `UNVERIFIED` against the recorded
-entry point and its digest, and names every source it could not open instead of
-omitting it. What it cannot do in this release is the live self-test (spawning
-the proxy against the bundled echo server), so it reports its five self-test
-checks as `NOT RUN` and **exits `3` (not verifiable) on a machine with nothing else wrong**:
+**`doctor` tells you what is wired and runs a live self-test of the proxy. It does
+not yet prove that one of your wrapped routes mediates anything, and it says so on
+every run.** It reads your config, classifies each entry `WRAPPED` / `DIRECT` /
+`UNVERIFIED` against the recorded entry point and its digest, and names every
+source it could not open instead of omitting it. It then starts the proxy in
+front of the bundled echo server, in a private temporary folder, and checks five
+things: the proxy answers `initialize`; the request bytes reach the server
+unchanged; a withheld reply has the documented shape; replies come back inside
+the bound; and closing the connection leaves no process in the proxy's or the
+echo server's process group. It does not start
+your own servers, it runs before any approval exists and writes none, and so it
+does not exercise the content scan. With nothing else wrong it **exits `3` (not
+verifiable)**, because no route of yours has been verified:
 
 ```
-  Self-test NOT RUN — this build has no live self-test, so nothing below is
-  proof that a wrapped route mediates traffic.
-    initialized: NOT RUN
-    s1_forward_byte_equal: NOT RUN
-    ...
+  Self-test PASSED deadline 20 ms measured against a 2250 ms bound
+    self-test passed; no route to verify
 
   Servers
-    DIRECT     github  (config)
+    DIRECT     notes  (config)
 
   ROUTE_UNVERIFIED  exit 3
 ```
@@ -1189,7 +1192,14 @@ checks as `NOT RUN` and **exits `3` (not verifiable) on a machine with nothing e
 That exit `3` means *"I could not prove it"*, not *"your routes failed"*, and the
 report distinguishes the two in words. The alternative, reporting `0` because
 the config looked tidy, is the one sentence this tool must never say. A doctor
-that cannot demonstrate mediation must never imply it.
+that cannot demonstrate mediation must never imply it. If the proxy it starts
+does not answer `initialize`, the system will not make its private folder or
+start a process (the proxy, or one of the three rigged controls it is checked
+against), or this Python has no process groups, the
+self-test is reported as `NOT RUN` with the reason, and the exit is `3` as well.
+When it is one of the three controls that could not be started, the report names
+it, and each check keeps the state it really had (a check that passed shows as
+passed and one that failed shows as failed) while the exit stays `3`.
 
 Point `--config` at a file that does not exist and `doctor` refuses and names
 it, exactly as `install` does, rather than reporting "no server entries found"
@@ -1218,11 +1228,12 @@ different facts from "everything is fine", and a tool that collapses them into
 mean the same thing here.
 
 **In this release `3` is what `doctor` returns when nothing else is wrong.** The
-live self-test is not built, so it can never say `0`, and an unavailable
-self-test is reported as `NOT RUN` with no check marked failed, because "this
-wheel has no self-test" and "your self-test failed" are different facts too. A
-failure it saw (`1`) or a file it could not open (`2`) still outranks the `3`.
-A script that tested for `== 1` on a machine with nothing wired now sees `3`.
+per-route check is not built, so it can never say `0`. A self-test that did not
+run (the proxy never answered, or no process groups) is reported as `NOT RUN`
+with no check marked failed, because "the instrument did not come up" and "your
+self-test failed" are different facts. A failure it saw (`1`) or a file it could
+not open (`2`) still outranks the `3`. A script that tested for `== 1` on a
+machine with nothing wired now sees `3`.
 
 A self-test that ran and did not pass is always `1`, whatever the rest of the
 report says, because an instrument that failed has no standing to report on

@@ -15,6 +15,7 @@ allowed to say:
 Every test runs against a throwaway home and project folder.
 """
 import json
+import re
 import os
 import subprocess
 import sys
@@ -261,7 +262,10 @@ def test_without_the_flag_the_output_is_unchanged_whatever_the_agents_hold(world
     before = _doctor(home=home, cwd=project)
     _write(home / ".cursor" / "mcp.json", {"mcpServers": {"files": {"command": "npx"}}})
     after = _doctor(home=home, cwd=project)
-    assert (before.stdout, before.returncode) == (after.stdout, after.returncode)
+    # the live self-test's measured figure differs run to run; nothing else may
+    def steady(out):
+        return re.sub(r"deadline \d+ ms", "deadline N ms", out)
+    assert (steady(before.stdout), before.returncode) == (steady(after.stdout), after.returncode)
     assert "Other agents" not in after.stdout
     assert "agents" not in json.loads(_doctor("--json", home=home, cwd=project).stdout)
 
