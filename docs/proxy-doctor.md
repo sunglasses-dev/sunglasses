@@ -59,11 +59,81 @@ would run it (`test_artifact_identity_is_the_proxy_entry_point_not_the_interpret
 **A build with no entry point verifies nothing, and says so**
 (`test_a_build_with_no_entry_point_verifies_nothing`).
 
+## Launching a route: `--launch-routes`
+
+`doctor --launch-routes` starts each wrapped route in your own `~/.claude.json` once
+(`sunglasses/proxy/route_launch.py`). It starts your server through the proxy with a
+scratch state root and verifies the handshake and a ping. The launched check does not
+read or write your approvals, receipts or captures, and does not test your policy (the
+inventory part of `doctor` still reads your approval records, as it always does).
+
+- **Only your own file.** An entry from a project `.mcp.json` is never started, even if
+  that file is a link to your user file, and naming it with `--config` does not change
+  that. To verify a project entry, move it into your own `~/.claude.json`. An entry from a
+  `--config` file is started only when the path you give is written as your own
+  `~/.claude.json`: the test is the path as written, so your own file may itself be a link,
+  but another path that links to it, or a path with `..`, is not accepted. The classifier
+  checks the marker and the start of the argument list, not what follows the `--`, so a
+  file that carries this installation's artifact path and digest can reach WRAPPED with
+  any command after it; a route from a project or other file is `NOT_RUN` for that reason.
+- **A scratch state root.** `--state-root <folder>` is put before the first `--`, so it is
+  the last one the proxy reads; the folder is created 0700 inside a private 0700 folder.
+  The command, arguments, environment, working folder and `HOME` are yours, unchanged.
+  The folders are removed when the run ends, including on Ctrl-C and TERM (a SIGKILL cannot
+  be caught, so it leaves them).
+- **What is sent.** `initialize`, `notifications/initialized` and `ping`, then the
+  connection is closed. `tools/list` and `tools/call` are never sent.
+- **Verdicts.** `PASS`: `initialize` answered with a result (up to 19 s), the
+  `notifications/initialized` frame written, `ping` answered with a result inside the
+  2250 ms bound, and after the close the proxy exits 0 and no process group seen below it
+  remains. `FAIL`: `initialize` was answered and a later step was not, whatever the clock
+  says, including a frame that could not be written, a server whose group was never seen
+  (it cannot be shown gone) and one that exits at once. `NOT_RUN` (3): `initialize` was not
+  answered in time, the entry cannot be started as written, or it is a file that is never
+  started.
+- **A server that ignores a closed input.** If the server keeps running after its input
+  closed and the proxy then stops it, the route is still `PASS` (the proxy did what it is
+  for) and the run prints `<name>: server kept running after its input closed; the proxy
+  stopped it` to stderr. The proxy has up to 8 s to do that, which is its own stop: up to
+  5 s for its reader to finish, then 2 s of grace for the server's group, and a 1 s margin.
+- **The process list.** The groups below the proxy are read, with `ps` or from `/proc`
+  where `ps` cannot be run, while the route waits for `initialize` and again before it is
+  stopped; they are not read during the ping and exit waits. Every group seen is kept and
+  stopped on every way out. Each read ends at its limit (1 s while a route runs, 3 s for
+  the check before the first start) or at the route's own 30 s limit, whichever comes
+  first, and a read that is cut short is not a result. On the Linux `/proc` path that
+  limit is checked between entries, so one entry that blocks is not interrupted. If
+  neither source can be read before a start, no route is started. If the list is lost
+  while a route runs, the groups already seen are still stopped. For a server whose group
+  was never seen the proxy is asked to stop it by closing its input and given up to 8 s;
+  only if the launcher has to kill the proxy before the server was seen, or a group it saw
+  is still there at the end, does the run say a process may still be running.
+- **Limits.** 16 routes, and a route is started only if a whole 30 s is left of the 120 s.
+  Each route has one 30 s limit on one clock, from its start to the end of its cleanup,
+  and every wait in it is cut to what is left of it, the waits after a kill included: up to 19 s for `initialize` (less when that would leave under 8 s for the proxy
+  to stop), 2.5 s for the ping, up to 8 s for the proxy to exit, and 2 s for the groups to
+  go. A route out of time before `initialize` is answered is `NOT_RUN` and says so; after
+  it, a step left undone is `FAIL`. After a kill the launcher waits for the process (up to
+  2 s) and for its output reader (up to 2 s), each cut to what is left of the route; when
+  nothing is left it does not wait, and the run says a process may still be running if a
+  group is still there.
+- **What is printed.** One line to stderr per start: the name, the file label (`user` or
+  `config`), and the program's file name. Arguments, environment, working folder and the
+  route's output are never printed.
+- **Ctrl-C and TERM.** The routes' processes and the private folders are stopped and
+  removed, one line goes to stderr, and the exit is 130 or 143 without a traceback. If a
+  process could not be shown to have stopped (a group still there when the time ran out,
+  or the proxy had to be killed before its server's group was seen), the line says it may
+  still be running.
+
+Exit 0 means every configured route is wrapped and answered; the self-test passing alone
+never gives 0.
+
 ## The self-test, and what makes a run valid at all
 
 The doctor runs a live self-test (`sunglasses/proxy/live_selftest.py`): it starts the
 installed proxy in front of the bundled echo server, in a private 0700 folder with
-`HOME` pointed into it, and reports the five checks below. It does not start any
+`HOME` pointed into it, and reports the five checks below. Without `--launch-routes` it does not start any
 server from your config, it runs before any approval exists and writes none, and so
 it does not exercise the content scan. It is not proof about one of your routes: with
 the self-test passed and no route verified the report says "self-test passed; no
