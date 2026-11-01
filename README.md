@@ -1174,7 +1174,7 @@ front of the bundled echo server, in a private temporary folder, and checks five
 things: the proxy answers `initialize`; the request bytes reach the server
 unchanged; a withheld reply has the documented shape; replies come back inside
 the bound; and closing the connection leaves no process in the proxy's or the
-echo server's process group. It does not start
+echo server's process group. Unless you pass `--launch-routes` (below) it does not start
 your own servers, it runs before any approval exists and writes none, and so it
 does not exercise the content scan. With nothing else wrong it **exits `3` (not
 verifiable)**, because no route of yours has been verified:
@@ -1188,6 +1188,35 @@ verifiable)**, because no route of yours has been verified:
 
   ROUTE_UNVERIFIED  exit 3
 ```
+
+**`sunglasses doctor --launch-routes` starts each wrapped route in your own
+`~/.claude.json` once and checks that it answers.** It starts your server through the
+proxy with a scratch state root and verifies the handshake and a ping. The launched
+check does not read or write your approvals, receipts or captures, and does not test
+your policy (the rest of `doctor` still reads your approval records, as it always
+does). Before each start it prints one line to stderr naming the server, the file it
+came from (`user` or `config`) and the program's file name, and nothing else about the
+command. An entry in a project `.mcp.json` is never started and is reported `NOT_RUN`;
+an entry in a file named with `--config` is started only when the path you give is
+written as your own `~/.claude.json` (your own file may itself be a link; another path that
+links to it, or a path with `..`, is not). At most
+16 routes are started, and none with less than 30 of the 120 seconds left; a route past a
+limit is `NOT_RUN`. Each route has one 30-second limit, from its start to the end of its
+cleanup, and every wait in it is cut to what is left of it, the waits after a kill included:
+up to 19 seconds for `initialize`, 2.5 for the ping, up to 8 for the proxy to stop after the
+connection closes, and 2 for the groups to go. A route that answers `initialize` and then fails any later step
+(a `notifications/initialized` frame that could not be written included), or leaves a
+process group it saw behind when the connection closes, is `FAIL` (exit `1`); a route that
+never answers `initialize` is `NOT_RUN` (exit `3`). A server that keeps running after its
+input closed and that the proxy then stops is still `PASS`, and the run says so on stderr.
+The process list is read with `ps`, or (on Linux only) from `/proc` where `ps` cannot be run; each read
+ends at its limit or at the route's, and on the `/proc` path the limit is checked between
+entries. If the process list cannot be read, no route is started; if it is lost while a
+route runs, a server whose group was not yet seen is given the proxy's own stop, and the
+run says a process may still be running only if it had to kill the proxy before the server was
+seen, or a group it saw was still there at the end. To verify a project `.mcp.json` entry, move
+it into your own `~/.claude.json`. Exit `0` means every configured route is wrapped and answered. Without
+the flag no configured route is started and the report says so.
 
 That exit `3` means *"I could not prove it"*, not *"your routes failed"*, and the
 report distinguishes the two in words. The alternative, reporting `0` because
