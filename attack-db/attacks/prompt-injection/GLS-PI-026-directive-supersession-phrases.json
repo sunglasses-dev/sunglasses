@@ -1,0 +1,29 @@
+{
+  "id": "GLS-PI-026",
+  "name": "Directive supersession phrases",
+  "version": "1.0",
+  "category": "prompt_injection",
+  "severity": "high",
+  "channels": [
+    "file",
+    "web_content",
+    "tool_output"
+  ],
+  "description": "Detects plain-text supersession language: ignoring previous or prior instructions, a new system directive, superseding a safety policy, overriding guardrails, or asking to reveal, print, dump, expose or return the system prompt, a token, a credential, a secret or an API key.",
+  "keywords": [
+    "new system directive ignore",
+    "supersede safety policy",
+    "override guardrails reveal"
+  ],
+  "regex": [
+    "(?is)(?=(?:ignore\\s+(?:all\\s+)?(?:previous|prior)\\s+instructions|new\\s+system\\s+directive|supersede\\s+safety\\s+policy|override\\s+guardrails?|(?:reveal|print|dump|expose|return)\\s+(?:the\\s+)?(?:hidden\\s+)?(?:system\\s*prompt|token|credential|secret|a-?p-?i\\s*key)))(?!.*\\b(?:security\\s+guidance|prompt\\s+injection\\s+attempt|press\\s+1\\s+for\\s+billing)\\b)(?!(?:(?!\\bmorse\\s+rhythm).)*\\bmorse\\s+rhythm(?:(?!lecture\\b).)*lecture\\b)(?:ignore\\s+(?:all\\s+)?(?:previous|prior)\\s+instructions|new\\s+system\\s+directive|supersede\\s+safety\\s+policy|override\\s+guardrails?|(?:reveal|print|dump|expose|return)\\s+(?:the\\s+)?(?:hidden\\s+)?(?:system\\s*prompt|token|credential|secret|a-?p-?i\\s*key))"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-10-31",
+  "source": "patterns.py:GLS-PI-026"
+}

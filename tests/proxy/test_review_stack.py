@@ -44,9 +44,10 @@ def test_RS10_catalog_counts():
  # #170's eight -API siblings arriving from main, not a change in this stack.
  # 1580 -> 1594 and 1592 -> 1606 are the fourteen -API tool-metadata siblings. Measured by id set against main:
  # the added sets on both catalogs are exactly those fourteen ids, nothing was removed, helper_catalog did not move.
- assert len(inspection.engine_catalog())==1594
+ # 1594 -> 1595 and 1606 -> 1607 are GLS-PI-026, split out of GLS-MM-AUDIO-206 (one id added, none removed).
+ assert len(inspection.engine_catalog())==1595
  assert len(inspection.helper_catalog())==12
- assert len(inspection.trusted_catalog())==1606
+ assert len(inspection.trusted_catalog())==1607
 
 def test_RS11_list_finding_provenance_is_preserved():
  page={'tools':[{'name':'echo','inputSchema':{'type':'object'}}]}
