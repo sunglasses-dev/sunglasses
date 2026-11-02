@@ -200,26 +200,30 @@ the rule, the bytes inspected and the rule ids that fired:
 
 ### Known limits when the proxy is stopped
 
-What follows is measured on the current release with a real proxy and a real
-server over pipes (Ctrl-C on Python 3.9, 3.12, 3.13 and 3.14; the rest on
-3.14). It states what happens today.
+Measured with a real proxy and a real server over pipes: Ctrl-C on Python 3.9,
+3.12, 3.13 and 3.14, everything else on 3.14. Each statement below names the
+case it was measured in and says nothing about other cases. Not measured:
+Windows (the proxy does not run there), Python 3.10 and 3.11, and any wait
+longer than 20 seconds.
 
 - **SIGTERM and SIGHUP end the proxy and do not stop the server it started.**
   The proxy runs the server in a process group of its own and has no handler
   for these two signals. A server that exits when its input closes, as the
   bundled echo server does, goes away on its own. A server that keeps running
-  after its input closes is still running when the proxy has gone. To stop the
-  proxy and its server together, close the proxy's stdin or press Ctrl-C, and
-  check that the server is gone.
-- **Ctrl-C (SIGINT) and closing stdin both leave the server gone, and Ctrl-C
-  does not end cleanly.** Closing stdin ends the proxy with exit status 0.
-  After Ctrl-C the proxy prints a Python traceback and a "Fatal Python error"
-  message on stderr and exits by abort (status 134 in a shell).
+  after its input closes is still running when the proxy has gone.
+- **While the server is reading its input, closing stdin and Ctrl-C
+  (SIGINT) both leave the server gone, and Ctrl-C does not end cleanly.** Closing stdin
+  between messages ends the proxy with exit status 0. Closing it in the middle
+  of a message ends the proxy with exit status 1. After Ctrl-C the proxy
+  prints a Python traceback and a "Fatal Python error" message on stderr and
+  exits by abort (status -6 as Python reports it, 134 in a shell).
 - **A server that has stopped reading its input can keep the proxy from
-  ending.** When the proxy is in the middle of writing a message to such a
-  server (170 KB in the measurement), closing stdin and Ctrl-C both left the
-  proxy running for the 20 seconds we watched, with the server still running.
-  If a wrapped server can stop reading, do not rely on closing stdin to stop it.
+  ending, and then neither closing stdin nor Ctrl-C ends it.** When the proxy
+  is in the middle of writing a message to such a server (a 170,870-byte
+  message in the measurement), closing stdin and Ctrl-C each left the proxy
+  and the server running for the 20 seconds we watched. If a wrapped server
+  can stop reading, do not rely on closing stdin or on Ctrl-C to stop the
+  proxy and its server together, and check that the server is gone.
 
 ### What this is not
 
