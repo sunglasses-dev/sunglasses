@@ -4153,6 +4153,10 @@ def main():
         "--agents", action="store_true",
         help="Also list the MCP config files of other agents (Cursor, Codex CLI, Gemini CLI, "
              "Windsurf) and what each holds; read-only, changes and starts nothing")
+    doctor_parser.add_argument(
+        "--launch-routes", action="store_true", dest="launch_routes",
+        help="Start each wrapped route in your user file once (initialize and ping, "
+             "through the proxy with a scratch state root) and check that it answers")
     doctor_parser.set_defaults(func=cmd_doctor)
 
     config_parser = subparsers.add_parser("config", help="Configure SUNGLASSES")
@@ -4401,9 +4405,9 @@ WHAT IT CHECKS
   file it could not read shows UNREADABLE with the reason, never "absent". The
   exit code is not changed by this block.
 
-WHAT IT CANNOT DO IN THIS RELEASE
-  It cannot yet demonstrate that one of YOUR wrapped routes mediates traffic:
-  it does not start your servers. What it does run is a live self-test of the
+WHAT IT CANNOT DO WITHOUT --launch-routes
+  Unless you ask, it cannot demonstrate that one of YOUR wrapped routes mediates
+  traffic: it does not start your servers. What it does run is a live self-test of the
   proxy itself, in a private temporary folder against a bundled echo server:
   it starts the proxy, checks that the request bytes arrive unchanged, that a
   withheld reply has the documented shape, that replies come back inside the
@@ -4416,6 +4420,27 @@ WHAT IT CANNOT DO IN THIS RELEASE
   of your route must never imply it.
   Exit 3 here means "I could not prove it", not "your routes failed" -- the
   report says which.
+
+WITH --launch-routes
+  It starts each wrapped route in your own file (~/.claude.json) once, through
+  the proxy with a scratch state root, sends `initialize` and a `ping`, closes
+  the connection and checks that the proxy exits and that no process group it
+  saw below the proxy remains. The launched check does not read or write your
+  approvals, receipts or captures, never sends `tools/list` or `tools/call`, and
+  does not test your policy. Entries in a project .mcp.json are never started;
+  entries in a file named with --config are started only when the path is
+  written as your own ~/.claude.json (your own file may itself be a link; another
+  path that links to it, or a path with .., is not). It
+  prints the program's file name before each start, and never arguments,
+  environment or output. If the process list cannot be read, no route is
+  started. At most 16 routes; none is started with less than 30 s of the 120 s
+  left. Each route has one 30 s limit, from its start to the end of its cleanup,
+  and every wait in it is cut to what is left of it, the waits after a kill
+  included: up to 19 s for `initialize`, 2.5 s for the ping, up to 8 s for the
+  proxy to stop after the connection closes, 2 s for the groups to go. A server that
+  keeps running after its input closed and that the proxy then stops is still a
+  PASS; the run says so on stderr. To verify a project entry, move it into your
+  own ~/.claude.json.
 
 EXIT CODES
   0  every route it knows about is wrapped and passed a live check
@@ -4499,7 +4524,9 @@ def cmd_doctor(args, _run=None):
         sources = [("config", target)]
 
     try:
-        report = (_run or _doc.run)(sources=sources)
+        # The keyword is passed only when asked for, so a runner written before it exists still fits.
+        report = (_run or _doc.run)(
+            sources=sources, **({"launch_routes": True} if getattr(args, "launch_routes", False) else {}))
     except KeyboardInterrupt:
         # Ctrl-C ends the run with one line and the shell's own code for it.
         print("sunglasses doctor: interrupted.", file=sys.stderr)
@@ -4520,6 +4547,8 @@ def cmd_doctor(args, _run=None):
     # JSON prints, and never recomputed here.
     route_verdict = {(w["name"], w["source"]): w["result"]
                      for w in rendered["per_wrapper"]}
+    route_reason = {(w["name"], w["source"]): _doc.ROUTE_REASON_TEXT.get(w.get("reason"), "")
+                    for w in rendered["per_wrapper"]}
     print()
     if st["failure_class"] == _doc.SELF_TEST_UNAVAILABLE:
         # A self-test that could not come up says so plainly, in the one place an operator reads.
@@ -4566,6 +4595,9 @@ def cmd_doctor(args, _run=None):
             if verdict:
                 vcolour = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
                 line += f"  route {vcolour}{verdict}{RESET}"
+                why = route_reason.get((row["name"], row["source"]))
+                if why:
+                    line += f" {DIM}({why}){RESET}"
             # An unreadable source is NAMED, never omitted: a file we could not
             # open must not become, in a reader's head, a file with nothing in it.
             print(line + (f"  {YELLOW}{detail}{RESET}" if detail else ""))
@@ -4607,6 +4639,10 @@ def cmd_doctor(args, _run=None):
                       f"them is wrapped. Add a server to ./.mcp.json, then run: "
                       f"sunglasses install <name>{RESET}")
 
+    if not getattr(args, "launch_routes", False) and rendered["per_wrapper"]:
+        print(f"  {DIM}Routes were not started. Pass --launch-routes to start each wrapped "
+              f"route in your user file once and check that it answers.{RESET}")
+        print()
     if rendered.get("approvals"):
         print(f"  {BOLD}Approvals{RESET}  {DIM}(each is bound to the folder the server was "
               f"started from){RESET}")
