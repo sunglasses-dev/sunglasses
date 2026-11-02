@@ -1,13 +1,11 @@
-"""Contract rows R4/R5 at the CLI, through a real subprocess.
+"""The `install` and `uninstall` commands at the CLI, through a real subprocess.
 
 Exit codes follow AGENTS.md: 0 clean · 1 threat · 2 usage or operational error ·
 3 incomplete inspection, and `0` and `3` must never collapse into each other.
 
-`install` and `uninstall` never default to a path in the user's home. This
-repo's CLAUDE.md records the hazard directly: `sunglasses init` writing into a
-real settings file once inspected an agent's own subsequent tool calls. A wiring
-command whose default target is `~/.claude.json` is the same hazard with a
-different file, so the default is the project `.mcp.json` in the working
+`install` and `uninstall` never default to a path in the user's home. A wiring
+command whose default target is `~/.claude.json` would write into a real
+settings file, so the default is the project `.mcp.json` in the working
 directory and anything else is explicit.
 """
 import hashlib
@@ -37,28 +35,54 @@ RAW_CONFIG = (
 )
 
 
-def sg(*args, cwd, home, pkgroot=None):
-    """PYTHONPATH is pinned to the repo on purpose, or to `pkgroot` when a test
-    needs to decide for itself whether the proxy entry point exists (F3).
+# Child-side programs. Every child names the tree it must import in
+# SG_TEST_TREE and puts that tree at the front of sys.path itself (`_PIN`).
+# PYTHONPATH is set to the repository on purpose: an interpreter started in
+# isolated mode ignores it, and one wrapped to put the repository first
+# shadows it, so PYTHONPATH cannot choose between the repository and a package
+# copy. A child that dropped the pin would import the repository, and the rows
+# that built a copy to control which files exist would test the wrong tree.
+_PIN = (
+    "import os, sys\n"
+    "sys.path.insert(0, os.environ['SG_TEST_TREE'])\n"
+)
+# Run `sunglasses.cli` the way `-m` would (module as __main__).
+_RUN_CLI = _PIN + (
+    "import runpy\n"
+    "sys.argv = ['sunglasses.cli'] + sys.argv[1:]\n"
+    "runpy.run_module('sunglasses.cli', run_name='__main__', alter_sys=True)\n"
+)
+_WHICH_TREE = _PIN + "import sunglasses\nprint(sunglasses.__file__)\n"
 
-    Without it these tests run `-m sunglasses.cli` from a tmp cwd, the import
-    fails before argparse is ever reached, and every assertion of the form
-    "invalid choice not in stderr" passes against a process that never started.
-    Three of these tests passed that way before this line existed. Installed
-    versus tree, the Sep-14 lesson, inside my own harness.
+
+def _env(root, **extra):
+    """The environment of a child that must import `root`."""
+    return dict(os.environ, PYTHONPATH=REPO, SG_TEST_TREE=str(root),
+                PYTHONDONTWRITEBYTECODE="1", **extra)
+
+
+def _child(code, root, *args, cwd, home):
+    return subprocess.run([sys.executable, "-B", "-c", code, *args],
+                          cwd=str(cwd),
+                          env=_env(root, HOME=str(home), SUNGLASSES_HOME=str(home)),
+                          capture_output=True, text=True)
+
+
+def sg(*args, cwd, home, pkgroot=None):
+    """Run the CLI in a child process that imports `pkgroot`, or the repository.
+
+    The child chooses its tree itself (`_PIN`); PYTHONPATH names the
+    repository. `pkgroot` is for the tests that need to decide whether the
+    proxy entry point exists.
 
     `HOME` is isolated alongside `SUNGLASSES_HOME` because the install record
-    now lives under `serve.state_root()`, which is HOME-derived by design. With
-    only the variable set, every row here would write its record into the real
-    user's `~/.sunglasses` and read an empty sandbox -- which is the Sep-19
-    failure verbatim: isolate BOTH, and assert the artefact landed inside the
-    sandbox rather than trusting an empty directory.
+    is stored under `serve.state_root()`, which is derived from HOME. With only
+    the variable set, a row that installs would write its record into the real
+    user's `~/.sunglasses` and read an empty sandbox. Isolate both, and assert
+    the artefact landed inside the sandbox rather than trusting an empty
+    directory.
     """
-    env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
-               PYTHONPATH=str(pkgroot) if pkgroot else REPO,
-               PYTHONDONTWRITEBYTECODE="1")
-    return subprocess.run([sys.executable, "-B", "-m", "sunglasses.cli", *args],
-                          cwd=str(cwd), env=env, capture_output=True, text=True)
+    return _child(_RUN_CLI, pkgroot if pkgroot else REPO, *args, cwd=cwd, home=home)
 
 
 def _package_copy(dest, *, with_artifact):
@@ -66,9 +90,9 @@ def _package_copy(dest, *, with_artifact):
     `pathlib.Path(__file__).resolve().parent` and `resolve()` walks a symlink
     straight back to the original tree, so a symlink farm would shadow nothing.
 
-    The artifact written here is this test's own fixture. It is deliberately
-    NOT #168's `proxy/__main__.py`: a control that borrows another branch's
-    file is a control that changes meaning when that branch does.
+    The artifact written here is this test's own fixture, not the
+    repository's `proxy/__main__.py`: a control that borrows the product's file
+    changes meaning when that file does.
     """
     dest.mkdir(parents=True, exist_ok=True)
     pkg = dest / "sunglasses"
@@ -77,7 +101,7 @@ def _package_copy(dest, *, with_artifact):
     entry = pkg / "proxy" / "__main__.py"
     if with_artifact:
         entry.parent.mkdir(parents=True, exist_ok=True)
-        entry.write_text("# this test's fixture entry point, not #168's\n",
+        entry.write_text("# this test's fixture entry point\n",
                          encoding="utf-8")
     elif entry.exists():
         entry.unlink()
@@ -96,7 +120,7 @@ def pkg_present(tmp_path_factory):
 
 
 def _tree_digests(root):
-    """Every file under `root`, by path and content digest."""
+    """Every file under `root` except bytecode caches, by path and content digest."""
     out = {}
     for f in sorted(pathlib.Path(root).rglob("*")):
         if f.is_file() and "__pycache__" not in f.parts:
@@ -105,25 +129,38 @@ def _tree_digests(root):
 
 
 def test_the_harness_actually_reaches_the_cli(tmp_path):
-    """Guard on the guard: if this fails, every other test in this file is
-    asserting against a process that died on import.
+    """The harness reaches our CLI: the child prints our subcommand names.
 
-    Asserts on output only our CLI emits. Round 1 asserted `returncode == 0`
-    and "No module named" absent, which an empty `sys.exit(0)` satisfies.
+    Asserts on output only our CLI emits, so an empty `sys.exit(0)` fails; a
+    return code of 0 with "No module named" absent would not be enough.
 
-    ANCHORED ON THE SUBCOMMAND NAMES, NOT ON HELP PROSE. This row used to assert
-    the `install` help string, and a correction to that string's WORDING broke
-    the guard while the harness was working perfectly -- the guard reported on
-    the sentence rather than on the thing it exists to prove. Command names are
-    a contract and change deliberately; help prose is written to be rewritten.
-    An empty `sys.exit(0)` still fails this, which is the failure it was built
-    for.
+    Anchored on the subcommand names, not on help prose: command names are a
+    contract and change deliberately; help prose is written to be rewritten.
     """
     r = sg("--help", cwd=tmp_path, home=tmp_path / "h")
     assert r.returncode == 0, r.stderr
     assert "No module named" not in r.stderr
     for command in ("firewall-hook", "install", "uninstall"):
         assert command in r.stdout, f"{command} missing from --help"
+
+
+def test_the_child_imports_the_tree_it_was_pinned_to(tmp_path, pkg_absent):
+    """Every row that passes `pkgroot` assumes the child imported THAT copy.
+    Asks a child which file it imported while PYTHONPATH names the repository,
+    so a pin that did not take effect shows up as the repository's file."""
+    root, entry = pkg_absent
+    r = _child(_WHICH_TREE, root, cwd=tmp_path, home=tmp_path / "h")
+    assert r.returncode == 0, r.stderr
+    assert pathlib.Path(r.stdout.strip()).resolve() == (root / "sunglasses" / "__init__.py").resolve(), r.stdout
+    assert not entry.exists()   # and that copy really has no entry point
+
+
+def test_every_child_program_starts_with_the_pin():
+    """The CLI runner, the racing install and the lock holder are separate
+    programs; each must open with the shared pin."""
+    for name, code in (("cli", _RUN_CLI), ("which", _WHICH_TREE),
+                       ("racer", RACER), ("holder", HOLDER)):
+        assert code.startswith(_PIN), f"the {name} child does not pin its tree"
 
 
 @pytest.fixture
@@ -136,13 +173,9 @@ def test_install_is_a_real_subcommand(project, tmp_path, pkg_absent):
     """Positive evidence: the refusal diagnostic our install prints. "invalid
     choice" being absent is also true of a process that never started.
 
-    F3, FOURTH ROW. I named three rows from reading their docstrings and the
-    measurement named a different three, which is the whole lesson again: this
-    one says nothing about the artifact and was still green only because it
-    was absent. Its positive evidence is the string "SUNGLASSES install",
-    printed by the refusal; a SUCCEEDING install prints "Wrapped ..." instead,
-    so with #168's entry point on main the row went red while looking
-    unrelated to it. The absence it needs is now constructed like the others."""
+    The row says nothing about the artifact, so the absence it needs is built
+    from a package copy without the entry point: a succeeding install prints
+    "Wrapped ..." instead of the refusal."""
     root, _ = pkg_absent
     r = sg("install", "github", cwd=project, home=tmp_path / "h", pkgroot=root)
     assert "invalid choice" not in r.stderr
@@ -157,15 +190,10 @@ def test_uninstall_is_a_real_subcommand(project, tmp_path):
 
 def test_install_exits_2_and_says_why_when_the_artifact_is_absent(
         project, tmp_path, pkg_absent):
-    """F3. The absence is now BUILT BY THIS TEST rather than inherited from
-    whatever the working tree happens to contain.
-
-    On 8b16d96 this row was green because `sunglasses/proxy/__main__.py` did
-    not exist anywhere yet, so it asserted a refusal that the build was
-    producing for free. The declared merge order puts #168 ahead of this PR,
-    and the day that file lands on main the row went red without a line of it
-    changing. Now the refusal is driven from a package copy that genuinely
-    lacks the entry point, so it means the same thing before and after."""
+    """The absence is built by this test rather than inherited from whatever
+    the working tree contains: the refusal is driven from a package copy that
+    lacks `proxy/__main__.py`, so it means the same whether or not the
+    repository has one."""
     root, _ = pkg_absent
     before = (project / ".mcp.json").read_bytes()
     r = sg("install", "github", cwd=project, home=tmp_path / "h", pkgroot=root)
@@ -175,12 +203,8 @@ def test_install_exits_2_and_says_why_when_the_artifact_is_absent(
 
 
 def test_install_never_writes_outside_the_named_config(project, tmp_path_factory, pkg_present):
-    """F3. This row asserted "never writes outside" against a run that never
-    wrote ANYTHING, because install refused at artifact resolution first. It
-    proved the refusal twice and the property once, in the wrong direction.
-
-    With the entry point present the install SUCCEEDS, so there is finally a
-    write to be confined, and the confinement is checked by hashing every file
+    """With the entry point present the install succeeds, so there is a write
+    to be confined. The confinement is checked by hashing every non-cache file
     in the project tree and in the package tree before and after."""
     root, entry = pkg_present
     # The home goes OUTSIDE the project on purpose. `project` IS `tmp_path`, so
@@ -205,7 +229,7 @@ def test_install_never_writes_outside_the_named_config(project, tmp_path_factory
     # And the package it wired itself to is untouched.
     assert _tree_digests(root) == package_before, "install wrote inside the package"
 
-    # Present means WRAPPED, which is the state this file could not reach before.
+    # Present means WRAPPED.
     entry_json = json.loads((project / ".mcp.json").read_text())["mcpServers"]["github"]
     assert inst.classify(entry_json, artifact=entry) == "WRAPPED", entry_json
 
@@ -221,16 +245,11 @@ def test_uninstall_without_a_record_exits_2_and_does_not_mutate(project, tmp_pat
 
 
 def test_install_exits_2_when_it_cannot_proceed_at_all(tmp_path, pkg_present):
-    """Renamed from "on an unreadable config", which it did not prove.
+    """An install that cannot proceed at all exits 2 with a diagnostic.
 
-    The reviewer: on round 3 install refused at artifact resolution BEFORE it ever
-    read the config, so a green result here was never evidence about
-    config-read handling, and the docstring said so rather than fixing it.
-
-    F3: with the entry point present the CLI now gets PAST resolution and
-    fails on the missing config, which is the layer this row claimed to be
-    about. It still proves exit 2 rather than 1, and a diagnostic rather than a
-    traceback.
+    The package copy has the entry point, so the CLI gets past artifact
+    resolution and fails on the missing config. It exits 2 rather than 1, and
+    prints a diagnostic rather than a traceback.
     """
     root, _ = pkg_present
     d = tmp_path / "empty"
@@ -264,42 +283,39 @@ def test_install_accepts_an_explicit_config_path(tmp_path):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Round 7. review's R6_CHECK_RENAME_GAP, reshaped so the stimulus survives and
-# the instrument does not deadlock.
+# A racing install between our comparison and our rename.
 #
-# His row puts the racing install INSIDE our critical section and requires it to
-# SUCCEED there: `child_install` is a synchronous `subprocess.run` called from a
-# barrier inside `os.replace`, and its setup asserts `returncode == 0`. Under
-# any mutual exclusion that is a circular wait, measured rather than argued: the
-# parent holds the lock and waits for the child, the child waits for the lock
-# (pids 47089 and 47097, 2026-09-17 04:31, in the PR body). No product-side
-# timeout can break it, because the product is not the thing waiting.
-#
-# The stimulus he is actually testing -- a second install that completes while
-# we are between our comparison and our rename -- is kept exactly. The only
-# change is that his racer becomes a racer that CAN wait: spawned BEFORE the
-# barrier, joined AFTER it. On a build without the lock it finishes inside our
-# window and its work is destroyed, which is the defect. On this build it blocks
-# for as long as we hold the lock and then completes, which is the fix.
+# A second install that completes while we are between our comparison and our
+# rename must not have its work destroyed. The racer is spawned BEFORE the
+# barrier inside `os.replace` and joined AFTER it, so it can wait. A racer run
+# synchronously from inside the barrier is a circular wait under any mutual
+# exclusion: the parent holds the lock and waits for the child, the child waits
+# for the lock. With the lock, the racer blocks for as long as we hold it and
+# then completes.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-RACER = """
-import os, pathlib, runpy, sys
+RACER = _PIN + """import pathlib, runpy
 pathlib.Path(sys.argv[1]).write_text("trying")
 sys.argv = ["sunglasses", "install", "other", "--config", sys.argv[2]]
 runpy.run_module("sunglasses.cli", run_name="__main__")
 """
 
+HOLDER = _PIN + """import time, pathlib
+from sunglasses import install as i
+with i._exclusive(pathlib.Path(sys.argv[1])):
+    pathlib.Path(sys.argv[2]).touch()
+    while not pathlib.Path(sys.argv[3]).exists():
+        time.sleep(0.01)
+"""
+
 
 def test_a_racing_install_that_can_wait_survives_our_rename(
         tmp_path, pkg_present):
-    """R7-CHECK-RENAME-GAP. A compare and a rename are two operations, and a
-    racer can publish between them. It is not enough to move the comparison
-    closer to the rename: round 6 moved it as close as it goes, to the instant
-    before the syscall, and this still failed. Two operations become one only
-    under mutual exclusion, which is why the lock is on the transaction and the
-    racer is one that can wait for it."""
+    """A compare and a rename are two operations, and a racer can publish
+    between them. Moving the comparison closer to the rename does not close the
+    gap. Two operations become one only under mutual exclusion, which is why
+    the lock is on the transaction and the racer is one that can wait for it."""
     root, entry = pkg_present
     project = tmp_path / "project"
     project.mkdir()
@@ -310,12 +326,10 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
         '    "other": {"command": "other", "args": []}\n'
         '  }\n}',
         encoding="utf-8")
-    # The racer IS the real CLI, so its root is HOME-derived
+    # The racer is the real CLI, so its root is HOME-derived
     # (`serve.install_records_home()`), while this process passes `home=`
     # explicitly. The two contend on one lock only if both name the same tree,
-    # so the test builds it: HOME/.sunglasses. Setting only `SUNGLASSES_HOME`
-    # sent the racer's record into the developer's real `~/.sunglasses` and the
-    # row then failed against a lock nobody else was holding.
+    # so the test builds it: HOME/.sunglasses.
     home_root = tmp_path / "h"
     home = home_root / ".sunglasses"
     marker = tmp_path / "racer-trying"
@@ -329,8 +343,7 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
     pending_path.write_text(json.dumps(rec), encoding="utf-8")
     rec_path.unlink()
 
-    env = dict(os.environ, HOME=str(home_root), SUNGLASSES_HOME=str(home),
-               PYTHONPATH=str(root), PYTHONDONTWRITEBYTECODE="1")
+    env = _env(root, HOME=str(home_root), SUNGLASSES_HOME=str(home))
     racer = subprocess.Popen(
         [sys.executable, "-B", "-c", RACER, str(marker), str(target)],
         cwd=str(project), env=env, stdout=subprocess.PIPE,
@@ -347,9 +360,9 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
         def barrier(src, dst):
             if pathlib.Path(dst) == target and not entered:
                 entered.append(True)
-                # Inside the critical section, AFTER the comparison: the only
-                # instant round 6 left. Give the racer every chance to finish.
-                # Without the lock it does, and the next line destroys its work.
+                # Inside the critical section, after the comparison: give the
+                # racer every chance to finish. Without mutual exclusion it
+                # could, and the next line would destroy its work.
                 stop = time.monotonic() + 2
                 while time.monotonic() < stop and racer.poll() is None:
                     time.sleep(0.01)
@@ -380,10 +393,10 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
 
 def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
         tmp_path, pkg_present):
-    """The remainder of the review's step 3 that it did not reach: not a
-    simulated wait, an actual one. A writer blocks on the lock while a second
-    process changes the file twice, and what it publishes has to describe what
-    is there when it finally gets in, not what it read before it waited."""
+    """Not a simulated wait, an actual one. A writer blocks on the lock while
+    a second process changes the file twice, and what it publishes has to
+    describe what is there when it finally gets in, not what it read before it
+    waited."""
     root, entry = pkg_present
     project = tmp_path / "project"
     project.mkdir()
@@ -398,18 +411,10 @@ def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
 
     holder_ready = tmp_path / "holder-ready"
     release = tmp_path / "release"
-    code = (
-        "import sys, time, pathlib\n"
-        "from sunglasses import install as i\n"
-        "with i._exclusive(pathlib.Path(sys.argv[1])):\n"
-        "    pathlib.Path(sys.argv[2]).touch()\n"
-        "    while not pathlib.Path(sys.argv[3]).exists():\n"
-        "        time.sleep(0.01)\n")
     holder = subprocess.Popen(
-        [sys.executable, "-B", "-c", code,
+        [sys.executable, "-B", "-c", HOLDER,
          str(inst._lock_path(home, target)), str(holder_ready), str(release)],
-        env=dict(os.environ, SUNGLASSES_HOME=str(home), PYTHONPATH=str(root),
-                 PYTHONDONTWRITEBYTECODE="1"),
+        env=_env(root, SUNGLASSES_HOME=str(home)),
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         deadline = time.monotonic() + 10
@@ -422,8 +427,7 @@ def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
 
         def change_it_twice_then_wait(t, data):
             if not changed:
-                # Set before the uninstall below, which writes through this
-                # same boundary; a guard set afterwards re-enters.
+                # Recorded first, so this hook acts once.
                 changed.append(None)
                 # Two real changes to the file itself. Written directly rather
                 # than through uninstall: uninstall takes the very lock the
@@ -462,9 +466,10 @@ def test_a_second_change_during_a_real_wait_is_seen_by_the_waiter(
 def test_install_says_what_happens_next_and_names_only_real_things(tmp_path, monkeypatch):
     """The success message has to be runnable, not reassuring.
 
-    Every claim it makes is checked against the product here, because a message
-    that names a command or a directory that does not exist is worse than
-    silence: it sends the reader somewhere and they find nothing.
+    The commands, directories and field names it names are checked against the
+    product here, because a message that names a command or a directory that
+    does not exist is worse than silence: it sends the reader somewhere and
+    they find nothing.
 
     It must NOT make a protection claim. A wrap succeeding says the launch path
     goes through us and nothing about what is enforced.
