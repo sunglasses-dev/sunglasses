@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Stopping `sunglasses proxy` with SIGTERM, SIGHUP or SIGINT now stops the server it started as well, the same way a closed input does, and the proxy exits 143, 129 or 130 with one line on stderr and no traceback. Those signals used to end the proxy at once and leave the server running with nothing mediating it (SIGINT ended in a traceback). A second signal while it shuts down changes nothing.
+
 ## [0.6.18] — 2026-11-01
 
 ### Added
