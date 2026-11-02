@@ -20,20 +20,21 @@ front of us, which is not doubt, and contract row 10.3 gives it precedence over 
 An instrument that never ran is doubt, not a failure: a self-test that was not
 run is 3, and only a self-test that ran and did not pass is 1.
 
-WHAT IS NOT BUILT YET, stated here rather than stubbed quietly: contract row
-10.2's per-route launch. `default_self_test` now spawns `sys.executable -m
-sunglasses.proxy` against the bundled echo server (`live_selftest`), but
-`default_launcher` still reports that nothing was launched, so every wrapped route
-is NOT_RUN and `run()` exits 3 (not verifiable), never 0: a doctor that cannot
-demonstrate mediation of a route must never imply it. Where the self-test cannot
-come up (no process groups, the system refuses its folder or a process, it runs out
-of time, or the proxy never answers `initialize`) it reports
+PER-ROUTE LAUNCH (contract row 10.2). `default_launcher` starts nothing, so a plain
+`doctor` leaves every wrapped route NOT_RUN and exits 3 (not verifiable), never 0: a doctor
+that cannot demonstrate mediation of a route must never imply it. Starting the user's own
+servers is opt-in: `run(launch_routes=True)` (`doctor --launch-routes`) builds a
+`route_launch.RouteLauncher`, which starts each wrapped route in the user's own file once. It
+reads no word from the route into the report: only the verdicts and the codes named in this module.
+Where the self-test cannot come up (no process groups, the system refuses its folder or a
+process, it runs out of time, or the proxy never answers `initialize`) it reports
 that nothing ran, with failure_class SELF_TEST_UNAVAILABLE and the five checks
 rendered NOT_RUN. Both are injectable so the decision logic above them is
 exercised without a spawn.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -102,6 +103,24 @@ NOT_RUN = "NOT_RUN"
 # is "nothing launched it", which is not a failure and must never be spelled as one.
 ROUTE_RESULTS = ("PASS", "FAIL", NOT_RUN)
 
+# Why a route is NOT_RUN, when `--launch-routes` was given. Codes of our own, never
+# a word the route or the operating system said; the sentence for each is ours too.
+REASON_NOT_USER_FILE = "NOT_USER_FILE"
+REASON_CAP = "CAP"
+REASON_NO_INITIALIZE = "NO_INITIALIZE"
+REASON_COULD_NOT_START = "COULD_NOT_START"
+REASON_OUT_OF_TIME = "OUT_OF_TIME"
+REASON_UNSUPPORTED = "UNSUPPORTED"
+ROUTE_REASON_TEXT = {
+    REASON_NOT_USER_FILE: "project file or other file, not started (only entries in your own "
+                          "~/.claude.json are started)",
+    REASON_CAP: "not started: cap (16 routes, or fewer than 30 s of the 120 s left)",
+    REASON_NO_INITIALIZE: "no `initialize` result in 20 s; this may be the server and not the proxy",
+    REASON_COULD_NOT_START: "it could not be started",
+    REASON_OUT_OF_TIME: "it used its 30 s allowance before the check could finish",
+    REASON_UNSUPPORTED: "it was not started: this machine has no process groups or no readable process list, so its server could not be stopped",
+}
+
 # The only details this report will ever print. An allowlist rather than a
 # string, because `detail` is the field a future caller reaches for when it has
 # an exception to explain, and the doctor's report is read in a terminal by the
@@ -137,6 +156,14 @@ class Entry:
     # `passed` alone cannot say "never launched": False meant both that
     # and "launched and failed", and the JSON rendered the first as FAIL.
     result: str = NOT_RUN
+    # The entry as the file holds it, for the launcher alone. Never rendered, never
+    # compared, never in a repr: it carries the route's arguments and environment.
+    spec: dict = field(default=None, repr=False, compare=False)
+    # True for the user's own file (`~/.claude.json`): the only file whose entries
+    # `--launch-routes` will start.
+    user_file: bool = False
+    # Why NOT_RUN, one of the codes above; "" when nothing needs saying.
+    reason: str = ""
 
 
 @dataclass
@@ -341,6 +368,26 @@ def default_sources():
             ("user", Path.home() / ".claude.json")]
 
 
+def _is_user_file(label, path) -> bool:
+    """The user's own `~/.claude.json`: its own label, or a `--config` path that names it.
+
+    A project file is never the user's, whatever it resolves to: a `.mcp.json` that is a
+    link to the user file would otherwise start the user's servers from a cloned folder.
+    That holds for a path named with `--config` too, so the path is compared as it was
+    written (no links followed, no `..`), and only the user file's own name matches.
+    """
+    if label == "project":
+        return False
+    if label == "user":
+        return True
+    try:
+        if ".." in Path(path).parts:
+            return False
+        return os.path.abspath(path) == os.path.abspath(Path.home() / ".claude.json")
+    except (OSError, ValueError):
+        return False
+
+
 def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
     """Read every known source, classify every entry, and name what we could
     not read. Returns (entries, unreadable).
@@ -385,10 +432,12 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
         except (OSError, _install.ConfigIOError):
             unreadable.append(str(path))
             continue
+        user_file = _is_user_file(label, path)
         for name, spec in servers.items():
             entries.append(Entry(
                 name=name, source=label,
-                state=_install.classify(spec, artifact=artifact)))
+                state=_install.classify(spec, artifact=artifact),
+                spec=spec, user_file=user_file))
     return entries, unreadable
 
 
@@ -399,7 +448,10 @@ def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
     unreadable = list(unreadable or [])
 
     per_wrapper = [{"name": e.name, "source": e.source,
-                    "result": e.result}
+                    "result": e.result,
+                    # Only where there is a reason, so a report without a launch is
+                    # the document it always was.
+                    **({"reason": e.reason} if e.reason in ROUTE_REASON_TEXT else {})}
                    for e in entries if e.state == WRAPPED]
     inventory = [{"name": e.name, "source": e.source, "state": e.state}
                  for e in entries]
@@ -472,7 +524,8 @@ def process_exit_code(outcome, self_test_ok, unreadable=(), key_unusable=False,
 
 
 def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
-        self_test=None, launcher=None, home=None, approvals_root=None) -> Report:
+        self_test=None, launcher=None, home=None, approvals_root=None,
+        launch_routes=False) -> Report:
     """Read, classify, self-test, launch every wrapped route, then aggregate.
 
     Every part above is called from here. On 2026-09-13 a review of this lane
@@ -527,22 +580,30 @@ def run(sources=None, artifact=None, artifact_sha=None, hash_of=None,
     self_test_unavailable = (not ok) and failure_class == SELF_TEST_UNAVAILABLE
     detail = info.get("detail") or ("" if controls else SELF_TEST_UNAVAILABLE)
 
-    launch = launcher or default_launcher
     route_checks = {}
-    for entry in entries:
-        if entry.state != WRAPPED:
-            continue
-        # `route_result` and not `checks`. This loop used to
-        # assign the launcher's checks to the SAME local that held the
-        # self-test's, so `self_test_checks` below stored the LAST route's
-        # checks: the rendered self-test said its deadline check PASSED while
-        # the failure class said DEADLINE. The exit code survived and the
-        # evidence named the wrong thing, which is worse than a wrong exit
-        # because it is the part an operator reads.
-        passed, route_result = launch(entry)
-        entry.result = _route_result(passed)
-        entry.passed = entry.result == "PASS"
-        route_checks[f"{entry.source}:{entry.name}"] = _safe_checks(route_result)
+    # `launch_routes` starts the user's own servers, so it is asked for by name and
+    # the launcher is only built when there is a wrapped route to start. A launcher
+    # handed in by a caller is used as given.
+    with contextlib.ExitStack() as stack:
+        launch = launcher
+        if launch is None and launch_routes and any(e.state == WRAPPED for e in entries):
+            from . import route_launch
+            launch = stack.enter_context(route_launch.RouteLauncher())
+        launch = launch or default_launcher
+        for entry in entries:
+            if entry.state != WRAPPED:
+                continue
+            # `route_result` and not `checks`. This loop used to
+            # assign the launcher's checks to the SAME local that held the
+            # self-test's, so `self_test_checks` below stored the LAST route's
+            # checks: the rendered self-test said its deadline check PASSED while
+            # the failure class said DEADLINE. The exit code survived and the
+            # evidence named the wrong thing, which is worse than a wrong exit
+            # because it is the part an operator reads.
+            passed, route_result = launch(entry)
+            entry.result = _route_result(passed)
+            entry.passed = entry.result == "PASS"
+            route_checks[f"{entry.source}:{entry.name}"] = _safe_checks(route_result)
 
     outcome = aggregate(sources_readable=not unreadable, entries=entries,
                         unreadable=unreadable)

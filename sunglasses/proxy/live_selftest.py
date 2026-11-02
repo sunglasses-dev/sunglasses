@@ -110,7 +110,7 @@ class _Terminated(BaseException):
 class _Peer:
     """A spawned process in its own group, read through a queue so every wait has a limit."""
 
-    def __init__(self, argv, env, cwd):
+    def __init__(self, argv, env, cwd, clock=None):
         self.proc = None
         self._reader = None
         self._lines = queue.Queue()
@@ -125,7 +125,7 @@ class _Peer:
             self._reader = threading.Thread(target=self._pump, daemon=True)
             self._reader.start()
         except BaseException as exc:
-            self.kill()
+            self.kill(clock)
             if isinstance(exc, (OSError, RuntimeError)):
                 raise _CouldNotStart(type(exc).__name__) from None
             raise
@@ -181,7 +181,9 @@ class _Peer:
         except subprocess.TimeoutExpired:
             return None
 
-    def kill(self):
+    def kill(self, clock=None):
+        """Stop the process and its group. With a `clock` the reap and the reader join are cut
+        to what is left of it."""
         if self.proc is None:
             return
         # The group is killed whether or not its leader is still alive: a leader
@@ -192,11 +194,11 @@ class _Peer:
             self.proc.kill()
         except OSError:
             pass
-        self.wait(2.0)
+        self.wait(2.0 if clock is None else clock.take(2.0))
         self.close_stdin()
         reader_started = self._reader is not None and self._reader.ident is not None
         if reader_started:
-            self._reader.join(PUMP_JOIN_S)
+            self._reader.join(PUMP_JOIN_S if clock is None else clock.take(PUMP_JOIN_S))
         if not reader_started or not self._reader.is_alive():
             try:
                 self.proc.stdout.close()
