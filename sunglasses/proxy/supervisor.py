@@ -18,6 +18,7 @@ from __future__ import annotations
 import errno
 import os
 import signal
+import threading
 import time
 
 
@@ -197,3 +198,53 @@ def stop_group(pid, *, grace_ms=2000, poll_ms=25, handle=None):
 
     _collect(handle)
     return settled() is True
+
+
+# The longest a caller waits for another caller's stop to finish: the 2 s after
+# SIGTERM, the 1 s after SIGKILL and the 1 s final reap of `stop_group`, which is
+# the most a stop can take. It is the same time that caller would have spent
+# stopping the group itself, so waiting adds nothing to a teardown's total.
+STOP_WAIT_S = 4.0
+
+
+class StopOnce:
+    """One stop per server group, decided under one lock.
+
+    The deadline close and the teardown that a signal starts can both reach the
+    group at the same moment, and a check made before stopping ("is it gone
+    yet?") is answered too late. So the decision is made here: the first caller
+    to ask is the one that stops the group, and any other caller never calls
+    `stop_group`; it waits, for at most `STOP_WAIT_S`, for the first one to
+    finish and returns the answer that one got.
+
+    A stop that did not end with the group gone gives the claim back, so a later
+    caller can try again; the only thing this refuses is a second stop of a group
+    that a first stop is already taking down or already took down.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._claimed = False
+        self._done = threading.Event()
+        self._result = False
+
+    def run(self, stop):
+        with self._lock:
+            first = not self._claimed
+            if first:
+                self._claimed = True
+                self._done.clear()
+        if first:
+            result = False
+            try:
+                result = bool(stop())
+                return result
+            finally:
+                self._result = result
+                if not result:
+                    with self._lock:
+                        self._claimed = False
+                self._done.set()
+        if self._done.wait(STOP_WAIT_S):
+            return self._result
+        return False

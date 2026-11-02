@@ -29,6 +29,7 @@ import hashlib
 import os
 import pathlib
 import shlex
+import signal
 import subprocess
 import sys
 import threading
@@ -245,8 +246,104 @@ def _close_spare(scan, error):
             error.add_note(f"closing the warm spare failed too: {failure!r}")
 
 
+# The signals a client, a supervisor or a terminal uses to stop a process it
+# started. Each one ends the session the way a closed input does.
+_END_SIGNALS = tuple(
+    each for each in (signal.SIGTERM, signal.SIGINT, getattr(signal, "SIGHUP", None))
+    if each is not None)
+
+
+def _end_on_signals(state):
+    """Make a stop signal end the session through the normal teardown.
+
+    The server runs in a group of its own (`start_new_session=True`), so a
+    signal that kills the proxy does not reach it. With the default action
+    SIGTERM and SIGHUP ended the proxy at once and left the server running with
+    nothing mediating it; SIGINT ran the teardown but ended in a traceback.
+
+    The handler only remembers the FIRST signal, in a plain assignment. It takes
+    no lock and wakes nothing: a second signal can run the handler again while
+    the main thread is inside any lock, and `Event.set()` takes one that a
+    handler cannot safely wait on. `_wait_for_end` notices the remembered signal
+    on its next short poll, and the teardown in `_serve` then runs once, on the
+    main thread, as it does when the client closes its end.
+
+    From the remembered signal to the process leaving, the teardown waits at
+    most: 0.25 s for the server's input to close (`bounds.KILL_GRACE_MS`), 5 s
+    for the reader thread (0.25 s when the session already ended on a stalled
+    write), 0.25 s for the server's exit status, 2 s for the server's group to
+    leave after SIGTERM, 1 s for it to leave after SIGKILL, and 1 s for the
+    final reap of the server's exit status: 9.5 s in all, plus the 50 ms signal
+    poll and the 25 ms step inside the group wait. Writing the log's last row
+    and closing the warm spare are not waits on the server and have no bound
+    here. A write to a server that has stopped reading can keep the session from
+    seeing the client's end of input; that limit is older than the signal
+    handlers and they do not change it.
+
+    Handlers can only be set from the main thread; anywhere else (a test that
+    calls `main` from a worker thread) nothing is installed and the returned
+    function does nothing. Otherwise it returns the function that puts the
+    previous handlers back.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return lambda: None
+
+    def handler(signum, frame):
+        if state["signum"] is None:
+            state["signum"] = signum
+
+    previous = {}
+    for signum in _END_SIGNALS:
+        try:
+            previous[signum] = signal.signal(signum, handler)
+        except (OSError, ValueError):
+            pass
+
+    def restore():
+        for signum, old in previous.items():
+            try:
+                signal.signal(signum, old)
+            except (OSError, ValueError, TypeError):
+                pass
+    return restore
+
+
+# How often the main thread looks for a remembered stop signal while it waits
+# for the session to end.
+_SIGNAL_POLL_S = 0.05
+
+
+def _wait_for_end(done, state):
+    """Block until either side ends the session or a stop signal was remembered."""
+    while state["signum"] is None and not done.wait(_SIGNAL_POLL_S):
+        pass
+
+
 def main(argv=None, stdin=None, stdout=None, stderr=None):
     stderr = stderr if stderr is not None else sys.stderr
+    done = threading.Event()
+    state = {"signum": None, "server_stopped": None}
+    restore = _end_on_signals(state)
+    try:
+        code = _serve(argv, stdin, stdout, stderr, done, state)
+    finally:
+        restore()
+    if state["signum"] is not None:
+        # 128 + the signal number, the shell's own convention: 143, 129, 130.
+        # One line, and never a traceback. The server is mentioned only when
+        # the teardown ran and gave an answer: stopped when its group was gone,
+        # possibly still running when it was not.
+        name = signal.Signals(state["signum"]).name
+        stopped = state["server_stopped"]
+        tail = ("; its server was stopped" if stopped
+                else "; its server may still be running" if stopped is False
+                else "")
+        stderr.write(f"sunglasses proxy: stopped by {name}{tail}.\n")
+        return 128 + state["signum"]
+    return code
+
+
+def _serve(argv, stdin, stdout, stderr, done, state):
     upstream_argv, options = parse(sys.argv[1:] if argv is None else argv)
     root = options.get("state-root")
     worker = options.get("worker", "inprocess")
@@ -372,7 +469,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     # There is nothing to mediate once either side is gone, so whichever
     # finishes first ends the session, and the teardown below runs exactly once
     # on the main thread.
-    done = threading.Event()
+    # `done` is made in `main`, before the server is started, so a stop signal
+    # that arrives while the session is still being wired is not lost.
     # AR14. Set once the teardown has run, so a caller that OWNS the process
     # can leave without waiting on a client reader that is blocked on a pipe
     # nobody will write to again. See `exit_process`.
@@ -389,7 +487,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         reader.start()
         client.start()
         watchdog.start()
-        done.wait()
+        _wait_for_end(done, state)
     finally:
         _close(child)
         # AR13. A reader blocked writing to a client that has stopped reading
@@ -411,7 +509,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         # session whose ending was never written down.
         _record_ending(log, session, code)
         log.close()
-        supervisor.stop_group(child.pid, handle=child)
+        state["server_stopped"] = _stop_server(session, child)
         # The warm spare, if any. `exit_process` leaves through `os._exit`, so
         # an atexit hook would never run and the spare would outlive us.
         close_scan = getattr(engine.scan, "close", None)
@@ -663,10 +761,42 @@ def _drain_client(engine, session, stdin, done):
 
 
 def _close(child):
+    """Close the server's input without waiting for it for ever.
+
+    A client thread that is flushing a frame into a server that has stopped
+    reading holds the writer's lock, and closing waits for that lock. So the
+    close runs on its own thread and the teardown waits for it only for the kill
+    grace. If it is still waiting, the group stop further down ends the server,
+    the write fails, and the close finishes by itself.
+    """
+    def close():
+        try:
+            child.stdin.close()
+        except OSError:
+            pass
     try:
-        child.stdin.close()
-    except OSError:
+        closer = threading.Thread(target=close, daemon=True)
+        closer.start()
+        closer.join(timeout=bounds.KILL_GRACE_MS / 1000)
+    except RuntimeError:
+        # No thread could be started. The close is a courtesy: the group stop
+        # that follows ends the server whether or not its input was closed, and
+        # the ending and the stop must still run.
         pass
+
+
+def _stop_server(session, child):
+    """Stop the server's group through the session's claim.
+
+    The session also stops the group when it closes itself, on a deadline or on
+    the server's end of output. Whichever of the two asks the claim first stops
+    the group; the other does not call `stop_group` and waits, for at most
+    `supervisor.STOP_WAIT_S`, for that stop to finish. That wait stands in for
+    the stop this side would otherwise have made, so it adds nothing to the
+    total.
+    """
+    return session.group_stop.run(
+        lambda: supervisor.stop_group(child.pid, handle=child))
 
 
 def _exit_code(session, child):
@@ -675,9 +805,9 @@ def _exit_code(session, child):
     `child.poll()` answers None for a child that has not finished exiting, and
     mapping None to EXIT_OK would report an upstream that was on its way to
     failing as a clean run. A non-blocking question cannot wait out an exit
-    already under way, so it is the wrong question: the child's stdin is
-    already closed by `_close` above, and a child that is going to exit has
-    begun.
+    already under way, so it is the wrong question: `_close` above asked
+    for the child's stdin to be closed, and a child that is going to exit has
+    begun if that close finished within its grace.
 
     The wait is BOUNDED by the same kill grace the teardown uses, and a timeout
     still means EXIT_OK. Unknown is not a fault -- the proxy may be leaving

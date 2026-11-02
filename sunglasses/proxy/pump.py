@@ -381,6 +381,10 @@ class Session:
         # One settlement owner. The reader and the watcher both reach the debt
         # and only one of them may be holding it at a time.
         self._settlement = threading.Lock()
+        # The one claim on stopping the server's group. The close that a deadline
+        # or an end of output starts and the teardown a stop signal starts both
+        # ask it, and only the first of them calls `stop_group`.
+        self.group_stop = supervisor.StopOnce()
         # RC13. Items that have LEFT `_pending` and have not yet reached the
         # core. Without this set there is a moment when a request is in neither
         # table, and a close that lands in it records no debt for a client who
@@ -2727,8 +2731,9 @@ class Session:
         target = self._pgid if self._pgid is not None else self._upstream.pid
 
         def stop():
-            return supervisor.stop_group(target, grace_ms=250,
-                                         handle=self._upstream)
+            return self.group_stop.run(
+                lambda: supervisor.stop_group(target, grace_ms=250,
+                                              handle=self._upstream))
         return stop
 
     def _drain_refusals(self):

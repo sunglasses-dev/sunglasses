@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Stopping `sunglasses proxy` with SIGTERM, SIGHUP or SIGINT runs the same teardown as a closed input: the server the proxy started is stopped, and the proxy exits 143, 129 or 130 with one line on stderr and no traceback. Before this change SIGTERM and SIGHUP ended the proxy at once and left that server running, and SIGINT ran the teardown but ended in a traceback. The first signal decides the exit code, and a later signal does not start a second teardown. The server's group is stopped once: the session's own close and the teardown both ask one claim, the first to ask stops the group, and the other waits for that stop (at most 4 s, the time a stop itself can take) without making a second one. From the signal to the proxy leaving, the teardown waits at most 9.5 s in all: 0.25 s for the server's input to close, 5 s for the reader thread, 0.25 s for the server's exit status, 2 s for the server's group to leave after SIGTERM, 1 s after SIGKILL and 1 s for the final reap of its exit status (plus a 50 ms signal poll and a 25 ms step in the group wait). A write to a server that has stopped reading can keep the proxy from seeing the client's end of input; that limit is not changed by this entry.
+
 ## [0.6.18] — 2026-11-01
 
 ### Added
