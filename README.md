@@ -198,6 +198,29 @@ the rule, the bytes inspected and the rule ids that fired:
 - **Ordinary traffic passes.** `tools/list` returns the real list and a benign
   call returns its real result.
 
+### Known limits when the proxy is stopped
+
+What follows is measured on the current release with a real proxy and a real
+server over pipes (Ctrl-C on Python 3.9, 3.12, 3.13 and 3.14; the rest on
+3.14). It states what happens today.
+
+- **SIGTERM and SIGHUP end the proxy and do not stop the server it started.**
+  The proxy runs the server in a process group of its own and has no handler
+  for these two signals. A server that exits when its input closes, as the
+  bundled echo server does, goes away on its own. A server that keeps running
+  after its input closes is still running when the proxy has gone. To stop the
+  proxy and its server together, close the proxy's stdin or press Ctrl-C, and
+  check that the server is gone.
+- **Ctrl-C (SIGINT) and closing stdin both leave the server gone, and Ctrl-C
+  does not end cleanly.** Closing stdin ends the proxy with exit status 0.
+  After Ctrl-C the proxy prints a Python traceback and a "Fatal Python error"
+  message on stderr and exits by abort (status 134 in a shell).
+- **A server that has stopped reading its input can keep the proxy from
+  ending.** When the proxy is in the middle of writing a message to such a
+  server (170 KB in the measurement), closing stdin and Ctrl-C both left the
+  proxy running for the 20 seconds we watched, with the server still running.
+  If a wrapped server can stop reading, do not rely on closing stdin to stop it.
+
 ### What this is not
 
 This is the credential lane on tool results and tool calls. It is **not**
