@@ -29,6 +29,7 @@ import hashlib
 import os
 import pathlib
 import shlex
+import signal
 import subprocess
 import sys
 import threading
@@ -245,8 +246,77 @@ def _close_spare(scan, error):
             error.add_note(f"closing the warm spare failed too: {failure!r}")
 
 
+# The signals a client, a supervisor or a terminal uses to stop a process it
+# started. Each one ends the session the way a closed input does.
+_END_SIGNALS = tuple(
+    each for each in (signal.SIGTERM, signal.SIGINT, getattr(signal, "SIGHUP", None))
+    if each is not None)
+
+
+def _end_on_signals(done, state):
+    """Make a stop signal end the session through the normal teardown.
+
+    The server runs in a group of its own (`start_new_session=True`), so a
+    signal that kills the proxy does not reach it: with the default action the
+    proxy left at once and the server kept running with nobody mediating it
+    (SIGINT only got as far as a traceback). The handler does one thing, which
+    is to say the session is over; the teardown in `_serve` then runs once, on
+    the main thread, exactly as it does when the client closes its end. A second
+    signal while it runs changes nothing, so the teardown is not cut short.
+
+    Handlers can only be set from the main thread; anywhere else (a test that
+    calls `main` from a worker thread) nothing is installed and the function
+    behaves as before. Returns the function that puts the old handlers back.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return lambda: None
+
+    def handler(signum, frame):
+        if state["signum"] is None:
+            state["signum"] = signum
+        done.set()
+
+    previous = {}
+    for signum in _END_SIGNALS:
+        try:
+            previous[signum] = signal.signal(signum, handler)
+        except (OSError, ValueError):
+            pass
+
+    def restore():
+        for signum, old in previous.items():
+            try:
+                signal.signal(signum, old)
+            except (OSError, ValueError, TypeError):
+                pass
+    return restore
+
+
 def main(argv=None, stdin=None, stdout=None, stderr=None):
     stderr = stderr if stderr is not None else sys.stderr
+    done = threading.Event()
+    state = {"signum": None, "server_stopped": None}
+    restore = _end_on_signals(done, state)
+    try:
+        code = _serve(argv, stdin, stdout, stderr, done, state)
+    finally:
+        restore()
+    if state["signum"] is not None:
+        # 128 + the signal number, the shell's own convention: 143, 129, 130.
+        # One line, and never a traceback. The server is mentioned only when
+        # the teardown ran and gave an answer: stopped when its group was gone,
+        # possibly still running when it was not.
+        name = signal.Signals(state["signum"]).name
+        stopped = state["server_stopped"]
+        tail = ("; its server was stopped" if stopped
+                else "; its server may still be running" if stopped is False
+                else "")
+        stderr.write(f"sunglasses proxy: stopped by {name}{tail}.\n")
+        return 128 + state["signum"]
+    return code
+
+
+def _serve(argv, stdin, stdout, stderr, done, state):
     upstream_argv, options = parse(sys.argv[1:] if argv is None else argv)
     root = options.get("state-root")
     worker = options.get("worker", "inprocess")
@@ -372,7 +442,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     # There is nothing to mediate once either side is gone, so whichever
     # finishes first ends the session, and the teardown below runs exactly once
     # on the main thread.
-    done = threading.Event()
+    # `done` is made in `main`, before the server is started, so a stop signal
+    # that arrives while the session is still being wired is not lost.
     # AR14. Set once the teardown has run, so a caller that OWNS the process
     # can leave without waiting on a client reader that is blocked on a pipe
     # nobody will write to again. See `exit_process`.
@@ -411,7 +482,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
         # session whose ending was never written down.
         _record_ending(log, session, code)
         log.close()
-        supervisor.stop_group(child.pid, handle=child)
+        state["server_stopped"] = supervisor.stop_group(child.pid, handle=child)
         # The warm spare, if any. `exit_process` leaves through `os._exit`, so
         # an atexit hook would never run and the spare would outlive us.
         close_scan = getattr(engine.scan, "close", None)
