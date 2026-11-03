@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- `sunglasses proxy`: when Ctrl-C arrives while the proxy is serving, it now stops the server it started and ends with exit status 130 and no traceback; it used to end with `Fatal Python error` and an abort (status -6; 134 in a shell). Not changed: a Ctrl-C after the shutdown has begun is not caught and can still end the proxy with a traceback or an abort and leave the server running. The README gives the measured cases.
+
 ## [0.6.18] — 2026-11-01
 
 ### Added

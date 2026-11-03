@@ -198,6 +198,10 @@ the rule, the bytes inspected and the rule ids that fired:
 - **Ordinary traffic passes.** `tools/list` returns the real list and a benign
   call returns its real result.
 
+### Stopping the proxy with Ctrl-C
+
+When Ctrl-C (SIGINT) arrives while the proxy is serving, it stops the server it started and ends with exit status 130 and no traceback (3 of 3 runs with a server that exits when its input closes, 3 of 3 with a server that ignores a closed input; every figure in this section was measured on the proxy code of this change, with Python 3.14.7, on one machine). A Ctrl-C after the shutdown has begun is not caught: it can end the proxy with a traceback or an abort, and with a server that ignores a closed input it can leave that server running (client input closed, Ctrl-C 0.3 s later: status -2, server left running, 3 of 3 runs; a second Ctrl-C 0.3, 1.0 or 2.5 s after the first: status -6, server left running, 9 of 9 runs; an interrupt injected at each of 6 statements of the shutdown after the server had exited on its own: status -6, 6 of 6 runs). A Ctrl-C before serving begins is unchanged, and these measurements do not cover it. A server that has stopped reading its input, with a 170,868-byte frame in flight, left the proxy and the server running 20 s after Ctrl-C (3 of 3 runs), so check that the server is gone after any Ctrl-C.
+
 ### What this is not
 
 This is the credential lane on tool results and tool calls. It is **not**
