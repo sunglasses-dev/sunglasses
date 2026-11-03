@@ -37,28 +37,37 @@ RAW_CONFIG = (
 )
 
 
-def sg(*args, cwd, home, pkgroot=None):
-    """PYTHONPATH is pinned to the repo on purpose, or to `pkgroot` when a test
-    needs to decide for itself whether the proxy entry point exists (F3).
+_RUN_CLI = (
+    "import runpy, sys\n"
+    "sys.path.insert(0, sys.argv[1])\n"
+    "sys.argv[1:2] = []\n"
+    "runpy.run_module('sunglasses.cli', run_name='__main__', alter_sys=True)\n")
 
-    Without it these tests run `-m sunglasses.cli` from a tmp cwd, the import
-    fails before argparse is ever reached, and every assertion of the form
-    "invalid choice not in stderr" passes against a process that never started.
-    Three of these tests passed that way before this line existed. Installed
-    versus tree, the Sep-14 lesson, inside my own harness.
+
+def sg(*args, cwd, home, pkgroot=None):
+    """Run the CLI in a child process from the package tree `pkgroot`, or from
+    the repository when none is given. A test passes `pkgroot` when it needs to
+    decide for itself whether the proxy entry point exists.
+
+    The child puts that tree first on `sys.path` in its own code. It does not
+    rely on PYTHONPATH, which a launcher that starts Python in isolated mode, or
+    that already puts another tree on the path, would ignore. With no tree on
+    the path and no installed copy, `-m sunglasses.cli` from a temporary working
+    directory fails at import, and every assertion of the form "invalid choice
+    not in stderr" passes against a process that never started.
 
     `HOME` is isolated alongside `SUNGLASSES_HOME` because the install record
     now lives under `serve.state_root()`, which is HOME-derived by design. With
     only the variable set, every row here would write its record into the real
-    user's `~/.sunglasses` and read an empty sandbox -- which is the Sep-19
-    failure verbatim: isolate BOTH, and assert the artefact landed inside the
-    sandbox rather than trusting an empty directory.
+    user's `~/.sunglasses` and read an empty sandbox: isolate BOTH, and assert
+    the artefact landed inside the sandbox rather than trusting an empty
+    directory.
     """
     env = dict(os.environ, HOME=str(home), SUNGLASSES_HOME=str(home),
-               PYTHONPATH=str(pkgroot) if pkgroot else REPO,
                PYTHONDONTWRITEBYTECODE="1")
-    return subprocess.run([sys.executable, "-B", "-m", "sunglasses.cli", *args],
-                          cwd=str(cwd), env=env, capture_output=True, text=True)
+    return subprocess.run(
+        [sys.executable, "-B", "-c", _RUN_CLI, str(pkgroot or REPO), *args],
+        cwd=str(cwd), env=env, capture_output=True, text=True)
 
 
 def _package_copy(dest, *, with_artifact):
@@ -286,6 +295,7 @@ def test_install_accepts_an_explicit_config_path(tmp_path):
 
 RACER = """
 import os, pathlib, runpy, sys
+sys.path.insert(0, sys.argv[3])
 pathlib.Path(sys.argv[1]).write_text("trying")
 sys.argv = ["sunglasses", "install", "other", "--config", sys.argv[2]]
 runpy.run_module("sunglasses.cli", run_name="__main__")
@@ -330,9 +340,9 @@ def test_a_racing_install_that_can_wait_survives_our_rename(
     rec_path.unlink()
 
     env = dict(os.environ, HOME=str(home_root), SUNGLASSES_HOME=str(home),
-               PYTHONPATH=str(root), PYTHONDONTWRITEBYTECODE="1")
+               PYTHONDONTWRITEBYTECODE="1")
     racer = subprocess.Popen(
-        [sys.executable, "-B", "-c", RACER, str(marker), str(target)],
+        [sys.executable, "-B", "-c", RACER, str(marker), str(target), str(root)],
         cwd=str(project), env=env, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True)
     try:
