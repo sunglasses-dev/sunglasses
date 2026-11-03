@@ -83,7 +83,7 @@ FAST_SHARDS = ["1", "2", "3", "4"]
 SHARD_PARTS = {"3.12": 4}
 SHARD_PARTS_DEFAULT = 2
 SHARD_INCLUDE = [{"python-version": "3.12", "shard": "3"}, {"python-version": "3.12", "shard": "4"}]
-INTEGRITY_SUITE_CMD = ("pytest -q --durations=0 "
+INTEGRITY_SUITE_CMD = ("pytest -q -rfEs --durations=0 "
                        "${{ needs.classify.outputs.quick == 'true' && '-m \"not full_matrix\"' || '' }}")
 
 CANONICAL_COVERAGE_RUN = 'echo "classify=$CLASSIFY full=$FULL fast=$FAST integrity=$INTEGRITY"\n[ "$CLASSIFY" = "success" ] || { echo "COVERAGE FAIL: classify did not succeed"; exit 1; }\n[ "$FAST" = "success" ]     || { echo "COVERAGE FAIL: fast lane did not succeed"; exit 1; }\nif [ "$FULL" = "true" ]; then\n  [ "$INTEGRITY" = "success" ] || { echo "COVERAGE FAIL: full matrix required and not green ($INTEGRITY)"; exit 1; }\n  echo "COVERAGE OK: full matrix required and green"\nelse\n  [ "$FULL" = "false" ] || { echo "COVERAGE FAIL: classify output is neither true nor false ($FULL)"; exit 1; }\n  echo "COVERAGE OK: documentation-only change, fast lane green"\nfi\n'
@@ -1085,13 +1085,13 @@ def test_control_quick_lane_fails_open_on_grep_error(tmp_path):
 
 
 def _suite_step(d):
-    return [st for st in d["jobs"]["integrity"]["steps"] if "pytest -q --durations=0" in st.get("run", "")][0]
+    return [st for st in d["jobs"]["integrity"]["steps"] if "pytest -q -rfEs --durations=0" in st.get("run", "")][0]
 
 
 def test_control_main_lane_dropping_a_format_is_still_refused():
     """The point of the gate after this change: the narrowing is allowed on a pull
     request that cannot have touched a renderer and nowhere else."""
-    def always(d): _suite_step(d)["run"] = "pytest -q --durations=0 -m \"not full_matrix\""
+    def always(d): _suite_step(d)["run"] = "pytest -q -rfEs --durations=0 -m \"not full_matrix\""
     assert check_workflow(_mutate(always)) or quick_lane_shape(_mutate(always))
     def flipped(d):
         _suite_step(d)["run"] = _suite_step(d)["run"].replace("== 'true'", "!= 'true'")
