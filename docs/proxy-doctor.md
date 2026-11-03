@@ -98,6 +98,9 @@ has a limit of a few seconds; a descendant that still holds a pipe after that
 is abandoned, not waited for. A SIGKILL cannot be caught, so it leaves the
 folder behind.
 
+That is the doctor's own clean-up. The proxy it tests does not stop the same way on these signals; see
+[Known limits when the proxy is stopped](../README.md#known-limits-when-the-proxy-is-stopped).
+
 When a live or injected self-test is available, the doctor runs its own checks
 against controls that are supposed to FAIL before reporting on anything. In that
 contract a run is valid only when **all checks pass and all

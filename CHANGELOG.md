@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Documentation
+
+- README: a "Known limits when the proxy is stopped" block states what `sunglasses proxy` does on SIGTERM, SIGHUP, Ctrl-C, and a server that stops reading, in the cases that were measured. No behaviour changes.
+
 ## [0.6.18] — 2026-11-01
 
 ### Added

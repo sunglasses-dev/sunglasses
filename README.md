@@ -198,6 +198,14 @@ the rule, the bytes inspected and the rule ids that fired:
 - **Ordinary traffic passes.** `tools/list` returns the real list and a benign
   call returns its real result.
 
+### Known limits when the proxy is stopped
+
+Not measured: Windows (the proxy does not run there), Python 3.10 and 3.11, and any wait longer than 20 seconds. Unless a sentence names other Python versions, the runs were on Python 3.14, with a real proxy, a real server and real pipes.
+
+- **SIGTERM and SIGHUP end the proxy and do not stop the server it started.** A server that exits when its input closes goes away on its own; a server that keeps running after its input closes was still running when the proxy had gone.
+- **Ctrl-C (SIGINT) while the proxy is serving can end it by abort instead of an exit status.** In the runs, on Python 3.9, 3.12, 3.13 and 3.14, the proxy printed a Python traceback and a "Fatal Python error" message and exited with status -6 as Python reports it (134 in a shell), and the server it had started was gone afterwards. If the server has stopped reading its input, see the next limit.
+- **A server that has stopped reading its input can keep the proxy from ending.** With a 170,870-byte message in flight, closing stdin and Ctrl-C each left the proxy and the server running for the 20 seconds watched. If a wrapped server can stop reading, do not rely on closing stdin or on Ctrl-C to stop the proxy and its server together, and check that the server is gone.
+
 ### What this is not
 
 This is the credential lane on tool results and tool calls. It is **not**
