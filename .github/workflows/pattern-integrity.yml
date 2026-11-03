@@ -600,7 +600,7 @@ jobs:
         # log lines on a job that already runs for over two hours.
         env:
           CI_SHARD: ${{ matrix.shard }}/${{ matrix.python-version == '3.12' && 4 || 2 }}
-        run: pytest -q --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
+        run: pytest -q -rfEs --durations=0 ${{ needs.classify.outputs.quick == 'true' && '-m "not full_matrix"' || '' }}
 
   coverage:
     # The single check merge automation may rely on. always() so a skipped or
