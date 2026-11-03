@@ -30,45 +30,34 @@ ordered.
 import os
 import zlib
 
-DEFAULT_COST = 6
+DEFAULT_COST = 4
 
-# Seconds on the slowest interpreter in the matrix (3.12), from a green full
-# run's per-test durations: run 39015698884 (main after the prefilter-table
-# change), both 3.12 parts, setup + call + teardown summed per file. Every file
-# measured at 60 s or more is listed; DEFAULT_COST is the mean of the rest.
-# Keys are collected paths, as pytest prints them. The negation file's entry is
-# kept for the record only: SPLIT_BY_TEST takes it out of assign().
+# Seconds from run 41633101898 (main d8630621cbeb), Python 3.14, both parts summed
+# (setup + call + teardown per file, from pytest's per-test durations). Every file
+# measured at 60 s or more is listed; DEFAULT_COST is the mean of the rest. Keys are
+# collected paths, as pytest prints them. The negation file's entry is kept for the
+# record only: SPLIT_BY_TEST takes it out of assign().
 COST = {
-    "tests/test_negation_cues_and_lists.py": 6009,
-    "tests/test_v056_matrix.py": 1198,
-    "tests/test_api_response_siblings.py": 512,
-    "tests/test_repair_v056.py": 238,
-    "tests/test_benchmark_installed.py": 228,
-    "tests/test_defensive_framing_later_hits.py": 210,
-    "tests/test_lab_b1_quadratic_whitespace_gate.py": 205,
-    "tests/test_directive_and_hidden_text_case_matrix.py": 202,
-    "tests/test_benchmark_negatives_truth.py": 200,
-    "tests/test_prefilter_table.py": 164,
-    "tests/test_a_control_character_beside_a_negated_quote_changes_nothing.py": 148,
-    "tests/test_regex_prefilter.py": 146,
-    "tests/test_anchored_window_matching.py": 119,
-    "tests/test_hidden_text_rule_on_every_start_tag.py": 109,
-    "tests/test_ai_addressed_directive_rules.py": 109,
-    "tests/proxy/test_artifact_review.py": 108,
-    "tests/test_gauntlet.py": 101,
-    "tests/test_enc_alt_210_run_boundary.py": 92,
-    "tests/test_proxy_state_dir_obstruction.py": 89,
-    "tests/test_real_corpus_fp.py": 82,
-    "tests/test_repo_ladder_corpus.py": 61,
-    "tests/test_prefilter_branch_coverage.py": 61,
-    # Added later, from run 41582274118 (Python 3.14, the slowest interpreter in
-    # that run; both parts summed, same unit as above). These four had no entry and
-    # counted DEFAULT_COST while taking 584 to 1032 s, so one part carried most of
-    # them. The entries above are still the 3.12 figures.
-    "tests/test_settings_validator.py": 1032,
-    "tests/test_structural_validators.py": 839,
-    "tests/test_environment_ast_validator.py": 884,
-    "tests/test_registry_redirect_validator.py": 584,
+    "tests/test_settings_validator.py": 1199,
+    "tests/test_v056_matrix.py": 1001,
+    "tests/test_environment_ast_validator.py": 942,
+    "tests/test_structural_validators.py": 859,
+    "tests/test_negation_cues_and_lists.py": 838,
+    "tests/test_registry_redirect_validator.py": 647,
+    "tests/test_benchmark_installed.py": 354,
+    "tests/test_benchmark_negatives_truth.py": 236,
+    "tests/test_pattern_perf_gate.py": 227,
+    "tests/test_lab_b1_quadratic_whitespace_gate.py": 162,
+    "tests/test_api_response_siblings.py": 150,
+    "tests/test_extension_parity.py": 149,
+    "tests/proxy/test_poisoned_listing_end_to_end.py": 126,
+    "tests/test_real_corpus_fp.py": 119,
+    "tests/test_gauntlet.py": 99,
+    "tests/test_anchored_window_matching.py": 98,
+    "tests/test_repair_v056.py": 87,
+    "tests/proxy/test_artifact_review.py": 77,
+    "tests/test_scan_repo_progress_and_dir.py": 66,
+    "tests/test_repo_ladder_corpus.py": 62,
 }
 
 
