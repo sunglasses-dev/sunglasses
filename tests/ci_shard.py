@@ -61,6 +61,14 @@ COST = {
     "tests/test_real_corpus_fp.py": 82,
     "tests/test_repo_ladder_corpus.py": 61,
     "tests/test_prefilter_branch_coverage.py": 61,
+    # Added later, from run 41582274118 (Python 3.14, the slowest interpreter in
+    # that run; both parts summed, same unit as above). These four had no entry and
+    # counted DEFAULT_COST while taking 584 to 1032 s, so one part carried most of
+    # them. The entries above are still the 3.12 figures.
+    "tests/test_settings_validator.py": 1032,
+    "tests/test_structural_validators.py": 839,
+    "tests/test_environment_ast_validator.py": 884,
+    "tests/test_registry_redirect_validator.py": 584,
 }
 
 
