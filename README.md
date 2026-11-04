@@ -198,6 +198,8 @@ the rule, the bytes inspected and the rule ids that fired:
 - **Ordinary traffic passes.** `tools/list` returns the real list and a benign
   call returns its real result.
 
+Ctrl-C while the proxy is serving no longer aborts the interpreter. Once shutdown finishes, the process exits with status 130. Shutdown waits on the server, so a server that has stopped reading its input can hold it open.
+
 ### What this is not
 
 This is the credential lane on tool results and tool calls. It is **not**
