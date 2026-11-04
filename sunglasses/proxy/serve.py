@@ -48,6 +48,7 @@ WORKER_MODES = ("inprocess", "process")
 
 EXIT_OK = 0
 EXIT_FAULT = 1
+EXIT_INTERRUPTED = 130  # 128 + SIGINT
 EXIT_USAGE = 2
 
 
@@ -385,11 +386,21 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
     watchdog = threading.Thread(
         target=_watchdog, args=(session, log, writing_since, done, child),
         daemon=True)
+    # If Ctrl-C interrupts `done.wait()`, it is caught here; when the teardown
+    # below completes, `main` returns and `exit_process` takes its `os._exit`
+    # branch. Left to propagate, `main` never returns, interpreter shutdown
+    # meets the client reader blocked on stdin, and the process aborts
+    # (SIGABRT). An interrupt that lands anywhere else in `main`, or inside
+    # the teardown itself, is not handled here.
+    interrupted = False
     try:
         reader.start()
         client.start()
         watchdog.start()
-        done.wait()
+        try:
+            done.wait()
+        except KeyboardInterrupt:
+            interrupted = True
     finally:
         _close(child)
         # AR13. A reader blocked writing to a client that has stopped reading
@@ -405,6 +416,8 @@ def main(argv=None, stdin=None, stdout=None, stderr=None):
             reader.join(timeout=bounds.KILL_GRACE_MS / 1000
                         if stalled and stalled[0] == "SCAN_DEADLINE" else 5)
         code = _exit_code(session, child)
+        if interrupted:
+            code = EXIT_INTERRUPTED
         finished.set()
         # T905. The log needs a terminal event or it does not verify, and it
         # did not have one: every receipt this command produced described a
