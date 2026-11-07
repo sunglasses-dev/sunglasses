@@ -182,7 +182,7 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
     stdout.write(f"{len(tools)} tool(s) in this capture\n")
     for tool_name in sorted(tools):
         digest = (tools[tool_name] or {}).get("descriptor_sha256") or "?"
-        stdout.write(f"  {tool_name}  {digest[:16]}\n")
+        stdout.write(f"  {_shown_text(tool_name)}  {_shown_text(str(digest)[:16])}\n")
 
     answered = confirm() if confirm is not None else _ask(stdout)
     if answered is None:
@@ -202,6 +202,26 @@ def _approve(server_id, options, stdout, stderr, *, confirm=None):
         return _state_fault(stderr, failure, root)
     stdout.write("approved\n")
     return EXIT_OK
+
+
+def _shown_text(value):
+    """Text a server chose, as a human may be shown it: escaped, capped, and marked when changed.
+
+    A tool name comes from the server, so it is data. Printed raw, an escape sequence would
+    redraw the terminal, a carriage return would draw one name over another, and a line feed
+    would print a second line that reads as another tool. The reviewed helper the agent listing
+    uses escapes every character `str.isprintable()` refuses and caps the length (a cut name
+    ends in a short digest, so two long names with the same start stay two rows). The marker
+    says WHY the line differs from the name, because the human is approving descriptors by name
+    and must not be left thinking an odd line is the whole name. The approval itself still
+    binds the descriptor digest, which never goes through here.
+    """
+    from .agent_discovery import _safe
+    text = value if isinstance(value, str) else ""
+    shown = _safe(text)
+    if shown == text:
+        return shown
+    return shown + (" [escaped]" if not text.isprintable() else " [shortened]")
 
 
 def _state_fault(stderr, failure, root):

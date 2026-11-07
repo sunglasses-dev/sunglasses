@@ -7,6 +7,7 @@ All notable changes to Sunglasses are documented here.
 
 ### Fixed
 
+- `sunglasses proxy approve` no longer prints a server-chosen tool name raw. The names a server advertises are shown so a person can approve them, and a name holding an escape sequence, a carriage return, a line feed or another control or format character could redraw the terminal, draw one name over another, or print a line that reads as another tool. Every such character is now shown as text (`\x1b`), a name over 80 characters is cut and ends in a short digest, and the line carries `[escaped]` or `[shortened]` so it is clear the line is not the whole name. Plain names print as before. The approval itself is unchanged: it still binds the real descriptor digest and the capture sha. `tests/test_proxy_approve_server_text.py`.
 - `GLS-SD-001` and `GLS-SD-001-API` no longer report an OpenAI-shaped (`sk-`) or Anthropic-shaped
   (`sk-ant-`) key inside a word. `task-`, `disk-`, `risk-` or any word ending in `sk` followed by
   twenty or more letters or digits (a task id, a volume id) used to be blocked as a key. The two
