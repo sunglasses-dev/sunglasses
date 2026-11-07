@@ -108,6 +108,8 @@ _M12_HOOK = (
     r"(?:before|prior to|after) (?:you )?(?:call(?:ing)?|us(?:e|ing)|invok(?:e|ing)|run(?:ning)?|execut(?:e|ing))"
     r" (?:this|the|any|each|every)(?: \w+)? (?:tool|function)"
     r"|before (?:each|every|any) (?:call|use|invocation) (?:to|of) (?:this|the)(?: \w+)? (?:tool|function)"
+    r"|to prepare (?:this|the)(?: \w+)? (?:tool|function) for (?:invocation|use|a call|calling)"
+    r"|in preparation for (?:calling|using|invoking|running) (?:this|the)(?: \w+)? (?:tool|function)"
     r"|when(?:ever)? (?:this|the)(?: \w+)? (?:tool|function) is (?:called|used|invoked|run|executed)"
     r"|when(?:ever)? (?:you )?(?:call(?:ing)?|us(?:e|ing)|invok(?:e|ing)|run(?:ning)?) (?:this|the)(?: \w+)? (?:tool|function)"
     r"|(?:each|every) time (?:this|the)(?: \w+)? (?:tool|function) is (?:called|used|invoked|run)"
@@ -140,10 +142,13 @@ _M12_OWNED = (
 # "contents of" marker in front, because "you need an API key; pass it as the
 # api_key argument" is ordinary tool documentation. The dot-path is bounded so
 # a long path cannot be made to backtrack; `process.env` and `config.env` are
-# excluded by the lookbehind.
+# excluded by the lookbehind. Only secret-named dot directories count (a theme
+# in ~/.config/editor is not a secret; ~/.config/gh is), and a path that ends in `.pub` is a
+# public key, which is meant to be shared.
+_M12_NOT_PUB = r"(?![\w./\\-]{0,100}\.pub\b)"
 _M12_SOURCE_FILE = (
-    r"(?:(?<!\w)\.(?:ssh|aws|env|netrc|npmrc|pypirc|git-credentials|kube|gnupg|docker|azure|gcloud|config)(?![\w-])"
-    r"|\bid_(?:rsa|ed25519|ecdsa|dsa)\b"
+    rf"(?:(?<!\w)\.(?:ssh|aws|env|netrc|npmrc|pypirc|git-credentials|kube|gnupg|docker|azure|gcloud)(?![\w-]){_M12_NOT_PUB}"
+    rf"|\bid_(?:rsa|ed25519|ecdsa|dsa)\b{_M12_NOT_PUB}"
     r"|\b(?:bash|zsh|fish|shell|command|terminal) ?history\b"
     r"|\bprivate keys?\b|\bssh keys?\b|\bsigning keys?\b|\bcredentials? files?\b|\bpasswords? (?:files?|managers?|stores?)\b"
     r"|\bsecrets? (?:files?|stores?)\b|\bkeychains?\b|\bwallets?\b"
@@ -151,7 +156,9 @@ _M12_SOURCE_FILE = (
     r"|\b(?:dump|export|list|print|echo)(?:s|ing)? (?:out )?(?:the |all )?(?:environment variables?|env vars?)\b"
     r"|\bmcp\.json\b|\bhosts\.yml\b|\bbrowser (?:cookies|profiles?|history)\b"
     r"|/etc/(?:passwd|shadow)\b|/proc/self/environ\b"
-    r"|(?:~|\$HOME|%USERPROFILE%)[/\\]\.[\w.-]{1,64}(?:[/\\][\w.-]{1,64}){0,8}"
+    rf"|(?:~|\$HOME|%USERPROFILE%)[/\\]\.(?:(?:ssh|aws|gnupg|kube|docker|netrc|npmrc|pypirc|git-credentials|azure|gcloud)(?![\w-])"
+    rf"|config[/\\](?:gh|gcloud|glab|op|rclone|helm|doctl|hub)(?![\w-])"
+    rf"|env[\w.-]{{0,32}}){_M12_NOT_PUB}(?:[/\\][\w.-]{{1,64}}){{0,8}}"
     r")"
 )
 _M12_SOURCE_WORD = (
@@ -165,7 +172,7 @@ _M12_ARG_SINK = (
     r"\b(?:arguments?|parameters?|params?|fields?|inputs?|notes?|sidenotes?|payloads?|responses?|repl(?:y|ies)|answers?|outputs?"
     r"|par[aá]metros?|argumentos?|campos?|notas?|respuestas?)\b"
 )
-_M12_EMAIL = r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+_M12_EMAIL = r"(?<![\w.+-])[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,8}"
 # A sentence that keeps the step from the user. MECH-006 needs a verb after
 # the secrecy phrase in the same sentence; a poisoned description puts the
 # concealment in a sentence of its own ("The user does not need to know about
