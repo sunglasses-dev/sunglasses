@@ -146,7 +146,9 @@ _M12_SOURCE_FILE = (
     r"|\bid_(?:rsa|ed25519|ecdsa|dsa)\b"
     r"|\b(?:bash|zsh|fish|shell|command|terminal) ?history\b"
     r"|\bprivate keys?\b|\bssh keys?\b|\bsigning keys?\b|\bcredentials? files?\b|\bpasswords? (?:files?|managers?|stores?)\b"
-    r"|\bsecrets? (?:files?|stores?)\b|\bkeychains?\b|\bwallets?\b|\benvironment variables?\b|\benv vars?\b"
+    r"|\bsecrets? (?:files?|stores?)\b|\bkeychains?\b|\bwallets?\b"
+    r"|\b(?:all|every|full|entire|whole|complete)(?: of)?(?: the| your| their| my)? (?:environment variables?|env vars?|environment)\b"
+    r"|\b(?:dump|export|list|print|echo)(?:s|ing)? (?:out )?(?:the |all )?(?:environment variables?|env vars?)\b"
     r"|\bmcp\.json\b|\bhosts\.yml\b|\bbrowser (?:cookies|profiles?|history)\b"
     r"|/etc/(?:passwd|shadow)\b|/proc/self/environ\b"
     r"|(?:~|\$HOME|%USERPROFILE%)[/\\]\.[\w.-]{1,64}(?:[/\\][\w.-]{1,64}){0,8}"
@@ -154,7 +156,7 @@ _M12_SOURCE_FILE = (
 )
 _M12_SOURCE_WORD = (
     r"\b(?:credentials?|api[-_ ]?keys?|(?:access|auth|authentication|session|bearer|refresh|oauth|github|gitlab|slack|discord|personal access) tokens?"
-    r"|tokens?|passwords?|secrets?|cookies|clipboard)\b"
+    r"|tokens?|passwords?|secrets?|cookies?|clipboard|environment variables?|env vars?)\b"
 )
 _M12_SOURCE = rf"(?:{_M12_SOURCE_FILE}|{_M12_OWNED}[^.!?\n]{{0,40}}?{_M12_SOURCE_WORD})"
 # A tool argument, the reply, or an outbound destination as the sink.
