@@ -33,12 +33,14 @@ All notable changes to Sunglasses are documented here.
   the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
 
 - `GLS-SD-001` and `GLS-SD-001-API` also recognise the OpenAI project (`sk-proj-`), service-account
-  (`sk-svcacct-`) and admin (`sk-admin-`) key prefixes: the prefix, then twenty or more letters,
-  digits, underscores or hyphens, with the same word-edge requirement as the other `sk-` shapes.
-  The twenty is a floor that keeps short prose out; it is not a documented key length. A key written
-  directly after a letter or digit is not reported by these shapes, and prose that begins a word
-  with one of the three prefixes and runs twenty characters or more is reported.
-  `tests/test_sd001_openai_prefixed_shapes.py` pins both directions.
+  (`sk-svcacct-`) and admin (`sk-admin-`) key prefixes, with the same word-edge requirement as the
+  other `sk-` shapes. The tail must look like a key and not like words: twenty or more letters,
+  digits, underscores or hyphens, where one of the first nine hyphen-separated parts is twelve or more
+  letters, digits and underscores and holds both a letter and a digit. The twenty and the twelve are
+  floors chosen to keep documentation out; they are not documented key lengths. A documentation file
+  named after a prefix (`docs/sk-proj-credential-format-reference.md`) is not reported. A key written
+  directly after a letter or digit, or a tail with no digit in a twelve-character part, is not
+  reported by these shapes. `tests/test_sd001_openai_prefixed_shapes.py` pins both directions.
 
 ## [0.6.19] — 2026-11-04
 

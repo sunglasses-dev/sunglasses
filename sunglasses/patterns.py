@@ -866,7 +866,12 @@ PATTERNS = [
         "regex": [
             r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
             r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
-            r"(?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{20,}",  # OpenAI project / service-account / admin keys, same left boundary
+            # OpenAI project / service-account / admin keys, same left boundary. The tail must look like a key,
+            # not words: within the first nine hyphen-separated parts one part is 12+ of [A-Za-z0-9_] and holds
+            # a letter and a digit. Every lookahead stops at a hyphen or after nine parts, so the cost is bounded.
+            r"(?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-"
+            r"(?=(?:[A-Za-z0-9_]*-){0,8}(?=[A-Za-z0-9_]{12})(?=[A-Za-z_]*\d)(?=[0-9_]*[A-Za-z]))"
+            r"[A-Za-z0-9_\-]{20,}",
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -2684,7 +2689,12 @@ PATTERNS = [
         "regex": [
             r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
             r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
-            r"(?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{20,}",  # OpenAI project / service-account / admin keys, same left boundary
+            # OpenAI project / service-account / admin keys, same left boundary. The tail must look like a key,
+            # not words: within the first nine hyphen-separated parts one part is 12+ of [A-Za-z0-9_] and holds
+            # a letter and a digit. Every lookahead stops at a hyphen or after nine parts, so the cost is bounded.
+            r"(?<![A-Za-z0-9])sk-(?:proj|svcacct|admin)-"
+            r"(?=(?:[A-Za-z0-9_]*-){0,8}(?=[A-Za-z0-9_]{12})(?=[A-Za-z_]*\d)(?=[0-9_]*[A-Za-z]))"
+            r"[A-Za-z0-9_\-]{20,}",
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
