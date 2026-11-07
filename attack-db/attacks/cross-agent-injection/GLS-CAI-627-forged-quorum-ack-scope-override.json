@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or counterfeit approval attestation, acknowledgement, or token from an agent or delegate service is used to override or bypass policy scope and safety restrictions.",
   "keywords": [],

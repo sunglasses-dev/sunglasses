@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects forged or spoofed directives attributed to a peer, upstream, or remote agent, tagged with false precedence to bypass guardrails and validation.",
   "keywords": [

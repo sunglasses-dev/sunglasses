@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent presenting a forged approval or attestation to escalate role or scope and override policy or guardrail boundaries.",
   "keywords": [],

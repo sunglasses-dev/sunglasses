@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or orchestrator presents a forged quorum certificate, vote tally, or consensus receipt to override or circumvent policy and guardrail authorization controls.",
   "keywords": [],

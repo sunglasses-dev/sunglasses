@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Supervisor-agent role hijack \u2014 attacker claims to BE the supervisor/orchestrator agent and issues a safe-mode override directive for the current thread, attempting to elevate privilege via false role assertion.",
   "keywords": [

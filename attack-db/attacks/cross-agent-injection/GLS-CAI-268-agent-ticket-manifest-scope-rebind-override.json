@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged ticket, nonce, or manifest used in an agent handoff to rebind scope or privilege and override guardrail policy.",
   "keywords": [],

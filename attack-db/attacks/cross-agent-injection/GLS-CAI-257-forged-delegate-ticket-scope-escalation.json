@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or counterfeit delegate ticket or token is used to escalate scope, privilege, or role for an agent or worker and then bypass or ignore execution guardrails.",
   "keywords": [],

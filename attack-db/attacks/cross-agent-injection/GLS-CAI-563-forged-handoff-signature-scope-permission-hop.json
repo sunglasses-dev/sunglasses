@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged or counterfeit token or signature in a delegation or handover that enables a trust hop or permission hop to invoke privileged actions.",
   "keywords": [],

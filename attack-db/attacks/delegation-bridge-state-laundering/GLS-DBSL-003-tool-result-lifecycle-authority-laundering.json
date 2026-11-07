@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "A structured tool result asserting verified/complete lifecycle metadata is promoted from evidence to workflow authority at queue admission and auto-forwarded to a peer agent without fresh provenance, freshness, or audience revalidation.",
   "keywords": [],

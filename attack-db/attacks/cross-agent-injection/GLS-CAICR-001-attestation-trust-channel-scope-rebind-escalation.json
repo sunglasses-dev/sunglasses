@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged, spoofed, or tampered attestation, nonce, token, or capability is used to rebind scope or escalate trust-anchor authority in order to override, bypass, or supersede policy or guardrail approval checks.",
   "keywords": [],

@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "Anthropic Messages API `tool_use` blocks can launder pending model-requested tool-call state into a fake human/coordinator approval receipt, causing downstream release workers to deploy or publish while suppressing approval warnings.",
   "keywords": [],

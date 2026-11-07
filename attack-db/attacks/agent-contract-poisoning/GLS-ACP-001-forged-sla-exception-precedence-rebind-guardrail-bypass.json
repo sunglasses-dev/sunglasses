@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "tool_output",
-    "file"
+    "file",
+    "agent_input"
   ],
   "description": "Detects forged contractual exception clauses that rebind precedence and disable security checks in agent execution flows.",
   "keywords": [

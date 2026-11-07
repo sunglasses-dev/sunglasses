@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged capability token or delegation ticket used by a peer agent to widen or elevate scope beyond approved boundaries and bypass verification gates.",
   "keywords": [],

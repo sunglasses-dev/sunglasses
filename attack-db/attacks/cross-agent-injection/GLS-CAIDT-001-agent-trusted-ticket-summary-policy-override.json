@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text \u2014 excluding negated forms \u2014 in which an agent, delegate, or worker presents a ticket, handoff summary, or report that is asserted to be a trusted or authoritative source of truth in order to override, bypass, or ignore policy or guardrail safety checks.",
   "keywords": [],

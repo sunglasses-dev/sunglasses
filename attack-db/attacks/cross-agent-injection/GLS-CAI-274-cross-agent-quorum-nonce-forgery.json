@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a cross-agent or peer handoff that presents a forged quorum or approval chain nonce to override scope, permission, or guardrail policy.",
   "keywords": [],

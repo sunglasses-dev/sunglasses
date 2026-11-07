@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a handoff to a downstream agent that includes a stale, revoked, or forged token or nonce used to override safety validation or bypass policy.",
   "keywords": [],

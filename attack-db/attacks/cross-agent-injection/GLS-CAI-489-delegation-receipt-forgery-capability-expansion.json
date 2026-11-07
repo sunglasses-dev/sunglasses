@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged delegation receipt or execution token that expands capability or authority scope beyond the original grant.",
   "keywords": [],

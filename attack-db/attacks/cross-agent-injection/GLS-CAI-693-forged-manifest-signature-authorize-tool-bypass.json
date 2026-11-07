@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or remote agent uses a forged or tampered manifest, signature, or attestation to authorize or unlock execution while bypassing or circumventing policy, guardrail, or approval verification.",
   "keywords": [],

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects another or upstream agent instructing the recipient to override policy or guardrails and execute an action in place of the previous instruction set.",
   "keywords": [],

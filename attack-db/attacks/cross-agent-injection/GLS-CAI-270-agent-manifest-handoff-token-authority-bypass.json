@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged manifest or handoff token used by an agent or orchestrator to claim false authority and bypass review or verification guardrails.",
   "keywords": [],

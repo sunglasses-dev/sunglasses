@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent, broker, or orchestrator forges or fabricates a ticket, quorum badge, or scope nonce to bypass, override, escalate, or rebind past authorization controls.",
   "keywords": [],

@@ -31,6 +31,19 @@ All notable changes to Sunglasses are documented here.
   There is no corpus of real tool output, so the false-positive rate on real tool results is not
   measured. `sunglasses scan --help`, the README and `tests/test_tool_result_channel_doc.py` carry
   the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
+- The rules for text passed between agents now also run on the `agent_input` channel. Before this
+  change `agent_input` ran 1 of the 145 rules in the fourteen inter-agent categories (forged
+  handoffs, agent-card metadata, delegated approvals, approval graphs, compaction artifacts and
+  their neighbours), so a handoff that was blocked on `message` was allowed on `agent_input`. 144
+  rules now declare `agent_input` alongside the channels they already had. Channel lists only: no
+  regex, keyword or severity changed, and no rule outside those categories gained the channel.
+  Seven of the 144 rows carry neither a regex nor a keyword list and cannot fire on any channel.
+  Measured on the 111 clean documents of the false-positive corpora scanned on `agent_input`: one
+  decision changed (an agent-skills `AGENTS.md` goes from allow to quarantine on a medium
+  cross-agent rule that already fires on that text on `message` and `tool_output`), and one
+  document that was already blocked gained three findings. There is no corpus of real
+  agent-to-agent traffic, so the false-positive rate on real handoffs is not measured.
+  `tests/test_agent_input_inter_agent_families.py` pins the behaviour.
 
 ## [0.6.19] — 2026-11-04
 

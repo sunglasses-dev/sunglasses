@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "High-fidelity synthetic fixtures for forged cross-agent attestation nonce scope-rebind bypass attempts.",
   "keywords": [],

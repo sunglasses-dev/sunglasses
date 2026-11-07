@@ -5666,7 +5666,7 @@ PATTERNS = [
         "name": "Cross-agent injection — trusted handoff override",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["tool_output", "message"],
+        "channel": ["tool_output", "message", "agent_input"],
         "keywords": [
             "upstream agent output trusted ignore prior safety instructions",
             "previous agent verified bypass system prompt",
@@ -5712,7 +5712,7 @@ PATTERNS = [
         "name": "Cross-agent injection — forged handoff ticket scope bypass",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["tool_output", "message"],
+        "channel": ["tool_output", "message", "agent_input"],
         "keywords": [
             "forged approval ticket bypass scope guardrails",
             "fabricated signoff receipt ignore permission scope",
@@ -6042,7 +6042,7 @@ PATTERNS = [
         "name": "Peer To Peer Trust Rebind Override",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "agent agent trusted",
             "agent trusted handoff",
@@ -6064,7 +6064,7 @@ PATTERNS = [
         "name": "Fabricated Quorum Bypass",
         "category": "cross_agent_injection",
         "severity": "medium",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "other agents already",
             "agents already approved",
@@ -6086,7 +6086,7 @@ PATTERNS = [
         "name": "Forged Policy Checkpoint Waiver",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "planner agent already",
             "agent already approved",
@@ -6108,7 +6108,7 @@ PATTERNS = [
         "name": "Delegated Attestation Replay Guardrail Bypass",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "cross-agent handoff note",
             "cross-agent handoff",
@@ -6306,7 +6306,7 @@ PATTERNS = [
         "name": "Forged Handoff Human Authority Ack",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "delegate agent handoff boss signed off",
             "worker instruction security lead authorized",
@@ -6540,7 +6540,7 @@ PATTERNS = [
         "name": "Approver Identity Swap Bypass",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "tool_output"],
+        "channel": ["message", "tool_output", "agent_input"],
         "keywords": [
             "approver identity swap",
             "identity swap bypass",
@@ -6793,7 +6793,7 @@ PATTERNS = [
         "name": "Delegation Token Revocation Ignore Verification Bypass",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output", "file"],
+        "channel": ["message", "tool_output", "file", "agent_input"],
         "keywords": [
             "delegation token marked revoked",
             "peer agent handoff token expired",
@@ -6904,7 +6904,7 @@ PATTERNS = [
         "name": "Unrestricted Role Override",
         "category": "agent_persona_drift",
         "severity": "high",
-        "channel": ["message", "file"],
+        "channel": ["message", "file", "agent_input"],
         "keywords": [
             "persona shift request",
             "persona shift",
@@ -7319,7 +7319,7 @@ PATTERNS = [
         "name": "Forged sla exception precedence rebind guardrail bypass",
         "category": "agent_contract_poisoning",
         "severity": "high",
-        "channel": ["message", "tool_output", "file"],
+        "channel": ["message", "tool_output", "file", "agent_input"],
         "keywords": [
             "use this forged contract appendix emergency clause",
             "fabricated sla waiver says override order applies",
@@ -7339,7 +7339,7 @@ PATTERNS = [
         "name": "Forged SLA Exception Precedence Guardrail Bypass",
         "category": "agent_contract_poisoning",
         "severity": "high",
-        "channel": ["message", "tool_output", "file"],
+        "channel": ["message", "tool_output", "file", "agent_input"],
         "keywords": [
             "the agent contract accepted forged sla exception",
             "spoofed service level runbook clause tampered with",
@@ -7359,7 +7359,7 @@ PATTERNS = [
         "name": "Agent Contract Poisoning pattern",
         "category": "agent_contract_poisoning",
         "severity": "high",
-        "channel": ["message", "tool_output", "file"],
+        "channel": ["message", "tool_output", "file", "agent_input"],
         "keywords": [
             "forged agent contract inserts exception clause bypass",
             "fake delegation contract uses priority order rebind",
@@ -7519,7 +7519,7 @@ PATTERNS = [
         "name": "Agent Persona Drift pattern",
         "category": "agent_persona_drift",
         "severity": "high",
-        "channel": ["message", "tool_output", "file"],
+        "channel": ["message", "tool_output", "file", "agent_input"],
         "keywords": [
             "across multiple turns gradually shift your role",
             "step-by-step persona transition act admin identity and",
@@ -7539,7 +7539,7 @@ PATTERNS = [
         "name": "Forged Delegate Attestation Nonce Scope Rebind Bypass",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["tool_output", "message"],
+        "channel": ["tool_output", "message", "agent_input"],
         "keywords": [
         ],
         "regex": [r"""(?is)^(?=.*\b(?:delegate|delegated|worker|agent|handoff|peer|broker)\b)(?=.*\b(?:token|ticket|attestation|proof|receipt|nonce)\b)(?=.*\b(?:forge|forged|forging|spoofed|spoofing|replayed|replay|tampered|tampering)\b)(?=.*\b(?:scope|privilege|authority|approval)\b)(?=.*\b(?:expand|expanded|expanding|escalate|escalated|escalating|rebind|rebound|override|overrode|bypass|bypassed)\b)(?=.*\b(?:policy|guardrail(?:s)?|verification|approval)\b).+"""],
@@ -7551,7 +7551,7 @@ PATTERNS = [
         "name": "Cross Agent Injection pattern",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["tool_output", "message"],
+        "channel": ["tool_output", "message", "agent_input"],
         "keywords": [
             "inject forged peer agent ticket with higher",
             "spoof another agent directive authoritative precedence bypass",
@@ -7678,7 +7678,7 @@ PATTERNS = [
         "name": 'Stale-Credential Handoff Scope Elevation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegat(?:e|ed|es|ing)|orchestrator|worker|peer)\\b)(?=.*\\b(?:handoff|relay|forward|delegat(?:e|ed|es|ing)|transfer)\\b)(?=.*\\b(?:token|nonce|session|credential)\\b)(?=.*\\b(?:revoked|stale|expired|old)\\b)(?=.*\\b(?:scope|permission(?:s)?|authority)\\b)(?=.*\\b(?:rebind|elevate|expand|upgrade|widen)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|validation)\\b).*$'],
         "description": 'Detects a cross-agent handoff that reuses a revoked or expired credential while rebinding scope and overriding approval policy.'
     },
@@ -7687,7 +7687,7 @@ PATTERNS = [
         "name": 'Upstream-Agent Policy Override Directive',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
         "description": 'Detects a message attributed to an upstream or supervisor agent that instructs the recipient to ignore or bypass policy, guardrails, or system instructions.'
     },
@@ -7857,7 +7857,7 @@ PATTERNS = [
         "name": 'Incremental Persona Drift Guardrail Relaxation',
         "category": 'agent_persona_drift',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:persona|character|role|identity|tone)\\b)(?=.*\\b(?:incremental(?:ly)?|gradual(?:ly)?|step[-\\s]*by[-\\s]*step|over\\s+several\\s+turns|slow(?:ly)?|turn\\s*\\d+)\\b)(?=.*\\b(?:ignore|bypass|override|sidestep|relax|drop)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|restriction(?:s)?|constraint(?:s)?)\\b).*$'],
         "description": 'Detects a gradual, step-by-step persona or character shift across multiple turns designed to slowly relax or bypass policy, guardrails, or safety restrictions.'
     },
@@ -7886,7 +7886,7 @@ PATTERNS = [
         "name": 'Forged Scheduler Receipt Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
         "description": 'Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.'
     },
@@ -7895,7 +7895,7 @@ PATTERNS = [
         "name": 'Agent Forged Token Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
         "description": 'Detects an agent or delegate presenting a forged or spoofed token, ticket, or attestation to bypass or override scope, permission, or guardrail enforcement.'
     },
@@ -8045,7 +8045,7 @@ PATTERNS = [
         "name": 'Forged Approval Quorum Auto-Approve Override',
         "category": 'approval_graph_poisoning',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ing)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:approval|quorum|sign-?off|attestation|vote\\s+snapshot|vote\\s+count)\\b)(?=.*\\b(?:override|bypass|auto-?approve|recalculat(?:e|ed|ing|ion)|escalat(?:e|ed|ing|ion))\\b).*$'],
         "description": 'Detects a forged approval quorum, sign-off, or vote snapshot used to auto-approve or bypass recalculation of the approval graph.'
     },
@@ -8054,7 +8054,7 @@ PATTERNS = [
         "name": 'Forged Approval Graph Delegate Vote Policy Bypass',
         "category": 'approval_graph_poisoning',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?!.*\\b(?:never|without)\\s+(?:bypass|override|auto\\s*-?approve|skip|ignore)\\b)(?=.*\\b(?:forge|forged|forging|fake|tampered|spoofed|counterfeit)\\b)(?=.*\\b(?:approval\\s+graph|quorum\\s+snapshot|delegate\\s+vote|signed\\s+ballot|attestation\\s+bundle)\\b)(?=.*\\b(?:override|overrides|overridden|overriding|bypass|bypasses|bypassed|bypassing|auto\\s*-?approve|auto\\s*-?approved|skip|skips|skipped|skipping|ignore|ignores|ignored|ignoring)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|trust\\s+gate(?:s)?|approval\\s+gate(?:s)?|verification\\s+check(?:s)?)\\b).+'],
         "description": 'Detects a forged approval graph, quorum snapshot, or delegate ballot used to auto-approve or skip guardrail trust-gate policy.'
     },
@@ -8064,7 +8064,7 @@ PATTERNS = [
         "name": 'Agent Manifest Scope Escalation Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|handoff|peer|coordinator|supervisor)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:ed|ion)|counterfeit)\\b)(?=.*\\b(?:manifest|ticket|receipt|approval|sign(?:ed|off)?)\\b)(?=.*\\b(?:scope|permission|authorization|authz|whitelist)\\b)(?=.*\\b(?:escalat(?:e|ed|ion)|override|overrode|bypass(?:ed|ing)?|ignor(?:e|ed|ing)|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail|review|safety|verification)\\b).*$'],
         "description": 'Detects an agent or coordinator presenting a forged manifest, ticket, or signed receipt to escalate scope or bypass authorization policy.'
     },
@@ -8073,7 +8073,7 @@ PATTERNS = [
         "name": 'Agent Ticket Replay Privilege Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer[-\\s]*agent|remote[-\\s]*agent|orchestrator)\\b)(?=.*\\b(?:forg(?:ed|ery)|spoof(?:ed|ing)?|replay(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:ticket|token|nonce|credential|handoff[-\\s]*id|session[-\\s]*tag)\\b)(?=.*\\b(?:scope|permission|privilege|tool[-\\s]*execution|action[-\\s]*rights)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|suppress(?:ed|ing)?|disable(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|approval|verification)\\b).*$'],
         "description": 'Detects a forged or replayed handoff ticket or credential used by a remote agent to override tool-execution permissions and bypass policy.'
     },
@@ -8082,7 +8082,7 @@ PATTERNS = [
         "name": 'Delegation Ticket Scope Escalation Execution',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|fabricated)\\b)(?=.*\\b(?:delegate\\s+ticket|agent\\s+ticket|handoff\\s+token|delegation\\s+pass|authorization\\s+token)\\b)(?=.*\\b(?:scope\\s+escalation|scope\\s+rebind|privilege\\s+upgrade|permission\\s+escalation|access\\s+elevation)\\b)(?=.*\\b(?:execute|executed|executing|run|ran|launch|launched|action|actions)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|override|overrode|overriding|disable|disabled|disabling|ignore|ignored|ignoring|skip|skipped|skipping)\\b).*$'],
         "description": 'Detects a forged delegate ticket or authorization token carrying an explicit scope-escalation or privilege-upgrade claim that is then used to execute actions while bypassing controls.'
     },
@@ -8091,7 +8091,7 @@ PATTERNS = [
         "name": 'Agent Approval Forgery Role Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:forged|spoofed|fabricated|fake)\\b)(?=.*\\b(?:approval|attestation|handoff|delegation|ticket)\\b)(?=.*\\b(?:role|scope|permission|privilege)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|boundary|limit(?:s)?)\\b).*$'],
         "description": 'Detects an agent presenting a forged approval or attestation to escalate role or scope and override policy or guardrail boundaries.'
     },
@@ -8100,7 +8100,7 @@ PATTERNS = [
         "name": 'Forged Signoff Scope Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:approval|attestation|signoff|ticket)\\b)(?=.*\\b(?:delegate|agent|worker|reviewer)\\b)(?=.*\\b(?:bypass|override|ignore|skip)\\b)(?=.*\\b(?:policy|guardrail|scope)\\b).+'],
         "description": 'Detects a forged or counterfeit approval, signoff, or attestation submitted to a delegate or worker to bypass policy or scope guardrails.'
     },
@@ -8109,7 +8109,7 @@ PATTERNS = [
         "name": 'Agent Capability Token Impersonation Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|orchestrator|service)\\b)(?=.*\\b(?:handoff|handover|ticket|token|credential|capability|nonce)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|fabricat(?:e|ed|ing)|spoof(?:ed|ing)|impersonat(?:e|ed|ing)|replay(?:ed|ing))\\b)(?=.*\\b(?:authorit(?:y|ies)|scope|permission|approval|policy|guardrail)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|overrid(?:e|es|ing|en|ed)|execut(?:e|ed|ing)|dispatch(?:ed|ing)|escalat(?:e|ed|ing)|rerout(?:e|ed|ing))\\b).+$'],
         "description": 'Detects an agent or coordinator presenting a forged or replayed capability token or handoff credential to gain unauthorized authority and bypass approval.'
     },
@@ -8118,7 +8118,7 @@ PATTERNS = [
         "name": 'Receipt Forgery Scope Rebind Privilege',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|broker)\\b)(?=.*\\b(?:receipt|ticket|handoff|approval|nonce|token)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|counterfeit|fabricat(?:ed|ing)?)\\b)(?=.*\\b(?:scope\\s*rebind|scope\\s*override|policy\\s*bypass|guardrail\\s*override|privilege\\s*escalation)\\b).+$'],
         "description": 'Detects a forged or counterfeit receipt or handoff token used by an agent or peer to achieve an explicit scope rebind or policy guardrail override.'
     },
@@ -8127,7 +8127,7 @@ PATTERNS = [
         "name": 'Delegation Receipt Forgery Capability Expansion',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|delegation|agent|subagent|worker|orchestrator)\\b)(?=.*\\b(?:ticket|handoff|approval\\s+token|execution\\s+token|delegation\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery|ing)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:scope|permission|capability|authority)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|expand|expand(?:ed|ing)?|override(?:d|s|ing)?|overrode|bypass(?:ed|es|ing)?)\\b).*'],
         "description": 'Detects a forged delegation receipt or execution token that expands capability or authority scope beyond the original grant.'
     },
@@ -8140,7 +8140,7 @@ PATTERNS = [
         "name": 'Escalation Ticket Trust Header Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service|orchestrator|copilot)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|counterfeit|fabricated)\\b)(?=.*\\b(?:escalation\\s+ticket|ticket|capability\\s+lease|trust\\s+header|auth(?:entication)?\\s+header|approval\\s+token)\\b)(?=.*\\b(?:override|bypass|skip|ignore|disable)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|auth(?:entication)?\\s+check(?:s)?|permission(?:s)?)\\b).*'],
         "description": 'Detects an agent presenting a forged escalation ticket, capability lease, or trust header to override authentication checks and guardrails.'
     },
@@ -8149,7 +8149,7 @@ PATTERNS = [
         "name": 'Forged Delegate Ticket Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|counterfeit)\\b)(?=.*\\b(?:delegate|delegated|agent|worker)\\b)(?=.*\\b(?:ticket|token|credential|pass)\\b)(?=.*\\b(?:scope|privilege|role|permission)\\b)(?=.*\\b(?:escalate|escalated|escalation|elevate|elevated|elevation|admin|root)\\b)(?=.*\\b(?:execute|executed|execution|run|action|actions|command|tool\\s*call)\\b)(?=.*\\b(?:bypass|bypassed|bypassing|ignore|ignored|ignoring|skip|skipped|skipping|override|overrode|overriding|overridden)\\b).*$'],
         "description": 'Detects text in which a forged or counterfeit delegate ticket or token is used to escalate scope, privilege, or role for an agent or worker and then bypass or ignore execution guardrails.'
     },
@@ -8158,7 +8158,7 @@ PATTERNS = [
         "name": 'Delegation Manifest Attestation Nonce Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|subagent)\\b)(?=.*\\b(?:forged|forge|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:delegation\\s+manifest|handoff\\s+manifest|execution(?:\\s|-)+ticket|nonce\\s+attestation|attestation\\s+nonce|attestation)\\b)(?=.*\\b(?:override|bypass|ignore|skip|disable|suppress|waive)\\w*\\b)(?=.*\\b(?:policy|guardrail|approval|verification|trust\\s+check(?:s)?|auth\\s+check(?:s)?|safety)\\b).{0,800}'],
         "description": 'Detects a forged delegation manifest or attestation-nonce submitted by an agent to override trust checks, policy, or safety guardrails.'
     },
@@ -8167,7 +8167,7 @@ PATTERNS = [
         "name": 'Quorum Receipt Scope Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|reviewer|peer)\\b)(?=.*\\b(?:forged|fabricated|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:receipt|ticket|token|approval|quorum|attestation)\\b)(?=.*\\b(?:scope|privilege|authorization|policy|guardrail)\\b)(?=.*\\b(?:bypass|override|ignore|skip|disable|regrant|unlock)\\b).*$'],
         "description": 'Detects a forged quorum receipt, approval token, or attestation used by an agent to regrant or unlock scope while bypassing policy.'
     },
@@ -8176,7 +8176,7 @@ PATTERNS = [
         "name": 'Agent Nonce Impersonation Trust Domain Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator|handoff)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|fake|counterfeit)\\b)(?=.*\\b(?:nonce|ticket|receipt|attestation|signature|token)\\b)(?=.*\\b(?:scope|role|privilege|boundary|trust\\s+domain|authorization)\\b)(?=.*\\b(?:rebind|re-map|reassign|escalat(?:e|ed|ion)|override|bypass|ignore|skip)\\b).*$'],
         "description": 'Detects an agent using a forged or replayed nonce or signature to rebind trust domain or privilege scope and override guardrails.'
     },
@@ -8185,7 +8185,7 @@ PATTERNS = [
         "name": 'Agent Identity Snapshot Forgery Priority Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|assistant|copilot|peer)\\b)(?=.*\\b(?:identity|profile|memory|session|handoff|ticket|token|snapshot)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|impersonat(?:e|ed|ing)|counterfeit|fake|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:priority|policy|guardrail|approval|scope|trust)\\b)(?=.*\\b(?:override|bypass|skip|ignore|elevat(?:e|ed|ing)|escalat(?:e|ed|ing))\\b).+$'],
         "description": 'Detects an agent presenting a forged identity, profile, or session snapshot to elevate priority or override scope and guardrail enforcement.'
     },
@@ -8194,7 +8194,7 @@ PATTERNS = [
         "name": 'Capability Token Scope Widening Guardrail Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|coordinator|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:delegation\\s+ticket|capability\\s+token|authorization\\s+token|session\\s+tag|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|boundary|access\\s+scope)\\b)(?=.*\\b(?:expand|elevat(?:e|ed|ion)|widen|rewrite|override|bypass)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|approval\\s+gate(?:s)?)\\b).*$'],
         "description": 'Detects a forged capability token or delegation ticket used by a peer agent to widen or elevate scope beyond approved boundaries and bypass verification gates.'
     },
@@ -8323,7 +8323,7 @@ PATTERNS = [
         "name": 'Support Bundle Swap System Prompt Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|copilot|assistant)\\b)(?=.*\\b(?:support(?:\\s|-)?bundle|ticket(?:\\s|-)?attachment|incident(?:\\s|-)?artifact|retrieval(?:\\s|-)?cache)\\b)(?=.*\\b(?:swap|swapped|replace|replaced|overwrite|overwrote|overrode|inject|injected|poison(?:ed|ing)?)\\b)(?=.*\\b(?:system\\s+prompt|guardrail(?:s)?|policy(?:\\s|-)?check(?:s)?|approval(?:\\s|-)?gate(?:s)?)\\b)(?=.*\\b(?:bypass|bypasses|ignore|ignores|disable|disables|skip|skips)\\b).{0,900}$'],
         "description": 'Detects an agent or copilot receiving a swapped or poisoned support bundle or incident artifact that overwrites system prompts or bypasses policy approval gates.'
     },
@@ -8332,7 +8332,7 @@ PATTERNS = [
         "name": 'Scheduler Receipt Forgery Guardrail Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
         "description": 'Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.'
     },
@@ -8341,7 +8341,7 @@ PATTERNS = [
         "name": 'Forged Safety Attestation Validator Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|handoff|supervisor|peer\\s+agent)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|fabricat(?:e|ed|ing)|fake)\\b)(?=.*\\b(?:safety\\s+attestation|audit\\s+token|approval\\s+token|signature|compliance\\s+token|trust\\s+attestation)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|disable|disabled|disabling|skip|skipped|skipping|ignore|ignored|ignoring|suppress|suppressed|suppressing)\\b)(?=.*\\b(?:policy|guardrail|validator|verification|safety\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects an agent forging a safety attestation, compliance token, or audit token to suppress or disable policy validators and safety checks.'
     },
@@ -8350,7 +8350,7 @@ PATTERNS = [
         "name": 'Broker Agent Fake Token Fail-Open Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
         "description": 'Detects a broker or scheduler agent presenting a fake token or attestation to trigger a fail-open condition and escalate scope or privileges.'
     },
@@ -8359,7 +8359,7 @@ PATTERNS = [
         "name": 'Upstream Coordinator Forged Receipt Trust Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
         "description": 'Detects an upstream coordinator or orchestrator presenting a forged receipt or attestation to override or supersede trust, role, or policy enforcement.'
     },
@@ -8368,7 +8368,7 @@ PATTERNS = [
         "name": 'Forged Quorum Ack Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed)?|counterfeit)\\b)(?=.*\\b(?:approval|attestation|ack(?:nowledg(?:e|ed|ement))?|signature|token|lease)\\b)(?=.*\\b(?:agent|delegate|delegation|worker|broker|service)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|scope|restriction(?:s)?|safety)\\b).*$'],
         "description": 'Detects text in which a forged or counterfeit approval attestation, acknowledgement, or token from an agent or delegate service is used to override or bypass policy scope and safety restrictions.'
     },
@@ -8377,7 +8377,7 @@ PATTERNS = [
         "name": 'Cross-Agent Authority Claim Policy Disregard',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)(?:\\b(?:agent|service|orchestrator|coordinator|worker)\\s*(?:a|alpha|upstream|peer)?\\b.{0,80}\\b(?:said|states?|reported|confirmed|attested|signed)\\b.{0,110}\\b(?:authoritative|source\\s+of\\s+truth|final\\s+authority|root\\s+authority)\\b.{0,120}\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b.{0,70}\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+gate)\\b|\\b(?:treat|mark|classify|accept)\\b.{0,70}\\b(?:peer|upstream|cross-agent)\\s+(?:message|packet|instruction|directive)\\b.{0,100}\\b(?:as\\s+authoritative|as\\s+trusted|as\\s+final)\\b.{0,110}\\b(?:skip|drop|disable|bypass|override|replace)\\b.{0,60}\\b(?:verification|attestation|policy\\s+check(?:s)?)\\b)'],
         "description": 'Detects a cross-agent message attributed as authoritative or final authority that instructs the recipient to disregard or replace policy, guardrails, or verification attestation.'
     },
@@ -8386,7 +8386,7 @@ PATTERNS = [
         "name": 'Token Replay Scope Expansion Policy Approval',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|worker|agent|handoff|peer|broker)\\b)(?=.*\\b(?:token|ticket|attestation|proof|receipt|nonce)\\b)(?=.*\\b(?:forge|forged|forging|spoofed|spoofing|replayed|replay|tampered|tampering)\\b)(?=.*\\b(?:scope|privilege|authority|approval)\\b)(?=.*\\b(?:expand|expanded|expanding|escalate|escalated|escalating|rebind|rebound|override|overrode|bypass|bypassed)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|approval)\\b).+'],
         "description": 'Detects a replayed or forged token or proof in a delegate handoff that expands scope or authority and bypasses approval guardrails.'
     },
@@ -8395,7 +8395,7 @@ PATTERNS = [
         "name": 'Stale Token Downstream Agent Guard Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|handoff|handover|forward|route)\\b)(?=.*\\b(?:agent|worker|executor|subagent|downstream)\\b)(?=.*\\b(?:token|nonce|session|credential|attestation|capability)\\b)(?=.*\\b(?:stale|expired|revoked|forged|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification|validation)\\b).*'],
         "description": 'Detects a handoff to a downstream agent that includes a stale, revoked, or forged token or nonce used to override safety validation or bypass policy.'
     },
@@ -8404,7 +8404,7 @@ PATTERNS = [
         "name": 'Replayed Forged Nonce Stale Scope Disregard',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
         "description": 'Detects a forged or replayed nonce, token, or attestation that is stale or expired and reused in an agent handoff to disregard policy boundaries and trust gates.'
     },
@@ -8413,7 +8413,7 @@ PATTERNS = [
         "name": 'Peer Capability Manifest Auto-Approve Execution',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without)\\s+(?:trust|whitelist|allowlist|execute|dispatch|bypass)\\b)(?=.*\\b(?:forged|fake|spoofed|counterfeit|fabricated)\\b.{0,50}\\b(?:peer\\s*agent|delegate|worker|remote\\s*agent)\\b.{0,50}\\b(?:capability\\s*manifest|capability\\s*token|attestation|identity\\s*card)\\b)(?=.*\\b(?:trust|whitelist|allowlist|elevate)\\b.{0,60}\\b(?:without\\s+verification|skip(?:ping)?\\s+verification|ignore\\s+verification|auto-approve)\\b)(?=.*\\b(?:execute|run|dispatch|trigger)\\b.{0,60}\\b(?:privileged\\s*action|tool\\s*call|write\\s*operation|network\\s*action)\\b).*$'],
         "description": 'Detects a forged peer-agent capability manifest or identity card that instructs the receiver to whitelist or elevate the sender and auto-approve execution of privileged actions.'
     },
@@ -8422,7 +8422,7 @@ PATTERNS = [
         "name": 'Forged Handoff Signature Scope Permission Hop',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|delegation|worker|handoff|handover|peer\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|counterfeit|tamper(?:ed|ing)?)\\b)(?=.*\\b(?:token|attestation|ticket|credential(?:s)?|signature)\\b)(?=.*\\b(?:override|overrides|overrode|overriding|bypass|bypasses|bypassed|bypassing|ignore|ignores|ignored|ignoring|scope\\s+transfer|permission\\s+hop|trust\\s+hop)\\b)(?=.*\\b(?:execute|executes|executed|executing|run|runs|running|invoke|invokes|invoked|invoking|trigger|triggers|triggered|triggering)\\b).{0,1000}$'],
         "description": 'Detects a forged or counterfeit token or signature in a delegation or handover that enables a trust hop or permission hop to invoke privileged actions.'
     },
@@ -8431,7 +8431,7 @@ PATTERNS = [
         "name": 'Trace Token Swap Execution Safety Downgrade',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|did\\s+not|does\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:bypass|override|disable|ignore|skip|evade|swap|replace|forge|reroute)\\b)(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:handoff|ticket|trace\\s+token|trace\\s+id|session\\s+token|capability\\s+token|custody\\s+token)\\b)(?=.*\\b(?:forge(?:d|ry)?|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|swap(?:ped|ping)?|replace(?:d|ment)?|rerout(?:e|ed|ing))\\b)(?=.*\\b(?:bypass|override|disable|ignore|skip|evad(?:e|ed|ing)|downgrad(?:e|ed|ing))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval|verification|trust\\s+gate|execution\\s+check(?:s)?|safety\\s+check(?:s)?)\\b).*'],
         "description": 'Detects an agent swapping or rerouting a trace token or session token in a handoff to evade or downgrade safety checks and bypass guardrails.'
     },
@@ -8440,7 +8440,7 @@ PATTERNS = [
         "name": 'Cross-Agent Revoked Attestation Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:override|bypass|ignore|disregard|rebind|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator|controller|handoff|cross-agent|peer)\\b)(?=.*(?:\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b.{0,80}\\b(?:attestation|nonce|token|certificate|capability|signature)\\b|\\b(?:attestation|nonce|token|certificate|capability|signature)\\b.{0,80}\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b))(?=.*\\b(?:override|bypass|ignore|disregard|supersed(?:e|es|ed|ing)|rebind)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|authorization|scope|validation)\\b).*'],
         "description": 'Detects a cross-agent or peer handoff presenting a revoked, stale, or forged attestation or certificate to override authorization scope and bypass safety validation.'
     },
@@ -8449,7 +8449,7 @@ PATTERNS = [
         "name": 'Orchestrator Instruction Policy Supersede',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
         "description": 'Detects a message from an orchestrator, planner, or supervisor agent that instructs the recipient to ignore or supersede developer or system instructions and policy.'
     },
@@ -8458,7 +8458,7 @@ PATTERNS = [
         "name": 'Peer Agent Instruction Override Execute',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:another|other|peer|upstream|planner|worker|delegate|orchestrator)\\s+agent\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|previous\\s+instruction(?:s)?)\\b)(?=.*\\b(?:execute|run|invoke|trigger|call)\\b).{0,900}$'],
         "description": 'Detects another or upstream agent instructing the recipient to override policy or guardrails and execute an action in place of the previous instruction set.'
     },
@@ -8470,7 +8470,7 @@ PATTERNS = [
         "name": 'Stolen Handoff Capability Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:handoff|handover|ticket|capability|nonce|scope)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|escalat(?:e|ed|ing|ion)|ignore(?:d|s|ing)?)\\b).*'],
         "description": 'Detects a stolen or forged handoff capability or nonce used by an agent or service to escalate scope and override authorization.'
     },
@@ -8479,7 +8479,7 @@ PATTERNS = [
         "name": 'Upstream Peer Attestation Scope Override Enforcement',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
         "description": 'Detects an upstream or coordinator agent using a forged attestation or receipt to override or supersede policy and safety enforcement on scope or privilege.'
     },
@@ -8488,7 +8488,7 @@ PATTERNS = [
         "name": 'Replayed Agent Approval Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|replay(?:ed)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:approval|ticket|nonce|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|authority|policy|guardrail|permission)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|supersed(?:e|ed|ing)|skip)\\b).+$'],
         "description": 'Detects a forged or replayed approval, nonce, or attestation used by a remote agent to rebind scope or escalate authority while bypassing guardrails.'
     },
@@ -8497,7 +8497,7 @@ PATTERNS = [
         "name": 'Agent Badge Forgery Boundary Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|peer\\s+agent|reviewer|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fabricat(?:ed|ing)?|counterfeit)\\b)(?=.*\\b(?:badge|ticket|nonce|attestation|receipt)\\b)(?=.*\\b(?:scope|policy|guardrail|boundary)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind)\\b).+$'],
         "description": 'Detects a forged badge, nonce, or attestation submitted by a peer agent to escalate scope or override policy boundaries.'
     },
@@ -8506,7 +8506,7 @@ PATTERNS = [
         "name": 'Capability Receipt Nonce Execution Gate Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent|remote\\s+agent)\\b)(?=.*\\b(?:capability\\s+receipt|delegation\\s+receipt|handoff\\s+receipt|approval\\s+receipt)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fabricat(?:e|ed|ion)|spoof(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:nonce|session\\s+tag|scope|capability\\s+token)\\b)(?=.*\\b(?:execute|run|approve|ship(?:ment)?|deploy(?:ment)?)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore|skip(?:ped|s|ping)?|waive)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|review\\s+gate(?:s)?)\\b).*$'],
         "description": 'Detects a forged or replayed capability receipt with a nonce or scope token used to execute or deploy while skipping verification and guardrail gates.'
     },
@@ -8515,7 +8515,7 @@ PATTERNS = [
         "name": 'Token Revocation Bypass Forged Renewal',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|broker|handoff|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability|token|lease|grant|credential)\\b)(?=.*\\b(?:renew|refresh|extend|reissue|reactivate)\\b)(?=.*\\b(?:revocation|revoked|expiry|expiration|invalidat(?:e|ed|ion))\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|waiv(?:e|ed|es|ing))\\b).*$'],
         "description": 'Detects an agent presenting a forged renewal or refresh of a revoked or expired capability token to bypass expiry and override policy checks.'
     },
@@ -8524,7 +8524,7 @@ PATTERNS = [
         "name": 'Agent-to-Agent Delegation Privilege Circumvention',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|counterfeit)\\b)(?=.*\\b(?:handoff|delegate|delegation|agent-to-agent|a2a|receipt|token|attestation)\\b)(?=.*\\b(?:scope|privilege|permission|capability)\\b)(?=.*\\b(?:bypass|override|skip|ignore|evad(?:e|ed|ing)|disable|circumvent)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|approval\\s+gate|safety\\s+check|verification)\\b).*$'],
         "description": 'Detects a forged agent-to-agent handoff token or delegation receipt used to escalate privilege and circumvent approval guardrails.'
     },
@@ -8533,7 +8533,7 @@ PATTERNS = [
         "name": 'Agent Ticket Manifest Scope Rebind Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegation|handoff|coordinator|worker|planner|peer)\\b)(?=.*\\b(?:forged|spoofed|fabricated|counterfeit|fake)\\b)(?=.*\\b(?:ticket|nonce|token|receipt|attestation|manifest)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail|authorization|boundary)\\b)(?=.*\\b(?:override|overrides|overrode|bypass|bypasses|bypassed|rebind|rebinds|rebound|escalate|escalates|escalated)\\b).+$'],
         "description": 'Detects a forged ticket, nonce, or manifest used in an agent handoff to rebind scope or privilege and override guardrail policy.'
     },
@@ -8542,7 +8542,7 @@ PATTERNS = [
         "name": 'Delegation Receipt Access Boundary Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated\\s+agent|peer\\s+agent|worker|subagent)\\b)(?=.*\\b(?:forged|spoofed|fabricated|tampered|counterfeit)\\b)(?=.*\\b(?:ticket|handoff\\s+token|delegation\\s+receipt|approval\\s+token|capability\\s+pass)\\b)(?=.*\\b(?:scope|privilege|role\\s+boundary|access\\s+boundary)\\b)(?=.*\\b(?:override|bypass|bypassed|bypassing|escalate|escalated|escalation|rebind|rebound|unlock)\\b).+'],
         "description": 'Detects a forged delegation receipt or capability pass used by a subagent to escalate scope, unlock access boundaries, or bypass controls.'
     },
@@ -8551,7 +8551,7 @@ PATTERNS = [
         "name": 'Agent Approval Forgery Execution Gate Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)\\b(?:agent|delegate|handoff|worker)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|impersonat(?:e|ed|ing)|counterfeit)\\b.{0,160}\\b(?:approval(?:\\s+ticket)?|permit|capability(?:\\s+token)?|execution(?:\\s+token|\\s+grant)?)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|skip(?:ped|ping)?|ignore(?:d|s|ing)?)\\b.{0,120}\\b(?:execute|executed|run|deploy|activate)\\b'],
         "description": 'Detects a forged approval ticket or capability grant used by an agent in a handoff to bypass execution gates and run privileged actions.'
     },
@@ -8560,7 +8560,7 @@ PATTERNS = [
         "name": 'Agent Manifest Handoff Token Authority Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|fabricated|tampered)\\b)(?=.*\\b(?:manifest|ticket|handoff\\s+token|delegation\\s+record)\\b)(?=.*\\b(?:authority|scope|approval|privilege)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?)\\b)(?=.*\\b(?:guardrail(?:s)?|policy|review|verification)\\b).*'],
         "description": 'Detects a forged manifest or handoff token used by an agent or orchestrator to claim false authority and bypass review or verification guardrails.'
     },
@@ -8569,7 +8569,7 @@ PATTERNS = [
         "name": 'Peer Agent Impersonation Privilege Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer|delegate|worker)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fake|impersonat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|nonce|handoff|attestation|receipt|token)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
         "description": 'Detects a peer agent impersonating another via a forged ticket or nonce to rebind privilege or scope and bypass guardrail controls.'
     },
@@ -8578,7 +8578,7 @@ PATTERNS = [
         "name": 'Stolen Authorization Token Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|fabricated|stolen)\\b)(?=.*\\b(?:approval|ticket|nonce|authorization\\s*token|auth\\s*token)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s*agent)\\b)(?=.*\\b(?:scope|authority|permission)\\b)(?=.*\\b(?:rebind|override|bypass|escalate|escalated|escalating)\\b).+$'],
         "description": 'Detects a stolen or forged authorization token used by a peer agent to rebind scope and escalate permission.'
     },
@@ -8587,7 +8587,7 @@ PATTERNS = [
         "name": 'Cross-Agent Quorum Nonce Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:cross(?:-|\\s)*agent|peer(?:-|\\s)*agent|delegate|delegation|handoff)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|fake|fabricated)\\b)(?=.*\\b(?:quorum|approval(?:\\s|-)*chain|consensus)\\b)(?=.*\\b(?:nonce|session(?:\\s|-)*token|ticket)\\b)(?=.*\\b(?:scope(?:d)?|permission(?:s)?|privilege|authori[sz]ation)\\b)(?=.*\\b(?:override|bypass|ignore|ignored|ignores|ignoring)\\b).*'],
         "description": 'Detects a cross-agent or peer handoff that presents a forged quorum or approval chain nonce to override scope, permission, or guardrail policy.'
     },
@@ -8596,7 +8596,7 @@ PATTERNS = [
         "name": 'Forged Authentication Token Delegation Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|fabricated|counterfeit|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:approval|signoff|authorization|auth(?:entication)?\\s+token|attestation)\\b)(?=.*\\b(?:delegate|delegated|delegation|agent|worker|subagent|handoff)\\b)(?=.*\\b(?:scope|permission|privilege|role)\\b)(?=.*\\b(?:escalat(?:e|ed|es|ing|ion)|unlock|bypass|override)\\b).*$'],
         "description": 'Detects a forged authentication token or attestation used within a delegation to unlock or escalate privilege and bypass policy.'
     },
@@ -8817,7 +8817,7 @@ PATTERNS = [
         "name": 'Forged Nonce Replay Stale Token Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ["(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+"],
         "description": 'Detects a stale, expired, or forged nonce or attestation replayed or reused in an agent handoff to override scope and bypass trust boundaries.'
     },
@@ -8826,7 +8826,7 @@ PATTERNS = [
         "name": 'Agent Receipt Claim Scope Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+"],
         "description": 'Detects an agent asserting or claiming a forged receipt, ticket, or capability to rebind scope or privilege and bypass policy guardrails.'
     },
@@ -8835,7 +8835,7 @@ PATTERNS = [
         "name": 'Agent Ticket Mint Verification Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ["(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$"],
         "description": 'Detects an agent minting or forging a ticket or credential to skip verification or guardrail checks and bypass policy.'
     },
@@ -8946,7 +8946,7 @@ PATTERNS = [
         "name": 'A2A Attestation Lease Policy Supersede',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
         "description": 'Detects an agent-to-agent handoff where an attestation, lease, or capability is used to supersede or disregard safety, approval, or authorization policy.'
     },
@@ -8955,7 +8955,7 @@ PATTERNS = [
         "name": 'Remote Agent Signature Authorize Tool Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
         "description": 'Detects a remote or peer agent presenting a forged manifest signature or attestation to authorize a tool call while bypassing approval or verification policy.'
     },
@@ -8964,7 +8964,7 @@ PATTERNS = [
         "name": 'Forged Handoff Permission Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects a forged handoff token or receipt used to escalate permission or authorization and bypass guardrail and safety checks.'
     },
@@ -8973,7 +8973,7 @@ PATTERNS = [
         "name": 'Forged Quorum Certificate Vote Tally Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|coordinator|peer)\\b)(?=.*\\b(?:forged|spoofed|fake|fabricated|tampered)\\b)(?=.*\\b(?:quorum\\s+certificate|vote\\s+tally|approval\\s+record|consensus\\s+receipt)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|ignore|ignored|ignoring|circumvent|circumvented|circumventing)\\b)(?=.*\\b(?:policy|guardrail|scope|authorization)\\b).*$'],
         "description": 'Detects text in which an agent or orchestrator presents a forged quorum certificate, vote tally, or consensus receipt to override or circumvent policy and guardrail authorization controls.'
     },
@@ -8982,7 +8982,7 @@ PATTERNS = [
         "name": 'Delegation Manifest Authority Rebinding Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
         "description": 'Detects a forged handoff manifest or delegation note used to rebind authority or scope and bypass verification gates or transfer guardrails.'
     },
@@ -8991,7 +8991,7 @@ PATTERNS = [
         "name": 'Forged Approval Chain Scope Role Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
         "description": 'Detects a forged approval chain or handoff receipt used by an agent or delegate to override role, scope, or permission and bypass controls.'
     },
@@ -9000,7 +9000,7 @@ PATTERNS = [
         "name": 'Agent Quorum Badge Scope Escalation Rebind',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
         "description": 'Detects an agent presenting a forged quorum, badge, or approval ticket to rebind scope and escalate privilege.'
     },
@@ -9009,7 +9009,7 @@ PATTERNS = [
         "name": 'Handoff Token Priority Scope Unlock',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|counterfeit|fabricat(?:e|ed|ing))\\b)(?=.*\\b(?:handoff|ticket|receipt|token|session)\\b)(?=.*\\b(?:scope|priority|role|permission)\\b)(?=.*\\b(?:bypass(?:es|ed|ing)?|override(?:n|d|s|ing)?|escalat(?:e|ed|ing|ion)|unlock(?:ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail|check(?:s)?|approval)\\b).+$'],
         "description": 'Detects a forged handoff token or receipt used by an agent or planner to override priority, scope, or role and unlock policy-gated actions.'
     },
@@ -9018,7 +9018,7 @@ PATTERNS = [
         "name": 'Agent Quorum Vote Forgery Policy Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
         "description": 'Detects an agent forging quorum or vote results to skip policy guardrails or approval gates.'
     },
@@ -9027,7 +9027,7 @@ PATTERNS = [
         "name": 'Agent Impersonation Credential Borrowing Promotion',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
         "description": 'Detects an agent impersonating another or borrowing a stolen credential to bypass controls and promote itself to a trusted status.'
     },
@@ -9036,7 +9036,7 @@ PATTERNS = [
         "name": 'Peer Agent Scope Tag Replay Injection',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
         "description": 'Detects a peer agent using a forged, tampered, or replayed scope tag or transfer token to ignore policy or bypass authorization.'
     },
@@ -9045,7 +9045,7 @@ PATTERNS = [
         "name": 'Agent Nonce Replay Token Scope Disable',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
         "description": 'Detects a forged or replayed nonce or approval token in an agent handoff used to disable scope verification or override authorization checks.'
     },
@@ -9414,7 +9414,7 @@ PATTERNS = [
         "name": 'Agent Forged Attestation Tool Execution Privilege Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|delegated|peer|remote)\\b)(?=.*\\b(?:forg(?:ed|ery)|fake|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:attestation|receipt|approval|token|ticket|manifest)\\b)(?=.*\\b(?:tool|command|execution|run|action)\\b)(?=.*\\b(?:scope|privilege|authorization|permission)\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|escalat(?:e|ed|ing)|ignore(?:d|ing)?)\\b)(?=.*\\b(?:policy|guardrail|verification|validation)\\b).*$'],
         "description": 'Detects a peer or remote agent presenting a forged attestation, receipt, or ticket to authorize a tool or command execution while bypassing scope or privilege controls.'
     },
@@ -9515,7 +9515,7 @@ PATTERNS = [
         "name": 'Agent Identity Ticket Privilege Escalation Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s+agent|delegate|worker|planner)\\b)(?=.*\\b(?:identity\\s+claim|identity|credential|attestation|issuer)\\b)(?=.*\\b(?:forged|spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|counterfeit|faked?)\\b)(?=.*\\b(?:ticket|session\\s+ticket|approval\\s+token|handoff\\s+token|delegate\\s+pass)\\b)(?=.*\\b(?:escalat(?:e|ed|ion|ing)|elevat(?:e|ed|ion|ing)|admin\\s+scope|privilege)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|waive(?:d|s)?|skip(?:ped|s|ping)?)\\b).+'],
         "description": 'Detects text in which an agent or delegate presents a forged or spoofed identity credential, session ticket, or approval token with an escalated or elevated privilege scope to bypass or waive policy and guardrail verification.'
     },
@@ -9524,7 +9524,7 @@ PATTERNS = [
         "name": 'Peer Agent Capability Ticket Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|remote\\s+agent|delegate|worker|agent)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit|tampered)\\b)(?=.*\\b(?:capability\\s+ticket|delegation\\s+ticket|handoff\\s+token|attestation|authorization\\s+tag)\\b)(?=.*\\b(?:scope|permission|privilege|role|authorization)\\b)(?=.*\\b(?:guardrail|policy|safety\\s+gate|execution\\s+gate)\\b)(?=.*\\b(?:bypass(?:ed|ing)?|override|overrides|overriding|overrode|skip|skips|skipped|skipping|ignore(?:d|s)?)\\b).+'],
         "description": 'Detects text in which a peer or remote agent uses a forged or counterfeit capability ticket, delegation ticket, or attestation to claim elevated scope or permission and then bypass or override a policy safety gate or execution gate.'
     },
@@ -9533,7 +9533,7 @@ PATTERNS = [
         "name": 'Revoked Agent Token Handoff Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:revoked|expired|stale|invalid|forged|spoofed|fabricated)\\b)(?=.*\\b(?:token|ticket|capability|credential|attestation)\\b)(?=.*\\b(?:handoff|delegate|approval|authorization|policy|guardrail)\\b)(?=.*\\b(?:override|bypass(?:ed|es|ing)?|ignore(?:d|s|ing)?|escalat(?:e|ed|ion)|rebind)\\b).+'],
         "description": 'Detects text in which an agent or delegate presents a revoked, expired, stale, or forged token, ticket, or capability during a handoff or approval step in order to override, bypass, or escalate past policy and guardrail controls.'
     },
@@ -9542,7 +9542,7 @@ PATTERNS = [
         "name": 'Delegate Nonce Forgery Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|delegation|handoff|peer\\s+agent|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|approval\\s+token|signoff)\\b)(?=.*\\b(?:scope|permission|privilege|authority)\\b)(?=.*\\b(?:override|bypass|ignore|rebind)\\b).+'],
         "description": 'Detects text in which a forged or counterfeit nonce, attestation, or approval token is used during a delegation or handoff to override, bypass, or rebind scope, permission, or authority.'
     },
@@ -9551,7 +9551,7 @@ PATTERNS = [
         "name": 'Agent Policy Patch Ticket Authority Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent)\\b)(?=.*\\b(?:patch|hotfix|override\\s+patch|instruction\\s+patch|policy\\s+patch)\\b)(?=.*\\b(?:signed\\s+by|claimed\\s+as|asserted\\s+by|from)\\s+(?:delegate|planner|peer\\s+agent|security\\s+lead)\\b)(?=.*\\b(?:ticket|change\\s+ticket|incident\\s+ticket|approval\\s+token)\\b)(?=.*\\b(?:priority|authority|precedence|admin\\s+scope|elevated\\s+scope)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|skip(?:ped|s|ping)?|waive(?:d|s)?)\\b).+'],
         "description": 'Detects text in which an agent or planner presents a patch, hotfix, or policy patch claimed to be signed by a delegate, planner, or security lead with an approval ticket and elevated authority to bypass or waive policy and guardrail verification.'
     },
@@ -9560,7 +9560,7 @@ PATTERNS = [
         "name": 'Delegation Attestation Lease Policy Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
         "description": 'Detects text in which a delegation, agent-to-agent handoff, or broker interaction presents an attestation, ticket, or capability manifest that bypasses, overrides, or supersedes policy, guardrail, or authorization controls.'
     },
@@ -9569,7 +9569,7 @@ PATTERNS = [
         "name": 'Forged Nonce Stale Token Scope Replay',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
         "description": 'Detects text — excluding negated forms — in which an agent or handoff presents a forged or spoofed nonce, attestation, or session token for replay or reuse to override, bypass, or ignore policy, guardrail, or trust-boundary controls.'
     },
@@ -9578,7 +9578,7 @@ PATTERNS = [
         "name": 'Agent Receipt Scope Rebind Privilege Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+'],
         "description": 'Detects text in which an agent or delegate forges, fabricates, or asserts a receipt, ticket, attestation, or capability to rebind scope or privilege and then escalate, override, or bypass policy and guardrail controls.'
     },
@@ -9587,7 +9587,7 @@ PATTERNS = [
         "name": 'Forged Manifest Signature Authorize Tool Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
         "description": 'Detects text in which an agent or remote agent uses a forged or tampered manifest, signature, or attestation to authorize or unlock execution while bypassing or circumventing policy, guardrail, or approval verification.'
     },
@@ -9596,7 +9596,7 @@ PATTERNS = [
         "name": 'Handoff Capability Scope Permission Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects text in which a forged or counterfeit handoff receipt, capability token, or delegation approval is used to claim elevated scope or permission and then bypass, override, or escalate past guardrails or safety checks.'
     },
@@ -9605,7 +9605,7 @@ PATTERNS = [
         "name": 'Agent Ticket Forge Verification Skip',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$'],
         "description": 'Detects text in which an agent or worker forges, fakes, or counterfeits a ticket, token, credential, or capability pass and then skips, bypasses, or disables the corresponding verification, validation, or policy guardrail check.'
     },
@@ -9614,7 +9614,7 @@ PATTERNS = [
         "name": 'Handoff Manifest Authority Rebinding Forgery',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
         "description": 'Detects text in which a forged or shadow handoff manifest, delegation note, or authority memo is used to rebind scope or authority and then bypass verification gates, skip delegate approval, or override transfer guardrails.'
     },
@@ -9623,7 +9623,7 @@ PATTERNS = [
         "name": 'Delegate Handoff Receipt Scope Role Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
         "description": 'Detects text in which a forged or spoofed delegate, delegation, or agent handoff receipt, ticket, attestation, or approval chain carries elevated scope, role, or privilege claims used to override, bypass, or escalate past guardrail controls.'
     },
@@ -9632,7 +9632,7 @@ PATTERNS = [
         "name": 'Forged Agent Badge Nonce Scope Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
         "description": 'Detects text in which an agent, broker, or orchestrator forges or fabricates a ticket, quorum badge, or scope nonce to bypass, override, escalate, or rebind past authorization controls.'
     },
@@ -9641,7 +9641,7 @@ PATTERNS = [
         "name": 'Quorum Vote Tally Forgery Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
         "description": 'Detects text in which an agent or orchestrator forges or tampers with a quorum count, vote tally, or approval consensus and then uses it to override, bypass, or skip policy, guardrail, or approval-gate controls.'
     },
@@ -9650,7 +9650,7 @@ PATTERNS = [
         "name": 'Agent Impersonation Stolen Ticket Scope Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
         "description": 'Detects text in which a peer agent, delegate, or handoff participant spoofs, impersonates, or uses a stolen ticket or fake approval to bypass, override, skip, or escalate trust controls.'
     },
@@ -9659,7 +9659,7 @@ PATTERNS = [
         "name": 'Peer Agent Scope Tag Replay Policy Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
         "description": 'Detects text in which a peer, upstream, or delegated agent forges, tampers with, or replays a handoff ticket, transfer scope tag, or authorization tag to override, bypass, or disable policy, guardrail, or approval verification.'
     },
@@ -9668,7 +9668,7 @@ PATTERNS = [
         "name": 'Agent Nonce Token Replay Authorization Bypass',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
         "description": 'Detects text in which an agent or peer agent forges, replays, or tampers with a nonce, token, ticket, or approval receipt to override, bypass, or escalate past policy, guardrail, authorization, or approval-check controls.'
     },
@@ -9695,7 +9695,7 @@ PATTERNS = [
         "name": 'Agent Nonce Trust Channel Scope Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without|no)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|coordinator|assistant)\\b)(?=.*\\b(?:nonce|token|session|attestation|credential)\\b)(?=.*\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|rebind(?:ing|ed)?|replay(?:ed|ing)?)\\b)(?=.*\\b(?:scope|authority|trust(?:ed)?\\s+channel|source\\s+of\\s+truth|trust\\s+anchor)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+rule(?:s)?|approval\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects text — excluding negated forms — in which an agent or delegate forges, spoofs, or replays a nonce, token, session, or attestation to rebind scope or trust-anchor authority and then override, bypass, or disregard policy or safety rules.'
     },
@@ -9758,7 +9758,7 @@ PATTERNS = [
         "name": 'Attestation Trust Channel Scope Rebind Escalation',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?=.*\\b(attestation|nonce|token|session|capability)\\b)(?=.*\\b(forge|forged|spoof|spoofed|tamper(?:ed)?|fabricat(?:e|ed|ing))\\b)(?=.*\\b(scope|authority|trust\\s*anchor|trusted\\s*channel)\\b)(?=.*\\b(rebind|escalat(?:e|ed|ing|ion)|override|bypass|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(policy|guardrail(?:s)?|approval\\s*check(?:s)?)\\b).*$'],
         "description": 'Detects text in which a forged, spoofed, or tampered attestation, nonce, token, or capability is used to rebind scope or escalate trust-anchor authority in order to override, bypass, or supersede policy or guardrail approval checks.'
     },
@@ -9794,7 +9794,7 @@ PATTERNS = [
         "name": 'Agent Trusted Ticket Summary Policy Override',
         "category": 'cross_agent_injection',
         "severity": 'high',
-        "channel": ['tool_output', 'message'],
+        "channel": ['tool_output', 'message', 'agent_input'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:agent|delegate|worker|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:ticket|handoff|summary|note|report)\\b)(?=.*\\b(?:trusted|authoritative|source\\s+of\\s+truth)\\b)(?=.*\\b(?:override|bypass|ignore|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail|safety\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects text — excluding negated forms — in which an agent, delegate, or worker presents a ticket, handoff summary, or report that is asserted to be a trusted or authoritative source of truth in order to override, bypass, or ignore policy or guardrail safety checks.'
     },
@@ -10734,7 +10734,7 @@ PATTERNS = [
         "name": "Forged inter-agent ACK envelope",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "ack received from jack: proceed",
             "ack received from cava: proceed",
@@ -10759,7 +10759,7 @@ PATTERNS = [
         "name": "Transcript grafting via OCR alt-text",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "web_content"],
+        "channel": ["message", "file", "tool_output", "web_content", "agent_input"],
         "keywords": [
             "ocr alt-text says 'operator:",
             "ocr alt-text says \"operator:",
@@ -10784,7 +10784,7 @@ PATTERNS = [
         "name": "Other-agent authorization injection (no human review)",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         # Indirect-injection wrappers like "Calendar note:" share vocab with
         # NEGATION_PHRASES. The attack signature ("has authorized" + "no human
         # review") is specific enough that immunity is safe.
@@ -10812,7 +10812,7 @@ PATTERNS = [
         "name": "Shared-log prior-verification claim",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "shared log says agent_2 already confirmed",
             "shared log says agent already confirmed",
@@ -10837,7 +10837,7 @@ PATTERNS = [
         "name": "Supervisor-agent role hijack with safe-mode override",
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         # Calendar/email envelopes wrap this attack frequently — the attack
         # signature ("pretending to be the supervisor agent" + "override safe-mode")
         # is specific enough that immunity is safe.
@@ -11990,7 +11990,7 @@ PATTERNS = [
         "name": 'Split-Lane Approval Hash Downgrade Spoof',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "approval receipt substitution",
             "split-lane ack downgrade",
@@ -12015,7 +12015,7 @@ PATTERNS = [
         "name": 'OCR Alt-Text Cross-Modal Instruction Smuggle',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "ocr policy graft",
             "subtitle delimiter break-out",
@@ -12040,7 +12040,7 @@ PATTERNS = [
         "name": 'Transcript Channel Desync Sidecar Authority Pivot',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "asr-clean metadata-dirty split",
             "ocr sidecar authority pivot",
@@ -12065,7 +12065,7 @@ PATTERNS = [
         "name": 'Cross-Modal Evidence Swap OCR Override',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "ocr-overrides-metadata swap",
             "transcript caption contradiction",
@@ -12090,7 +12090,7 @@ PATTERNS = [
         "name": 'Cross-Feed Metric Bleed Fake Consensus Bypass',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "ops to growth headline hijack",
             "growth to ops suppression flip",
@@ -12115,7 +12115,7 @@ PATTERNS = [
         "name": 'Agent Authority Leak Checkpoint Token Spoof',
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "role-chain privilege carryover",
             "handoff summary laundering",
@@ -12140,7 +12140,7 @@ PATTERNS = [
         "name": 'Cross-Modal Bridge Abuse OCR Metadata Smuggle',
         "category": "cross_agent_injection",
         "severity": "high",
-        "channel": ["message", "file", "tool_output", "log_memory"],
+        "channel": ["message", "file", "tool_output", "log_memory", "agent_input"],
         "keywords": [
             "ocr instruction smuggling",
             "document metadata prompt pivot",
@@ -16832,7 +16832,7 @@ PATTERNS = [
         "name": "High-Trust Identity Tag Authority Lift",
         "category": "agent_persona_drift",
         "severity": "high",
-        "channel": ["message", "file", "web_content", "tool_output"],
+        "channel": ["message", "file", "web_content", "tool_output", "agent_input"],
         "keywords": [
             "agent identity scope confusion",
             "role label smuggling in retrieved docs",
@@ -23438,7 +23438,7 @@ PATTERNS = [
         "name": "A2A message/send Scope-Downgrade Injection",
         "category": "agent_contract_poisoning",
         "severity": "high",
-        "channel": ["message", "api_response"],
+        "channel": ["message", "api_response", "agent_input"],
         "keywords": [],
         "regex": ["(?is)^(?=.*\\b(?:approval|consent|authorization|permission|permit)\\b)(?=.*\\b(?:retry[-_\\s]*id|idempotenc(?:y|e)|request[-_\\s]*id|nonce)\\b)(?=.*\\b(?:downgrad(?:e|ed|ing)|scope\\s*(?:drop|reduce|shrink)|(?:drop|reduce|shrink)\\s*scope|fallback\\s*scope|least[-\\s]*privilege\\s*override)\\b)(?=.*\\b(?:tool\\s*result|planner|dispatcher|handoff|agent[-\\s]*to[-\\s]*agent|a2a)\\b).*"],
         "description": "A2A message/send Scope-Downgrade Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey — abusing idempotency and retry tokens to force unsafe state fallbacks."
@@ -24744,7 +24744,7 @@ PATTERNS = [
         "name": "Alembic Migration Legacy-Schema Approval Rebind",
         "category": "delegated_approval_rebinding",
         "severity": "high",
-        "channel": ["message", "file", "api_response"],
+        "channel": ["message", "file", "api_response", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*(?:cannot|can(?:'t|not)|block(?:ed|s|ing)?|refus(?:e|ed|es|ing)|reject(?:ed|s|ing)?|prevent(?:ed|s|ing)?|never)\b[^\n]{0,100}\b(?:override|swap(?:ped|ping)?|alias(?:ed|ing)?|rebind(?:ed|ing)?|escalat(?:e|ed|ing)|promot(?:e|ed|ing)))(?=.*(?:schema[-\s]*version|versioned\s*schema(?:\s*check)?|schema\s*migration|legacy\s*schema|older\s*schema))(?=.*(?:fallback|downgrad(?:e|ed|ing)|legacy\s*path|failed\s*open|compatibility\s*mode|older\s*schema\s*version))(?=.*(?:approval|consent|authorization|permission|grant))(?=.*(?:scope|role|privilege|tenant|audience|principal))(?=.*(?:override|swap(?:ped|ping)?|alias(?:ed|ing)?|rebind(?:ed|ing)?|escalat(?:e|ed|ing)|promot(?:e|ed|ing)|reus(?:e|ed|ing))).*$""",
         ],
@@ -24826,7 +24826,7 @@ PATTERNS = [
         "name": "Handoff Continuity Approval Reuse",
         "category": "delegation_boundary_poisoning",
         "severity": "high",
-        "channel": ["tool_output"],
+        "channel": ["tool_output", "agent_input"],
         "keywords": [
             "Agent handoff continuity notice",
             "reuse the previous approval",
@@ -24926,7 +24926,7 @@ PATTERNS = [
         "name": "Airflow XCom delegated-approval laundering hardening row",
         "category": "workflow_orchestrator_tool_output",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "Airflow XCom task-return data can launder a delegated task result into a forged approval receipt for release orchestration agents."
     },
     {
@@ -25046,7 +25046,7 @@ PATTERNS = [
         "name": "Phantom Tool-Result Frame Injection",
         "category": "tool_response_spoofing",
         "severity": "high",
-        "channel": ["message", "api_response"],
+        "channel": ["message", "api_response", "agent_input"],
         "regex": [
             r"""(?i)<(?:function_results?|tool_result)\b[^>]{0,80}>\s*\{[\s\S]{0,600}?\}\s*</(?:function_results?|tool_result)>""",
         ],
@@ -25136,7 +25136,7 @@ PATTERNS = [
         "name": "A2A Agent Card Security Scheme Description Injection",
         "category": "a2a_card_metadata_injection",
         "severity": "high",
-        "channel": ["message", "api_response"],
+        "channel": ["message", "api_response", "agent_input"],
         "regex": [
             r"""(?i)security[Ss]chemes?[\s\S]{0,600}description[\s\S]{0,400}(?:orchestrat(?:ing|or|e)|this\s+(?:api|service)\s+requires?\s+(?:you|the\s+(?:calling|requesting)\s+agent)|before\s+(?:calling|processing|invoking)\s+any|note\s+for\s+(?:calling|upstream|orchestrat))""",
         ],
@@ -25147,7 +25147,7 @@ PATTERNS = [
         "name": "Agent Card Skill-Description Privilege Escalation",
         "category": "a2a_capability_escalation",
         "severity": "critical",
-        "channel": ["message", "api_response"],
+        "channel": ["message", "api_response", "agent_input"],
         "regex": [
             r"""(?i)(orchestrat|coordinat|supervisor|dispatch)\w*\s+(note|instruction|directive|alert)\s*[:\-]\s*.{0,300}(bypass|skip\s+\w+\s+review|pre[- ]?authori|elevated\s+(clearance|privilege|trust|access)|admin\s+privilege|direct\s+execution|without\s+\w+\s+review)""",
         ],
@@ -25174,7 +25174,7 @@ PATTERNS = [
         "name": "Copilot coding-agent task summary delegation-bridge laundering (hardening row)",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "Copilot-style coding-agent task summaries can launder child-worker completion text into forged reviewer continuity or merge permission for orchestrator agents."
     },
     {
@@ -25190,7 +25190,7 @@ PATTERNS = [
         "name": "VS Code/LSP workspace-symbol delegation-bridge laundering (hardening row)",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "VS Code/LSP symbol-search results can launder IDE retrieval metadata into forged delegation continuity or accepted merge/release path for code-review agents."
     },
     {
@@ -25198,7 +25198,7 @@ PATTERNS = [
         "name": "Anthropic tool_use protocol-state delegation-bridge hardening",
         "category": "agent_protocol_state",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "Anthropic Messages API `tool_use` blocks can launder pending model-requested tool-call state into a fake human/coordinator approval receipt, causing downstream release workers to deploy or publish while suppressing approval warnings."
     },
     {
@@ -25206,7 +25206,7 @@ PATTERNS = [
         "name": "OpenAI Responses required_action delegation-bridge state laundering hardening",
         "category": "agent_protocol_state",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "Responses API `required_action` tool-call request envelopes can launder a pending tool-call state into a fake coordinator approval record, causing downstream agents to publish or deploy while hiding unresolved approval warnings."
     },
     # === v0.3.10 batch (9 patterns) ===
@@ -25215,7 +25215,7 @@ PATTERNS = [
         "name": "Fake Compaction Header State Injection",
         "category": "compaction_artifact_spoofing",
         "severity": "high",
-        "channel": ["message", "file", "api_response"],
+        "channel": ["message", "file", "api_response", "agent_input"],
         "regex": [
             r"""(?i)\[(?:context|session|memory|prior\s+turns?|previous\s+turns?)\s+(?:compacted?|compressed?|summarized?|restored?)[^\]]{0,80}\][\s\S]{0,500}(?:previously\s+(?:agreed|confirmed|established|set)|established\s+(?:constraint|rule|permission|clearance|priority)|ongoing\s+(?:task|priority|instruction|directive))""",
         ],
@@ -25269,7 +25269,7 @@ PATTERNS = [
         "name": "GitHub Actions cache hit semantic-cache authority laundering (hardening row)",
         "category": "semantic_cache_authority_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "GitHub Actions cache restore telemetry can launder a dependency/build cache hit into a forged release trust receipt for deployment agents."
     },
     {
@@ -25285,7 +25285,7 @@ PATTERNS = [
         "name": "Redis cache state trust-reuse authority laundering (hardening row)",
         "category": "semantic_cache_authority_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "description": "Redis or cache-state output can launder a cache hit, stale key, or previous-release value into a forged prior-review/trust receipt for a release or scanner agent."
     },
     # === v0.3.11 batch (8 patterns) ===
@@ -27208,7 +27208,7 @@ PATTERNS = [
         "name": "Delegated approval launders harmful-objective lineage after iterative reframing",
         "category": "delegated_approval_rebinding",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?=.*\b(?:iteration|iterative|multi[- ]model|candidate|refram(?:e|ed|ing)|rewrite)\b)(?=.*\b(?:evaluator|reviewer|judge|judged|evaluation)\b)(?=.*\b(?:accepted|approved|benign|safe)\b)(?=.*\b(?:final|assembled|later|delegat(?:ed|ion)|handoff|lost|forwards?)\b)(?=.*\b(?:session|handoff|forward|action)\b)(?=.*\b(?:targeted[_ -]?harm\w*|synthetic[_ -]?session\w*|sensitive|credential|exfil)\b).*$""",
         ],
@@ -27307,7 +27307,7 @@ PATTERNS = [
         "name": "MemoryWire HITL approval operation-scope replay",
         "category": "delegated_approval_rebinding",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:must\s+not|do\s+not|never|refus(?:e|ed|es)|reject(?:ed|s)?|block(?:ed|s)?|prevent|defensive|unit\s+test|test\s+fixture|runbook|documentation|scanner\s+rule|safe\s+agent|requires?\s+fresh(?:\s+human)?\s+review|current\s+(?:hitl\s+)?approval|approval\s+is\s+not\s+reusable)\b)(?=.*\b(?:memorywire|memory\s+wire|remember|merge|forget|expire)\b)(?=.*\b(?:hitl|human[- ]in[- ]the[- ]loop|review(?:er)?|approval|governance)\b)(?=.*\b(?:stale|replay|reused|previous|prior|old|mismatch|different|scoped?)\b)(?=.*\b(?:operation[ _-]?(?:id|identity)|request[ _-]?id|adapter[ _-]?(?:scope|id)|target[ _-]?scope|payload[ _-]?hash)\b)(?=.*\b(?:bypass(?:es|ed)?|skip(?:s|ped)?|without|no\s+fresh|reuse(?:s|d)?|accept(?:s|ed)?|honou?r(?:s|ed)?|proceed(?:s|ed)?|continue(?:s|d)?)\b.{0,140}\b(?:review|approval|human|governance|decision|write|merge|operation)\b).*$""",
         ],
@@ -27429,7 +27429,7 @@ PATTERNS = [
         "name": "delegated labeling-service label poisoning hardening",
         "category": "delegation_bridge_state_laundering",
         "severity": "medium",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*(?:independent\s+adjudication|provenance\s+(?:preserved|verified)|safe\s+(?:handling|aggregation)|benign|documentation|unit\s+test))(?=.*(?:label(?:ing|er)|annotation|annotator))(?=.*(?:delegat|outside|vendor|worker|service))(?=.*(?:dataset|training|evaluation|batch|record))(?=.*(?:reference_label|ground_truth)["'=:\s]{0,20}(?:unsafe|safe))(?=.*(?:worker_label|annotator_label)["'=:\s]{0,20}(?:safe|unsafe)).*$""",
         ],
@@ -27440,7 +27440,7 @@ PATTERNS = [
         "name": "coherent suffix objective mutation at delegation review",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?=.*\b(?:delegat(?:e|ed|ion)|handoff|human[- ]in[- ]the[- ]loop|reviewer)\b)(?=.*\b(?:coherent|natural|routine|ordinary|well[- ]written|low[- ]perplexity)\b)(?=.*\b(?:sub[- ]goal|secondary objective|additional objective|quietly)\b)(?=.*\b(?:approve|accept|greenlight|proceed)\b)(?=.*\b(?:without confirmation|without asking|skip(?:ping)? review|no need to ask)\b).*$""",
         ],
@@ -27451,7 +27451,7 @@ PATTERNS = [
         "name": "Tool Result Lifecycle Authority Laundering",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*(?:do not|must not|never|reject|quarantine|untrusted|treat as inert|require fresh|revalidate|verify provenance|safe handling|incident report))(?=.*(?:MCP|tool)\s*(?:result|response|output))(?=.*(?:status|state|lifecycle|verified|complete|approved|trusted))(?=.*(?:queue|enqueue|work item|job))(?=.*(?:forward|handoff|relay|transmit|peer agent|next agent))(?=.*(?:automatically|without (?:a )?(?:fresh )?(?:validation|review|provenance)|skip(?:ping)? (?:revalidation|provenance)|no (?:second|fresh) check|enters the queue|without revalidation|without freshness check)).*$""",
         ],
@@ -27484,7 +27484,7 @@ PATTERNS = [
         "name": "Delegated Citation Provenance Rebinding",
         "category": "delegation_bridge_state_laundering",
         "severity": "medium",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:security\s+guidance|reviewer\s+fetched|could\s+not\s+verify|rejected|corrected|requires?\s+(?:a\s+)?(?:human|second)\s+review|defensive|audit)\b)(?=.*\b(?:citation|cited|source\s+link)\b)(?=.*\b(?:wrong|fabricat\w*|forged|attacker[- ]controlled|adversary[- ]provided|swapped|stale)\b)(?=.*\b(?:evidence|quote|locator|digest|hash|data|conclusion|claim)\b)(?=.*\b(?:skip|bypass|suppress|approve|authori[sz]|rebind|replace|swap|accept)\w*\b).*$""",
         ],
@@ -27495,7 +27495,7 @@ PATTERNS = [
         "name": "delegated threat-model profile omission laundering",
         "category": "delegation_bridge_state_laundering",
         "severity": "medium",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*(?:defensive|documentation|research|unit test|test fixture|incident report|must not|rejected|requires binding|revalidation|benign control|safe handling))(?=.*(?:delegated|delegation|handoff|approver|HITL|human-in-the-loop))(?=.*(?:defense|antidistillation|distillation|robustness))(?=.*(?:effective|successful|robust|safe|approved|approve|cleared))(?=.*(?:omitted|missing|absent|unbound|unspecified|not reported))(?=.*(?:query budget|data budget|interface profile|interaction profile))(?=.*(?:universal|generalized|generalised|all attackers|threat-model)).*$""",
         ],
@@ -27506,7 +27506,7 @@ PATTERNS = [
         "name": "Delegated-workflow scope collapse via attacker-controlled issue prompt",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:blocked|rejected|quarantined|defensive|test fixture|must not|do not obey|requires fresh approval)\b)(?=.*\b(?:github\s+issue|issue\s+title|issue\s+body)\b)(?=.*\b(?:opened|webhook|automatic|auto[- ]trigger)\b)(?=.*\b(?:embedded|interpolated|injected|entered|supplied)\b.{0,100}\b(?:prompt|agent)\b)(?=.*\b(?:command[- ]capable|gh\s+(?:issue|cli)|authenticated)\b)(?=.*\b(?:comment|relabel|label)\b).*$""",
         ],
@@ -27517,7 +27517,7 @@ PATTERNS = [
         "name": "Paired Operand Lifecycle Flag Mismatch",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:benign|defensive|documentation|unit\s+test|test\s+fixture|must\s+not|do\s+not|never|safe|patched|fixed|reject(?:ed|s)?|validate(?:d|s)?|equal(?:ity)?\s+(?:check|validation)|consistent)\b)(?=.*\b(?:delegate|delegat(?:ed|ion)|approval|handoff|requeue|merge|paired|operand|two\s+records?)\b)(?=.*\b(?:flag|mode|generation|lifecycle|ownership|handle)\w*\b)(?=.*\b(?:different|mismatch(?:ed)?|incompatible|unequal|not\s+equal)\b)(?=.*\b(?:shared|common|single)\s+(?:action|operation|executor|cleanup|queue)\b)(?=.*\b(?:stale|dangling|freed|released|use[- ]after[- ]free|UAF|reuse|dereference)\w*\b)(?=.*\b(?:later|downstream|subsequent|after)\b).*?$""",
         ],
@@ -27539,7 +27539,7 @@ PATTERNS = [
         "name": "Anonymous Interleaving State Collision",
         "category": "delegation_bridge_state_laundering",
         "severity": "high",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:security guide|defensive|documentation|unit test|test fixture|incident report|must not|preserve attribution|reject cross[- ]session|blocked)\b)(?=.*\b(?:anonymous|untraceable|no session identity|sessionless)\b)(?=.*\b(?:interleav|arbitrarily interleav|cross[- ]session|unrelated session)\w*\b)(?=.*\b(?:fragment|partial request|benign[- ]looking query)\w*\b)(?=.*\b(?:merge|join|aggregate|reconstruct|compose)\w*\b)(?=.*\b(?:lose|lost|loses|missing|without|no)\w*\b)(?=.*\b(?:attribution|session|identity|partition|provenance)\b)(?=.*\b(?:delegat(?:ed|ion)|task state|workflow)\b)(?=.*\b(?:suppress|hide|omit|skip|ignore|continue|proceed)\w*\b)(?=.*\b(?:review|finding|warning|approval|security|task|workflow)\b).*$""",
         ],
@@ -27987,7 +27987,7 @@ PATTERNS = [
         "name": "covert tool-trace steganography in peer-agent coordination",
         "category": "cross_agent_injection",
         "severity": "medium",
-        "channel": ["message", "file", "web_content"],
+        "channel": ["message", "file", "web_content", "agent_input"],
         "regex": [
             r"""(?is)^(?!.*\b(?:defensive|security\s+(?:guide|test)|documentation|unit\s+test|negative\s+fixture|incident\s+report|runbook|must\s+not|do\s+not|never|inert|quarantined)\b)(?=.*\b(?:agent\s*[ab]|peer\s+agent|worker\s*[ab])\b)(?=.*\b(?:tool\s+(?:call|result|output)|search|browser|retrieval)\b)(?=.*\b(?:third|second|first|choice|ordering|selected|omitted|result\s+index|rank)\b)(?=.*\b(?:decode|encode|bit|signal|state|codebook|coordinate|correlat(?:ed|ion))\b).*$""",
         ],

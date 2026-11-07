@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a peer or remote agent presenting a forged attestation, receipt, or ticket to authorize a tool or command execution while bypassing scope or privilege controls.",
   "keywords": [],

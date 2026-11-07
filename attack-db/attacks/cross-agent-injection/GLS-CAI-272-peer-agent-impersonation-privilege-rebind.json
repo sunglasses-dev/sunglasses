@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a peer agent impersonating another via a forged ticket or nonce to rebind privilege or scope and bypass guardrail controls.",
   "keywords": [],

@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker forges or replays an acknowledgment in one channel (planner summary, audit log, approval text) while the executor lane commits a different, higher-impact action, breaking the binding between what the user approved and what the agent runs.",
   "keywords": [

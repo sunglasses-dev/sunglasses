@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker hides instructions inside text extracted from another modality (image OCR, subtitle, audio transcript, PDF footnote) and the agent silently promotes that untrusted span into tool arguments or policy context, bypassing channel trust boundaries.",
   "keywords": [

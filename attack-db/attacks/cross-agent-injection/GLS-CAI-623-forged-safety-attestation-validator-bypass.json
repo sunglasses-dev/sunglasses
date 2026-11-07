@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent forging a safety attestation, compliance token, or audit token to suppress or disable policy validators and safety checks.",
   "keywords": [],

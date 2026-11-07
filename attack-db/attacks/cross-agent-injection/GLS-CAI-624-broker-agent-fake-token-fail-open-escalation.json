@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a broker or scheduler agent presenting a fake token or attestation to trigger a fail-open condition and escalate scope or privileges.",
   "keywords": [],

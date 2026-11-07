@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged delegation manifest or attestation-nonce submitted by an agent to override trust checks, policy, or safety guardrails.",
   "keywords": [],

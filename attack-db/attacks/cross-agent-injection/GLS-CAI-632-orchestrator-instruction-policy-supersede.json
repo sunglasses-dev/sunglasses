@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a message from an orchestrator, planner, or supervisor agent that instructs the recipient to ignore or supersede developer or system instructions and policy.",
   "keywords": [],

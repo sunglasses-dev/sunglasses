@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged quorum receipt, approval token, or attestation used by an agent to regrant or unlock scope while bypassing policy.",
   "keywords": [],

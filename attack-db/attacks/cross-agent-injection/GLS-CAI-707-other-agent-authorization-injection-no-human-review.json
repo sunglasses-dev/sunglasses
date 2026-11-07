@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Other-agent authorization injection \u2014 attacker claims a named peer agent has already authorized an action AND explicitly waives human review, attempting to short-circuit human-in-the-loop guardrails.",
   "keywords": [

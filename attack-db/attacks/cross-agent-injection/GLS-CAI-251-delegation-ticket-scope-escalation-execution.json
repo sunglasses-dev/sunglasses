@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged delegate ticket or authorization token carrying an explicit scope-escalation or privilege-upgrade claim that is then used to execute actions while bypassing controls.",
   "keywords": [],

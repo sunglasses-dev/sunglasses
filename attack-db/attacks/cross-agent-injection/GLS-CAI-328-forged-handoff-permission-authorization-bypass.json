@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged handoff token or receipt used to escalate permission or authorization and bypass guardrail and safety checks.",
   "keywords": [],

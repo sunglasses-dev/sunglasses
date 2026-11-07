@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker reframes Ops telemetry (scanner, bot noise) as Growth truth (or vice versa) and fabricates cross-source consensus, so AI-assisted reporting agents corrupt priorities and either invent demand or downgrade real abuse.",
   "keywords": [

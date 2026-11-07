@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Shared-log prior-verification claim \u2014 attacker forges or injects a shared-log entry asserting that a peer agent already verified the action, telling the current agent to skip its own verification step.",
   "keywords": [

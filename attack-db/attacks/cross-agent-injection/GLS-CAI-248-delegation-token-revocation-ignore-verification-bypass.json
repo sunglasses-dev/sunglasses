@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "tool_output",
-    "file"
+    "file",
+    "agent_input"
   ],
   "description": "Attacker explicitly names a delegation token/receipt as REVOKED/EXPIRED/MISMATCH and instructs agent to ignore revocation and execute anyway. Revocation-ignore channel not covered by forgery/spoof/replay (GLS-CAI-241).",
   "keywords": [

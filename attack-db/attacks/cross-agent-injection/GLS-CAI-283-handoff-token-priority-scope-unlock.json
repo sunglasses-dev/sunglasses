@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged handoff token or receipt used by an agent or planner to override priority, scope, or role and unlock policy-gated actions.",
   "keywords": [],

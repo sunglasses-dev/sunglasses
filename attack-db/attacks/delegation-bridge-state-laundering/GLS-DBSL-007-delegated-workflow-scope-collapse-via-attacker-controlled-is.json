@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "An automatic issues.opened event interpolates attacker-written issue title/body into a command-capable triage agent's prompt, letting external text drive authenticated gh comment and relabel mutations outside the bounded triage purpose.",
   "keywords": [],

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or delegate presents a revoked, expired, stale, or forged token, ticket, or capability during a handoff or approval step in order to override, bypass, or escalate past policy and guardrail controls.",
   "keywords": [],

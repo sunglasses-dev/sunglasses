@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or peer agent forges, replays, or tampers with a nonce, token, ticket, or approval receipt to override, bypass, or escalate past policy, guardrail, authorization, or approval-check controls.",
   "keywords": [],

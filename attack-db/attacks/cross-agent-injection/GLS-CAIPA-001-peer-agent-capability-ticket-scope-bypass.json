@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a peer or remote agent uses a forged or counterfeit capability ticket, delegation ticket, or attestation to claim elevated scope or permission and then bypass or override a policy safety gate or execution gate.",
   "keywords": [],

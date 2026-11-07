@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent or delegate presenting a forged or spoofed token, ticket, or attestation to bypass or override scope, permission, or guardrail enforcement.",
   "keywords": [],

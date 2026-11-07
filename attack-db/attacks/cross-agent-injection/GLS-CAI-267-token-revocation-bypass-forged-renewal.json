@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent presenting a forged renewal or refresh of a revoked or expired capability token to bypass expiry and override policy checks.",
   "keywords": [],

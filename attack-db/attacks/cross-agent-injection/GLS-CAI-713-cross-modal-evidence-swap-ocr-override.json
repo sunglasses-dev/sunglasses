@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker plants conflicting claims across modalities (benign text plus malicious OCR or caption) so the orchestrator promotes the wrong channel as authoritative and a shallow merge silently flips guardrail fields, granting tool execution that policy should deny.",
   "keywords": [

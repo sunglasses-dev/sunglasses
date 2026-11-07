@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent minting or forging a ticket or credential to skip verification or guardrail checks and bypass policy.",
   "keywords": [],

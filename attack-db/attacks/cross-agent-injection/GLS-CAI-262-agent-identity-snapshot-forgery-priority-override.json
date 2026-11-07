@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent presenting a forged identity, profile, or session snapshot to elevate priority or override scope and guardrail enforcement.",
   "keywords": [],

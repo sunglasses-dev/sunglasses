@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "api_response"
+    "api_response",
+    "agent_input"
   ],
   "description": "Alembic Migration Legacy-Schema Approval Rebind: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 specific mechanism of exploiting schema-version fallbacks/downgrades to rebind approvals is not covered.",
   "keywords": [],

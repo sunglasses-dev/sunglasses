@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or orchestrator forges or tampers with a quorum count, vote tally, or approval consensus and then uses it to override, bypass, or skip policy, guardrail, or approval-gate controls.",
   "keywords": [],

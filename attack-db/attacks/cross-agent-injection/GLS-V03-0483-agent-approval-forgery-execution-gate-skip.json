@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged approval ticket or capability grant used by an agent in a handoff to bypass execution gates and run privileged actions.",
   "keywords": [],

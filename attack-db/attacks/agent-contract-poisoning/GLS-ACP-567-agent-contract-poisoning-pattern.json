@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "tool_output",
-    "file"
+    "file",
+    "agent_input"
   ],
   "description": "Attackers may poison inter-agent contract text with forged exception clauses that rebind priority order, causing execution guardrails to be bypassed.",
   "keywords": [

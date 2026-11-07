@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or delegate presents a forged or spoofed identity credential, session ticket, or approval token with an escalated or elevated privilege scope to bypass or waive policy and guardrail verification.",
   "keywords": [],
