@@ -1,12 +1,13 @@
 """The words "a tool result is the api_response channel" match what the code does.
 
 `scan --channel tool_output` is a documented channel, and a reader could take it for the
-channel a tool's output is scanned under. It is not: no credential rule is declared on it. The
-MCP proxy reads a tool result as `api_response`, and the `-API` credential rules are declared
-there. The help text and the README say so, and this test compares those words with the rules
-and the proxy. It pins three facts: the proxy reads a tool result as `api_response`, every `-API`
-credential rule is declared on `api_response`, and no credential rule is declared on
-`tool_output`. It also pins the full wording of those clauses in the help text and the README.
+channel a tool's output is scanned under. The credential rules for a tool result are declared
+on it as well as on `api_response`: the eight `-API` rules and the JWT rule. The MCP proxy reads
+a tool result as `api_response`. The help text and the README say so, and this test compares
+those words with the rules and the proxy. It pins four facts: the proxy reads a tool result as
+`api_response`, every `-API` credential rule is declared on `api_response`, exactly those rules
+plus `GLS-SD-005` are the credential rules declared on `tool_output`, and none of the other
+parents is. It also pins the full wording of those clauses in the help text and the README.
 It does not pin the complete channel list of any rule.
 """
 import subprocess
@@ -17,13 +18,14 @@ from sunglasses.proxy import selector
 
 _HELP_CLAUSES = (
     "A tool result is the api_response channel",
-    "the credential rules for tool results are declared there",
-    "and none is declared on tool_output",
+    "the credential rules for tool results are declared there and on tool_output",
+    "releases up to 0.6.19 declared none on tool_output",
 )
 _README_CLAUSES = (
     "A tool result is the `api_response` channel",
     "`sunglasses scan --channel api_response` runs those rules",
-    "`--channel tool_output` runs none of the credential rules",
+    "`--channel tool_output` runs them too",
+    "Releases up to 0.6.19 declared none of the credential rules on `tool_output`",
 )
 
 
@@ -62,9 +64,14 @@ def test_the_api_credential_rules_are_declared_on_api_response():
         assert "api_response" in p["channel"], p["id"]
 
 
-def test_no_credential_rule_is_declared_on_tool_output():
-    declared = [p["id"] for p in _credential_rules() if "tool_output" in p["channel"]]
-    assert declared == [], (
-        f"credential rules now declared on tool_output: {declared}. The help text and the "
-        "README say none are; update them (and the CHANGELOG line) with the rule change."
+def test_exactly_the_tool_result_credential_rules_are_declared_on_tool_output():
+    declared = sorted(p["id"] for p in _credential_rules() if "tool_output" in p["channel"])
+    expected = sorted(
+        [p["id"] for p in _credential_rules() if p["id"].endswith("-API")] + ["GLS-SD-005"]
+    )
+    assert len(expected) == 9
+    assert declared == expected, (
+        f"credential rules declared on tool_output: {declared}; the reviewed set is {expected}. "
+        "The help text and the README name this set; update them (and the CHANGELOG line) "
+        "with the rule change."
     )

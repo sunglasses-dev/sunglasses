@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "api_response",
-    "agent_input"
+    "agent_input",
+    "tool_output"
   ],
   "description": "Detects Google API keys in the standard AIza format.",
   "keywords": [

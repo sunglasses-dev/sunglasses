@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "api_response",
-    "agent_input"
+    "agent_input",
+    "tool_output"
   ],
   "description": "Detects GitHub fine-grained personal access tokens.",
   "keywords": [

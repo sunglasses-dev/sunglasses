@@ -7,7 +7,8 @@
   "channels": [
     "api_response",
     "log_memory",
-    "agent_input"
+    "agent_input",
+    "tool_output"
   ],
   "description": "Private key material that should never be in agent-accessible content.",
   "keywords": [

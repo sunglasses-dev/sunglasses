@@ -2212,7 +2212,7 @@ PATTERNS = [
         "name": "JWT token",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["file", "log_memory", "message", "web_content", "api_response"],
+        "channel": ["file", "log_memory", "message", "web_content", "api_response", "tool_output"],
         "keywords": [
             "JWT",
             "bearer token",
@@ -2679,7 +2679,7 @@ PATTERNS = [
         "name": "API key patterns (api_response)",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "regex": [
             r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
             r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
@@ -2696,7 +2696,7 @@ PATTERNS = [
         "name": "Private key content (api_response)",
         "category": "secret_detection",
         "severity": "critical",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "keywords": [
             "-----begin rsa private key-----",
             "-----begin openssh private key-----",
@@ -2711,7 +2711,7 @@ PATTERNS = [
         "name": "AWS access key ID (api_response)",
         "category": "secret_detection",
         "severity": "critical",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "keywords": [
             "aws access key",
             "credential",
@@ -2727,7 +2727,7 @@ PATTERNS = [
         "name": "PEM-encoded private key (api_response)",
         "category": "secret_detection",
         "severity": "critical",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "keywords": [
             "private key",
             "PEM",
@@ -2744,7 +2744,7 @@ PATTERNS = [
         "name": "GitHub classic PAT (api_response)",
         "category": "secret_detection",
         "severity": "critical",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "keywords": [
             "GitHub token",
             "PAT",
@@ -2760,7 +2760,7 @@ PATTERNS = [
         "name": "Slack API token (api_response)",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["api_response", "log_memory", "agent_input"],
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "keywords": [
             "Slack token",
             "bot token",
@@ -2776,7 +2776,7 @@ PATTERNS = [
         "name": "Google API Key (api_response)",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["api_response", "agent_input"],
+        "channel": ["api_response", "agent_input", "tool_output"],
         # NO log_memory FOR THIS ONE. The GLS-PI-021-API template carries
         # api_response/log_memory/agent_input, but this parent's channels are
         # message/file/code and do NOT include log_memory, so granting it here
@@ -2801,7 +2801,7 @@ PATTERNS = [
         "name": "GitHub fine-grained PAT (api_response)",
         "category": "secret_detection",
         "severity": "high",
-        "channel": ["api_response", "agent_input"],
+        "channel": ["api_response", "agent_input", "tool_output"],
         # NO log_memory FOR THIS ONE. The GLS-PI-021-API template carries
         # api_response/log_memory/agent_input, but this parent's channels are
         # message/file/code and do NOT include log_memory, so granting it here
