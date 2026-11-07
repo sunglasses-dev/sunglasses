@@ -44,6 +44,14 @@ All notable changes to Sunglasses are documented here.
   document that was already blocked gained three findings. There is no corpus of real
   agent-to-agent traffic, so the false-positive rate on real handoffs is not measured.
   `tests/test_agent_input_inter_agent_families.py` pins the behaviour.
+- Seven mechanism rules also run on `agent_input`: an instruction override (`GLS-MECH-001`), a covert
+  directive to an AI (002), an exfiltration sink (003), a markdown-image smuggle (004), a fabricated
+  authority (005), a covert-channel encoding (008) and a fabricated prior consent (010). They already
+  ran on `message`, `file`, `web_content`, `tool_output` and `api_response`. The two jailbreak-framing
+  rules (007, 009), the hook rule (011) and 006 stay off `agent_input`. Channel lists only. On the 111
+  clean documents no decision and no finding changed; that corpus holds no text these rules fire on, so
+  the figure says clean documentation stays clean and nothing about real handoffs.
+  `tests/test_agent_input_mechanisms.py` pins the behaviour.
 
 ## [0.6.19] — 2026-11-04
 
