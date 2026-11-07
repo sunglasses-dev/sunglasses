@@ -27,8 +27,7 @@ All notable changes to Sunglasses are documented here.
   review or a status update stays clean, and so does a maintainer's licence line, a CODEOWNERS line and a
   role description. It runs on `message`, `tool_output` and `agent_input` (`prompt` reads as `message`);
   `file`, `web_content`, `api_response` and `log_memory` stay off because role documents and READMEs
-  describe delegation designs. Text that calls itself documentation, a test fixture, an incident report
-  or a runbook is skipped, so a message that adds one of those words avoids the rule. It does not report
+  describe delegation designs. It does not report
   a third-person relay ("the supervisor told us to ..."), a message with no opener, a signed envelope
   with no instruction, or a request split across a line break; those are strict-xfail in
   `tests/test_cai_718_asserted_parent_authority.py`. Listed patterns 1,584 to 1,585 and patterns with a

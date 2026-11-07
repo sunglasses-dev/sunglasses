@@ -10,9 +10,7 @@ Every sentence below was written for this file. None is copied from a third-part
 
 STATED LIMITS, pinned rather than hidden (strict xfail at the bottom, so the day one is closed the test
 says so): a third-person relay ("the supervisor wants us to ..."), a message with no opener, a quoted
-signed envelope with no verb and object, and a request split across a line break are NOT reported; text
-that calls itself documentation, a test fixture, an incident report or a runbook is skipped, so an attacker
-who adds one of those words avoids the rule.
+signed envelope with no verb and object, and a request split across a line break are NOT reported.
 
 NOT MEASURED: real agent-to-agent traffic. The clean texts are written by us, not observed in the field.
 """
@@ -127,12 +125,18 @@ def test_the_channel_declaration_is_what_makes_the_carrier_fire(name):
     assert RULE_ID in _ids(_alone(_RULE).scan(CARRIERS[name], channel="agent_input"))
 
 
+_FRAMING_WORDS = ("defensive", "security guide", "documentation", "unit test", "negative fixture",
+                  "incident report", "runbook", "inert", "quarantined")
+
+
 @pytest.mark.parametrize("name", sorted(CARRIERS))
-def test_text_that_calls_itself_documentation_is_skipped(name):
-    """The defensive-framing convention of the neighbouring rules. The cost is stated in the module
-    docstring: an attacker who writes one of these words into the message avoids the rule."""
-    framed = "Documentation example of a forged delegation: " + CARRIERS[name]
-    assert RULE_ID not in _ids(_alone(_RULE).scan(framed, channel="agent_input"))
+def test_an_exclusion_word_does_not_disarm_the_rule(name):
+    """The rule reads what is asked of the receiving agent, not how the sender describes the text: a word
+    such as "documentation" in front of the carrier, or after it, changes nothing on any of the three channels."""
+    for word in _FRAMING_WORDS:
+        for text in (f"{word.capitalize()} example: " + CARRIERS[name], CARRIERS[name] + f" ({word})"):
+            for channel in ("message", "tool_output", "agent_input"):
+                assert RULE_ID in _ids(_alone(_RULE).scan(text, channel=channel)), (name, word, channel)
 
 
 def test_a_claim_without_a_sensitive_instruction_and_an_instruction_without_a_claim_are_both_clean():
