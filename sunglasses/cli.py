@@ -39,7 +39,7 @@ from .sarif import to_sarif
 from .taxonomy import for_category
 from .receipts._shown import printable as _shown_message
 from .receipts._shown import shown_path as _shown_path_pair
-from .receipts._shown import shown_text
+from .receipts._shown import shown_name
 
 
 # ANSI colors for terminal output
@@ -869,18 +869,22 @@ class _ScanPool:
 def _printable(name):
     """A file name is data, not terminal input: escape control characters before showing it.
 
-    The rule is `receipts._shown.shown_text`: a backslash is written twice, so a name that
-    spells an escape out cannot print the same as the name that holds the character."""
-    return shown_text(name)
+    A name that holds one is written between $'...' (`receipts._shown.shown_name`); any other
+    name, a Windows path included, is shown as it is."""
+    return shown_name(name)
 
 
 def _printable_match(text):
     """A quoted match is file content: escape controls, and the backslash that spells them.
 
     Every escape has a fixed width (`\\xNN`, `\\uNNNN`, `\\UNNNNNNNN`) and a literal
-    backslash is doubled, so two different texts never read the same. Same rule as
-    `_printable`, which since C805 is the one rule."""
-    return shown_text(text)
+    backslash is doubled, so two different texts never read the same.
+    """
+    return "".join(
+        ch if (ch.isprintable() or ch == " ") else (
+            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else
+            f"\\u{ord(ch):04x}" if ord(ch) < 0x10000 else f"\\U{ord(ch):08x}")
+        for ch in text.replace("\\", "\\\\"))
 
 
 def _where(path):
@@ -4562,7 +4566,7 @@ def cmd_doctor(args, _run=None):
     if rendered["inventory"]:
         print(f"  {BOLD}Servers{RESET}")
         for row in rendered["inventory"]:
-            name = shown_text(row["name"]) if row["name"] else "—"
+            name = shown_name(row["name"]) if row["name"] else "—"
             detail = row.get("detail")
             colour = GREEN if row["state"] == _doc.WRAPPED else DIM
             line = f"    {colour}{row['state']:<10}{RESET} {name}  {DIM}({_where(row['source'])}){RESET}"

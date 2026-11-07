@@ -1,13 +1,13 @@
 """Two different names never print the same line, and a name that is data never reaches a terminal as it stands.
 
-Until C805, `agent_discovery._safe` and `cli._printable` wrote a control character as `\\x1b` and left a
-backslash alone, so a name that SPELLED `\\x1b` out printed the same as the name that held the character.
-That matters where a person judges a row by what it shows: the `proxy approve` tool list has no numbering
-that tells two rows apart. One rule now (`receipts._shown.shown_text`): every character `str.isprintable()`
-refuses is an escape of fixed width, and a backslash is written twice.
+A name that holds a character `str.isprintable()` refuses is written between $'...' (`receipts._shown.shown_name`),
+every such character as an escape of fixed width and a backslash twice. A name with none of them is shown as it is,
+a Windows path included. So the name `a<ESC>b` and the name that spells it out (`a\\x1bb`) are two different lines,
+which matters where a person judges a row by what it shows: the `proxy approve` tool list has no numbering that
+tells two rows apart.
 
 The second half is the places that print a name or a path somebody else chose: the doctor Servers row, the
-install and uninstall lines, and the link line. Every name below was written for this file.
+install and uninstall lines, and the line that names a linked config. Every name below was written for this file.
 """
 import io
 import itertools
@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO))
 
 from sunglasses import cli  # noqa: E402
 from sunglasses.proxy import agent_discovery, approvals, commands  # noqa: E402
-from sunglasses.receipts._shown import shown_text  # noqa: E402
+from sunglasses.receipts._shown import name_is_escaped, shown_name  # noqa: E402
 
 SHA = "a" * 64
 DIGEST = "b" * 64
@@ -32,7 +32,7 @@ ESC, CR, LF, BIDI = "\x1b", "\r", "\n", "‮"
 HOSTILE = "evil" + ESC + "[2J" + LF + "FORGED approved" + CR + BIDI
 
 # Each symbol is a character, a character an escape is spelled with, or a character that gets one.
-ALPHABET = ["a", "\\", "x", "u", "0", "1", ESC, LF, BIDI, "\U000e0001", " "]
+ALPHABET = ["a", "\\", "x", "u", "0", "$", "'", ESC, LF, BIDI, "\U000e0001", " "]
 
 
 def test_no_two_different_names_print_the_same_up_to_length_four():
@@ -40,7 +40,7 @@ def test_no_two_different_names_print_the_same_up_to_length_four():
     for length in range(0, 5):
         for combo in itertools.product(ALPHABET, repeat=length):
             name = "".join(combo)
-            shown = shown_text(name)
+            shown = shown_name(name)
             assert shown not in seen, (name.encode("unicode_escape"), seen[shown].encode("unicode_escape"))
             seen[shown] = name
     assert len(seen) == sum(len(ALPHABET) ** n for n in range(0, 5))
@@ -48,20 +48,25 @@ def test_no_two_different_names_print_the_same_up_to_length_four():
 
 def test_the_output_holds_no_character_a_terminal_would_act_on():
     for combo in itertools.product(ALPHABET, repeat=3):
-        shown = shown_text("".join(combo))
+        shown = shown_name("".join(combo))
         assert all(ch.isprintable() for ch in shown)
 
 
-def test_a_name_with_nothing_to_escape_is_unchanged():
-    assert shown_text("read_file") == "read_file"
-    assert shown_text("my server") == "my server"
-    assert shown_text("") == ""
+@pytest.mark.parametrize("name", [
+    "read_file", "my server", "", "corp\\tool", "C:\\proj\\a.md", "\\\\host\\share\\a b.md", "a\\x1bb", "it's", "naïve",
+])
+def test_a_name_with_nothing_to_escape_is_shown_as_it_is(name):
+    assert shown_name(name) == name and not name_is_escaped(name)
+    assert cli._printable(name) == name and agent_discovery._safe(name) == name
 
 
-def test_a_backslash_is_written_twice_and_a_wide_character_has_a_fixed_width():
-    assert shown_text("corp\\tool") == "corp\\\\tool"
-    assert shown_text("\U000e0001") == "\\U000e0001"          # eight digits: never  then a 1
-    assert shown_text(BIDI) == "\\u202e"
+def test_a_name_that_needs_an_escape_is_written_between_dollar_quotes():
+    assert shown_name("a" + ESC + "b") == "$'a\\x1bb'"
+    assert shown_name(BIDI) == "$'\\u202e'"
+    assert shown_name("\U000e0001") == "$'\\U000e0001'"          # eight digits: never  then a 1
+    assert shown_name("a\\b" + LF) == "$'a\\\\b\\x0a'"            # backslash twice
+    assert shown_name("it's" + CR) == "$'it\\'s\\x0d'"            # quote escaped
+    assert shown_name("$'a'") == "$'$\\'a\\''"                    # a plain name that looks like the form
 
 
 @pytest.mark.parametrize("pair", [
@@ -69,24 +74,28 @@ def test_a_backslash_is_written_twice_and_a_wide_character_has_a_fixed_width():
     ("a" + LF + "b", "a\\x0ab"),
     ("a" + BIDI + "b", "a\\u202eb"),
     ("a\\b", "a\\\\b"),
+    ("a" + ESC + "b", "$'a\\x1bb'"),
 ])
-def test_the_three_renderers_keep_a_name_and_its_spelling_apart(pair):
+def test_the_renderers_keep_a_name_and_its_spelling_apart(pair):
     first, second = pair
     assert agent_discovery._safe(first) != agent_discovery._safe(second)
     assert cli._printable(first) != cli._printable(second)
     assert cli._printable_match(first) != cli._printable_match(second)
 
 
-def test_the_three_renderers_are_one_rule():
-    for name in ("plain", "tab\there", "a\\b", HOSTILE, "\U000e0001x", "naïve"):
-        assert agent_discovery._safe(name) == cli._printable(name) == cli._printable_match(name) == shown_text(name)
+def test_the_two_name_renderers_are_one_rule_and_the_match_renderer_is_unchanged():
+    for name in ("plain", "tab\there", "a\\b", HOSTILE, "\U000e0001x", "naïve", "C:\\proj\\a.md"):
+        assert agent_discovery._safe(name) == cli._printable(name) == shown_name(name)
+    assert cli._printable_match("a\\b") == "a\\\\b"          # a quoted match keeps its own rule
 
 
-def test_a_long_name_is_still_cut_with_a_digest_after_the_backslash_rule():
+def test_a_long_name_is_still_cut_with_a_digest():
     first, second = "\\" * 100 + "3662", "\\" * 100 + "4356"
     a, b = agent_discovery._safe(first), agent_discovery._safe(second)
     assert len(a) <= agent_discovery._NAME_LIMIT and len(b) <= agent_discovery._NAME_LIMIT
     assert a != b
+    held = "a" + ESC + "x" * 200
+    assert len(agent_discovery._safe(held)) <= agent_discovery._NAME_LIMIT
 
 
 # ── proxy approve ──────────────────────────────────────────────────────────
@@ -107,19 +116,20 @@ def test_approve_shows_a_name_and_its_spelling_as_two_different_rows(tmp_path):
     held, spelled = "a" + ESC + "b", "a\\x1bb"
     _capture(tmp_path, [held, spelled])
     _code, out, _err = _approve(tmp_path)
-    rows = [ln for ln in out.splitlines() if ln.startswith("  a")]
+    rows = [ln for ln in out.splitlines() if ln.startswith("  a") or ln.startswith("  $'a")]
     assert len(rows) == 2 and rows[0] != rows[1]
-    assert "  a\\x1bb [escaped]  " in out                     # the character, written out
-    assert "  a\\\\x1bb [escaped]  " in out                   # the name that spells it out: backslash twice
+    assert "  $'a\\x1bb' [escaped]  " in out                   # the character, written out
+    assert "  a\\x1bb  " in out and "  a\\x1bb [" not in out   # the name that spells it out: as it is
 
 
-def test_approve_says_escaped_for_a_backslash_and_shortened_only_for_a_cut(tmp_path):
-    _capture(tmp_path, ["corp\\tool", "n" * 200, "read_file"])
+def test_approve_marks_an_escape_and_a_cut_and_leaves_a_backslash_name_alone(tmp_path):
+    _capture(tmp_path, ["corp\\tool", "n" * 200, "read_file", "bell" + chr(7)])
     _code, out, _err = _approve(tmp_path)
     lines = out.splitlines()
-    assert any(ln.startswith("  corp\\\\tool [escaped]") for ln in lines)
+    assert any(ln.startswith("  corp\\tool  ") and "[" not in ln for ln in lines)
     assert any(ln.startswith("  nnn") and "[shortened]" in ln and "[escaped]" not in ln for ln in lines)
     assert any(ln.startswith("  read_file  ") and "[" not in ln for ln in lines)
+    assert any(ln.startswith("  $'bell\\x07' [escaped]") for ln in lines)
 
 
 # ── the CLI lines that print a name or a path somebody else chose ─────────────
@@ -156,7 +166,7 @@ def test_doctor_servers_row_shows_a_hostile_config_key_as_text_and_exits_as_befo
     code_h, out = _run(["doctor", "--config", str(hostile)], world, world / "home")
     assert _dirty(out) == []
     assert code_h == code_c
-    assert "evil\\x1b[2J\\x0aFORGED approved\\x0d\\u202e" in out
+    assert "$'evil\\x1b[2J\\x0aFORGED approved\\x0d\\u202e'" in out
 
 
 def test_doctor_names_an_unreadable_source_without_a_raw_control_character(world):
@@ -183,7 +193,8 @@ def test_install_and_uninstall_name_a_hostile_folder_as_text(world):
     assert code == 0 and _dirty(out) == [] and "Restored" in out
 
 
-def test_doctor_prints_the_config_path_it_names_as_text(world):
+def test_shown_path_for_a_linked_config(world):
+    """The path the doctor line names for a linked config is text: one line, no terminal control character."""
     proj = world / "proj"
     proj.mkdir()
     (proj / ".mcp.json").symlink_to(world / ("target" + HOSTILE + ".json"))
@@ -208,3 +219,29 @@ def test_a_path_with_a_space_is_quoted_so_the_person_can_paste_it(world):
     code, out = _run(["install", "demo"], proj, world / "home")
     assert code == 0
     assert f"Wrapped 'demo' in '{proj / '.mcp.json'}'" in out
+
+
+# ── names that are not hostile stay as they were ───────────────────────────────
+
+def test_a_windows_style_scan_name_prints_as_before():
+    assert cli._printable("C:\\proj\\a.md") == "C:\\proj\\a.md"
+    assert cli._printable("src\\deep\\file name.py") == "src\\deep\\file name.py"
+
+
+def _agents_json(home, names):
+    (home / ".cursor").mkdir()
+    (home / ".cursor" / "mcp.json").write_text(json.dumps(
+        {"mcpServers": {n: {"command": "python3", "args": ["x.py"]} for n in names}}))
+    code, out = _run(["doctor", "--agents", "--json"], home, home)
+    doc = json.loads(out[out.index("{"):out.rindex("}") + 1])
+    return [s["name"] for a in doc["agents"] for s in a["servers"]]
+
+
+def test_doctor_agents_json_carries_a_backslash_name_unchanged(world):
+    names = _agents_json(world / "home", ["corp\\tool", "C:\\proj\\srv", "plain"])
+    assert sorted(names) == sorted(["corp\\tool", "C:\\proj\\srv", "plain"])
+
+
+def test_doctor_agents_json_tells_a_held_character_from_its_spelling(world):
+    names = _agents_json(world / "home", ["a" + ESC + "b", "a\\x1bb"])
+    assert sorted(names) == sorted(["$'a\\x1bb'", "a\\x1bb"])

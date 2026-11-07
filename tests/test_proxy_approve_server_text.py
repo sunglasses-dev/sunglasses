@@ -74,7 +74,7 @@ def test_a_plain_name_prints_unchanged_with_no_marker(tmp_path):
 def test_the_escape_shows_the_characters_as_text_so_the_person_can_see_them(tmp_path):
     _capture(tmp_path, [HOSTILE["escape_clear_screen"]])
     _code, out, _err = _approve(tmp_path)
-    assert "tool\\x1b[2Jx [escaped]" in out
+    assert "$'tool\\x1b[2Jx' [escaped]" in out
 
 
 def test_a_very_long_name_is_cut_and_two_long_names_with_one_start_stay_two_lines(tmp_path):

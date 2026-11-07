@@ -29,7 +29,7 @@ import stat
 from urllib.parse import urlsplit
 
 from .. import install as _install
-from ..receipts._shown import shown_text
+from ..receipts._shown import shown_name
 from . import doctor as _doctor
 
 try:  # Python 3.11 and newer; older versions have no TOML reader in the standard library
@@ -77,16 +77,16 @@ def _files(home, cwd):
 
 
 def _safe(value, limit=_NAME_LIMIT):
-    """Text from a config file is data: escape control characters and the backslash, cap the length.
+    """Text from a config file is data: escape control characters, cap the length.
 
-    The backslash is written twice, so a name that spells `\\x1b` out cannot print the same as
-    one that holds the character.
+    A name that holds one is written between $'...' (`receipts._shown.shown_name`), so it cannot
+    print the same as a name that spells the escape out. Any other name is unchanged.
 
     A name cut to the limit ends in a short digest of the whole name, so two long
     names that share their first characters stay two different rows.
     """
     full = value if isinstance(value, str) else ""
-    out = shown_text(full)
+    out = shown_name(full)
     if len(out) <= limit:
         return out
     tag = hashlib.sha1(full.encode("utf-8", "surrogatepass")).hexdigest()[:6]

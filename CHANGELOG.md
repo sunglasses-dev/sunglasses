@@ -9,12 +9,13 @@ All notable changes to Sunglasses are documented here.
 
 - A name or a path that holds a control character is now shown as text, one line, in the
   `sunglasses doctor` Servers rows, the `install` and `uninstall` lines and the `doctor` hint
-  for a config with no servers. A backslash in a name shown by `doctor --agents`,
-  `proxy approve` and the scan report is now written twice, so a name that spells `\x1b` out and
-  a name that holds the character no longer print the same line. A path with a space in it is
-  now shown in quotes, as a shell reads it. Exit codes are unchanged; the JSON of
-  `doctor --agents --json` changes only for a name that holds a backslash.
-  `tests/test_shown_text_distinct.py` pins it.
+  for a config with no servers. In `doctor --agents`, `proxy approve` and the scan report, a name
+  that holds such a character is written between `$'...'` (`$'a\x1bb'`), so it no longer prints
+  the same line as a name that spells `\x1b` out; every other name, a Windows path included, is
+  shown as before. A path with a space in it is now shown in quotes, as a shell reads it. Exit
+  codes are unchanged, and the JSON of `doctor --agents --json` is unchanged except for a name
+  that holds such a character.
+  `tests/test_shown_name_distinct.py` pins it.
 
 ## [0.6.20] — 2026-11-08
 
