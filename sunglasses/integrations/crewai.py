@@ -48,9 +48,10 @@ def _scan_text(text: str, channel: str = "message") -> str:
         text: The text to scan for threats.
         channel: Context channel — one of: message, file, api_response,
                  web_content, log_memory, tool_output, agent_input, code,
-                 prompt. Defaults to "message". A tool result that may carry
-                 secrets goes through api_response, which runs the credential
-                 rules; tool_output does not.
+                 prompt. Defaults to "message". A tool result is the
+                 api_response channel: the credential rules for tool results
+                 are declared there and on tool_output (releases up to 0.6.19
+                 declared none on tool_output).
 
     Returns:
         JSON string with scan results including decision, findings, and summary.
