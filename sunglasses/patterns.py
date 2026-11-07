@@ -864,8 +864,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "log_memory", "message"],
         "regex": [
-            r"sk-[a-zA-Z0-9]{20,}",           # OpenAI
-            r"sk-ant-[a-zA-Z0-9\-]{20,}",     # Anthropic
+            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
+            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -2681,8 +2681,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input"],
         "regex": [
-            r"sk-[a-zA-Z0-9]{20,}",           # OpenAI
-            r"sk-ant-[a-zA-Z0-9\-]{20,}",     # Anthropic
+            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
+            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT

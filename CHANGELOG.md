@@ -5,6 +5,19 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `GLS-SD-001` and `GLS-SD-001-API` no longer report an OpenAI-shaped (`sk-`) or Anthropic-shaped
+  (`sk-ant-`) key inside a word. `task-`, `disk-`, `risk-` or any word ending in `sk` followed by
+  twenty or more letters or digits (a task id, a volume id) used to be blocked as a key. The two
+  shapes now need a character that is not a letter or digit before `sk-`; a key after `=`, `:`, a
+  quote, a space, a bracket or at the start of a line is still reported. The cost: a key written
+  directly after a letter or digit is not reported by these two shapes. The other five shapes in the
+  two rules and the other credential rules are unchanged. On the 104 clean documents of the
+  false-positive corpora no decision and no finding changed on the `file`, `message` and
+  `api_response` channels (the corpora hold no such id, so they do not exercise the fix);
+  `tests/test_sd001_left_boundary.py` does.
+
 ## [0.6.19] — 2026-11-04
 
 ### Fixed
