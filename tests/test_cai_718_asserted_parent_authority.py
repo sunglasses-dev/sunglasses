@@ -132,10 +132,10 @@ _FRAMING_WORDS = ("defensive", "security guide", "documentation", "unit test", "
 @pytest.mark.parametrize("name", sorted(CARRIERS))
 def test_an_exclusion_word_does_not_disarm_the_rule(name):
     """The rule reads what is asked of the receiving agent, not how the sender describes the text: a word
-    such as "documentation" in front of the carrier, or after it, changes nothing on any of the three channels."""
+    such as "documentation" in front of the carrier, or after it, changes nothing on any channel the rule declares."""
     for word in _FRAMING_WORDS:
         for text in (f"{word.capitalize()} example: " + CARRIERS[name], CARRIERS[name] + f" ({word})"):
-            for channel in ("message", "tool_output", "agent_input"):
+            for channel in _CHANNELS:
                 assert RULE_ID in _ids(_alone(_RULE).scan(text, channel=channel)), (name, word, channel)
 
 
