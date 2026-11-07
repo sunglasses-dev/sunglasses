@@ -909,6 +909,7 @@ TABLE = {
     '8d15be67da45708ce3ef24977db361f677c978ecdbae04fb0659b72ba998f6b5': (_F(('independent', 'only', 'single', 'sparse', 'zero')),_F(('accept', 'confirmed', 'proven', 'treat', 'verified')),),
     '8d441f3ef24a79b6dce85e1d0d33bf74a6af385f771565b083a9e9c5dc0d5d65': (_F(('checksum', 'digest', 'hash')),_F(('approved', 'signed', 'verified')),_F(('claim', 'narrative', 'text')),_F(('bypassing', 'skipping', 'without')),_F(('machine', 'recompute', 'runtime')),),
     '8d9d8ec00c20578b766f7162c100ed50d6cf63b841b3c4180d78b696746b0e84': (),
+    '8db35cf98f694f6a8500f7079ba1395149e10170fba70e39565a95fd9f0e2977': (_F(('sk-admin', 'sk-proj', 'sk-svcacct')),),
     '8ddf15f994abcdfe52a83bf805f5593822bc87b7e1670a5646fbff54875b6f5a': (_F(('fraud', 'moderation', 'scam', 'triage', 'trust')),_F(('calibration', 'confidence', 'offline', 'score')),_F(('adversarial', 'calibration', 'cost', 'decision', 'latency', 'operational', 'threshold')),_F(('accept', 'approve', 'authorize', 'disposition', 'escalat', 'proceed', 'waive')),_F(('agent', 'approval', 'decision', 'human', 'reviewer')),),
     '8de1a8497139eb639aca62ed8c3bd706e50217b4778a302fd2b74c9cc6507a58': (_F(('compliance', 'security', 'session')),_F(('alert', 'banner', 'notice')),_F(('enter', 'paste', 'type')),),
     '8e762bda43016ffa432e733bb2c224cd504d99c743f209312868f17106e3a413': (_F(('agent', 'assistant', 'canonical', 'crawler', 'governing', 'instruction', 'outrank', 'override', 'scanner', 'supersede', 'take', 'verifier')),),

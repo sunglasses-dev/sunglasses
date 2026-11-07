@@ -32,6 +32,14 @@ All notable changes to Sunglasses are documented here.
   measured. `sunglasses scan --help`, the README and `tests/test_tool_result_channel_doc.py` carry
   the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
 
+- `GLS-SD-001` and `GLS-SD-001-API` also recognise the OpenAI project (`sk-proj-`), service-account
+  (`sk-svcacct-`) and admin (`sk-admin-`) key prefixes: the prefix, then twenty or more letters,
+  digits, underscores or hyphens, with the same word-edge requirement as the other `sk-` shapes.
+  The twenty is a floor that keeps short prose out; it is not a documented key length. A key written
+  directly after a letter or digit is not reported by these shapes, and prose that begins a word
+  with one of the three prefixes and runs twenty characters or more is reported.
+  `tests/test_sd001_openai_prefixed_shapes.py` pins both directions.
+
 ## [0.6.19] — 2026-11-04
 
 ### Fixed
