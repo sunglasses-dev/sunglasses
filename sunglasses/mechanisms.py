@@ -541,7 +541,7 @@ MECHANISM_PATTERNS = [
             # hook … call another tool … to an e-mail address or URL
             rf"(?i){_M12_HOOK}{_M12_GAP}{{0,120}}?\b(?:also|then|first|additionally|and|must|should|always|silently|secretly) "
             rf"(?:call|invoke|use|run|trigger|execute) [`'\"]?[\w.-]+[`'\"]?{_M12_GAP}{{0,100}}?"
-            rf"\b(?:to|at|recipient|address|endpoint|url|webhook|destination|target|host|server)\b[:=]?\s*[`'\"<(\[]?\s*"
+            rf"\b(?:to|at|recipient|address|endpoint|url|webhook|destination|target|host|server)\b[:=]?\s*(?:[`'\"<(\[]\s*)?"
             rf"(?:{_M12_EMAIL}|https?://)",
             # hook … a sentence that hides the step from the user (same paragraph)
             rf"(?i){_M12_HOOK}{_M12_PARA}{{0,256}}?{_M12_CONCEAL}",
