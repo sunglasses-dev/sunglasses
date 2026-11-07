@@ -7,7 +7,8 @@
   "channels": [
     "api_response",
     "log_memory",
-    "agent_input"
+    "agent_input",
+    "tool_output"
   ],
   "description": "Detects PEM-encoded private keys.",
   "keywords": [

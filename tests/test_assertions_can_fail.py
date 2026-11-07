@@ -51,6 +51,11 @@ SANCTIONED_SUBSETS = [
     # coverage, which is the only thing it exists to separate. The result
     # direction is asserted on its own, a few lines above.
     {"file", "log_memory", "message", "web_content", "code"},   # the SD parents' own
+    # The same split after the siblings (and the JWT rule) also declare `tool_output`: their own
+    # reach is now api_response, agent_input, tool_output (+ log_memory for the seven -API rules).
+    # The parents'-own list above is unchanged; the two halves are still asserted separately.
+    {"api_response", "agent_input", "tool_output"},
+    {"api_response", "log_memory", "agent_input", "tool_output"},
     # The control-character tests judge a negated quote on the three channels where
     # a negated quotation is redacted. The question is whether a control character
     # changes that decision; the other channels never redact it.

@@ -18,6 +18,20 @@ All notable changes to Sunglasses are documented here.
   `api_response` channels (the corpora hold no such id, so they do not exercise the fix);
   `tests/test_sd001_left_boundary.py` does.
 
+### Changed
+
+- The credential rules for a tool result now also run on the `tool_output` channel. The eight
+  `-API` rules and `GLS-SD-005` (JWT) declare `tool_output` alongside the channels they already
+  had, so the same bytes get the same answer on `tool_output` as on `api_response`: a key a
+  tool prints (a `.env` file, a credentials listing, a diff that adds a key) is blocked. The
+  ten parent rules (`GLS-SD-001` to `GLS-SD-010` without the JWT rule) are unchanged, and no
+  severity changed. Releases up to 0.6.19 declared none of the credential rules on `tool_output`.
+  Measured on the 104 clean documents of the false-positive corpora: four credential hits, all on
+  the two secret-scanner documents that already hit on `api_response`, and no decision changed.
+  There is no corpus of real tool output, so the false-positive rate on real tool results is not
+  measured. `sunglasses scan --help`, the README and `tests/test_tool_result_channel_doc.py` carry
+  the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
+
 ## [0.6.19] — 2026-11-04
 
 ### Fixed

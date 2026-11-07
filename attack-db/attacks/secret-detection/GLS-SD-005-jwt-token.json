@@ -9,7 +9,8 @@
     "log_memory",
     "message",
     "web_content",
-    "api_response"
+    "api_response",
+    "tool_output"
   ],
   "description": "Detects JSON Web Tokens.",
   "keywords": [

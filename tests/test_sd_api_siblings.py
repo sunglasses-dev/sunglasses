@@ -24,7 +24,7 @@ from sunglasses.engine import SunglassesEngine          # noqa: E402
 from sunglasses.patterns import PATTERNS                 # noqa: E402
 import sd_api_sibling_rows as rows                       # noqa: E402
 
-RESULT_CHANNELS = ["api_response", "agent_input"]
+RESULT_CHANNELS = ["api_response", "agent_input", "tool_output"]
 PARENT_CHANNELS = ["file", "log_memory", "message", "web_content", "code"]
 
 
@@ -128,17 +128,17 @@ def test_vendor_examples_block_and_that_is_the_disclosed_limit(engine, rule_id):
 # allow and loses 14 secret findings, so a narrowed sibling is a real coverage
 # loss rather than a tidier declaration.
 EXPECTED_CHANNELS = {
-    "GLS-SD-001-API": {"api_response", "log_memory", "agent_input"},
-    "GLS-SD-002-API": {"api_response", "log_memory", "agent_input"},
-    "GLS-SD-003-API": {"api_response", "log_memory", "agent_input"},
-    "GLS-SD-004-API": {"api_response", "log_memory", "agent_input"},
-    "GLS-SD-006-API": {"api_response", "log_memory", "agent_input"},
-    "GLS-SD-007-API": {"api_response", "log_memory", "agent_input"},
+    "GLS-SD-001-API": {"api_response", "log_memory", "agent_input", "tool_output"},
+    "GLS-SD-002-API": {"api_response", "log_memory", "agent_input", "tool_output"},
+    "GLS-SD-003-API": {"api_response", "log_memory", "agent_input", "tool_output"},
+    "GLS-SD-004-API": {"api_response", "log_memory", "agent_input", "tool_output"},
+    "GLS-SD-006-API": {"api_response", "log_memory", "agent_input", "tool_output"},
+    "GLS-SD-007-API": {"api_response", "log_memory", "agent_input", "tool_output"},
     # 008 and 009 parents carry no `log_memory`, so their siblings do not
     # either: granting it would be new coverage outside the result direction
     # wearing a sibling's name.
-    "GLS-SD-008-API": {"api_response", "agent_input"},
-    "GLS-SD-009-API": {"api_response", "agent_input"},
+    "GLS-SD-008-API": {"api_response", "agent_input", "tool_output"},
+    "GLS-SD-009-API": {"api_response", "agent_input", "tool_output"},
 }
 
 # Every channel any sibling declares. The negative half of the exact set is
