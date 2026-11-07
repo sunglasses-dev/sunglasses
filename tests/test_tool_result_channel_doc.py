@@ -7,7 +7,8 @@ a tool result as `api_response`. The help text and the README say so, and this t
 those words with the rules and the proxy. It pins four facts: the proxy reads a tool result as
 `api_response`, every `-API` credential rule is declared on `api_response`, exactly those rules
 plus `GLS-SD-005` are the credential rules declared on `tool_output`, and none of the other
-parents is. It also pins the full wording of those clauses in the help text and the README.
+parents is. It also pins the full wording of those clauses in the help text, the README and
+the docstring of the CrewAI integration (`_scan_text`, read with `inspect.getdoc`).
 It does not pin the complete channel list of any rule.
 """
 import subprocess
@@ -26,6 +27,12 @@ _README_CLAUSES = (
     "`sunglasses scan --channel api_response` runs those rules",
     "`--channel tool_output` runs them too",
     "Releases up to 0.6.19 declared none of the credential rules on `tool_output`",
+)
+
+_CREWAI_CLAUSES = (
+    "A tool result is the api_response channel",
+    "the credential rules for tool results are declared there and on tool_output",
+    "releases up to 0.6.19 declared none on tool_output",
 )
 
 
@@ -51,6 +58,17 @@ def test_readme_carries_the_clauses():
     text = " ".join(readme.split())
     for clause in _README_CLAUSES:
         assert clause in text, clause
+
+
+def test_crewai_docstring_carries_the_clauses():
+    import inspect
+
+    from sunglasses.integrations import crewai
+
+    text = " ".join(inspect.getdoc(crewai._scan_text).split())
+    for clause in _CREWAI_CLAUSES:
+        assert clause in text, clause
+    assert "tool_output does not" not in text
 
 
 def test_the_proxy_reads_a_tool_result_as_api_response():
