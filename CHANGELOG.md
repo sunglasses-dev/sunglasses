@@ -34,10 +34,14 @@ All notable changes to Sunglasses are documented here.
 - The rules for text passed between agents now also run on the `agent_input` channel. Before this
   change `agent_input` ran 1 of the 145 rules in the fourteen inter-agent categories (forged
   handoffs, agent-card metadata, delegated approvals, approval graphs, compaction artifacts and
-  their neighbours), so a handoff that was blocked on `message` was allowed on `agent_input`. 144
+  their neighbours), so a handoff that was blocked on `message` was allowed on `agent_input`. 142
   rules now declare `agent_input` alongside the channels they already had. Channel lists only: no
   regex, keyword or severity changed, and no rule outside those categories gained the channel.
-  Seven of the 144 rows carry neither a regex nor a keyword list and cannot fire on any channel.
+  Seven of the 142 rows carry neither a regex nor a keyword list and cannot fire on any channel.
+  Two rules are left off on purpose: `GLS-TRS-001` (a `<tool_result>` frame around a JSON body) and
+  `GLS-CAI-244` (a planner agent announcing an assignment) were the only two rule ids that turned
+  a clean text into a block on a fresh set of 27 own-written agent-to-agent texts. They keep their
+  old channels and are pinned off `agent_input` until they are measured again.
   Measured on the 111 clean documents of the false-positive corpora scanned on `agent_input`: one
   decision changed (an agent-skills `AGENTS.md` goes from allow to quarantine on a medium
   cross-agent rule that already fires on that text on `message` and `tool_output`), and one

@@ -6,8 +6,7 @@
   "severity": "high",
   "channels": [
     "message",
-    "api_response",
-    "agent_input"
+    "api_response"
   ],
   "description": "Phantom Tool-Result Frame Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 detects specific XML structural envelopes used by agent frameworks to spoof tool output.",
   "keywords": [],

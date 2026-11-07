@@ -6086,7 +6086,7 @@ PATTERNS = [
         "name": "Forged Policy Checkpoint Waiver",
         "category": "cross_agent_injection",
         "severity": "critical",
-        "channel": ["message", "tool_output", "agent_input"],
+        "channel": ["message", "tool_output"],
         "keywords": [
             "planner agent already",
             "agent already approved",
@@ -25046,7 +25046,7 @@ PATTERNS = [
         "name": "Phantom Tool-Result Frame Injection",
         "category": "tool_response_spoofing",
         "severity": "high",
-        "channel": ["message", "api_response", "agent_input"],
+        "channel": ["message", "api_response"],
         "regex": [
             r"""(?i)<(?:function_results?|tool_result)\b[^>]{0,80}>\s*\{[\s\S]{0,600}?\}\s*</(?:function_results?|tool_result)>""",
         ],
