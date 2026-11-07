@@ -132,7 +132,7 @@ _M12_ACQUIRE = (
 # A possessive or "contents of" marker: the material is the USER'S, or a
 # file's contents, not a value the caller supplies ("your API key").
 _M12_OWNED = (
-    r"\b(?:(?:full |entire |whole |complete |raw )?contents? of|(?:the |this |that |an? |end[- ])?(?:user['’]s|users['’])|their|his|her"
+    r"\b(?:(?:full |entire |whole |complete |raw )?contents? of|(?:the |this |that |an? |end[- ])?(?:user['’]s|users['’])"
     r"|el contenido de|su contenido|del usuario|de la usuaria)(?!\w)"
 )
 # Secret or user material. Files and stores match bare; generic words
