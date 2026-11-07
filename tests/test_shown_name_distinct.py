@@ -1,6 +1,6 @@
 """Two different names never print the same line, and a name that is data never reaches a terminal as it stands.
 
-A name that holds a character `str.isprintable()` refuses is written between $'...' (`receipts._shown.shown_name`),
+A name that holds a character `str.isprintable()` refuses is written between single quotes (`receipts._shown.shown_name`),
 every such character as an escape of fixed width and a backslash twice. A name with none of them is shown as it is,
 a Windows path included. So the name `a<ESC>b` and the name that spells it out (`a\\x1bb`) are two different lines,
 which matters where a person judges a row by what it shows: the `proxy approve` tool list has no numbering that
@@ -61,12 +61,13 @@ def test_a_name_with_nothing_to_escape_is_shown_as_it_is(name):
 
 
 def test_a_name_that_needs_an_escape_is_written_between_dollar_quotes():
-    assert shown_name("a" + ESC + "b") == "$'a\\x1bb'"
-    assert shown_name(BIDI) == "$'\\u202e'"
-    assert shown_name("\U000e0001") == "$'\\U000e0001'"          # eight digits: never  then a 1
-    assert shown_name("a\\b" + LF) == "$'a\\\\b\\x0a'"            # backslash twice
-    assert shown_name("it's" + CR) == "$'it\\'s\\x0d'"            # quote escaped
-    assert shown_name("$'a'") == "$'$\\'a\\''"                    # a plain name that looks like the form
+    assert shown_name("a" + ESC + "b") == "'a\\x1bb'"
+    assert shown_name(BIDI) == "'\\u202e'"
+    assert shown_name("\U000e0001") == "'\\U000e0001'"          # eight digits: never  then a 1
+    assert shown_name("a\\b" + LF) == "'a\\\\b\\x0a'"            # backslash twice
+    assert shown_name("it's" + CR) == "'it\\'s\\x0d'"            # quote escaped
+    assert shown_name("'a'") == "'\\'a\\''"                      # a plain name that looks like the form
+    assert shown_name("$'a'") == "$'a'"                                # the shell form is just text now
 
 
 @pytest.mark.parametrize("pair", [
@@ -74,7 +75,7 @@ def test_a_name_that_needs_an_escape_is_written_between_dollar_quotes():
     ("a" + LF + "b", "a\\x0ab"),
     ("a" + BIDI + "b", "a\\u202eb"),
     ("a\\b", "a\\\\b"),
-    ("a" + ESC + "b", "$'a\\x1bb'"),
+    ("a" + ESC + "b", "'a\\x1bb'"),
 ])
 def test_the_renderers_keep_a_name_and_its_spelling_apart(pair):
     first, second = pair
@@ -116,9 +117,9 @@ def test_approve_shows_a_name_and_its_spelling_as_two_different_rows(tmp_path):
     held, spelled = "a" + ESC + "b", "a\\x1bb"
     _capture(tmp_path, [held, spelled])
     _code, out, _err = _approve(tmp_path)
-    rows = [ln for ln in out.splitlines() if ln.startswith("  a") or ln.startswith("  $'a")]
+    rows = [ln for ln in out.splitlines() if ln.startswith("  a") or ln.startswith("  'a")]
     assert len(rows) == 2 and rows[0] != rows[1]
-    assert "  $'a\\x1bb' [escaped]  " in out                   # the character, written out
+    assert "  'a\\x1bb' [escaped]  " in out                   # the character, written out
     assert "  a\\x1bb  " in out and "  a\\x1bb [" not in out   # the name that spells it out: as it is
 
 
@@ -129,7 +130,7 @@ def test_approve_marks_an_escape_and_a_cut_and_leaves_a_backslash_name_alone(tmp
     assert any(ln.startswith("  corp\\tool  ") and "[" not in ln for ln in lines)
     assert any(ln.startswith("  nnn") and "[shortened]" in ln and "[escaped]" not in ln for ln in lines)
     assert any(ln.startswith("  read_file  ") and "[" not in ln for ln in lines)
-    assert any(ln.startswith("  $'bell\\x07' [escaped]") for ln in lines)
+    assert any(ln.startswith("  'bell\\x07' [escaped]") for ln in lines)
 
 
 # ── the CLI lines that print a name or a path somebody else chose ─────────────
@@ -166,7 +167,7 @@ def test_doctor_servers_row_shows_a_hostile_config_key_as_text_and_exits_as_befo
     code_h, out = _run(["doctor", "--config", str(hostile)], world, world / "home")
     assert _dirty(out) == []
     assert code_h == code_c
-    assert "$'evil\\x1b[2J\\x0aFORGED approved\\x0d\\u202e'" in out
+    assert "'evil\\x1b[2J\\x0aFORGED approved\\x0d\\u202e'" in out
 
 
 def test_doctor_names_an_unreadable_source_without_a_raw_control_character(world):
@@ -244,4 +245,4 @@ def test_doctor_agents_json_carries_a_backslash_name_unchanged(world):
 
 def test_doctor_agents_json_tells_a_held_character_from_its_spelling(world):
     names = _agents_json(world / "home", ["a" + ESC + "b", "a\\x1bb"])
-    assert sorted(names) == sorted(["$'a\\x1bb'", "a\\x1bb"])
+    assert sorted(names) == sorted(["'a\\x1bb'", "a\\x1bb"])

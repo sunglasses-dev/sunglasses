@@ -869,7 +869,7 @@ class _ScanPool:
 def _printable(name):
     """A file name is data, not terminal input: escape control characters before showing it.
 
-    A name that holds one is written between $'...' (`receipts._shown.shown_name`); any other
+    A name that holds one is written between single quotes (`receipts._shown.shown_name`); any other
     name, a Windows path included, is shown as it is."""
     return shown_name(name)
 

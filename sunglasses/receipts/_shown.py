@@ -53,27 +53,28 @@ def printable(text):
 
 
 def name_is_escaped(text):
-    """True when `shown_name` writes `text` between $'...' (see there)."""
+    """True when `shown_name` writes `text` between single quotes (see there)."""
     text = str(text)
-    return text.startswith("$'") or any(not (c.isprintable() or c == " ") for c in text)
+    return text.startswith("'") or any(not (c.isprintable() or c == " ") for c in text)
 
 
 def shown_name(text):
     """`text` as one line a person may read: a name somebody else chose (a tool, a server entry, a file).
 
     A name with nothing in it that `str.isprintable()` refuses comes back as it is, a backslash
-    included (a Windows path is a name too). Any other name comes back between $'...': every
-    refused character as an escape of fixed width (`\\xNN`, `\\uNNNN`, `\\UNNNNNNNN`; the space stays),
-    a backslash and a quote each with a backslash in front. So the line holds no terminal control
-    character, and a name that spells an escape out in plain text never prints the same as the
-    name that holds the character: the first is shown as it is, the second between $'...'. A plain
-    name that itself begins with $' is written between $'...' too, so the two never meet. Not for a
-    path where a shell may read it back (that is `shown_path`) and not for a sentence that already
-    holds escapes (that is `printable`)."""
+    included (a Windows path is a name too). Any other name comes back between single quotes, the way
+    Python writes a string: every refused character as an escape of fixed width (`\\xNN`, `\\uNNNN`,
+    `\\UNNNNNNNN`; the space stays), a backslash and a quote each with a backslash in front. No shell
+    evaluates that form (it is not `$'...'`), so a person who copies the line into a terminal gets the
+    same text back, never the raw character. The line holds no terminal control character, and a name
+    that spells an escape out in plain text never prints the same as the name that holds the character:
+    the first is shown as it is, the second between quotes. A plain name that itself begins with a quote
+    is written between quotes too, so the two never meet. Not for a path where a shell may read it back
+    (that is `shown_path`) and not for a sentence that already holds escapes (that is `printable`)."""
     text = str(text)
     if not name_is_escaped(text):
         return text
-    return "$'" + "".join(
+    return "'" + "".join(
         "\\\\" if ch == "\\" else "\\'" if ch == "'" else
         ch if (ch.isprintable() or ch == " ") else (
             f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else

@@ -79,7 +79,7 @@ def _files(home, cwd):
 def _safe(value, limit=_NAME_LIMIT):
     """Text from a config file is data: escape control characters, cap the length.
 
-    A name that holds one is written between $'...' (`receipts._shown.shown_name`), so it cannot
+    A name that holds one is written between single quotes (`receipts._shown.shown_name`), so it cannot
     print the same as a name that spells the escape out. Any other name is unchanged.
 
     A name cut to the limit ends in a short digest of the whole name, so two long

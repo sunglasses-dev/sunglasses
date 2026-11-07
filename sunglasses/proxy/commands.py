@@ -222,7 +222,7 @@ def _shown_text(value):
     shown = _safe(text)
     if shown == text:
         return shown
-    # Escaped when the name was written between $'...'; otherwise the only change was the length cap.
+    # Escaped when the name was written between quotes; otherwise the only change was the length cap.
     return shown + (" [escaped]" if name_is_escaped(text) else " [shortened]")
 
 
