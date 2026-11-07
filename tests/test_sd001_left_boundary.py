@@ -68,7 +68,7 @@ def test_the_sibling_carries_the_same_two_alternatives_as_the_parent():
     assert _BY_ID["GLS-SD-001"]["regex"] == _BY_ID["GLS-SD-001-API"]["regex"]
 
 
-@pytest.mark.parametrize("channel", ["file", "message", "log_memory", "api_response", "agent_input"])
+@pytest.mark.parametrize("channel", ["message", "file", "api_response", "web_content", "log_memory", "tool_output", "agent_input", "code", "prompt"])
 def test_the_full_ruleset_agrees_on_a_word_internal_id(channel):
     engine = SunglassesEngine()
     result = engine.scan(f"created task-{_ID} ok", channel)
