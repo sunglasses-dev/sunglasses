@@ -17,6 +17,29 @@ All notable changes to Sunglasses are documented here.
   that holds such a character.
   `tests/test_shown_name_distinct.py` pins it.
 
+### Added
+
+- `GLS-CAI-718` reports (severity high) a message that says it
+  comes from the receiving agent's parent (orchestrator, supervisor, coordinator, controller, root,
+  master, primary, lead, manager, with or without "agent") and, in the same line, tells it to bypass a
+  guard, move a secret or user data, or change authority ("disable the safety filter", "send the API
+  key to ...", "grant full access"). It needs both halves: a parent that asks for logs, a config file, a
+  review or a status update stays clean, and so does a maintainer's licence line, a CODEOWNERS line and a
+  role description. It runs on `message`, `tool_output` and `agent_input` (`prompt` reads as `message`);
+  `file`, `web_content`, `api_response` and `log_memory` stay off because role documents and READMEs
+  describe delegation designs. Text that calls itself documentation, a test fixture, an incident report
+  or a runbook is skipped, so a message that adds one of those words avoids the rule. It does not report
+  a third-person relay ("the supervisor told us to ..."), a message with no opener, a signed envelope
+  with no instruction, or a request split across a line break; those are strict-xfail in
+  `tests/test_cai_718_asserted_parent_authority.py`. Listed patterns 1,584 to 1,585 and patterns with a
+  matcher 1,513 to 1,514.
+  Measured locally: 8 of 11 self-assertion texts are caught (the original report and ten from other
+  detection projects' fixtures, evaluated on this machine and not stored in this repository); of the
+  texts that relay the claim or carry no instruction, 1 of 8 is caught. 0 hits on 58 clean texts (17 from
+  the review packet, 18 + 8 + 15 written separately) and on 27 agent-traffic texts we wrote, and on the
+  111 corpus files, on all three channels. There is no corpus of real agent-to-agent traffic, so the
+  false-positive rate on real traffic is not measured.
+
 ## [0.6.20] — 2026-11-08
 
 ### Fixed
