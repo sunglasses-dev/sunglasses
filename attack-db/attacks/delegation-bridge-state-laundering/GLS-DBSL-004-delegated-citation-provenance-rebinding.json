@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "A delegated verifier sees a syntactically valid citation and correct URL while the evidence digest, locator, quote, or underlying bytes were silently rebound to attacker-supplied content at the handoff, so citation presence is mistaken for evidence provenance.",
   "keywords": [],

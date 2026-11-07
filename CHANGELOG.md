@@ -33,6 +33,31 @@ All notable changes to Sunglasses are documented here.
   There is no corpus of real tool output, so the false-positive rate on real tool results is not
   measured. `sunglasses scan --help`, the README and `tests/test_tool_result_channel_doc.py` carry
   the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
+- The rules for text passed between agents now also run on the `agent_input` channel. Before this
+  change `agent_input` ran 1 of the 145 rules in the fourteen inter-agent categories (forged
+  handoffs, agent-card metadata, delegated approvals, approval graphs, compaction artifacts and
+  their neighbours), so a handoff that was blocked on `message` was allowed on `agent_input`. 142
+  rules now declare `agent_input` alongside the channels they already had. Channel lists only: no
+  regex, keyword or severity changed, and no rule outside those categories gained the channel.
+  Seven of the 142 rows carry neither a regex nor a keyword list and cannot fire on any channel.
+  Two rules are left off on purpose: `GLS-TRS-001` (a `<tool_result>` frame around a JSON body) and
+  `GLS-CAI-244` (a planner agent announcing an assignment) were the only two rule ids that turned
+  a clean text into a block on a fresh set of 27 own-written agent-to-agent texts. They keep their
+  old channels and are pinned off `agent_input` until they are measured again.
+  Measured on the 111 clean documents of the false-positive corpora scanned on `agent_input`: one
+  decision changed (an agent-skills `AGENTS.md` goes from allow to quarantine on a medium
+  cross-agent rule that already fires on that text on `message` and `tool_output`), and one
+  document that was already blocked gained three findings. There is no corpus of real
+  agent-to-agent traffic, so the false-positive rate on real handoffs is not measured.
+  `tests/test_agent_input_inter_agent_families.py` pins the behaviour.
+- Seven mechanism rules also run on `agent_input`: an instruction override (`GLS-MECH-001`), a covert
+  directive to an AI (002), an exfiltration sink (003), a markdown-image smuggle (004), a fabricated
+  authority (005), a covert-channel encoding (008) and a fabricated prior consent (010). They already
+  ran on `message`, `file`, `web_content`, `tool_output` and `api_response`. The two jailbreak-framing
+  rules (007, 009), the hook rule (011) and 006 stay off `agent_input`. Channel lists only. On the 111
+  clean documents no decision and no finding changed; that corpus holds no text these rules fire on, so
+  the figure says clean documentation stays clean and nothing about real handoffs.
+  `tests/test_agent_input_mechanisms.py` pins the behaviour.
 
 ## [0.6.19] — 2026-11-04
 

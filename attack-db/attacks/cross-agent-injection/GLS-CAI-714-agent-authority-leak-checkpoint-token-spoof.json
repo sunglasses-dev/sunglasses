@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker crafts handoff text that smuggles authority forward between agents (claimed prior approvals, spoofed checkpoint tokens, laundered summary bullets) so a downstream role executes unverified instructions as if upstream policy had signed them.",
   "keywords": [

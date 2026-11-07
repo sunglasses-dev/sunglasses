@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker exploits the trust shift across modality bridges (OCR, document metadata, retrieval snippets, tool error reflections) so parser-supplied content gains de facto instruction authority and steers downstream tool calls without crossing a real policy gate.",
   "keywords": [

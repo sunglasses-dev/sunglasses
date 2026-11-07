@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged badge, nonce, or attestation submitted by a peer agent to escalate scope or override policy boundaries.",
   "keywords": [],

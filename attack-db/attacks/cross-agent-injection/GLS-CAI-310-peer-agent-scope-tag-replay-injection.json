@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a peer agent using a forged, tampered, or replayed scope tag or transfer token to ignore policy or bypass authorization.",
   "keywords": [],

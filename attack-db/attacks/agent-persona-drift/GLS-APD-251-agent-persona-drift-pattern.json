@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "tool_output",
-    "file"
+    "file",
+    "agent_input"
   ],
   "description": "Detects a multi-turn persona drift where an agent is gradually pushed to adopt an admin, root, or security-lead identity and then override safety policy.",
   "keywords": [

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a message attributed to an upstream or supervisor agent that instructs the recipient to ignore or bypass policy, guardrails, or system instructions.",
   "keywords": [],

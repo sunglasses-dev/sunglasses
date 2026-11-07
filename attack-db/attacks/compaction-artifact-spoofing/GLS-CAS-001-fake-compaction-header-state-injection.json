@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "api_response"
+    "api_response",
+    "agent_input"
   ],
   "description": "Fake Compaction Header State Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 system compaction artifacts; distinct from tool results or general instructions.",
   "keywords": [],

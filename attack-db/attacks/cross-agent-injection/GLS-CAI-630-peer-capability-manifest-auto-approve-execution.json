@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged peer-agent capability manifest or identity card that instructs the receiver to whitelist or elevate the sender and auto-approve execution of privileged actions.",
   "keywords": [],

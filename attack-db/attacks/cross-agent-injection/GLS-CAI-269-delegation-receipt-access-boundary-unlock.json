@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged delegation receipt or capability pass used by a subagent to escalate scope, unlock access boundaries, or bypass controls.",
   "keywords": [],

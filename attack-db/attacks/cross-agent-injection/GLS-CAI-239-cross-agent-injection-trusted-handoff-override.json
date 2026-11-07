@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects cross-agent injection attacks where output from an upstream, previous, delegated, planner, or worker agent is presented as trusted, authoritative, verified, signed, or approved \u2014 and that claim is used to justify ignoring, bypassing, overriding, disregarding, or replacing the downstream agent's system prompt, policy, guardrails, safety checks, or instructions. Covers A2A (agent-to-agent) trust-boundary abuse in multi-agent workflows.",
   "keywords": [

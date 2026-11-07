@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or worker forges, fakes, or counterfeits a ticket, token, credential, or capability pass and then skips, bypasses, or disables the corresponding verification, validation, or policy guardrail check.",
   "keywords": [],

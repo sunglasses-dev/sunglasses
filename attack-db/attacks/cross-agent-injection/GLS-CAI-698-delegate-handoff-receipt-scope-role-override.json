@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or spoofed delegate, delegation, or agent handoff receipt, ticket, attestation, or approval chain carries elevated scope, role, or privilege claims used to override, bypass, or escalate past guardrail controls.",
   "keywords": [],

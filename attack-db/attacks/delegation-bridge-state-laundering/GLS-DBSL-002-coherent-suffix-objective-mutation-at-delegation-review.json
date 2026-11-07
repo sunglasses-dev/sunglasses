@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "A fluent, semantically coherent delegated-review request preserves the apparent task while appending a quiet extra objective plus an approval-bypass clause, so a task-level reviewer greenlights the added effect without independently authorizing it.",
   "keywords": [],

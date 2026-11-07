@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a peer agent, delegate, or handoff participant spoofs, impersonates, or uses a stolen ticket or fake approval to bypass, override, skip, or escalate trust controls.",
   "keywords": [],

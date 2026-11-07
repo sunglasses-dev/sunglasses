@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a cross-agent message attributed as authoritative or final authority that instructs the recipient to disregard or replace policy, guardrails, or verification attestation.",
   "keywords": [],

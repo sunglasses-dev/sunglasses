@@ -6,7 +6,8 @@
   "severity": "critical",
   "channels": [
     "message",
-    "api_response"
+    "api_response",
+    "agent_input"
   ],
   "description": "Agent Card Skill-Description Privilege Escalation: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 capability discovery phase in A2A handshake; distinct from runtime manifest smuggling.",
   "keywords": [],

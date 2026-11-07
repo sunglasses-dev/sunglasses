@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged approval chain or handoff receipt used by an agent or delegate to override role, scope, or permission and bypass controls.",
   "keywords": [],

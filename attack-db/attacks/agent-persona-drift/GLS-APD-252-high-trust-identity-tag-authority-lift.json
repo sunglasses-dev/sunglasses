@@ -8,7 +8,8 @@
     "message",
     "file",
     "web_content",
-    "tool_output"
+    "tool_output",
+    "agent_input"
   ],
   "description": "Attacker labels untrusted retrieved content or delegate output with high-trust identity tags ('Role: system', 'approved by lead agent', 'Priority: P0') so the planner upgrades it during context assembly. Soft identity boundaries let attacker text inherit privileged authority and steer tool execution without explicit jailbreak.",
   "keywords": [

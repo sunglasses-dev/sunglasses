@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "An evaluator's 'benign' verdict on an iteratively reframed candidate is reused as delegated/session authorization after the original objective's lineage is dropped, so a sensitive action executes with no fresh risk assessment.",
   "keywords": [],

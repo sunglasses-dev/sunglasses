@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects an agent using a forged or replayed nonce or signature to rebind trust domain or privilege scope and override guardrails.",
   "keywords": [],

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a delegation, agent-to-agent handoff, or broker interaction presents an attestation, ticket, or capability manifest that bypasses, overrides, or supersedes policy, guardrail, or authorization controls.",
   "keywords": [],

@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "Transcript grafting via OCR alt-text \u2014 attacker hides an authorization directive inside image alt-text or OCR output, expecting a downstream agent to render and execute it as a peer-issued command.",
   "keywords": [

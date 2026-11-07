@@ -6,7 +6,8 @@
   "severity": "critical",
   "channels": [
     "message",
-    "tool_output"
+    "tool_output",
+    "agent_input"
   ],
   "description": "Impersonates HUMAN authority (boss/chief/director/owner/security-lead signed off) inside an agent-to-agent handoff to justify policy bypass and execution. Distinct from forged AGENT tickets/tokens (GLS-CAI-241).",
   "keywords": [

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged authentication token or attestation used within a delegation to unlock or escalate privilege and bypass policy.",
   "keywords": [],

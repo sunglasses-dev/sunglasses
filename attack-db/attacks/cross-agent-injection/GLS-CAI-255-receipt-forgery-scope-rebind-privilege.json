@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a forged or counterfeit receipt or handoff token used by an agent or peer to achieve an explicit scope rebind or policy guardrail override.",
   "keywords": [],

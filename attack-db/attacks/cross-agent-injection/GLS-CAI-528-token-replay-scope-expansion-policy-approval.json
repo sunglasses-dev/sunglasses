@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a replayed or forged token or proof in a delegate handoff that expands scope or authority and bypasses approval guardrails.",
   "keywords": [],

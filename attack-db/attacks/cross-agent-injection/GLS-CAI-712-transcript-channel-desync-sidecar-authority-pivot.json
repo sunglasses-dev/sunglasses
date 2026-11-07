@@ -8,7 +8,8 @@
     "message",
     "file",
     "tool_output",
-    "log_memory"
+    "log_memory",
+    "agent_input"
   ],
   "description": "Attacker hides tool-driving directives in an auxiliary modality channel (sidecar metadata, OCR raw tokens, alt-text, late-arriving audio segments) so the reviewed transcript passes safety checks while the executor reads a different, malicious representation.",
   "keywords": [

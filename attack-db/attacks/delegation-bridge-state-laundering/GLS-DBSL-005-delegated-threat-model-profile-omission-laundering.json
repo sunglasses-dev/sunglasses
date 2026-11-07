@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "A defense evaluation result valid only under a specific query budget, data budget, and interface profile is laundered into a universal-robustness claim when the delegated handoff omits those scope dimensions and an approver clears the unscoped result.",
   "keywords": [],

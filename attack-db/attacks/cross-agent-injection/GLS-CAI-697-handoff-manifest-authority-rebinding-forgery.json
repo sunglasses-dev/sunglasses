@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or shadow handoff manifest, delegation note, or authority memo is used to rebind scope or authority and then bypass verification gates, skip delegate approval, or override transfer guardrails.",
   "keywords": [],

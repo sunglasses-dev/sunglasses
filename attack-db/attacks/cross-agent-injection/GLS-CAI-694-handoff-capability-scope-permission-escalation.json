@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or counterfeit handoff receipt, capability token, or delegation approval is used to claim elevated scope or permission and then bypass, override, or escalate past guardrails or safety checks.",
   "keywords": [],

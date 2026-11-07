@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects a stale, expired, or forged nonce or attestation replayed or reused in an agent handoff to override scope and bypass trust boundaries.",
   "keywords": [],

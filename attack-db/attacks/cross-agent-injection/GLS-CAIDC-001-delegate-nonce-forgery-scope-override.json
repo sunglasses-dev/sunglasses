@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a forged or counterfeit nonce, attestation, or approval token is used during a delegation or handoff to override, bypass, or rebind scope, permission, or authority.",
   "keywords": [],

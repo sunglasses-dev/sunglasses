@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text \u2014 excluding negated forms \u2014 in which an agent or delegate forges, spoofs, or replays a nonce, token, session, or attestation to rebind scope or trust-anchor authority and then override, bypass, or disregard policy or safety rules.",
   "keywords": [],

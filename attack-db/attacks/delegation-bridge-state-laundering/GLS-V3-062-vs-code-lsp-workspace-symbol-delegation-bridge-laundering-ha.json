@@ -7,7 +7,8 @@
   "channels": [
     "message",
     "file",
-    "web_content"
+    "web_content",
+    "agent_input"
   ],
   "description": "VS Code/LSP symbol-search results can launder IDE retrieval metadata into forged delegation continuity or accepted merge/release path for code-review agents.",
   "keywords": [],

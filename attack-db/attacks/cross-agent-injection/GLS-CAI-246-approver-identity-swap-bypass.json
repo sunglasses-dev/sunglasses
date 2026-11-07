@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "message",
-    "tool_output"
+    "tool_output",
+    "agent_input"
   ],
   "description": "Approver Identity Swap Bypass - cross agent injection mechanism that overrides policy or safety gates.",
   "keywords": [

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which a peer, upstream, or delegated agent forges, tampers with, or replays a handoff ticket, transfer scope tag, or authorization tag to override, bypass, or disable policy, guardrail, or approval verification.",
   "keywords": [],

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "message",
-    "api_response"
+    "api_response",
+    "agent_input"
   ],
   "description": "A2A Agent Card Security Scheme Description Injection: a carrier-native prompt-injection that embeds authoritative suppression / authority-inversion instructions an AI agent may obey \u2014 authentication metadata in A2A cards; distinct from RPC service metadata poisoning.",
   "keywords": [],

@@ -6,7 +6,8 @@
   "severity": "high",
   "channels": [
     "tool_output",
-    "message"
+    "message",
+    "agent_input"
   ],
   "description": "Detects text in which an agent or planner presents a patch, hotfix, or policy patch claimed to be signed by a delegate, planner, or security lead with an approval ticket and elevated authority to bypass or waive policy and guardrail verification.",
   "keywords": [],
