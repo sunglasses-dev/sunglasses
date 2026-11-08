@@ -5,9 +5,11 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.20] — 2026-11-08
+
 ### Fixed
 
-- `sunglasses proxy approve` no longer prints a server-chosen tool name raw. The names a server advertises are shown so a person can approve them, and a name holding an escape sequence, a carriage return, a line feed or another control or format character could redraw the terminal, draw one name over another, or print a line that reads as another tool. Every such character is now shown as text (`\x1b`), a name over 80 characters is cut and ends in a short digest, and the line carries `[escaped]` or `[shortened]` so it is clear the line is not the whole name. Plain names print as before. The approval itself is unchanged: it still binds the real descriptor digest and the capture sha. `tests/test_proxy_approve_server_text.py`.
+- `sunglasses proxy approve` no longer prints a server-chosen tool name raw. The names a server advertises are shown so a person can approve them, and a name holding an escape sequence, a carriage return, a line feed or another control or format character could redraw the terminal, draw one name over another, or print a line that reads as another tool. Every such character is now shown as text (`\x1b`), a name over 80 characters is cut and ends in a short digest, and the line carries `[escaped]` or `[shortened]` so it is clear the line is not the whole name. Plain names print as before. The approval itself is unchanged: it still binds the real descriptor digest and the capture sha. `tests/test_proxy_approve_server_text.py`. (#582)
 - `GLS-SD-001` and `GLS-SD-001-API` no longer report an OpenAI-shaped (`sk-`) or Anthropic-shaped
   (`sk-ant-`) key inside a word. `task-`, `disk-`, `risk-` or any word ending in `sk` followed by
   twenty or more letters or digits (a task id, a volume id) used to be blocked as a key. The two
@@ -18,7 +20,7 @@ All notable changes to Sunglasses are documented here.
   false-positive corpus tests scan (of 111 corpus files), no decision and no finding changed on the
   `file`, `message` and `api_response` channels (the corpora hold no such id, so they do not
   exercise the fix);
-  `tests/test_sd001_left_boundary.py` does.
+  `tests/test_sd001_left_boundary.py` does. (#575)
 
 ### Changed
 
@@ -33,7 +35,13 @@ All notable changes to Sunglasses are documented here.
   `api_response`, and no decision changed.
   There is no corpus of real tool output, so the false-positive rate on real tool results is not
   measured. `sunglasses scan --help`, the README and `tests/test_tool_result_channel_doc.py` carry
-  the new wording; `tests/test_sd_tool_output.py` pins the behaviour.
+  the new wording; `tests/test_sd_tool_output.py` pins the behaviour. (#576)
+- The docstring of the `crewai` integration's scan function said that a tool result goes through
+  `api_response`, which runs the credential rules, and that `tool_output` does not. That stopped
+  being true when the credential rules were declared on `tool_output` (the entry above), and the
+  sentence would have shipped in this release. It now says what `sunglasses scan --help` says.
+  Documentation only: no code path, pattern, channel list or number changed.
+  `tests/test_tool_result_channel_doc.py` reads the docstring and pins the three clauses. (#580)
 
 ## [0.6.19] — 2026-11-04
 
