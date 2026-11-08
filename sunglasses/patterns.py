@@ -20821,7 +20821,7 @@ PATTERNS = [
             "cookie",
         ],
         "regex": [
-            r"""^(?!
+            r"""(?isx)^(?!
   (?=.*\b(?:security\s+training|scanner\s+docs?|policy\s+docs?|defensive\s+guidance|example\s+of\s+prompt\s+injection)\b)
  |
   (?=.*\b(?:do\s+not|don't|never|must\s+not|should\s+not)\b.{0,180}\b(?:obey|follow|trust|treat|honou?r|include|leak|send|suppress|omit|hide)\b.{0,180}\b(?:raml|api\s+blueprint|apiary|api\s+description|metadata|documentation)\b)
@@ -21597,7 +21597,7 @@ PATTERNS = [
             "do not report",
         ],
         "regex": [
-            r"""(?is)
+            r"""(?isx)
 (?!.*\b(?:agents?|assistants?|scanners?|auditors?)\s+must\s+not\s+obey\b)
 (?!.*\b(?:do\s+not|never)\s+(?:obey|trust|follow|treat)\b.{0,80}\b(?:webauthn|passkeys?|related[-_\s]?origins?|rp[-_\s]?id)\b)
 (?!.*\b(?:webauthn|passkeys?|related[-_\s]?origins?|rp[-_\s]?id)\b.{0,80}\b(?:is|are)\s+not\s+(?:agent\s+)?policy\b)

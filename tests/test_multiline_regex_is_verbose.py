@@ -12,7 +12,7 @@ holds the line as a ratchet:
   * a KNOWN_BROKEN source that gains the flag fails (the xfail is strict), so the entry
     must be removed in the same change that fixes the rule.
 
-KNOWN_BROKEN is meant to reach empty. New entries are not accepted.
+KNOWN_BROKEN is empty. New entries are not accepted: fix the rule instead.
 """
 import re
 
@@ -21,11 +21,8 @@ import pytest
 from sunglasses.mechanisms import MECHANISM_PATTERNS
 from sunglasses.patterns import PATTERNS
 
-# Rule ids whose multi-line source is not verbose today (index = position in "regex").
-KNOWN_BROKEN = {
-    ("GLS-DFP-026", 0): "multi-line source without the verbose flag",
-    ("GLS-DFP-048", 0): "multi-line source without the verbose flag",
-}
+# Rule ids whose multi-line source is not verbose (index = position in "regex"). Empty on purpose.
+KNOWN_BROKEN = {}
 
 _LEADING_FLAGS = re.compile(r"\(\?([aiLmsux]+)\)")
 
