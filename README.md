@@ -990,9 +990,10 @@ private key files are named individually and matching is boundary-aware, so
   fails when the lane is repaired.
 
 - **The WARN lane is off by default**, and the reasons are measurements, not
-  taste: 1 of 39 ordinary tool calls escalates (a plain `curl -s pypi.org` reads
-  as a dangerous shell command), and it costs ~902ms per call because the
-  pattern database is rebuilt in every hook subprocess. Enable with
+  taste: a few ordinary tool calls escalate (a plain `curl -s pypi.org` has read
+  as a dangerous shell command), and the lane adds time to every call: about
+  @@LANE_ON_MS@@ ms per tool call with it on against @@LANE_OFF_MS@@ ms with it
+  off, measured on @@VERSION@@, @@DATE@@ (ledger entry). Enable with
   `touch ~/.sunglasses/warn-lane` if you want it anyway.
 - **On older Pythons one regex can outrun the WARN lane clock.** The 7 second
   budget is a timer signal, and before Python 3.11.6 and 3.12.1 the regex engine
@@ -1072,8 +1073,10 @@ private key files are named individually and matching is boundary-aware, so
 
 ### Cost
 
-~27ms per tool call (measured min-of-15 on an M-series Mac; bare Python startup
-is 19ms of that). Zero network calls (nothing about your work leaves the
+About @@LANE_OFF_MS@@ ms per tool call with the pattern lane off (the default) and about
+@@LANE_ON_MS@@ ms with it on (the installed hook command, whole process, min of @@REPEATS@@ runs,
+a benign Bash call, measured on @@VERSION@@, @@DATE@@, @@MACHINE_CLASS@@; bare Python
+startup is @@PY_START_MS@@ ms of that). Zero network calls (nothing about your work leaves the
 machine). An invocation appends two lines when both writes succeed, one when the check
 starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
 recording a SHA-256 of the tool input and never the input itself. A hook killed
