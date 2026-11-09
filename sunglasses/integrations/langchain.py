@@ -97,7 +97,7 @@ def _build_tool_class():
             return json.dumps(output, indent=2)
 
         async def _arun(self, text: str, channel: str = "message", **kwargs) -> str:
-            """Async version — delegates to sync (scanning is CPU-bound, <1ms)."""
+            """Async version — delegates to sync (scanning is CPU-bound; about 1.5 ms for a short input, longer input takes longer)."""
             return self._run(text, channel=channel, **kwargs)
 
     return _SunglassesScanTool

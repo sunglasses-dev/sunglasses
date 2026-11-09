@@ -2,7 +2,8 @@
 SUNGLASSES Scanner — Unified interface for FAST and DEEP scanning modes.
 
 SUNGLASSES-FAST (always on, non-blocking):
-    - Text: emails, messages, web pages, APIs, logs → <1ms
+    - Text: emails, messages, web pages, APIs, logs → cost grows with input length
+      (about 1.5 ms for a short input; stats/current.json has the measured sizes)
     - Inline images: EXIF metadata + quick OCR → 1-3 sec
     - Never blocks the agent workflow
 
@@ -60,11 +61,11 @@ class SunglassesScanner:
         self._whisper_model = whisper_model
 
     # =========================================================================
-    # FAST MODE — Always on, <3 seconds
+    # FAST MODE — always on; cost grows with input length
     # =========================================================================
 
     def scan_text(self, text: str, channel: str = "message"):
-        """FAST: Scan text directly. <1ms."""
+        """FAST: Scan text directly. About 1.5 ms for a short input; longer input takes longer."""
         return self.engine.scan(text, channel=channel)
 
     def scan_email(self, email_body: str, attachments: list = None):
