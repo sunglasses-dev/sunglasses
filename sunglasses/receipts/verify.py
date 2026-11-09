@@ -1,8 +1,11 @@
 """Verify a receipt chain offline, and say exactly what the answer means.
 
 WIRE_SPEC §Offline: a standalone verifier with NO `sunglasses` import. It
-needs this directory's `wire.py`, `codes.py`, `_fs.py` and PyCA's Ed25519,
-nothing else, so it can be handed to an auditor who never installs the product.
+needs this directory's `wire.py`, `codes.py`, `_fs.py`, `_shown.py` and PyCA's
+Ed25519, nothing else, so it can be handed to an auditor who never installs the
+product. (`_shown.py` joined the list on 2026-10-21, when `_fs.py` began to
+import it; the list was not updated and the bundle stopped importing.
+tests/test_standalone_bundle.py runs exactly this list under `python -I`.)
 
 FIVE RESULTS, NEVER ONE. Key trust, chain integrity, unsigned tail, expected
 endpoint and lifecycle are computed and printed separately, and nothing here
