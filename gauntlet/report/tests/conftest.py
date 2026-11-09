@@ -40,6 +40,27 @@ def reviewed_map_for_the_suite(tmp_path_factory):
     classify.MAP_PATH = original
 
 
+@pytest.fixture(autouse=True, scope="session")
+def no_imported_records_from_the_tree(tmp_path_factory):
+    """No test reads the run file or the ledger record that sits beside produce.py.
+
+    `produce.build()` imports `execution_run.json` and `ledger_record.json` from fixed paths in
+    the source tree. Those files are what the driver and the operator leave there, so a tree
+    that has had a real run in it (the dress rehearsal does exactly that) made every test that
+    calls `build()` without its own patch read it, and a real run is older than the clock these
+    tests pin: eleven rows failed with EXEC_RUN_STALE on a tree that was otherwise green. The
+    suite points both paths at a folder with nothing in it. The rows that DO want a run file
+    (test_execution_run.py) patch the paths themselves and put these back when they finish.
+    """
+    import produce
+    empty = tmp_path_factory.mktemp("no-imported-records")
+    saved = produce.EXECUTION_RUN, produce.LEDGER_RECORD
+    produce.EXECUTION_RUN = empty / "execution_run.json"
+    produce.LEDGER_RECORD = empty / "ledger_record.json"
+    yield
+    produce.EXECUTION_RUN, produce.LEDGER_RECORD = saved
+
+
 OPEN_MAP = HERE / "fixtures" / "capability_map.open.json"
 
 
