@@ -460,6 +460,14 @@ repair. Neither is in 0.6.7.
 the limit is repaired. The behavioral check for it is kept out of the public tree on
 purpose (lab finding E3).
 
+## Open limit as of 0.6.20 (2026-11-09) — two rules block some real manifests
+
+GLS-PT-001 (path traversal, file channel) blocks real package.json files whose entry-point or script fields hold
+relative parent paths: 213 of 1,907 distinct npm packages on one Mac (581 of 5,691 top-level files), measured
+Nov 9 2026 on 0.6.20. `scan --dir` skips node_modules, so this reaches a user who scans a single manifest or a
+vendored tree. GLS-CI-007 quarantines our own action.yml the same way. Present since v0.2.4; not a regression.
+Fix: design round C1065, target 0.6.22.
+
 ## Documented bound — the proxy keeps per-request-id records for the whole session
 
 A proxy session keeps several tables keyed by request id and does not trim them while it runs:

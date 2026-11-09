@@ -42,3 +42,10 @@ def test_the_unbounded_proxy_id_records_are_listed_with_the_bounded_sibling():
     section = GAPS[GAPS.index("## Documented bound"):]
     assert "TOMBSTONE_LIMIT" in section
     assert "left unbounded" in section
+
+
+def test_the_manifest_false_positives_are_listed_until_the_fix_ships():
+    # C1066: remove this test in the change that ships the C1065 fix, together with the row.
+    for rule_id in ("GLS-PT-001", "GLS-CI-007"):
+        assert rule_id in GAPS, f"{rule_id} is missing from KNOWN_VERSION_GAPS.md"
+    assert "581 of 5,691" in GAPS
