@@ -14,6 +14,7 @@ nothing about the product, which is why this file never quotes a number from the
 import copy
 import datetime
 import json
+import re
 import pathlib
 import sys
 import types
@@ -309,6 +310,20 @@ def test_a_report_with_a_run_in_it_still_renders(world):
     if validate.validate_report(world.report):
         pytest.skip("covered by the clean report row")
     assert "execution_partition.passed" in render.render(world.report)
+
+
+def test_the_real_page_prints_every_outcome_count_and_the_total(world):
+    """End to end through validate and the schema view: the three keys the page now reads are not
+    cut away, and what it prints is the report's own partition."""
+    if validate.validate_report(world.report):
+        pytest.skip("covered by the clean report row")
+    page = render.render(world.report)
+    shown = dict(re.findall(r'data-bound="([^"]+)">([^<]*)<', page))
+    part = world.report["coverage"]["execution_partition"]
+    for key in schema.PARTITION_KEYS:
+        assert shown["coverage.execution_partition." + key] == str(part[key]), key
+    assert shown["coverage.total"] == str(world.report["coverage"]["total"])
+    assert "Execution counts did not reconcile" not in page
 
 
 # =========================== VALIDATOR V1 to V14 ================================================

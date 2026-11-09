@@ -130,6 +130,29 @@ def _state_note(panel: dict) -> str:
     return body
 
 
+EXECUTED_WITHHELD = ("Execution counts did not reconcile to the delivered total; "
+                     "sentence withheld")
+
+
+def _executed_sentence(coverage: dict) -> list:
+    """The one sentence that says what a run did. Every outcome count, and the total they are
+    out of, or nothing but the withheld notice. Leaving a count out (a sentence that gave
+    only passed and not run over a partition that also held failed and refused) is the defect this
+    exists to prevent."""
+    if not schema.partition_reconciles(coverage):
+        return [_text(EXECUTED_WITHHELD)]
+    part = coverage["execution_partition"]
+    return [
+        "Executed this run, on a stand-in route and not on the product proxy: ",
+        _figure("coverage.execution_partition.passed", part["passed"]), " passed, ",
+        _figure("coverage.execution_partition.failed", part["failed"]), " failed, ",
+        _figure("coverage.execution_partition.refused", part["refused"]), " refused, ",
+        _figure("coverage.execution_partition.errored", part["errored"]), " errored, ",
+        _figure("coverage.execution_partition.not_run", part["not_run"]), " not run, out of ",
+        _figure("coverage.total", coverage["total"]), " delivered schedules.",
+    ]
+
+
 def _coverage_section(report: dict) -> str:
     coverage = report["coverage"]
     if not schema.numeric_readable(coverage):
@@ -149,14 +172,9 @@ def _coverage_section(report: dict) -> str:
         "</p>",
         '<p class="detail">Planning and execution are separate counts. '
         "Being drivable is not being run. Being run is not passing. ",
-        "Executed this run: ",
-        _figure("coverage.execution_partition.passed",
-                coverage["execution_partition"]["passed"]),
-        " passed, ",
-        _figure("coverage.execution_partition.not_run",
-                coverage["execution_partition"]["not_run"]),
-        " not run.</p>",
     ]
+    parts.extend(_executed_sentence(coverage))
+    parts.append("</p>")
 
     ceiling = coverage["ceiling"]
     state = ceiling.get("state")

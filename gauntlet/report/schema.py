@@ -244,6 +244,26 @@ def executed_total(coverage) -> int:
                and isinstance(v, int) and not isinstance(v, bool))
 
 
+PARTITION_KEYS = ("passed", "failed", "refused", "errored", "not_run")
+
+
+def partition_reconciles(coverage) -> bool:
+    """True when the five execution counts are whole numbers that add up to the delivered total.
+
+    The page prints all five beside the total. A sentence whose parts do not add up to its
+    denominator is a sentence nobody can check, so the page withholds it (render.py).
+    """
+    if not isinstance(coverage, dict):
+        return False
+    part, total = coverage.get("execution_partition"), coverage.get("total")
+    if not isinstance(part, dict) or isinstance(total, bool) or not isinstance(total, int):
+        return False
+    values = [part.get(key) for key in PARTITION_KEYS]
+    if any(isinstance(v, bool) or not isinstance(v, int) for v in values):
+        return False
+    return sum(values) == total
+
+
 def nothing_executed(coverage) -> bool:
     """V15. A measured coverage panel under which no variant has an executed outcome."""
     return (isinstance(coverage, dict) and coverage.get("state") == "measured"
@@ -387,7 +407,9 @@ REPORT_READS = {
                    "capability_map_review_state": _nul(code_in("REVIEW_STATES", REVIEW_STATES))},
     "harness": dict(_PANEL),
     "coverage": dict(_PANEL, plan_partition=_opt({"drivable": _opt(WHOLE)}), total=_opt(WHOLE),
-                     execution_partition=_opt({"passed": _opt(WHOLE), "not_run": _opt(WHOLE)}),
+                     execution_partition=_opt({"passed": _opt(WHOLE), "failed": _opt(WHOLE),
+                                               "refused": _opt(WHOLE), "errored": _opt(WHOLE),
+                                               "not_run": _opt(WHOLE)}),
                      ceiling=_opt({"state": _opt(code_in("CEILING_STATES", CEILING_STATES)),
                                    "unclassified_count": _opt(WHOLE),
                                    "blocked_needing_route": _opt(WHOLE),
@@ -411,7 +433,9 @@ REPORT_READS = {
 }
 # A panel whose digits may be shown is read for them, so these must be there when it is.
 _READ_WHEN_NUMERIC = (("plan_partition", "drivable"), ("total",), ("execution_partition", "passed"),
-                      ("execution_partition", "not_run"), ("ceiling",))
+                      ("execution_partition", "failed"), ("execution_partition", "refused"),
+                      ("execution_partition", "errored"), ("execution_partition", "not_run"),
+                      ("ceiling",))
 
 
 def _has_kind(value, kind) -> bool:
