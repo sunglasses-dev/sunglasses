@@ -105,14 +105,11 @@ hex string or JWT.
 
 The growth is measurable and reproducible; the exact byte counts and timings are
 held in our internal release evidence rather than published here, so this file
-states the boundary without also handing over a tuned recipe. The fix lands in
-v0.6 and the measurements go public with it.
+states the boundary without also handing over a tuned recipe. The pattern-lane deadline shipped in v0.6.6 (#307).
 
 **Why it matters, beyond speed.** The PreToolUse firewall hook has a 10-second
-timeout, and Claude Code does not treat a timed-out hook as a block: *"A
-timed-out command hook doesn't block the tool call. The call continues through
-the normal permission flow."* So an input of this shape can push the hook past
-its timeout, and the tool call then proceeds **unscanned**. That is reachable from attacker-controlled input, which makes it
+timeout. Before v0.6.6 an input of this shape could push the hook past
+its timeout, and the tool call then proceeded unscanned; since v0.6.6 the pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked. That is reachable from attacker-controlled input, which made it
 a bypass of the enforcement surface rather than a performance complaint. The
 same curve stalls a repo scan in CI.
 
