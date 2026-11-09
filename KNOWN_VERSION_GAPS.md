@@ -470,7 +470,8 @@ Fix: design round C1065, target 0.6.22.
 
 GLS-TS-251, GLS-GHSA-PI-202 and GLS-APIP-005 block real workflow, issue-template and Dockerfile files on comment,
 URL or glob text: 20 of 298 distinct files found on one Mac (copies of our own repos and installed npm packages
-included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in this report. Fix card C1069.
+included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in the Poisoned Build Manifests report
+(sunglasses.dev/reports/poisoned-build-manifests). Fix card C1069.
 
 ## Documented bound — the proxy keeps per-request-id records for the whole session
 
