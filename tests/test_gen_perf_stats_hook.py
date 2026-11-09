@@ -76,3 +76,26 @@ def test_measured_command_is_the_one_the_installer_writes():
 def test_block_names_the_command_it_timed():
     block = json.loads(STATS.read_text(encoding="utf-8"))["hook_speed"]
     assert block["command"] == f"python -m {HOOK_MARKER}"
+
+
+def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
+    """What measure_hook actually hands to the timer is the installed command, and the ledger says so.
+
+    Pinning hook_argv() alone guards the helper, not the call site: a measure_hook that typed its
+    own argv, or timed `python -c pass` as the hook, would stay green. Capture the argv at the
+    timer and compare it with the installed command; the recorded `command` is derived from
+    the argv that ran, never a literal.
+    """
+    seen = []
+
+    def fake_process_ms(argv, env, stdin, repeats):
+        seen.append((list(argv), stdin))
+        return 1.0, 2.0
+
+    monkeypatch.setattr(gen, "_process_ms", fake_process_ms)
+    block = gen.measure_hook(repeats=2)
+    installed = shlex.split(build_hook_entry(interpreter=sys.executable)["hooks"][0]["command"])
+    assert [argv for argv, _ in seen] == [installed, installed, [sys.executable, "-c", "pass"]]
+    assert seen[0][1] is not None and seen[0][1] == seen[1][1]  # the same benign Bash call in both lanes
+    assert block["command"] == "python " + " ".join(installed[1:])
+    assert block["command"] == f"python -m {HOOK_MARKER}"

@@ -112,6 +112,7 @@ def hook_argv():
 def measure_hook(repeats=HOOK_REPEATS):
     """The whole-hook process time with the warn lane off and on, and the interpreter floor."""
     result = {}
+    ran = {}  # the argv each case actually ran, so the ledger names what was timed
     with tempfile.TemporaryDirectory() as off_home, tempfile.TemporaryDirectory() as on_home:
         open(os.path.join(on_home, "warn-lane"), "w").close()
         hook = hook_argv()
@@ -121,12 +122,13 @@ def measure_hook(repeats=HOOK_REPEATS):
         for name, argv, home, stdin in cases:
             env = {"HOME": home, "SUNGLASSES_HOME": home,
                    "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+            ran[name] = list(argv)
             low, mid = _process_ms(argv, env, stdin, repeats)
             result[f"{name}_min_ms"] = round(low, 1)
             result[f"{name}_median_ms"] = round(mid, 1)
     result.update({
         "repeats": repeats,
-        "command": f"python -m {HOOK_MARKER}",
+        "command": " ".join(["python"] + ran["hook_lane_off"][1:]),
         "command_shape": "benign Bash call (ls -la)",
         "scope": "whole child process wall clock, interpreter start included",
         "version": SUNGLASSES_VERSION,
