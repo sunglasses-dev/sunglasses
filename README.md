@@ -314,7 +314,7 @@ Most AI agent attacks don't look like attacks. They hide inside normal-looking c
 SUNGLASSES is a free, open-source input inspection layer. It does not sit invisibly in front of your agent and sanitise everything it reads (nothing does). It gives you three surfaces you invoke deliberately:
 
 - **`sunglasses scan`**, inspect a file, a repo or a string on demand, in CI or at the terminal. Reports what it found *and what it could not read*.
-- **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
+- **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers ask, and a default install (v0.6.10 and later) sets `onFailure: "block"` so a hook that times out or cannot start refuses the call on Claude Code 2.1.295 and later (`init --fail-open` opts out; see `KNOWN_VERSION_GAPS.md`).
 - **The MCP server**, exposes scanning to an agent as a tool it can call.
 
 It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note.
@@ -694,7 +694,7 @@ A deep scan of audio or video downloads the Whisper speech model (about 145 MB f
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
-**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost grows with input length, and some input shapes cost more than their length suggests (see [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md), gap 4). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes, a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
+**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost grows with input length, and some input shapes cost more than their length suggests (see [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md), gap 4). An uncapped filter handed a 10 MB page stalls an agent for minutes, a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
 
 **Exit codes.** `0` = read the whole input and found nothing that fails the scan (with `--fail-on` or `--baseline`, findings below the level or listed in the baseline are still reported). `1` = threat found (with `--fail-on` or `--baseline`, a finding below the level or listed in the baseline does not exit `1`; see above). `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 

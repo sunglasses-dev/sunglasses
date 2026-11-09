@@ -99,31 +99,27 @@ actually inspected — and silence about a limitation is its own version of that
 ## v0.5.6 — the firewall is best-effort on very long unbroken tokens
 
 **What.** The pattern matcher's cost is roughly linear in input length for
-ordinary whitespace-separated text, and roughly **quadratic** for a single
-unbroken token — a base64 blob, a `data:` URI, a minified bundle line, a long
+ordinary whitespace-separated text, and on the 2026-09-07 head far costlier than its length suggested for a single
+unbroken token (re-measured on v0.6.20, 2026-11-09: worse than linear on some shapes, not quadratic) — a base64 blob, a `data:` URI, a minified bundle line, a long
 hex string or JWT.
 
 The growth is measurable and reproducible; the exact byte counts and timings are
 held in our internal release evidence rather than published here, so this file
-states the boundary without also handing over a tuned recipe. The fix lands in
-v0.6 and the measurements go public with it.
+states the boundary without also handing over a tuned recipe. The pattern-lane deadline shipped in v0.6.6 (#307).
 
 **Why it matters, beyond speed.** The PreToolUse firewall hook has a 10-second
-timeout, and Claude Code does not treat a timed-out hook as a block: *"A
-timed-out command hook doesn't block the tool call. The call continues through
-the normal permission flow."* So an input of this shape can push the hook past
-its timeout, and the tool call then proceeds **unscanned**. That is reachable from attacker-controlled input, which makes it
+timeout. Before v0.6.6 an input of this shape could push the hook past
+its timeout, and the tool call then proceeded unscanned; since v0.6.6 the pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked; since v0.6.10 a default install also sets `onFailure: "block"`, so on Claude Code 2.1.295 and later a hook that still times out blocks the call instead of letting it through (`init --fail-open` restores the pass-through; older hosts ignore the key). That is reachable from attacker-controlled input, which made it
 a bypass of the enforcement surface rather than a performance complaint. The
 same curve stalls a repo scan in CI.
 
 **What the input cap does and does not do.** `MAX_SCAN_BYTES` is 1 MB. It bounds
-the LENGTH of the input; it does not bound the cost, because the cost is
-quadratic *in* that length for this input shape.
+the LENGTH of the input; it does not bound the cost, because the cost can grow faster than that length for some input shapes.
 
 **Why no test caught it.** `tests/test_input_cap.py::test_truncation_bounds_the_cost`
 exists to prove exactly this, and builds its payload as `"a " * n` — the
 whitespace-separated shape, which is the fast one. The gate has been green
-throughout while the quadratic shape was unbounded underneath it.
+throughout while the slow shape was unbounded underneath it.
 
 **Status.** Not fixed in v0.5.6, and PARTLY reduced since. v0.5.6 is a scoped
 trust repair and the fix belongs in the matcher; landing it unreviewed at the end
@@ -156,8 +152,8 @@ remains a v0.6 item.
 unbroken tokens. The static scanner still does not execute scanned content;
 this is about what gets inspected, not about what runs.
 
-**Shape sensitivity at a FIXED length, measured 2026-09-07 on the release head.** The
-README's "~50 µs/byte" is a floor, not a rate that holds across inputs. Six payloads, each
+**Shape sensitivity at a FIXED length, measured 2026-09-07 on the release head.** No
+single per-byte rate holds across inputs. Six payloads, each
 just over the 1 MiB cap so each scans exactly the capped 1,048,576 bytes, warm engine,
 same machine:
 
@@ -171,9 +167,11 @@ same machine:
 | `"\n" * n` (a run of newlines) | 139.8 s |
 
 Same byte count, **2.7× spread**. This is the ordinary-shape band and it does not include
-the unbroken-token case above, which is the quadratic one. It is recorded because the
+the unbroken-token case above, which cost more than its length suggested on the
+2026-09-07 head (re-measured on v0.6.20, 2026-11-09: worse than linear on some input
+shapes, not quadratic). It is recorded because the
 README previously stated the linear rate without qualification, and because a reader
-sizing a CI budget from "50 µs/byte" would be wrong by a factor of three before ever
+sizing a CI budget from one per-byte rate would be wrong by a factor of three before ever
 meeting an adversarial input. No tuned recipe is published here for the same reason as
 above.
 
@@ -432,8 +430,8 @@ where every other entry grows in step with the input: `GLS-AW-001`, `GLS-SC-018`
 that already carries their required words.
 
 This is the same family as the long-token entry above and carries the same
-consequence: the firewall hook has a fixed timeout, and a timed-out hook does not
-block the call. We have not published timings, for the same reason as before.
+consequence: the firewall hook has a fixed timeout, and before v0.6.10 a timed-out hook did not block the call (a default install now blocks on timeout on Claude Code 2.1.295 and later; see the long-token entry above).
+We have not published timings, for the same reason as before.
 
 Status after 0.6.8: four of the five are repaired. `GLS-AW-001` was repaired in
 0.6.8. `GLS-SC-018`, `GLS-CF-251` and `GLS-AW-713` are repaired in the release
