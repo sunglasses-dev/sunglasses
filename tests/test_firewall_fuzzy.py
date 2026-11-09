@@ -10,15 +10,16 @@ v0.4 rule locked out.
 So the tests here are mostly about what this lane is forbidden to do, plus the
 two measurements that decided it ships OFF by default:
 
-  * FP rate on the 39 normal tool calls: 1 (a plain `curl -s https://pypi.org/…`
-    read as "dangerous shell command"). ~2.6% of ordinary agent work would raise
-    an escalation prompt for nothing, and a prompt people learn to dismiss is
-    worse than no prompt.
-  * Cost: ~902ms per tool call vs ~31ms with the lane off — the pattern DB is
-    rebuilt in every hook subprocess. 9x the spec's own 100ms budget.
+  * FP rate on the 39 normal tool calls, as measured when the lane was built
+    (Aug 2026): 1 (a plain `curl -s https://pypi.org/…` read as "dangerous shell
+    command"). A prompt people learn to dismiss is worse than no prompt.
+  * Cost, as measured when the lane was built: the pattern DB was rebuilt in
+    every hook subprocess, many times the spec's own 100ms budget. Later releases
+    removed that rebuild; the current cost, lane off and on, is the `hook_speed`
+    entry in stats/current.json (tools/gen_perf_stats.py).
 
-Neither number is a reason to hide the lane; both are reasons for it to be
-opt-in, loudly, with the numbers written down.
+Both were reasons for the lane to be opt-in, loudly, with the numbers written
+down. Neither is a current measurement.
 """
 
 import json

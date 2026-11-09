@@ -100,7 +100,7 @@ def test_self_test_survives_a_spaced_interpreter_path(tmp_path):
 
 
 def test_hook_entry_targets_the_fast_module_not_the_cli():
-    """cli.py costs ~109ms of module-scope imports; the module path costs ~27ms."""
+    """cli.py pays module-scope imports of the whole engine; the module path does not."""
     command = build_hook_entry()["hooks"][0]["command"]
     assert "sunglasses.firewall" in command
     assert "firewall-hook" not in command
