@@ -50,6 +50,12 @@ def test_the_manifest_path_false_positives_are_listed_until_the_fix_ships():
         assert rule_id in GAPS, f"{rule_id} is missing from KNOWN_VERSION_GAPS.md"
     assert "581 of 5,691" in GAPS
 
+def test_the_ci_007_misses_are_listed_until_the_fix_ships():
+    # T9 14:23 Nov 9 (C1089): remove this test in the change that closes the GLS-CI-007 miss side (C1065), together with its paragraph.
+    assert "flags 48 and misses 24" in GAPS
+    assert "a list of misses we wrote, not a miss rate" in GAPS
+
+
 
 def test_the_comment_text_false_positives_are_listed_until_the_fix_ships():
     # C1066: remove this test in the change that ships the C1069 fix (GLS-TS-251, GLS-GHSA-PI-202, GLS-APIP-005), together with its paragraph.

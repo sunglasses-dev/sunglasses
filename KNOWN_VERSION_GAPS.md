@@ -468,6 +468,10 @@ Nov 9 2026 on 0.6.20. `scan --dir` skips node_modules, so this reaches a user wh
 vendored tree. GLS-CI-007 quarantines our own action.yml the same way. Present since v0.2.4; not a regression.
 Fix: design round C1065, target 0.6.22.
 
+GLS-CI-007 (workflow shell-step interpolation, file channel) misses some forms of the step it is aimed at: of 72
+attacker-source workflow shapes we wrote, it flags 48 and misses 24; a list of misses we wrote, not a miss rate on
+real workflows. Measured Nov 9 2026 on 0.6.20. Fix: design round C1065, target 0.6.22.
+
 GLS-TS-251, GLS-GHSA-PI-202 and GLS-APIP-005 block real workflow, issue-template and Dockerfile files on comment,
 URL or glob text: 20 of 298 distinct files found on one Mac (copies of our own repos and installed npm packages
 included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in the Poisoned Build Manifests report
