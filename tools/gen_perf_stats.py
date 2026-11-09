@@ -13,6 +13,7 @@ generator: it measures, it stamps what it measured on, and it writes the result.
 
     python3 tools/gen_perf_stats.py            # print, do not write
     python3 tools/gen_perf_stats.py --write    # update stats/current.json
+    python3 tools/gen_perf_stats.py --hook-only --write   # refresh only hook_speed
 
 Corpus — public, in-repo, no network, no randomness:
   quickstart   the exact string the README quickstart tells a reader to run
@@ -22,6 +23,19 @@ Corpus — public, in-repo, no network, no randomness:
 Reported as a DISTRIBUTION, not a single headline. Scan cost is linear in input
 length, so one number cannot describe both an 18-character command and an 8 KB
 document. Publishing the smallest one as "average" is how H1 happened.
+
+The firewall hook is a different cost from a scan: it is a whole child process per tool
+call (interpreter start, imports, the check, exit). `hook_speed` records that, with the
+scope in the key names, so a page or README that quotes a per-call hook time cites one
+dated block instead of a number typed by hand:
+  hook_lane_off_*   the command the installer writes (`<python> -m <HOOK_MARKER>`, the marker is
+                    imported from sunglasses.firewall, never typed here) on a benign Bash call,
+                    warn lane off
+  hook_lane_on_*    the same with the lane marker present (`<SUNGLASSES_HOME>/warn-lane`)
+  python_start_*    a bare interpreter start (`python -c pass`), the floor under both
+Each is the minimum and the median of `repeats` runs of the whole child process, wall
+clock, in a throwaway HOME so nothing under the real ~/.sunglasses is read or written.
+The first run of each case is discarded (cold file cache).
 """
 
 import argparse
@@ -30,19 +44,30 @@ import json
 import os
 import platform
 import statistics
+import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, REPO)
 
+from sunglasses import __version__ as SUNGLASSES_VERSION  # noqa: E402
 from sunglasses.engine import SunglassesEngine  # noqa: E402
+from sunglasses.firewall import HOOK_MARKER  # noqa: E402
 
 QUICKSTART_STRING = "some text to check"
 WARMUP = 20
 REPEATS = 200
 DOC_REPEATS = 5      # 8 KB documents are ~100x the cost; fewer reps, same method
+HOOK_REPEATS = 15    # whole-process runs per case; min + median are reported
+HOOK_INPUT = json.dumps({
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {"command": "ls -la"},
+    "session_id": "perf-stats",
+})
 
 
 def _median_ms(engine, text, repeats):
@@ -54,6 +79,78 @@ def _median_ms(engine, text, repeats):
         engine.scan(text)
         samples.append((time.perf_counter() - start) * 1000)
     return statistics.median(samples), statistics.mean(samples)
+
+
+def _process_ms(argv, env, stdin, repeats):
+    """Wall-clock ms of the whole child process: (minimum, median) over `repeats` runs.
+
+    One discarded run first. A non-zero exit is an error, not a sample: a hook that
+    crashed in 5 ms would otherwise publish a flattering number.
+    """
+    samples = []
+    for i in range(repeats + 1):
+        start = time.perf_counter()
+        done = subprocess.run(argv, input=stdin, capture_output=True, text=True,
+                              env=env, cwd=REPO, check=False)
+        elapsed = (time.perf_counter() - start) * 1000
+        if done.returncode != 0:
+            raise RuntimeError(f"{argv[-1]} exited {done.returncode}: {done.stderr[-200:]}")
+        if i:
+            samples.append(elapsed)
+    return min(samples), statistics.median(samples)
+
+
+def hook_argv():
+    """The argv of the hook the installer registers: `<python> -m <HOOK_MARKER>`.
+
+    Built from the same HOOK_MARKER `build_hook_entry` uses, so the number measured is the cost of
+    the command that actually runs on every tool call, not of a sibling entry point.
+    """
+    return [sys.executable, "-m", HOOK_MARKER]
+
+
+def measure_hook(repeats=HOOK_REPEATS):
+    """The whole-hook process time with the warn lane off and on, and the interpreter floor."""
+    result = {}
+    ran = {}  # the argv each case actually ran, so the ledger names what was timed
+    with tempfile.TemporaryDirectory() as off_home, tempfile.TemporaryDirectory() as on_home:
+        open(os.path.join(on_home, "warn-lane"), "w").close()
+        hook = hook_argv()
+        cases = (("hook_lane_off", hook, off_home, HOOK_INPUT),
+                 ("hook_lane_on", hook, on_home, HOOK_INPUT),
+                 ("python_start", [sys.executable, "-c", "pass"], off_home, None))
+        for name, argv, home, stdin in cases:
+            env = {"HOME": home, "SUNGLASSES_HOME": home,
+                   "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+            ran[name] = list(argv)
+            low, mid = _process_ms(argv, env, stdin, repeats)
+            result[f"{name}_min_ms"] = round(low, 1)
+            result[f"{name}_median_ms"] = round(mid, 1)
+    result.update({
+        "repeats": repeats,
+        "command": " ".join(["python"] + ran["hook_lane_off"][1:]),
+        "command_shape": "benign Bash call (ls -la)",
+        "scope": "whole child process wall clock, interpreter start included",
+        "version": SUNGLASSES_VERSION,
+        "measured_on": {
+            "machine": platform.machine(),
+            "system": f"{platform.system()} {platform.release()}",
+            "python": platform.python_version(),
+        },
+        "measured_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+        "generated_by": "tools/gen_perf_stats.py",
+    })
+    return result
+
+
+def write_hook_only(path, hook):
+    """Replace only `hook_speed` in the stats file; every other key is left as it was."""
+    with open(path) as fh:
+        stats = json.load(fh)
+    stats["hook_speed"] = hook
+    with open(path, "w") as fh:
+        json.dump(stats, fh, indent=2)
+        fh.write("\n")
 
 
 def measure():
@@ -111,6 +208,7 @@ def measure():
             "system": f"{platform.system()} {platform.release()}",
             "python": platform.python_version(),
         },
+        "hook_speed": measure_hook(),
         "scan_speed_generated_by": "tools/gen_perf_stats.py",
         "scan_speed_generated_at": datetime.now(timezone.utc)
             .astimezone().isoformat(timespec="seconds"),
@@ -140,7 +238,18 @@ def main():
     parser.add_argument("--write", action="store_true",
                         help="update stats/current.json in place")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--hook-only", action="store_true",
+                        help="measure only hook_speed; with --write, touch nothing else")
     args = parser.parse_args()
+
+    if args.hook_only:
+        hook = measure_hook()
+        print(json.dumps(hook, indent=2))
+        if args.write:
+            path = os.path.join(REPO, "stats", "current.json")
+            write_hook_only(path, hook)
+            print(f"wrote hook_speed in {path}")
+        return
 
     measured = measure()
 
