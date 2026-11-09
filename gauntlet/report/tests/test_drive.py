@@ -147,6 +147,20 @@ def test_normalise_drops_clocks_ids_and_nested_json_clocks_but_keeps_facts():
     assert drive.normalise(a) != drive.normalise(c)          # a changed code is a changed fact
 
 
+def test_wire_byte_counts_do_not_flip_the_execution_hash_when_only_a_timing_float_changes_width():
+    # The client-bound reply carries "elapsed_ms": 260.196 on one run and 260.19 on the next;
+    # the execution file counts that reply's bytes. Same variant, same facts, one byte apart.
+    def execution(client, upstream, steps=("send_file", "await_client_error")):
+        return json.dumps({"scenario_id": "G2-16", "variant": "wire_name", "steps": list(steps),
+                           "client_wire_bytes": client, "upstream_wire_bytes": upstream,
+                           "assertions": [{"op": "await_client_error", "held": False}]}).encode()
+    a, b = execution(421, 419), execution(421, 418)
+    assert drive.stable_digest_of(a, False) == drive.stable_digest_of(b, False)
+    # a changed step is still a changed fact
+    assert drive.stable_digest_of(a, False) != drive.stable_digest_of(
+        execution(421, 419, steps=("send_file",)), False)
+
+
 def test_stable_record_digest_ignores_time_and_volatile_but_not_the_outcome():
     r = {"variant_id": "x", "outcome": "passed", "started_at": "1", "finished_at": "2",
          "volatile": {"b": 1}}
