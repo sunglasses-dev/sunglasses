@@ -462,7 +462,7 @@ purpose (lab finding E3).
 
 ## Open limit as of 0.6.20 (2026-11-09) — two rules block some real manifests
 
-GLS-PT-001 (path traversal, file channel) blocks real package.json files whose entry-point or script fields hold
+GLS-PT-001 (path traversal, file channel) blocks real package.json files whose script or tool-config fields hold
 relative parent paths: 213 of 1,907 distinct npm packages on one Mac (581 of 5,691 top-level files), measured
 Nov 9 2026 on 0.6.20. `scan --dir` skips node_modules, so this reaches a user who scans a single manifest or a
 vendored tree. GLS-CI-007 quarantines our own action.yml the same way. Present since v0.2.4; not a regression.
