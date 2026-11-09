@@ -2526,7 +2526,7 @@ def _verify_lifecycle(rows, directory, unparseable=()):
     print(f"  {DIM}Three things produce this, and this file cannot tell them "
           f"apart:{RESET}")
     print(f"    {DIM}1. the evaluation is still running{RESET}")
-    print(f"    {DIM}2. the hook was killed or crashed, which fails open{RESET}")
+    print(f"    {DIM}2. the hook was killed, timed out or crashed (a crash inside the check defers to the normal permission flow; a timeout follows the install's onFailure){RESET}")
     print(f"    {DIM}3. the decision was made and enforced, and the terminal "
           f"append failed{RESET}\n")
     for eid, rec in orphans[:20]:

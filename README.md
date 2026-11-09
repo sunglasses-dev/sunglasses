@@ -852,7 +852,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 ## The Firewall, from detector to control (v0.4)
 
 Everything above this line *reports*. The firewall *stops*. It installs as a
-Claude Code `PreToolUse` hook and answers one question before every tool call (**best-effort**: the hook runs under a 10-second timeout, and Claude Code lets a timed-out hook's tool call proceed, so on the pathological input shapes described in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md) a call can go through unscanned):
+Claude Code `PreToolUse` hook and answers one question before every tool call (**best-effort**: the hook runs under a 10-second timeout; its optional pattern lane stops itself at 7 seconds and answers ask, and a default install sets `onFailure: "block"`, so a hook that still times out refuses the call on Claude Code 2.1.295 and later; see [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md)):
 **does this action violate a fact we can prove?**
 
 ```bash
@@ -1007,14 +1007,18 @@ private key files are named individually and matching is boundary-aware, so
   pattern to blame. When the clock runs out the lane stops and asks you, and
   that call reaches you without a completed pattern check. Hard blocks do not
   use this clock and are unaffected.
-- **It fails open, and says so.** A crash falls through to Claude Code's own
-  permission flow rather than wedging your agent. A *dead control* is different:
+- **A crash inside the check falls through, and says so.** An error while
+  checking defers to Claude Code's own permission flow with a notice that the
+  call was NOT checked, rather than wedging your agent. A hook that times out or
+  cannot start is different: a default install refuses the call on Claude Code
+  2.1.295 and later (`init --fail-open` lets it through; older hosts ignore the
+  key). A *dead control* is different again:
   if the policy file is missing, empty, unreadable or unparseable, or if the audit
   trail cannot be written, the firewall now ASKS and names which control is down,
   and unreadable includes the shapes that are not a file you can read at all: a
   FIFO, socket, device node or directory in that path is answered from metadata
   before anything opens it, because a FIFO with no writer blocks in the kernel
-  and a blocked hook is timed out by the harness and fails open. A NUL byte
+  and a blocked hook is ended by the harness at its timeout, which refuses the call on a default install and lets it through under `--fail-open`. A NUL byte
   anywhere in the policy counts as unparseable, comments included: YAML will
   happily keep one inside a value, and a path with a NUL in it silently matches
   nothing, which is the one answer indistinguishable from a clean scan.
