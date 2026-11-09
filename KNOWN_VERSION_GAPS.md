@@ -460,7 +460,7 @@ repair. Neither is in 0.6.7.
 the limit is repaired. The behavioral check for it is kept out of the public tree on
 purpose (lab finding E3).
 
-## Open limit as of 0.6.20 (2026-11-09) — five rules block some real files
+## Open limit as of 0.6.20 (2026-11-09) — five rules block some real files, and one misses some workflow steps
 
 GLS-PT-001 (path traversal, file channel) blocks real package.json files whose script or tool-config fields hold
 relative parent paths: 213 of 1,907 distinct npm packages on one Mac (581 of 5,691 top-level files), measured
