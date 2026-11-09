@@ -15,10 +15,7 @@ rather than describe one after the fact.
 
 Two limits, up front:
 
-- **It is best-effort under load.** The hook runs under a 10-second timeout;
-  since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers
-  ask, naming the call as not pattern-checked, instead of passing silently. See
-  `KNOWN_VERSION_GAPS.md`.
+- **It is best-effort under load, by your choice.** The hook runs under a 10-second timeout; since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked. If the hook itself times out or cannot start, a default install (v0.6.10 and later) tells Claude Code to block the call (`onFailure: "block"`, honoured by Claude Code 2.1.295 and later; older hosts let the call through). `sunglasses init --fail-open` lets it through instead. Host behaviour per the Claude Code hooks documentation, read 2026-11-09. See `KNOWN_VERSION_GAPS.md`.
 - **It is deterministic-only.** It blocks secret material leaving in an outbound
   call, plus rules you write in `~/.sunglasses/policy.yaml`. Pattern and intent
   matches are **not checked by default**. An opt-in warn lane
@@ -182,9 +179,7 @@ it survive, only our entry is removed, and a timestamped backup is written first
 Say the limits plainly, because an integration people over-trust is worse than
 none:
 
-- **A slow hook asks, it does not decide.** 10-second host budget; the pattern
-  lane stops itself at 7 seconds and answers ask, naming the call as not
-  pattern-checked. Documented in `KNOWN_VERSION_GAPS.md`.
+- **A slow hook asks; a dead hook blocks unless you say otherwise.** 10-second host budget; the pattern lane stops itself at 7 seconds and answers ask. A default install sets `onFailure: "block"`, so a hook that times out or cannot start refuses the call on Claude Code 2.1.295 and later, every call, until you fix or remove the entry; `init --fail-open` opts out. Documented in `KNOWN_VERSION_GAPS.md`.
 - **It does not read tool *results*.** This is `PreToolUse`. Content that arrives
   as the *output* of a tool call is not inspected here — pipe it through
   `sunglasses scan` if you need that.

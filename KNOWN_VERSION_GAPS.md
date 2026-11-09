@@ -109,7 +109,7 @@ states the boundary without also handing over a tuned recipe. The pattern-lane d
 
 **Why it matters, beyond speed.** The PreToolUse firewall hook has a 10-second
 timeout. Before v0.6.6 an input of this shape could push the hook past
-its timeout, and the tool call then proceeded unscanned; since v0.6.6 the pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked. That is reachable from attacker-controlled input, which made it
+its timeout, and the tool call then proceeded unscanned; since v0.6.6 the pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked; since v0.6.10 a default install also sets `onFailure: "block"`, so on Claude Code 2.1.295 and later a hook that still times out blocks the call instead of letting it through (`init --fail-open` restores the pass-through; older hosts ignore the key). That is reachable from attacker-controlled input, which made it
 a bypass of the enforcement surface rather than a performance complaint. The
 same curve stalls a repo scan in CI.
 
@@ -430,8 +430,7 @@ where every other entry grows in step with the input: `GLS-AW-001`, `GLS-SC-018`
 that already carries their required words.
 
 This is the same family as the long-token entry above and carries the same
-consequence: the firewall hook has a fixed 10-second timeout; since v0.6.6 its pattern lane
-stops itself at 7 seconds and answers ask, naming the call as not pattern-checked.
+consequence: the firewall hook has a fixed timeout, and before v0.6.10 a timed-out hook did not block the call (a default install now blocks on timeout on Claude Code 2.1.295 and later; see the long-token entry above).
 We have not published timings, for the same reason as before.
 
 Status after 0.6.8: four of the five are repaired. `GLS-AW-001` was repaired in
