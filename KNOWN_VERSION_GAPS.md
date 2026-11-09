@@ -156,8 +156,8 @@ remains a v0.6 item.
 unbroken tokens. The static scanner still does not execute scanned content;
 this is about what gets inspected, not about what runs.
 
-**Shape sensitivity at a FIXED length, measured 2026-09-07 on the release head.** The
-README's "~50 µs/byte" is a floor, not a rate that holds across inputs. Six payloads, each
+**Shape sensitivity at a FIXED length, measured 2026-09-07 on the release head.** No
+single per-byte rate holds across inputs. Six payloads, each
 just over the 1 MiB cap so each scans exactly the capped 1,048,576 bytes, warm engine,
 same machine:
 
@@ -171,9 +171,11 @@ same machine:
 | `"\n" * n` (a run of newlines) | 139.8 s |
 
 Same byte count, **2.7× spread**. This is the ordinary-shape band and it does not include
-the unbroken-token case above, which is the quadratic one. It is recorded because the
+the unbroken-token case above, which cost more than its length suggested on the
+2026-09-07 head (re-measured on v0.6.20, 2026-11-09: worse than linear on some input
+shapes, not quadratic). It is recorded because the
 README previously stated the linear rate without qualification, and because a reader
-sizing a CI budget from "50 µs/byte" would be wrong by a factor of three before ever
+sizing a CI budget from one per-byte rate would be wrong by a factor of three before ever
 meeting an adversarial input. No tuned recipe is published here for the same reason as
 above.
 

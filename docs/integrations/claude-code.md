@@ -15,8 +15,9 @@ rather than describe one after the fact.
 
 Two limits, up front:
 
-- **It is best-effort under load.** The hook is registered with a 10-second
-  timeout. A hook that times out does **not** block the call. See
+- **It is best-effort under load.** The hook runs under a 10-second timeout;
+  since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers
+  ask, naming the call as not pattern-checked, instead of passing silently. See
   `KNOWN_VERSION_GAPS.md`.
 - **It is deterministic-only.** It blocks secret material leaving in an outbound
   call, plus rules you write in `~/.sunglasses/policy.yaml`. Pattern and intent
@@ -181,8 +182,9 @@ it survive, only our entry is removed, and a timestamped backup is written first
 Say the limits plainly, because an integration people over-trust is worse than
 none:
 
-- **A timed-out hook does not block.** 10-second budget; under load the call
-  proceeds. Documented in `KNOWN_VERSION_GAPS.md`.
+- **A slow hook asks, it does not decide.** 10-second host budget; the pattern
+  lane stops itself at 7 seconds and answers ask, naming the call as not
+  pattern-checked. Documented in `KNOWN_VERSION_GAPS.md`.
 - **It does not read tool *results*.** This is `PreToolUse`. Content that arrives
   as the *output* of a tool call is not inspected here — pipe it through
   `sunglasses scan` if you need that.
