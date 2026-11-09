@@ -473,6 +473,17 @@ URL or glob text: 20 of 298 distinct files found on one Mac (copies of our own r
 included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in the Poisoned Build Manifests report
 (sunglasses.dev/reports/poisoned-build-manifests). Fix card C1069.
 
+## Open limit as of 0.6.20 (2026-11-09) — tool-description poisoning: three gaps in the 58 class rules
+
+GLS-MECH-006 flagged 2 of 309 real descriptions. 309 distinct tool descriptions from 11 sources on one Mac (120 from
+one vendor's connector caches). Both are false positives. Measured Nov 9 2026 on 0.6.20. Design card C1072.
+
+0 of 5 reworded attacks fired a class rule, and 4 of 5 were allowed on every channel. n=5, written by us: a list of
+misses, not a miss rate. Measured Nov 9 2026 on 0.6.20. Design card C1072.
+
+Benchmark case HARD-08: 0 findings on all 9 documented channels on 0.6.20. Fix is a rule change, 0.6.22 at the
+earliest. Measured Nov 9 2026 on 0.6.20. Card C1061.
+
 ## Documented bound — the proxy keeps per-request-id records for the whole session
 
 A proxy session keeps several tables keyed by request id and does not trim them while it runs:

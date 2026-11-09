@@ -56,3 +56,14 @@ def test_the_comment_text_false_positives_are_listed_until_the_fix_ships():
     for rule_id in ("GLS-TS-251", "GLS-GHSA-PI-202", "GLS-APIP-005"):
         assert rule_id in GAPS, f"{rule_id} is missing from KNOWN_VERSION_GAPS.md"
     assert "20 of 298" in GAPS
+
+
+def test_the_tool_description_gaps_are_listed_until_the_fix_ships():
+    # C1084: remove this test in the change that ships the C1072 fix (GLS-MECH-006 and the plain-wording rows), together with its two paragraphs.
+    assert "GLS-MECH-006 flagged 2 of 309" in GAPS
+    assert "0 of 5 reworded attacks fired a class rule" in GAPS
+
+
+def test_benchmark_case_hard_08_is_listed_until_the_fix_ships():
+    # C1084: remove this test in the change that ships the C1061 fix (HARD-08), together with its paragraph.
+    assert "Benchmark case HARD-08: 0 findings on all 9 documented channels" in GAPS
