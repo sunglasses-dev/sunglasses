@@ -30,9 +30,10 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 try:                                   # inside the package
-    from . import _fs, codes, wire
+    from . import _fs, _shown, codes, wire
 except ImportError:                    # the standalone bundle: a flat directory
     import _fs, codes                  # type: ignore[no-redef]
+    import _shown                      # type: ignore[no-redef]
     import wire                        # type: ignore[no-redef]
 
 CHECKPOINT = "checkpoint"
@@ -465,7 +466,9 @@ def render_log(report: LogReport, name: str = "log") -> str:
         code = report.results[kind]
         out.append(f"{kind}: {code} -- {codes.CODES.get(code, '')}")
     if report.first_failure_segment is not None:
-        out.append(f"first failure: {report.first_failure_segment} "
+        # A segment's name is a file name somebody else may have chosen: it is
+        # written as one line of text, never as the raw characters.
+        out.append(f"first failure: {_shown.shown_name(report.first_failure_segment)} "
                    f"({report.failure_detail})")
     if report.authority_transitions:
         # Only when there is one, so every existing log prints what it did.
@@ -478,7 +481,7 @@ def render_log(report: LogReport, name: str = "log") -> str:
     alone = report.results["expected_endpoint"] == "ENDPOINT_CONFIRMED"
     for segment_name, segment in report.segments:
         out.append("")
-        out.append(f"-- {segment_name}")
+        out.append(f"-- {_shown.shown_name(segment_name)}")
         out.append(render(segment, alone=alone))
     return "\n".join(out)
 
