@@ -37,6 +37,9 @@ from .reporter import ProtectedEngine, generate_report
 from .result import verdict_word
 from .sarif import to_sarif
 from .taxonomy import for_category
+from .receipts._shown import printable as _shown_message
+from .receipts._shown import shown_path as _shown_path_pair
+from .receipts._shown import shown_name
 
 
 # ANSI colors for terminal output
@@ -864,11 +867,11 @@ class _ScanPool:
 
 
 def _printable(name):
-    """A file name is data, not terminal input: escape control characters before showing it."""
-    return "".join(
-        ch if (ch.isprintable() or ch == " ") else (
-            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else f"\\u{ord(ch):04x}")
-        for ch in name)
+    """A file name is data, not terminal input: escape control characters before showing it.
+
+    A name that holds one is written between single quotes (`receipts._shown.shown_name`); any other
+    name, a Windows path included, is shown as it is."""
+    return shown_name(name)
 
 
 def _printable_match(text):
@@ -882,6 +885,11 @@ def _printable_match(text):
             f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else
             f"\\u{ord(ch):04x}" if ord(ch) < 0x10000 else f"\\U{ord(ch):08x}")
         for ch in text.replace("\\", "\\\\"))
+
+
+def _where(path):
+    """A path in a line a person reads: shell-quoted, or between $'...' when it hides a character."""
+    return _shown_path_pair(path)[0]
 
 
 def _note(text):
@@ -4272,8 +4280,8 @@ def cmd_install(args):
         _inst.install(target, args.name, artifact=artifact,
                       home=install_records_home(), argv=args.argv or None)
     except _inst.ArtifactUnresolved as e:
-        print(f"\n  {RED}SUNGLASSES install refused{RESET} — {e}")
-        print(f"  {DIM}target: {target}{RESET}\n")
+        print(f"\n  {RED}SUNGLASSES install refused{RESET} — {_shown_message(e)}")
+        print(f"  {DIM}target: {_where(target)}{RESET}\n")
         sys.exit(2)
     except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
         # A first run in a folder with no MCP config read as a crash: the raw
@@ -4282,14 +4290,14 @@ def cmd_install(args):
         # a file missing later, or a missing lock or state path, keeps its own.
         if isinstance(e, _inst.ConfigMissing):
             print(f"\n  {RED}SUNGLASSES install failed{RESET} — no MCP config "
-                  f"file was found at {target}. This command changed nothing.")
+                  f"file was found at {_where(target)}. This command changed nothing.")
             print(f"  {DIM}run it in the folder that holds your project's .mcp.json, "
                   f"or name the file with --config <path>{RESET}\n")
             sys.exit(2)
-        print(f"\n  {RED}SUNGLASSES install failed{RESET} — {e}")
-        print(f"  {DIM}target: {target}{RESET}\n")
+        print(f"\n  {RED}SUNGLASSES install failed{RESET} — {_shown_message(e)}")
+        print(f"  {DIM}target: {_where(target)}{RESET}\n")
         sys.exit(2)
-    print(f"\n  {GREEN}Wrapped {args.name!r}{RESET} in {target}")
+    print(f"\n  {GREEN}Wrapped {args.name!r}{RESET} in {_where(target)}")
     print(f"  {DIM}Undo with: sunglasses uninstall {args.name}{RESET}")
 
     # WHAT HAPPENS NEXT, because without it the first thing the user sees is a
@@ -4328,25 +4336,25 @@ def cmd_uninstall(args):
         # restore" about a directory the user never used.
         res = _inst.uninstall(target, args.name, home=install_records_home())
     except (_inst.ConfigConflict, _inst.ConfigIOError) as e:
-        print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {e}")
-        print(f"  {DIM}target: {target}{RESET}\n")
+        print(f"\n  {RED}SUNGLASSES uninstall refused{RESET} — {_shown_message(e)}")
+        print(f"  {DIM}target: {_where(target)}{RESET}\n")
         sys.exit(2)
     if res.byte_exact and res.earlier:
         # The end state is the file before an earlier install on it, so
         # saying it changed would be false; saying which original it matches
         # keeps the claim exact.
-        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
+        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {_where(target)} "
               f"{DIM}(byte-identical to the file before an earlier "
               f"install){RESET}\n")
     elif res.byte_exact:
-        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {target} "
+        print(f"\n  {GREEN}Restored {args.name!r}{RESET} in {_where(target)} "
               f"{DIM}(byte-identical){RESET}\n")
     elif res.later:
         # The only difference from the file before the install is a wrapper a
         # later install put there, so say that instead of "it changed". Names
         # only, no command: the file is on the line above and a name is not a
         # quoted shell word.
-        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {_where(target)}")
         for later in res.later:
             print(f"  {DIM}later sunglasses install still wrapped here: "
                   f"{later!r}{RESET}")
@@ -4354,7 +4362,7 @@ def cmd_uninstall(args):
         print(f"  {DIM}uninstall {them} the same way (name each one, and this "
               f"file with --config) to restore the original{RESET}\n")
     else:
-        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {target}")
+        print(f"\n  {YELLOW}Restored {args.name!r}{RESET} in {_where(target)}")
         print(f"  {DIM}entry restored, file not byte-identical: it changed "
               f"after the install{RESET}\n")
     _say_approvals_outlive_uninstall()
@@ -4493,8 +4501,8 @@ def cmd_doctor(args, _run=None):
         # self-test verdict for it to outrank.
         if not target.exists():
             print(f"\n  {RED}SUNGLASSES doctor refused{RESET} — "
-                  f"cannot read {target}: no such file")
-            print(f"  {DIM}target: {target}{RESET}\n")
+                  f"cannot read {_where(target)}: no such file")
+            print(f"  {DIM}target: {_where(target)}{RESET}\n")
             sys.exit(2)
         sources = [("config", target)]
 
@@ -4558,10 +4566,10 @@ def cmd_doctor(args, _run=None):
     if rendered["inventory"]:
         print(f"  {BOLD}Servers{RESET}")
         for row in rendered["inventory"]:
-            name = row["name"] or "—"
+            name = shown_name(row["name"]) if row["name"] else "—"
             detail = row.get("detail")
             colour = GREEN if row["state"] == _doc.WRAPPED else DIM
-            line = f"    {colour}{row['state']:<10}{RESET} {name}  {DIM}({row['source']}){RESET}"
+            line = f"    {colour}{row['state']:<10}{RESET} {name}  {DIM}({_where(row['source'])}){RESET}"
             verdict = route_verdict.get((row["name"], row["source"]))
             if verdict:
                 vcolour = {"PASS": GREEN, "FAIL": RED}.get(verdict, YELLOW)
@@ -4578,13 +4586,12 @@ def cmd_doctor(args, _run=None):
         if not st["failed"] and (st["valid"] or st["failure_class"] in (None, _doc.SELF_TEST_UNAVAILABLE)) \
                 and rendered.get("receipts_key", {}).get("status") != "KEY_UNUSABLE":
             import pathlib as _pl
-            import shlex as _shlex
             default = _pl.Path.cwd() / ".mcp.json"
             if sources:
                 named = sources[0][1]
-                print(f"  {DIM}{named} lists no MCP servers, so nothing in it is "
+                print(f"  {DIM}{_where(named)} lists no MCP servers, so nothing in it is "
                       f"wrapped. Add a server to it, then run: sunglasses install "
-                      f"<name> --config {_shlex.quote(str(named))}{RESET}")
+                      f"<name> --config {_where(named)}{RESET}")
             elif default.is_symlink():
                 # `install` refuses to write through a link (C498): a bare `install` here
                 # exits 2, so the step names the file behind the link with --config.
@@ -4592,14 +4599,14 @@ def cmd_doctor(args, _run=None):
                     behind = default.resolve()
                 except (OSError, RuntimeError):     # a loop: name the link's own text
                     behind = _pl.Path(os.readlink(default))
-                quoted = _shlex.quote(str(behind))
+                quoted = _where(behind)
                 if behind.exists():
-                    print(f"  {DIM}./.mcp.json is a link to {behind}. install does not "
-                          f"write through a link: add a server to {behind}, then run: "
+                    print(f"  {DIM}./.mcp.json is a link to {quoted}. install does not "
+                          f"write through a link: add a server to {quoted}, then run: "
                           f"sunglasses install <name> --config {quoted}{RESET}")
                 else:
-                    print(f"  {DIM}./.mcp.json is a link to {behind}, which does not exist. "
-                          f"install does not write through a link: create {behind} with a "
+                    print(f"  {DIM}./.mcp.json is a link to {quoted}, which does not exist. "
+                          f"install does not write through a link: create {quoted} with a "
                           f"server in it, then run: sunglasses install <name> "
                           f"--config {quoted}{RESET}")
             else:

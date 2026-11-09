@@ -7,7 +7,7 @@ or key diagnostic writes such a path: shell-quoted when nothing is hidden in it,
 between $'...' as byte escapes that bash (3.2 included) and zsh read back as the same bytes,
 so the line stays one line and two different names never print the same. Several paths in
 one message are each written this way and the message adds `ESCAPED_NOTE` once if any was
-escaped. `printable` is for text that is not a path.
+escaped. `printable` is for text that is not a path, and `shown_name` is for a name.
 
 The producers that use it: the five key messages in `optin`, `_fs.Unlistable` (so a key or
 hook-chain directory that cannot be listed names itself the same way in the proxy, the
@@ -50,6 +50,36 @@ def printable(text):
     different names from printing the same). Output holds no terminal control character, and
     running it again changes nothing."""
     return "".join(_escape(c) if _hidden(c) else c for c in str(text))
+
+
+def name_is_escaped(text):
+    """True when `shown_name` writes `text` between single quotes (see there)."""
+    text = str(text)
+    return text.startswith("'") or any(not (c.isprintable() or c == " ") for c in text)
+
+
+def shown_name(text):
+    """`text` as one line a person may read: a name somebody else chose (a tool, a server entry, a file).
+
+    A name with nothing in it that `str.isprintable()` refuses comes back as it is, a backslash
+    included (a Windows path is a name too). Any other name comes back between single quotes, the way
+    Python writes a string: every refused character as an escape of fixed width (`\\xNN`, `\\uNNNN`,
+    `\\UNNNNNNNN`; the space stays), a backslash and a quote each with a backslash in front. No shell
+    evaluates that form (it is not `$'...'`), so a person who copies the line into a terminal gets the
+    same text back, never the raw character. The line holds no terminal control character, and a name
+    that spells an escape out in plain text never prints the same as the name that holds the character:
+    the first is shown as it is, the second between quotes. A plain name that itself begins with a quote
+    is written between quotes too, so the two never meet. Not for a path where a shell may read it back
+    (that is `shown_path`) and not for a sentence that already holds escapes (that is `printable`)."""
+    text = str(text)
+    if not name_is_escaped(text):
+        return text
+    return "'" + "".join(
+        "\\\\" if ch == "\\" else "\\'" if ch == "'" else
+        ch if (ch.isprintable() or ch == " ") else (
+            f"\\x{ord(ch):02x}" if ord(ch) < 0x100 else
+            f"\\u{ord(ch):04x}" if ord(ch) < 0x10000 else f"\\U{ord(ch):08x}")
+        for ch in text) + "'"
 
 
 def shown_path(path):

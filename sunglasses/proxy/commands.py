@@ -216,12 +216,14 @@ def _shown_text(value):
     and must not be left thinking an odd line is the whole name. The approval itself still
     binds the descriptor digest, which never goes through here.
     """
+    from ..receipts._shown import name_is_escaped
     from .agent_discovery import _safe
     text = value if isinstance(value, str) else ""
     shown = _safe(text)
     if shown == text:
         return shown
-    return shown + (" [escaped]" if not text.isprintable() else " [shortened]")
+    # Escaped when the name was written between quotes; otherwise the only change was the length cap.
+    return shown + (" [escaped]" if name_is_escaped(text) else " [shortened]")
 
 
 def _state_fault(stderr, failure, root):

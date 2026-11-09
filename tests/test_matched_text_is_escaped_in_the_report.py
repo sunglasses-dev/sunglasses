@@ -92,7 +92,8 @@ def test_a_backslash_in_the_quoted_match_is_doubled(capsys):
 
 
 def test_the_escape_form_is_the_one_used_for_file_names():
-    assert cli._printable("a\x07b") == "a\\x07b"
+    assert cli._printable("a\x07b") == "'a\\x07b'"          # a name that needs an escape is written between single quotes
+    assert cli._printable("a\\x07b") == "a\\x07b"             # the name that spells it out is shown as it is
 
 
 def test_a_control_byte_and_its_literal_escape_spelling_read_differently():
