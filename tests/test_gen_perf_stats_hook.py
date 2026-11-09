@@ -7,6 +7,7 @@ that the committed stats file carries the block. They assert shape, never a dura
 """
 import importlib.util
 import json
+import os
 import pathlib
 import shlex
 import sys
@@ -87,9 +88,11 @@ def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
     the argv that ran, never a literal.
     """
     seen = []
+    lane_marker = []  # per call: does the HOME the child would get hold the warn-lane marker?
 
     def fake_process_ms(argv, env, stdin, repeats):
         seen.append((list(argv), stdin))
+        lane_marker.append(os.path.exists(os.path.join(env["HOME"], "warn-lane")))
         return 1.0, 2.0
 
     monkeypatch.setattr(gen, "_process_ms", fake_process_ms)
@@ -99,3 +102,6 @@ def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
     assert seen[0][1] is not None and seen[0][1] == seen[1][1]  # the same benign Bash call in both lanes
     assert block["command"] == "python " + " ".join(installed[1:])
     assert block["command"] == f"python -m {HOOK_MARKER}"
+    # lane off is timed in a HOME without the marker, lane on in a HOME with it: two lanes timed
+    # in the same HOME would measure one thing twice (the interpreter-floor call is lane-less).
+    assert lane_marker[:2] == [False, True]
