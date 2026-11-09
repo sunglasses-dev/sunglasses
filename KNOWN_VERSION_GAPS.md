@@ -468,8 +468,9 @@ Nov 9 2026 on 0.6.20. `scan --dir` skips node_modules, so this reaches a user wh
 vendored tree. GLS-CI-007 quarantines our own action.yml the same way. Present since v0.2.4; not a regression.
 Fix: design round C1065, target 0.6.22.
 
-GLS-TS-251, GLS-GHSA-PI-202 and GLS-APIP-005 blocked 4 of 113 real files on comment or description text (3 workflow
-and issue-template files, 1 Dockerfile) in the Nov 9 2026 measure on 0.6.20. Fix card C1069.
+GLS-TS-251, GLS-GHSA-PI-202 and GLS-APIP-005 block real workflow, issue-template and Dockerfile files on comment,
+URL or glob text: 20 of 298 distinct files found on one Mac (copies of our own repos and installed npm packages
+included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in this report. Fix card C1069.
 
 ## Documented bound — the proxy keeps per-request-id records for the whole session
 
