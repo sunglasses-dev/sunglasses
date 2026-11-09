@@ -273,3 +273,29 @@ def test_the_public_page_names_no_internal_session(tmp_path, monkeypatch):
                             tmp_path / "attempts.jsonl").read_text()
     visible = re.sub(r"<script.*?</script>", "", page, flags=re.S)
     assert not re.findall(r"\bT(?:8|9|10|11)\b", visible)
+
+
+def test_the_cli_refuses_without_an_attempts_path_and_writes_nothing(honest, tmp_path):
+    # The history must outlive a run, so it has no default inside the checkout:
+    # a default there dirtied the tree on every nightly (and a temp default
+    # would lose the history between runs and break "never older over newer").
+    landing = tmp_path / "landing"
+    landing.mkdir()
+    report = _dump(tmp_path, "r.json", _at(honest, "2026-09-23T03:30:00+00:00"))
+    evidence = HERE.parents[1] / "boundary" / "evidence"
+    before = sorted(p.name for p in evidence.iterdir())
+    done = subprocess.run(
+        [sys.executable, str(HERE.parent / "write_page.py"), "--report", str(report),
+         "--landing", str(landing)],
+        capture_output=True, text=True)
+    assert done.returncode == 2, done.stderr
+    assert "--attempts" in done.stderr
+    assert not (landing / "gauntlet.html").exists(), "a refused run writes no page"
+    assert sorted(p.name for p in evidence.iterdir()) == before, "nothing left in the tree"
+
+
+def test_no_default_attempts_path_exists_inside_the_checkout():
+    import inspect
+    assert not hasattr(write_page, "ATTEMPTS_PATH")
+    for fn in (write_page.write, write_page.expired):
+        assert inspect.signature(fn).parameters["attempts"].default is inspect.Parameter.empty

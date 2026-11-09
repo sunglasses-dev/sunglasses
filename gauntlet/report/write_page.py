@@ -40,7 +40,6 @@ import render                                              # noqa: E402
 
 EVIDENCE = pathlib.Path(__file__).resolve().parents[1] / "boundary" / "evidence"
 REPORT_PATH = EVIDENCE / "nightly.json"
-ATTEMPTS_PATH = EVIDENCE / "attempts.jsonl"
 PAGE_NAME = "gauntlet.html"
 
 
@@ -49,7 +48,7 @@ class WriterRefused(Exception):
 
 
 def write(report_path: pathlib.Path, landing: pathlib.Path,
-          attempts: pathlib.Path = ATTEMPTS_PATH) -> pathlib.Path:
+          attempts: pathlib.Path) -> pathlib.Path:
     """The written page's path. Raises instead of writing a page it cannot stand behind."""
     landing = pathlib.Path(landing)
     if not landing.is_dir():
@@ -72,7 +71,7 @@ def write(report_path: pathlib.Path, landing: pathlib.Path,
     return target
 
 
-def expired(attempts: pathlib.Path = ATTEMPTS_PATH,
+def expired(attempts: pathlib.Path,
             now: datetime.datetime | None = None) -> bool:
     """Is what is up older than its own policy? Read from the history, not memory.
 
@@ -98,7 +97,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--report", type=pathlib.Path, default=REPORT_PATH)
     parser.add_argument("--landing", type=pathlib.Path, required=True,
                         help="a landing checkout; gauntlet.html is written at its root")
-    parser.add_argument("--attempts", type=pathlib.Path, default=ATTEMPTS_PATH)
+    parser.add_argument("--attempts", type=pathlib.Path, required=True,
+                        help="the persisted attempt history (JSON lines). Required, with no "
+                             "default: it must survive between runs, so it lives outside the "
+                             "checkout, and a default inside the tree dirtied it")
     args = parser.parse_args(argv)
     try:
         target = write(args.report, args.landing, args.attempts)
