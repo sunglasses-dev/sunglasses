@@ -430,8 +430,9 @@ where every other entry grows in step with the input: `GLS-AW-001`, `GLS-SC-018`
 that already carries their required words.
 
 This is the same family as the long-token entry above and carries the same
-consequence: the firewall hook has a fixed timeout, and a timed-out hook does not
-block the call. We have not published timings, for the same reason as before.
+consequence: the firewall hook has a fixed 10-second timeout; since v0.6.6 its pattern lane
+stops itself at 7 seconds and answers ask, naming the call as not pattern-checked.
+We have not published timings, for the same reason as before.
 
 Status after 0.6.8: four of the five are repaired. `GLS-AW-001` was repaired in
 0.6.8. `GLS-SC-018`, `GLS-CF-251` and `GLS-AW-713` are repaired in the release
