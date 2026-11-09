@@ -335,6 +335,26 @@ jobs:
             echo "TRIPWIRE GATE INVALID: a skip/error/failure is present"; exit 1; fi
           exit "$CODE"
 
+      # The receipts library's own tests live inside the package
+      # (sunglasses/receipts/tests), which pytest.ini's testpaths does not name,
+      # so no bare `pytest` ever collected them. Five of the seven files stopped
+      # importing on 2026-10-21 and nothing noticed. Named here as a blocking step
+      # in both lanes so the fast lane still mirrors the matrix step for step.
+      # At least one test must pass and nothing may skip, error, fail or be
+      # deselected; a count is not pinned, so adding a test needs no edit here.
+      # tests/test_ci_gate.py fails if a test_*.py under sunglasses/ is outside
+      # every path the gate runs.
+      - name: Receipts library tests (sunglasses/receipts/tests), zero skips
+        run: |
+          pytest -q -p no:cacheprovider sunglasses/receipts/tests \
+            | tee /tmp/receipts_lib.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^[0-9]+ passed" /tmp/receipts_lib.log || {
+            echo "RECEIPTS GATE INVALID: no passing test was reported"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed|deselected)" /tmp/receipts_lib.log; then
+            echo "RECEIPTS GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
+
       # The fast suite: everything except the two v0.5.6 acceptance modules
       # (tests/test_v056_matrix.py — the media matrix, 398 cases — and
       # tests/test_repair_v056.py — 114 cases spanning media, consent, CLI output
@@ -580,6 +600,26 @@ jobs:
             echo "TRIPWIRE GATE INVALID: expected exactly '3 passed'"; exit 1; }
           if grep -qE "[0-9]+ (skipped|error|failed|deselected)" /tmp/boundary_tripwire.log; then
             echo "TRIPWIRE GATE INVALID: a skip/error/failure is present"; exit 1; fi
+          exit "$CODE"
+
+      # The receipts library's own tests live inside the package
+      # (sunglasses/receipts/tests), which pytest.ini's testpaths does not name,
+      # so no bare `pytest` ever collected them. Five of the seven files stopped
+      # importing on 2026-10-21 and nothing noticed. Named here as a blocking step
+      # in both lanes so the fast lane still mirrors the matrix step for step.
+      # At least one test must pass and nothing may skip, error, fail or be
+      # deselected; a count is not pinned, so adding a test needs no edit here.
+      # tests/test_ci_gate.py fails if a test_*.py under sunglasses/ is outside
+      # every path the gate runs.
+      - name: Receipts library tests (sunglasses/receipts/tests), zero skips
+        run: |
+          pytest -q -p no:cacheprovider sunglasses/receipts/tests \
+            | tee /tmp/receipts_lib.log
+          CODE=${PIPESTATUS[0]}
+          grep -qE "^[0-9]+ passed" /tmp/receipts_lib.log || {
+            echo "RECEIPTS GATE INVALID: no passing test was reported"; exit 1; }
+          if grep -qE "[0-9]+ (skipped|error|failed|deselected)" /tmp/receipts_lib.log; then
+            echo "RECEIPTS GATE INVALID: a skip/error/failure is present"; exit 1; fi
           exit "$CODE"
 
       # Full suite added 2026-07-10 (Strange audit): the 4 targeted gates above
