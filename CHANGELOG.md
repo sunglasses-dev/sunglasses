@@ -5,6 +5,14 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The source package (sdist) on PyPI no longer carries the test suite. Setuptools had been adding the
+  `tests/test*.py` files by default, but 42 of those 313 files cannot be collected from an unpacked sdist
+  because they read fixtures, tools and helper modules that live only in the git tree, so what shipped
+  looked like a runnable suite and was not. Run the tests from a git checkout. The wheel (what
+  `pip install sunglasses` installs) is unchanged.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed
