@@ -93,9 +93,13 @@ def _git_head(repo: pathlib.Path) -> str | None:
 # one 25 times: clocks (at, mono, elapsed_ms, waited_ms), process and run identity (pid,
 # run_id), the run root inside argv, and the child's own stdout and stderr text. None of
 # these is a fact about the scenario, and all of them change every hash.
+# The two wire byte counts are in the list because the reply they count carries `elapsed_ms`,
+# whose printed width moves from run to run (a dropped trailing zero is one byte): the count
+# is the length of text that is itself volatile, so a hash over it flips on an identical run.
 VOLATILE_KEYS = frozenset({"at", "mono", "run_id", "pid", "elapsed_ms", "waited_ms", "stdout",
                            "stderr", "stdout_bytes", "upstream_argv", "scanner_argv",
-                           "upstream_argv_sha256", "scanner_argv_sha256"})
+                           "upstream_argv_sha256", "scanner_argv_sha256",
+                           "client_wire_bytes", "upstream_wire_bytes"})
 
 
 def normalise(value):
