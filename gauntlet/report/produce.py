@@ -27,6 +27,7 @@ and absent renders as `unavailable`, never as zero.
 """
 from __future__ import annotations
 
+import argparse
 import datetime
 import hashlib
 import json
@@ -391,9 +392,15 @@ def ledger_panel_of(ledger: dict | None, ledger_digest: str | None, run_doc: dic
     return panel
 
 
-def build(run_id: str | None = None) -> tuple[dict, int]:
-    """The report and the exit code. Always both, even when it refuses."""
+def build(run_id: str | None = None,
+          execution_run: pathlib.Path | None = None) -> tuple[dict, int]:
+    """The report and the exit code. Always both, even when it refuses.
+
+    `execution_run` names the driver's run document. Left out, it is `EXECUTION_RUN` beside this
+    file, read when the call is made so a test that patches the name still works.
+    """
     started = _now()
+    execution_run = pathlib.Path(execution_run) if execution_run is not None else EXECUTION_RUN
     run_id = run_id or uuid.uuid4().hex[:16]
 
     capmap_error = None
@@ -412,7 +419,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
 
     # The driver's records, imported like the examiner's. A document that does not bind to
     # tonight's corpus, code and freshness window is set aside with its reason, never counted.
-    run_file, _ = _load_optional(EXECUTION_RUN)
+    run_file, _ = _load_optional(execution_run)
     run_doc, run_set_aside = usable_run(run_file, corpus_digest, started)
     if run_doc is not None and capmap is None:
         run_doc, run_set_aside = None, ("the capability map is unusable, so no coverage panel "
@@ -420,7 +427,7 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     # A run file that cannot be read as records is not a stale run, it is a broken instrument.
     # It refuses (exit 3) and still writes the report, rather than raising and writing nothing.
     run_unreadable = None
-    if run_file is None and EXECUTION_RUN.is_file():
+    if run_file is None and execution_run.is_file():
         run_unreadable = "the execution run file is not valid JSON"
     elif isinstance(run_file, dict) and isinstance(run_file.get("records"), list):
         run_unreadable = malformed_record(run_file["records"]) or (
@@ -546,11 +553,21 @@ def build(run_id: str | None = None) -> tuple[dict, int]:
     return report, report["run"]["exit_code"]
 
 
-def main() -> int:
-    report, code = build()
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
-    print(f"wrote {REPORT_PATH} outcome={report['run']['outcome']} exit={code}")
+def main(argv: list[str] | None = None) -> int:
+    """`--run` and `--out` let the report be built from a run document anywhere and written
+    anywhere, so a scheduled run in a clean checkout leaves that checkout clean. With neither,
+    the paths are the ones this file has always used."""
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0] if __doc__ else None)
+    ap.add_argument("--run", type=pathlib.Path, default=None,
+                    help="the driver's run document (default: execution_run.json beside this file)")
+    ap.add_argument("--out", type=pathlib.Path, default=None,
+                    help="where to write the report (default: the tracked evidence/nightly.json)")
+    ns = ap.parse_args(argv)
+    out = ns.out if ns.out is not None else REPORT_PATH
+    report, code = build(execution_run=ns.run)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
+    print(f"wrote {out} outcome={report['run']['outcome']} exit={code}")
     return code
 
 
