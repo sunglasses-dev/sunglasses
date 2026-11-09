@@ -59,7 +59,7 @@ HOOK_TEMPLATE = """\
   off, measured on @@VERSION@@, @@DATE@@ (ledger entry). Enable with
 About @@LANE_OFF_MS@@ ms per tool call with the pattern lane off (the default) and about
 @@LANE_ON_MS@@ ms with it on (the installed hook command, whole process, min of @@REPEATS@@ runs,
-a benign Bash call, measured on @@VERSION@@, @@DATE@@, @@MACHINE_CLASS@@; bare Python
+a benign Bash call, measured on @@VERSION@@, @@DATE@@, on @@MACHINE_CLASS@@; bare Python
 startup is @@PY_START_MS@@ ms of that). Zero network calls (nothing about your work leaves the
 """
 HOOK_EXPECTED = """\
@@ -69,7 +69,7 @@ HOOK_EXPECTED = """\
   off, measured on 0.6.20, 2026-11-09 (ledger entry). Enable with
 About 32 ms per tool call with the pattern lane off (the default) and about
 100 ms with it on (the installed hook command, whole process, min of 15 runs,
-a benign Bash call, measured on 0.6.20, 2026-11-09, arm64, Darwin 27.0.0; bare Python
+a benign Bash call, measured on 0.6.20, 2026-11-09, on an Apple silicon Mac (arm64, macOS); bare Python
 startup is 23 ms of that). Zero network calls (nothing about your work leaves the
 """
 TEMPLATE = SCAN_TEMPLATE + HOOK_TEMPLATE
@@ -230,3 +230,36 @@ def test_cli_fills_a_copy_refuses_without_writing_and_check_flags_a_left_slot(tm
     bad.write_text(json.dumps(old), encoding="utf-8")
     assert fill_slots.main(["--readme", str(readme), "--stats", str(bad)]) == 1
     assert readme.read_text(encoding="utf-8") == TEMPLATE
+
+
+def test_machine_class_maps_apple_silicon_to_a_phrase_and_prints_any_other_pair_raw():
+    apple = fill_slots.fill(TEMPLATE, STATS)
+    assert "on an Apple silicon Mac (arm64, macOS); bare Python" in apple
+    assert "27.0.0" not in apple  # the kernel build is not a macOS version and stays in the stats file
+    for machine, system, phrase in (
+        ("x86_64", "Darwin 23.1.0", "on x86_64, Darwin 23.1.0; bare Python"),
+        ("arm64", "Linux 6.8.0", "on arm64, Linux 6.8.0; bare Python"),
+        ("aarch64", "Darwin 27.0.0", "on aarch64, Darwin 27.0.0; bare Python"),
+        ("AMD64", "Windows 11", "on AMD64, Windows 11; bare Python"),
+    ):
+        stats = _with(STATS, ("hook_speed", "measured_on"), {"machine": machine, "system": system})
+        out = fill_slots.fill(TEMPLATE, stats)
+        assert phrase in out, (machine, system)
+        assert "Apple silicon" not in out
+
+
+def test_python_start_comes_from_the_same_hook_block_as_the_lane_figures_and_is_never_typed():
+    slots = fill_slots.SLOTS
+    # lane-off, lane-on and python-start are three keys of ONE hook_speed block, written by one generator run
+    assert {slots[s][0][0] for s in ("@@LANE_OFF_MS@@", "@@LANE_ON_MS@@", "@@PY_START_MS@@")} == {"hook_speed"}
+    assert slots["@@PY_START_MS@@"][0] == ("hook_speed", "python_start_min_ms")
+    assert slots["@@LANE_OFF_MS@@"][0] == ("hook_speed", "hook_lane_off_min_ms")
+    # a different start figure changes only that slot's text
+    other = _with(STATS, ("hook_speed", "python_start_min_ms"), 19.2)
+    assert "startup is 19 ms of that" in fill_slots.fill(TEMPLATE, other)
+    # the README never carries a typed figure there: a slot before the cut, the stats value after it
+    if _slots_in(README):
+        assert not re.search(r"startup is\s+\d", README)  # no typed figure before the cut
+    else:
+        py = FILE_STATS["hook_speed"]["python_start_min_ms"]
+        assert f"startup is {py:.0f} ms of that" in README  # after the cut: the stats value

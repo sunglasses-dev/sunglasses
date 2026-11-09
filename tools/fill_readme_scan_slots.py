@@ -43,7 +43,14 @@ def _date(v):
 
 
 def _machine(v):
-    return f"{v['machine'].strip()}, {v['system'].strip()}"
+    """Apple silicon on macOS reads as a plain phrase; any other pair prints the raw machine and system.
+
+    The kernel build ("Darwin 27.0.0") is not a macOS version and stays in stats/current.json only.
+    """
+    machine, system = v["machine"].strip(), v["system"].strip()
+    if machine == "arm64" and system.split()[0] == "Darwin":
+        return "an Apple silicon Mac (arm64, macOS)"
+    return f"{machine}, {system}"
 
 
 SLOTS = {

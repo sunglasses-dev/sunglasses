@@ -1075,7 +1075,7 @@ private key files are named individually and matching is boundary-aware, so
 
 About @@LANE_OFF_MS@@ ms per tool call with the pattern lane off (the default) and about
 @@LANE_ON_MS@@ ms with it on (the installed hook command, whole process, min of @@REPEATS@@ runs,
-a benign Bash call, measured on @@VERSION@@, @@DATE@@, @@MACHINE_CLASS@@; bare Python
+a benign Bash call, measured on @@VERSION@@, @@DATE@@, on @@MACHINE_CLASS@@; bare Python
 startup is @@PY_START_MS@@ ms of that). Zero network calls (nothing about your work leaves the
 machine). An invocation appends two lines when both writes succeed, one when the check
 starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
