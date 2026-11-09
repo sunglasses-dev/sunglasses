@@ -4540,7 +4540,7 @@ PATTERNS = [
         "description": "Detects malicious instructions embedded in MCP tool manifests/descriptions that attempt to override policy, coerce secret disclosure, or trigger unauthorized tool chains.",
     },
 
-    # --- GLS-GHSA-PI-202: GHSA-grounded prompt-driven tool abuse ---
+    # --- GLS-GHSA-PI-202: prompt-driven tool abuse ---
     {
         "id": "GLS-GHSA-PI-202",
         "name": "GHSA agent injection and tool abuse",
@@ -4562,7 +4562,7 @@ PATTERNS = [
         "regex": [
             r'(?is)(ignore\s+(?:previous|prior)\s+instructions|approved\s+already|consent\s+cached|run\s+(?:shell|bash|aws\s+cli)(?! command\? \(y\)es/\(n\)o\b)|execute\s+this\s+command|printenv\b|curl\s+https?://[^\s]*(?:\$|env|secret|token|key|cred|\.aws|\.ssh)|env\s*\|\s*(?:curl|nc|bash)|(?:send|post|exfiltrat\w*|leak|forward|email|upload|reveal|disclose|dump|transmit)\b[^.\n]{0,40}\b(?:api[_ -]?key|access[_ -]?token|token|secret|credential|password))',
         ],
-        "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems — grounded in GitHub Security Advisories.",
+        "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems.",
     },
 
     # --- GLS-I18N-LR-203: Low-resource language jailbreaks ---
