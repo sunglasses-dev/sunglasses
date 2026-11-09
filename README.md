@@ -694,7 +694,7 @@ A deep scan of audio or video downloads the Whisper speech model (about 145 MB f
 
 SUNGLASSES auto-detects file types. If you try to scan audio/video without `--deep`, it tells you what to do instead of crashing.
 
-**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost is roughly linear in input length (~50 µs/byte), but **not on every input shape**: the matcher is quadratic on a single unbroken token, so a long token can cost far more than its length suggests (measured curve and consequences in [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md)). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes, a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
+**Input size cap.** `engine.scan()` reads at most **1 MB** by default. On ordinary prose scan cost grows with input length, and some input shapes cost more than their length suggests (see [KNOWN_VERSION_GAPS.md](KNOWN_VERSION_GAPS.md), gap 4). Even at the linear rate, an uncapped filter handed a 10 MB page stalls an agent for minutes, a denial of service an attacker triggers with a large *benign* document. A scan that hit the cap says so: `result.truncated` is `True` and `result.bytes_scanned` reports what was actually read, in the human output and in `--json`. Change it with `SunglassesEngine(max_scan_bytes=N)`, or pass `0` to disable it.
 
 **Exit codes.** `0` = read the whole input and found nothing that fails the scan (with `--fail-on` or `--baseline`, findings below the level or listed in the baseline are still reported). `1` = threat found (with `--fail-on` or `--baseline`, a finding below the level or listed in the baseline does not exit `1`; see above). `3` = part of the input could not be read (a PDF text layer without `sunglasses[media]`, say) and nothing was found in the rest. `3` exists because `0` is a claim: "I read it and it is clean" and "I could not open it and saw nothing" must not be the same signal to a CI job.
 
@@ -713,7 +713,7 @@ print(result.is_clean)     # False — v0.5.6: this now means "no findings AND f
                            # To keep the pre-0.5.6 "no findings" test, use
                            # `not result.threat_found` — note the inversion:
                            # `result.threat_found` alone is the OPPOSITE condition.
-print(result.latency_ms)   # ~0.7ms on a short input; scales with length
+print(result.latency_ms)   # milliseconds; grows with input length
 ```
 
 ### Connect the MCP server
@@ -1001,8 +1001,8 @@ private key files are named individually and matching is boundary-aware, so
   lives in CPython itself (issue 109631). If you turn the WARN lane
   on, use Python 3.11.6, 3.12.1 or newer. macOS ships 3.9 as /usr/bin/python3.
 - **Large content passed as tool input can use up the WARN lane clock on any
-  Python.** On content of about 200 KB and up (a big file written in one call or
-  a large pasted payload) the 7 seconds add up over hundreds of pattern checks
+  Python.** On a long document of tens of kilobytes (a big file written in one call or
+  a large pasted payload) the 7 seconds can add up over hundreds of pattern checks
   plus building the pattern database on the first call, with no single slow
   pattern to blame. When the clock runs out the lane stops and asks you, and
   that call reaches you without a completed pattern check. Hard blocks do not
