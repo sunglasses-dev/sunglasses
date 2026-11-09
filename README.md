@@ -314,7 +314,7 @@ Most AI agent attacks don't look like attacks. They hide inside normal-looking c
 SUNGLASSES is a free, open-source input inspection layer. It does not sit invisibly in front of your agent and sanitise everything it reads (nothing does). It gives you three surfaces you invoke deliberately:
 
 - **`sunglasses scan`**, inspect a file, a repo or a string on demand, in CI or at the terminal. Reports what it found *and what it could not read*.
-- **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and a timed-out hook does not block the call (see `KNOWN_VERSION_GAPS.md`).
+- **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best-effort under load: the hook has a 10-second timeout, and since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers ask, naming the call as not pattern-checked (see `KNOWN_VERSION_GAPS.md`).
 - **The MCP server**, exposes scanning to an agent as a tool it can call.
 
 It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note.

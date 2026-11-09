@@ -99,8 +99,8 @@ actually inspected — and silence about a limitation is its own version of that
 ## v0.5.6 — the firewall is best-effort on very long unbroken tokens
 
 **What.** The pattern matcher's cost is roughly linear in input length for
-ordinary whitespace-separated text, and roughly **quadratic** for a single
-unbroken token — a base64 blob, a `data:` URI, a minified bundle line, a long
+ordinary whitespace-separated text, and on the 2026-09-07 head far costlier than its length suggested for a single
+unbroken token (re-measured on v0.6.20, 2026-11-09: worse than linear on some shapes, not quadratic) — a base64 blob, a `data:` URI, a minified bundle line, a long
 hex string or JWT.
 
 The growth is measurable and reproducible; the exact byte counts and timings are
@@ -117,13 +117,12 @@ a bypass of the enforcement surface rather than a performance complaint. The
 same curve stalls a repo scan in CI.
 
 **What the input cap does and does not do.** `MAX_SCAN_BYTES` is 1 MB. It bounds
-the LENGTH of the input; it does not bound the cost, because the cost is
-quadratic *in* that length for this input shape.
+the LENGTH of the input; it does not bound the cost, because the cost can grow faster than that length for some input shapes.
 
 **Why no test caught it.** `tests/test_input_cap.py::test_truncation_bounds_the_cost`
 exists to prove exactly this, and builds its payload as `"a " * n` — the
 whitespace-separated shape, which is the fast one. The gate has been green
-throughout while the quadratic shape was unbounded underneath it.
+throughout while the slow shape was unbounded underneath it.
 
 **Status.** Not fixed in v0.5.6, and PARTLY reduced since. v0.5.6 is a scoped
 trust repair and the fix belongs in the matcher; landing it unreviewed at the end
