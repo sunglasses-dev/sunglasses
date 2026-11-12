@@ -30,6 +30,13 @@ All notable changes to Sunglasses are documented here.
   critical, and a clean tree still reports `none`. `severity_breakdown`, the per file rows and the output of
   `--file` are unchanged.
 
+- `python -m sunglasses.mcp` now answers `initialize` with the protocol version the client offered
+  when it is 2024-11-05, 2025-06-18 or 2025-11-25, as the MCP lifecycle rule asks. It used to
+  answer 2024-11-05 to every client. An offer outside those three, or one that is missing or not
+  a string, is answered with 2025-11-25. 2025-03-26 is not in the list, because that revision
+  requires accepting `JSON-RPC` batches, which this server does not do.
+  `tests/test_mcp_initialize_version_negotiation.py` pins it.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed

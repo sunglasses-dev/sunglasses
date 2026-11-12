@@ -32,7 +32,11 @@ from sunglasses.extractors.dispatch import UnreadableFile
 JSONRPC = "2.0"
 SERVER_NAME = "sunglasses"
 SERVER_VERSION = __version__
-PROTOCOL_VERSION = "2024-11-05"
+# The protocol versions this server answers `initialize` with. A closed list, matched
+# by exact membership. 2025-03-26 is left out on purpose: that revision requires
+# implementations to accept JSON-RPC batches, and this server reads one object per line.
+SUPPORTED_PROTOCOL_VERSIONS = ("2024-11-05", "2025-06-18", "2025-11-25")
+PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[-1]  # the latest, the answer for any offer we do not support
 
 
 def _make_response(id, result):
@@ -50,10 +54,24 @@ def _make_notification(method, params=None):
     return msg
 
 
+def _negotiated_version(params):
+    """The version to answer with: the client's offer if we support it, else our latest.
+
+    MCP lifecycle, version negotiation: a server that supports the requested version
+    responds with the same one, otherwise with another version it supports, which
+    should be its latest. An offer that is missing, is not a string, or names a
+    version outside the list gets the latest.
+    """
+    offered = params.get("protocolVersion") if isinstance(params, dict) else None
+    if isinstance(offered, str) and offered in SUPPORTED_PROTOCOL_VERSIONS:
+        return offered
+    return PROTOCOL_VERSION
+
+
 def handle_initialize(params):
     """Handle initialize request — return server capabilities."""
     return {
-        "protocolVersion": PROTOCOL_VERSION,
+        "protocolVersion": _negotiated_version(params),
         "capabilities": {
             "tools": {}
         },
