@@ -10,7 +10,7 @@
     "web_content",
     "tool_output"
   ],
-  "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems \u2014 grounded in GitHub Security Advisories.",
+  "description": "Detects prompts and tool metadata that attempt command injection, untrusted subprocess launch, secret exfiltration, or approval-bypass execution in agent systems.",
   "keywords": [
     "approved already run shell",
     "consent cached skip confirmation",

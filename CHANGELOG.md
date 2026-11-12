@@ -13,6 +13,8 @@ All notable changes to Sunglasses are documented here.
   looked like a runnable suite and was not. Run the tests from a git checkout. The wheel (what
   `pip install sunglasses` installs) is unchanged.
 
+- GLS-GHSA-PI-202: description no longer claims advisory grounding; no cited advisory exists for this rule. Detection unchanged.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed
