@@ -128,9 +128,9 @@ def sync_readme(stats):
         # it was from #147 until this pattern was fixed. It leads with the index count,
         # the number version.json and `sunglasses info` publish, and names the declared
         # count beside it, so the line never reads as a second "keywords" figure.
-        (r'Text scanning: [\d,]+ patterns(?: that carry a matcher \([\d,]+ listed\))?, [\d,]+ indexed keywords '
+        (r'\*\*Text scanning\.\*\* [\d,]+ patterns(?: that carry a matcher \([\d,]+ listed\))?, [\d,]+ indexed keywords '
          r'\([\d,]+ declared\), [\d,]+ (?:attack|listed) categories',
-         f'Text scanning: {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} listed), '
+         f'**Text scanning.** {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} listed), '
          f'{stats["keywords"]:,} indexed keywords '
          f'({stats["keywords_declared"]:,} declared), {stats["categories"]:,} listed categories'),
     ]

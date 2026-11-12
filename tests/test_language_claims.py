@@ -67,7 +67,7 @@ def test_readme_states_the_measured_number_and_only_the_history_says_23():
             assert HISTORICAL in line, (
                 f"README line {line_no} still claims 23 languages as coverage: {line.strip()[:110]}"
             )
-    assert re.search(rf"dedicated non-English patterns in {n} languages", text), \
+    assert re.search(rf"dedicated patterns in {n} languages other than English", text), \
         "the feature bullet must state the measured dedicated-language count"
     assert re.search(rf"{n} languages have exactly two dedicated patterns each", text), \
         "the honest-limits bullet must state the measured dedicated-language count"
@@ -92,15 +92,15 @@ def _readme_check(text):
     for line in text.splitlines():
         if ("23 language" in line or re.search(r"\bin 23\b", line)) and HISTORICAL not in line:
             problems.append(f"claims 23 as coverage: {line.strip()[:80]}")
-    if not re.search(rf"dedicated non-English patterns in {n} languages", text):
+    if not re.search(rf"dedicated patterns in {n} languages other than English", text):
         problems.append("feature bullet lost the measured count")
     return problems
 
 
 def test_control_the_feature_bullet_reverts_to_23():
     text = README.read_text().replace(
-        "dedicated non-English patterns in 13 languages",
-        "dedicated non-English patterns in 23 languages")
+        "dedicated patterns in 13 languages other than English",
+        "dedicated patterns in 23 languages other than English")
     assert _readme_check(text), "reintroducing the 23-language coverage claim must fail the gate"
 
 
@@ -111,7 +111,7 @@ def test_control_a_new_document_line_claims_23():
 
 def test_control_the_historical_sentence_alone_is_not_a_failure():
     text = "\n".join([
-        "dedicated non-English patterns in 13 languages",
+        "dedicated patterns in 13 languages other than English",
         '**SUNGLASSES is English-first.** This section used to say "23 languages", which counted every',
     ])
     assert _readme_check(text) == [], "the correction's own history must remain sayable"
