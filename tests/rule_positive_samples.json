@@ -596,7 +596,7 @@
    "file",
    "web_content"
   ],
-  "text": "A knowledge-honeypot defense reroutes model-extraction queries to low-transferability decoy content, and the agent-facing summary collapses that route \u2014 omitting trap provenance and query-budget state \u2014 so the decoy answer is laundered into ordinary authoritative knowledge."
+  "text": "A knowledge-honeypot defense reroutes model-extraction queries to low-transferability decoy content, and the agent-facing summary collapses that route, omitting trap provenance and query-budget state, so the decoy answer is laundered into ordinary authoritative knowledge."
  },
  "GLS-RPDA-008": {
   "channels": [
