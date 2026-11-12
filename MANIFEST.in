@@ -7,3 +7,7 @@ include sunglasses/receipts/WIRE_SPEC.md sunglasses/receipts/VECTORS.json
 # read the tree, and make_vectors.py fails on import from an installed wheel.
 prune sunglasses/receipts/tests
 exclude sunglasses/receipts/make_vectors.py
+# The test suite is not packaged. From an sdist, 42 of its 313 test files cannot even be
+# collected (they read fixtures, tools and helper modules that live only in the git tree),
+# so shipping a part of it only looks like a runnable suite. Run the tests from a git checkout.
+prune tests
