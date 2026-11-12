@@ -50,7 +50,7 @@ list of every category and pattern.
     "benign": ["The documentation says to ignore previous versions"]
   },
   "references": ["https://owasp.org/www-project-top-10-for-large-language-model-applications/"],
-  "contributed_by": "AZ Rollin",
+  "contributed_by": "Sunglasses Team",
   "date_added": "2026-03-28"
 }
 ```
