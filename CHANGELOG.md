@@ -5,6 +5,20 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.21] — 2026-11-11
+
+### Changed
+
+- The measured figures in the README (the scan-speed table and the sentence under it, the WARN-lane cost bullet
+  and the Cost line) are no longer typed. Each is a named slot in the README on `main`, and
+  `tools/fill_readme_scan_slots.py` writes them from `stats/current.json` at the release cut. It refuses, writing
+  nothing, when a slot or a stats key is missing, when a measurement is not a finite number above zero, or when any
+  slot is left. `tools/gen_perf_stats.py --hook-only --write` now times the command `sunglasses init` writes into the
+  hook entry (lane off and lane on, whole process) and records it as the `hook_speed` block, with the version, the
+  date and the kind of machine it was measured on. The README says the figure and where it came from, and cannot say
+  a number the generator did not measure. Tests pin both tools (`tests/test_fill_readme_scan_slots.py`,
+  `tests/test_gen_perf_stats_hook.py`, `tests/test_readme_hook_claim.py`). (#600, #602)
+
 ### Fixed
 
 - A name or a path that holds a control character is now shown as text, one line, in the
@@ -16,6 +30,38 @@ All notable changes to Sunglasses are documented here.
   codes are unchanged, and the JSON of `doctor --agents --json` is unchanged except for a name
   that holds such a character.
   `tests/test_shown_name_distinct.py` pins it. (#583)
+
+### Documentation
+
+- The README no longer says the optional WARN lane of the Claude Code hook costs about 902 ms per tool
+  call because the pattern database is rebuilt in every hook subprocess. That was the cost up to 0.6.9
+  and stopped being true at 0.6.10, when the precomputed prefilter table (`sunglasses/_prefilter_table.py`)
+  took that work out of every start. Measured on 0.6.21, 2026-11-11, an Apple silicon Mac (arm64, macOS),
+  on the command `sunglasses init` writes into the hook entry (`python -m sunglasses.firewall`), minimum
+  of 15 runs: about 94 ms per tool call with the lane on and about 30 ms with it
+  off. The lane-off figure did not move in any release timed (0.4.0 to 0.6.21). The lane
+  is still off by default. (#602)
+
+- The README, `KNOWN_VERSION_GAPS.md` and `docs/integrations/claude-code.md` now say what a default install does when
+  the hook runs out of time. A hook that times out or cannot start is refused on a default install (`sunglasses init`
+  writes `onFailure: "block"` into the hook entry; Claude Code 2.1.295 and later honours it; `init --fail-open` lets
+  the call through). A crash inside the check still defers to Claude Code's own permission flow with a "not checked"
+  notice. The pages no longer say a timed-out hook fails open, and no longer give a per-byte scan rate or call the
+  cost "quadratic": they say scan cost grows with input length and can grow faster on some input shapes (details:
+  `KNOWN_VERSION_GAPS.md`). The line `sunglasses receipts` prints for an orphaned hook invocation now reads "killed,
+  timed out or crashed" and says what each one means. Documentation, plus that one output string; no rule, engine or
+  hook logic changed. (#597, #598, #599)
+
+- Docstrings and comments in `sunglasses/scanner.py` and `sunglasses/integrations/langchain.py` no longer carry
+  hand-typed speed claims ("<1ms", "<3 seconds"). They say that scan cost grows with input length and point to
+  `stats/current.json`, where the measured figures are regenerated each release.
+  Documentation only: no code path, pattern, channel list or number changed. (#596)
+
+- Comments and docstrings in `sunglasses/cli.py`, `sunglasses/engine.py` and `sunglasses/firewall.py` that quoted
+  a per-call cost now name the `hook_speed` block in `stats/current.json` instead, and where they said a timed-out
+  hook fails open they now say it follows the install's `onFailure` (the same facts as the README bullet above),
+  and two test docstrings say the same.
+  Documentation only: no code path, pattern, channel list or number changed. (#601)
 
 ## [0.6.20] — 2026-11-08
 
