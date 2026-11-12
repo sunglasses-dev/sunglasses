@@ -378,15 +378,23 @@ HANDLERS = {
 NOTIFICATION_METHODS = {"notifications/initialized", "notifications/cancelled"}
 
 
+_EOF = object()
+
+
 def read_message():
-    """Read a JSON-RPC message from stdin (newline-delimited JSON)."""
-    line = sys.stdin.readline()
-    if not line:
-        return None
-    line = line.strip()
-    if not line:
-        return None
-    return json.loads(line)
+    """Read the next JSON value from stdin (newline-delimited JSON).
+
+    Returns `_EOF` when the client closed the stream and nothing else. A blank line
+    is not a message and is skipped; a line that parses to `null` is a message (an
+    invalid one), so neither of them ends the server.
+    """
+    while True:
+        line = sys.stdin.readline()
+        if not line:
+            return _EOF
+        line = line.strip()
+        if line:
+            return json.loads(line)
 
 
 def write_message(msg):
@@ -426,11 +434,21 @@ def main(argv=None):
     sys.stderr.flush()
 
     while True:
+        # Reset for every message: the error reply in the handler below is addressed to
+        # THIS message's id, so it must never see the id of the one before it.
+        msg_id = None
         try:
             msg = read_message()
-            if msg is None:
+            if msg is _EOF:
                 # EOF — client disconnected
                 break
+
+            # JSON-RPC 2.0 section 5.1: a message that is not an object (a batch array,
+            # a number, a string, null) is an Invalid Request, answered once with id null.
+            # MCP dropped batching in its 2025-06-18 revision, so an array is not served.
+            if not isinstance(msg, dict):
+                write_message(_make_error(None, -32600, "Invalid Request"))
+                continue
 
             method = msg.get("method")
             msg_id = msg.get("id")
