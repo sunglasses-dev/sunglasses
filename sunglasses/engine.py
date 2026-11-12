@@ -2272,7 +2272,7 @@ class SunglassesEngine:
                     return None
             return self._match_windowed(rx, text)
         if mode == "windowed":
-            return self._match_windowed(rx, text)
+            return self._match_windowed(rx, text, tail=True)
         if mode == "anchored":
             return self._match_anchored(rx, guards, text, start, memo)
         if mode == "leadin":
@@ -2516,18 +2516,26 @@ class SunglassesEngine:
                 pos = m.start() + 1
         return None
 
-    def _match_windowed(self, rx, text: str):
+    def _match_windowed(self, rx, text: str, tail: bool = False):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
         Short inputs (the normal attack-payload case) are matched whole; long
         documents only fire if the predicate's co-occurring signals appear inside
-        one window. Returns the first re.Match or None."""
+        one window. Returns the first re.Match or None.
+
+        `tail=True` (the windowed mode only, see `_eval_regex`) also tries the aligned
+        starts after the first window that reaches the end of the text, which the loop
+        used to skip: a phrase that starts in the last WINDOW - STRIDE characters of a
+        text a little over one window long sat at no window start and was never read.
+        The guarded mode keeps the old stop, because a rule that carries a length cap
+        in its own pattern (`^(?=.{0,500}$)`) would match a short tail window of a long
+        text and fire where its author meant it not to."""
         if len(text) <= self.COOCCUR_WINDOW:
             return rx.match(text)
         for i in range(0, len(text), self.COOCCUR_STRIDE):
             m = rx.match(text[i : i + self.COOCCUR_WINDOW])
             if m:
                 return m
-            if i + self.COOCCUR_WINDOW >= len(text):
+            if not tail and i + self.COOCCUR_WINDOW >= len(text):
                 break
         return None
 
