@@ -1109,3 +1109,45 @@ def test_control_quick_output_unbound_or_marker_named_elsewhere():
     assert quick_lane_shape(_mutate(m))
     def m2(d): d["jobs"]["fast"]["steps"][-1]["run"] += ' -m "not full_matrix"'
     assert quick_lane_shape(_mutate(m2))
+
+
+# ----------------------------------------------- tests inside the package
+
+def _gated_test_roots():
+    """Every path a test file may live under and still be run by the gate:
+    pytest.ini's testpaths, plus each path argument a workflow `pytest` step
+    names. Text read, because the workflow is what decides what CI runs."""
+    ini = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+    block = ini.split("testpaths =", 1)[1].split("\n\n", 1)[0]
+    roots = {ln.strip() for ln in block.splitlines() if ln.strip() and not ln.lstrip().startswith("#")}
+    for run in _run_lines(_load()["jobs"]["fast"]) + _run_lines(_load()["jobs"]["integrity"]):
+        for tok in shlex.split(run.replace("\\\n", " "), comments=True):
+            tok = tok.split("::", 1)[0]
+            if tok.startswith(("sunglasses/", "tests/", "gauntlet/")) or tok.endswith(".py"):
+                roots.add(tok.rstrip("/"))
+    return roots
+
+
+def test_no_test_file_inside_the_package_is_outside_the_gate():
+    """sunglasses/receipts/tests sat outside testpaths for weeks and five of its
+    seven files could not even be imported (2026-10-21 to 2026-11-09). A test
+    file under sunglasses/ that no workflow step and no testpath reaches is a
+    test nobody runs: fail, and name it."""
+    roots = _gated_test_roots()
+    orphans = []
+    for f in sorted((ROOT / "sunglasses").rglob("test_*.py")):
+        rel = f.relative_to(ROOT).as_posix()
+        if not any(rel == r or rel.startswith(r + "/") for r in roots):
+            orphans.append(rel)
+    assert orphans == [], (
+        "test files under sunglasses/ that no gate path reaches (add their "
+        f"directory to pytest.ini testpaths or to a workflow pytest step): {orphans}")
+
+
+def test_the_orphan_check_would_fire(tmp_path):
+    """The check above is only worth its name if a missing path makes it fail:
+    drop the receipts step's path and the receipts files must read as orphans."""
+    roots = {r for r in _gated_test_roots() if "receipts" not in r}
+    rel = "sunglasses/receipts/tests/test_wire.py"
+    assert (ROOT / rel).exists()
+    assert not any(rel == r or rel.startswith(r + "/") for r in roots)

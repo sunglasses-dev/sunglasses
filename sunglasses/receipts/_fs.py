@@ -19,7 +19,10 @@ import fnmatch
 import os
 import pathlib
 
-from ._shown import ESCAPED_NOTE, shown_path
+try:
+    from ._shown import ESCAPED_NOTE, shown_path
+except ImportError:                    # flat import: chain.py and the tests load this file as a top-level module
+    from _shown import ESCAPED_NOTE, shown_path   # type: ignore[no-redef]
 
 
 class Unlistable(OSError):
