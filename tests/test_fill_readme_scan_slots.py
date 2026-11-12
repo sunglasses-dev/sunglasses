@@ -48,7 +48,7 @@ SCAN_TEMPLATE = """\
 | Scan latency, short input (@@SCAN_SHORT_CHARS@@ chars) | ~@@SCAN_SHORT_MS@@ ms |
 | Scan latency, typical attack string (median of @@SCAN_ATTACK_N@@) | ~@@SCAN_ATTACK_MS@@ ms |
 | Scan latency, real README (median of @@SCAN_DOC_N@@, median size @@SCAN_DOC_BYTES@@ bytes) | ~@@SCAN_DOC_MS@@ ms |
-| Sustained throughput | ~@@SCAN_KBPS@@ KB/sec, single-threaded |
+| Sustained throughput | ~@@SCAN_KBPS@@ KB/sec, single threaded |
 Reproduce with `python3 tools/gen_perf_stats.py`. @@SCAN_PROVENANCE@@ Your hardware will differ.
 """
 # The WARN-lane bullet and the Cost line, copied from the README (a test below keeps them equal).
@@ -83,7 +83,7 @@ def _expected_scan_lines(stats):
         f"(median of {s['attack_corpus_n']}) | ~{s['attack_median_ms']:.1f} ms |",
         f"(median of {s['document_corpus_n']}, median size {s['document_median_bytes']:,} bytes) "
         f"| ~{s['document_median_ms']:.0f} ms |",
-        f"| ~{s['throughput_kb_per_sec']:.0f} KB/sec, single-threaded |",
+        f"| ~{s['throughput_kb_per_sec']:.0f} KB/sec, single threaded |",
         stats["scan_speed_provenance"].strip(),
     ]
 

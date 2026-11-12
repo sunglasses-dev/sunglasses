@@ -29,7 +29,7 @@ def test_get_real_stats_carries_the_generated_language_count():
     assert stats["dedicated_pattern_languages"] == recorded["dedicated_pattern_languages"]
 
 
-TEXT_LINE = "- \u2705 Text scanning: {} patterns that carry a matcher ({} listed), {} indexed keywords ({} declared), {} listed categories (English-first, see [Language coverage](#language-coverage-measured))"
+TEXT_LINE = "- \u2705 **Text scanning.** {} patterns that carry a matcher ({} listed), {} indexed keywords ({} declared), {} listed categories (English first, see [Language coverage](#language-coverage-measured))"
 
 
 def _expected_line(stats):
@@ -56,7 +56,7 @@ def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkey
     sync = _load(ROOT / "scripts" / "sync-stats.py", "sync_stats_under_test_real")
     stats = sync.get_real_stats()
     real = (ROOT / "README.md").read_text()
-    assert sum(1 for l in real.splitlines() if "Text scanning:" in l) == 1
+    assert sum(1 for l in real.splitlines() if "**Text scanning.**" in l) == 1
     assert real.splitlines().count(_expected_line(stats)) == 1, "README line is not current"
     (tmp_path / "README.md").write_text(real)
     monkeypatch.setattr(sync, "REPO_ROOT", tmp_path)
@@ -64,7 +64,7 @@ def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkey
     assert (tmp_path / "README.md").read_text() == real
 
 
-KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the pre-screen "
+KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the prescreen "
                 "index holds {} ({} generic keywords are deliberately excluded from it). "
                 "`engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |")
 

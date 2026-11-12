@@ -268,7 +268,7 @@ def test_readme_describes_the_secret_lane_down_answer():
     assert "~/.sunglasses/on-error" in text
     assert "even when the receipt cannot be written" in text
     assert "when the receipt cannot be written the hook asks" in text
-    assert "Not measured: what the host does with that question in an unattended run, when its permissions are turned off, or when an allow rule already covers the call." in text
+    assert "Not measured. What the host does with that question in an unattended run, when its permissions are turned off, or when an allow rule already covers the call." in text
 
 
 def test_init_help_leaves_the_unattended_host_behaviour_as_not_measured():

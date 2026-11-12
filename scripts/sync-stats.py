@@ -108,10 +108,10 @@ def sync_readme(stats):
         (r'\| Patterns \| [\d,]+(?: carry a matcher \([\d,]+ listed\))? \|',
          f'| Patterns | {stats["patterns"]:,} carry a matcher ({stats["listed_patterns"]:,} listed) |'),
         (r'\| Keywords \| [\d,]+ unique declared \([\d,]+ entries across all patterns\); '
-         r'the pre-screen index holds [\d,]+ \([\d,]+ generic keywords',
+         r'the prescreen index holds [\d,]+ \([\d,]+ generic keywords',
          f'| Keywords | {stats["keywords_declared"]:,} unique declared '
          f'({stats["keyword_entries"]:,} entries across all patterns); '
-         f'the pre-screen index holds {stats["keywords"]:,} ('
+         f'the prescreen index holds {stats["keywords"]:,} ('
          f'{stats["keywords_declared"] - stats["keywords"]:,} generic keywords'),
         (r'\| Attack categories \| [\d,]+(?: listed)? \|', f'| Attack categories | {stats["categories"]:,} listed |'),
         # What Works Today header
@@ -128,9 +128,9 @@ def sync_readme(stats):
         # it was from #147 until this pattern was fixed. It leads with the index count,
         # the number version.json and `sunglasses info` publish, and names the declared
         # count beside it, so the line never reads as a second "keywords" figure.
-        (r'Text scanning: [\d,]+ patterns(?: that carry a matcher \([\d,]+ listed\))?, [\d,]+ indexed keywords '
+        (r'\*\*Text scanning\.\*\* [\d,]+ patterns(?: that carry a matcher \([\d,]+ listed\))?, [\d,]+ indexed keywords '
          r'\([\d,]+ declared\), [\d,]+ (?:attack|listed) categories',
-         f'Text scanning: {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} listed), '
+         f'**Text scanning.** {stats["patterns"]:,} patterns that carry a matcher ({stats["listed_patterns"]:,} listed), '
          f'{stats["keywords"]:,} indexed keywords '
          f'({stats["keywords_declared"]:,} declared), {stats["categories"]:,} listed categories'),
     ]
