@@ -1407,6 +1407,10 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                          + [f"{path}: {reason}" for path, reason in folder_gaps]
                          + [f"{path}: {reason}" for path, reason in partially_read]),
             "findings": summary.get("findings") or [],
+            # The findings live per file, so the normalizer sees an empty list and would
+            # answer "none" beside a block. Hand it the worst severity this scan counted.
+            "severity": next((s for s in ("critical", "high", "medium", "low")
+                              if severity_counts.get(s)), None),
             "channel": "file",
             "event_id": _new_event_id(),
         },
