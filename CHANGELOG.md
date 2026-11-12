@@ -21,6 +21,11 @@ All notable changes to Sunglasses are documented here.
   counts. The upload field list did not name it, so it was dropped before sending and the receiver stored
   nothing for it. A `--file` scan has no such count and is sent without one. Nothing else in the upload changes.
 
+- A blocked directory scan (`sunglasses scan --dir` and `--repo`, with `--json`) reported `severity: none` at the
+  top level beside `decision: block`. It now reports the worst severity it counted, `critical` when any finding is
+  critical, and a clean tree still reports `none`. `severity_breakdown`, the per file rows and the output of
+  `--file` are unchanged.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed
