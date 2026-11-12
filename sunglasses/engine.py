@@ -3727,7 +3727,14 @@ class SunglassesEngine:
         # pipeline, so the text is scanned a second time with each readable run decoded (C1191).
         # The raw scan above is kept whole and the second one only adds to it, so a text that
         # blocks without this step blocks with it. One level: the view is not decoded again.
-        view = utf7_view(text[:self.max_scan_bytes] if self.max_scan_bytes else text)
+        # It is built on the text after the pipeline's own character, entity and percent steps
+        # (`_Walk._unwrapped`, the one call that does them), so a plus or a letter of the run written
+        # as `&#43;`, `%2B`, a fullwidth letter or with an invisible character in it is found too.
+        cut = text[:self.max_scan_bytes] if self.max_scan_bytes else text
+        if not cut.isascii() or "+" in cut or "&" in cut or "%" in cut or "\\" in cut:
+            view = utf7_view(_Walk._unwrapped(cut))
+        else:
+            view = None                      # plain ASCII with no way to write a plus
         if view is None:
             return result
         return self._with_view_result(result, view, channel)

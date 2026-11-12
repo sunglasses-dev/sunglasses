@@ -13,6 +13,7 @@ anchored, greedy match of a single character class, so nothing backtracks. A bou
 that pattern was measured at 73.8 s on 1 MB of `+`, which is why there is none.
 """
 import codecs
+import collections
 import re
 import unicodedata
 
@@ -24,6 +25,9 @@ _BODY = re.compile("[A-Za-z0-9+/]*")
 # One UTF-16 unit needs three base64 letters. A larger minimum is an evasion lever: an attacker
 # splits the payload into short runs, so a minimum of 16 loses "one letter encoded" and "split".
 MIN_BODY = 3
+
+# Bodies shorter than this are decoded strictly (see `utf7_view`).
+STRICT_BELOW = 8
 
 # No cap on spans or decoded length, on purpose. The engine cuts its input at `max_scan_bytes` before
 # the view is built, and a view is never longer than its input. A smaller cap is an evasion lever:
@@ -43,21 +47,55 @@ def _folds_to_ascii(char):
     return hit
 
 
-def accept(decoded):
-    """Whether a decoded run is text worth putting in the view.
+_DROPPED = frozenset(("Cs", "Cn", "Co"))                       # lone surrogate, unassigned, private use: no reading at all
+_NEUTRAL = frozenset(("Cc", "Cf", "Zs", "Zl", "Zp"))           # controls, format characters, spaces: no letters, no objection
 
-    Printable only (a lone surrogate is not printable). Then one of:
-    - every character is ASCII or one the engine folds to ASCII, at any length. English written in
-      UTF-7 decodes to ASCII, and a lone look alike letter (`+BD4-` is Cyrillic o) is exactly how
-      a sentence is split;
-    - at least 8 characters with at least 60 percent letters or space: other scripts, long runs only,
-      so a random base64 looking token is not taken for text.
+
+_KANA_HAN = ("CJK", "HIRAGANA", "KATAKANA")
+
+
+def _script(char):
+    """A coarse script key: the first word of the character name, with Han and kana as one script (Japanese)."""
+    word = unicodedata.name(char, "?").split(" ", 1)[0]
+    return "CJK" if word in _KANA_HAN else word
+
+
+def read_run(decoded):
+    """The text of one decoded run as it goes into the view, or None when the run is not text.
+
+    Judged per character, never the whole run (C1191, T8 and T9 11:45): a newline, a tab, a zero width
+    joiner or a no break space inside a run used to make the whole run "not printable" and hide a full
+    sentence a model still reads. A character with no reading (lone surrogate, unassigned, private use) is
+    dropped, and what is left is kept. Then one of:
+    - every character is ASCII, a control, format or space character, or one the engine folds to ASCII
+      (the look alike map, or NFKC giving ASCII), at any length. English written in UTF-7 decodes to ASCII,
+      and a lone look alike letter (`+BD4-` is Cyrillic o) is exactly how a sentence is split;
+    - at least 8 characters, at least 60 percent of the decode letters, controls or spaces, and at least 80 percent
+      of the non-ASCII ones in one script, and at most 20 percent of the decode dropped: other scripts, long runs only, so a random base64 looking token is not
+      taken for text.
+    Nothing left after the drop is not text.
     """
-    if not decoded or not decoded.isprintable():
-        return False
-    if all(c.isascii() or _folds_to_ascii(c) for c in decoded):
-        return True
-    return len(decoded) >= 8 and sum(1 for c in decoded if c.isalpha() or c == " ") / len(decoded) >= 0.6
+    if not decoded:
+        return None
+    if decoded.isascii():
+        return decoded
+    text = "".join(c for c in decoded if unicodedata.category(c) not in _DROPPED)
+    if not text:
+        return None
+    if all(c.isascii() or unicodedata.category(c) in _NEUTRAL or _folds_to_ascii(c) for c in text):
+        return text
+    # Other scripts, long runs only. Random base64 looking text decodes to units spread over the whole plane
+    # (CJK, Hangul, Yi, private use, unassigned), and most of those are letters, so "mostly letters" alone
+    # cannot tell it from text. Real text in another script stays in one script, so that is required too.
+    # The share of letters is taken over what was DECODED, so characters dropped above count against the run.
+    if len(text) < 8 or len(text) < 0.8 * len(decoded):    # real text has no characters without a reading
+        return None
+    if sum(1 for c in text if c.isalpha() or unicodedata.category(c) in _NEUTRAL) / len(decoded) < 0.6:
+        return None
+    scripts = collections.Counter(_script(c) for c in text if not c.isascii() and unicodedata.category(c) not in _NEUTRAL)
+    if scripts and max(scripts.values()) / sum(scripts.values()) >= 0.8:
+        return text
+    return None
 
 
 def utf7_view(text):
@@ -73,11 +111,18 @@ def utf7_view(text):
         end = _BODY.match(text, i + 1).end()
         stop = end + 1 if end < n and text[end] == "-" else end
         if end - (i + 1) >= MIN_BODY:
+            # A body of 8 letters or more is decoded with errors="ignore": a stray base64 letter at the end of a run is
+            # a "partial character" to the strict decoder, which then refuses the whole run, while a model reads
+            # everything before it (T9 11:46). A shorter body is decoded strictly: measured on 300 commit diffs, an
+            # identifier after a plus (`+ALL_FIRES`) is a 3 to 5 letter body whose leftover bits are not zero, and
+            # with "ignore" 17 of them built a view for no reason. A short run with a stray letter is a known gap.
+            body = text[i + 1:end]
             try:
-                decoded = codecs.decode(("+" + text[i + 1:end] + "-").encode("ascii"), "utf-7")
-            except (UnicodeError, ValueError):
+                decoded = read_run(codecs.decode(("+" + body + "-").encode("ascii"), "utf-7",
+                                                 "ignore" if len(body) >= STRICT_BELOW else "strict"))
+            except UnicodeError:
                 decoded = None
-            if decoded is not None and accept(decoded):
+            if decoded is not None:
                 out.append(text[last:i])
                 out.append(decoded)
                 last = stop

@@ -19,6 +19,12 @@ All notable changes to Sunglasses are documented here.
   (`~3.8ms`), the way the README table does. The generator rounded it to a whole number (`~4ms`), so the two
   disagreed about one measurement. The stored figures are unchanged.
 
+- Text runs encoded as `UTF-7` are now decoded and scanned in addition to the raw text. The raw scan is unchanged,
+  so a result can only get stricter, never looser. Text that holds such runs is scanned a second time and can take
+  up to twice as long. A finding that comes from the decoded text shows the decoded words as its match, and the
+  results of `SunglassesEngine.scan` and `SunglassesScanner.scan_text` mark it with `view` set to `utf7`. No file,
+  CLI, MCP, SARIF or report output carries that mark. (#617)
+
 ### Fixed
 
 - `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan
