@@ -244,12 +244,12 @@ def _without_view_mark(node: Any) -> Any:
     or a file reads. A finding with no mark is passed on as it is."""
     if isinstance(node, dict):
         out = {}
-        for key, value in node.items():
-            if key in ("findings", "threats") and isinstance(value, list):
-                out[key] = [{k: v for k, v in item.items() if k != "view"}
-                            if isinstance(item, dict) and "view" in item else item for item in value]
+        for field, inner in node.items():
+            if field in ("findings", "threats") and isinstance(inner, list):
+                out[field] = [{k: v for k, v in item.items() if k != "view"}
+                              if isinstance(item, dict) and "view" in item else item for item in inner]
             else:
-                out[key] = _without_view_mark(value)
+                out[field] = _without_view_mark(inner)
         return out
     if isinstance(node, list):
         return [_without_view_mark(item) for item in node]
