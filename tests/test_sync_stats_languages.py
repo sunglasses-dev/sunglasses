@@ -64,7 +64,7 @@ def test_sync_readme_text_scanning_line_matches_the_real_readme(tmp_path, monkey
     assert (tmp_path / "README.md").read_text() == real
 
 
-KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the pre-screen "
+KEYWORDS_ROW = ("| Keywords | {} unique declared ({} entries across all patterns); the prescreen "
                 "index holds {} ({} generic keywords are deliberately excluded from it). "
                 "`engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |")
 

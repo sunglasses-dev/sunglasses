@@ -419,7 +419,7 @@ scan, and errors). `0` is a claim, so it is reserved for scans that earned it.
 | `0` | Inspection completed in the supported scope, and nothing matched. Not a statement that the file is safe, only that everything we could read was read, and no pattern fired. |
 | `1` | Threat found. Incompleteness, if any, is still reported alongside it. With `--fail-on` or `--baseline`, only a finding that reaches the level and is not listed in the baseline exits `1`. |
 | `2` | Usage or operational error, **nothing was scanned in the scope this invocation was asked for**. A path that does not exist, a directory, a socket, an unreadable file, an invalid argument, a failed deep scan. For an aggregate (a repository, an email with attachments) a *part* that could not be read is reported as incomplete (`3`) with that part named. `2` is for the case where the whole request failed. |
-| `3` | **Incomplete**: found nothing in the part that could be read. An archive we do not extract, a PDF whose text layer needs `sunglasses[media]`, audio without `--deep`, or input past the size cap. |
+| `3` | **Incomplete.** Found nothing in the part that could be read. An archive we do not extract, a PDF whose text layer needs `sunglasses[media]`, audio without `--deep`, or input past the size cap. |
 
 Precedence is `1 > 3 > 2 > 0`. A threat we did find outranks the part we could
 not read, and both outrank a usage complaint.
@@ -757,18 +757,18 @@ result = scanner.scan_auto("any_file.ext")
 | Scan latency, short input (18 chars) | ~1.5 ms |
 | Scan latency, typical attack string (median of 38) | ~3.8 ms |
 | Scan latency, real README (median of 77, median size 8,246 bytes) | ~134 ms |
-| Sustained throughput | ~54 KB/sec, single-threaded |
+| Sustained throughput | ~54 KB/sec, single threaded |
 | Patterns | 1,513 carry a matcher (1,584 listed) |
-| Keywords | 6,964 unique declared (7,864 entries across all patterns); the pre-screen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
-| Languages | English-first: full ruleset in English · 2 dedicated patterns each in 13 languages · keyword-level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
+| Keywords | 6,964 unique declared (7,864 entries across all patterns); the prescreen index holds 6,675 (289 generic keywords are deliberately excluded from it). `engine.info()` reports all three (`keywords_declared`, `keyword_entries`, `keywords`) |
+| Languages | English first. Full ruleset in English · 2 dedicated patterns each in 13 languages · keyword level only in 7 · none in Persian/Bengali. [Measured breakdown](#language-coverage-measured) |
 | Attack categories | 117 listed |
 | Normalization techniques | 16 |
 | Media types | 6 (text, image, audio, video, PDF, QR) |
 | Recall and precision on the shipped benchmark | recall 97.4% (37/38), precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py` (details in the Benchmark section below) |
-| pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand-maintained one drifts (it read 444 while the suite was 802) |
-| False-positive rate | **0 on the clean-code regression corpus**, which is not the same corpus as the benchmark below: on 77 real-world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root-caused and fixed in v0.2.64, zero-FP gate enforced in CI every release.) |
+| pytest (unit tests shipped in repo) | run `python3 -m pytest -q`, the count is not published here, because a hand maintained one drifts (it read 444 while the suite was 802) |
+| False positive rate | **0 on the clean code regression corpus**, which is not the same corpus as the benchmark below. On 77 real world READMEs the scanner flags **6**, including our own. Both numbers are published on purpose. (Was 8.3% through v0.2.63 on 12 benign controls; root caused and fixed in v0.2.64, zero FP gate enforced in CI every release.) |
 | Core dependencies | Zero for text scan; optional deps for media |
-| Platforms | CI runs on Linux. Windows is not supported: proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested. |
+| Platforms | CI runs on Linux. Windows is not supported. Proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested. |
 
 The Patterns count is the rules that carry a regex or a keyword matcher. The ruleset lists 1,584; the other 71 carry neither. Carrying a matcher is not proof that a rule fires. `engine.info()` reports both numbers (`patterns_with_matcher` and `listed_patterns`), and `sunglasses info` prints the difference.
 
@@ -799,8 +799,8 @@ Labeled dataset shipped in this repo. It holds 38 real agent input attacks (posi
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
 | F1 | 0.914 |
-| Known-shape attacks | 30/30 caught |
-| Novel-semantic attacks (paraphrases the pattern DB has never seen) | 7/8 caught |
+| Known shape attacks | 30/30 caught |
+| Novel semantic attacks (paraphrases the pattern DB has never seen) | 7/8 caught |
 
 **The known gap, stated out loud.** The one miss is `curl … | bash`. Seven of the 77 clean READMEs (deno, ollama, grype, ohmyzsh…) ship that exact install line, no text level rule separates the legitimate one from the malicious one, so flagging it would buy 1 catch at the cost of 7 false positives. It belongs to a runtime control, not a text scanner, and a test asserts we do **not** flag it. If a scanner claims to catch it from text alone, ask what their false positive rate on real READMEs is.
 
@@ -813,8 +813,8 @@ shipped patterns, counted from `sunglasses/patterns.py`.
 | tier | languages | what exists |
 |---|---|---|
 | **English** | English | the full ruleset |
-| **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** ("ignore previous instructions" and one credential-exfiltration shape) |
-| **Keyword-level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English-scoped patterns; **no dedicated pattern** |
+| **Dedicated patterns** | Spanish, Portuguese, French, German, Russian, Turkish, Arabic, Chinese, Japanese, Korean, Hindi, Indonesian, Vietnamese (13) | **exactly two patterns each** ("ignore previous instructions" and one credential exfiltration shape) |
+| **Keyword level only** | Italian, Dutch, Ukrainian, Polish, Czech, Azerbaijani, Hebrew (7) | keyword hits inside English scoped patterns; **no dedicated pattern** |
 | **Name only** | Persian, Bengali (2) | **no dedicated pattern and no keyword** (previously listed as covered) |
 
 So a two pattern seed is not language coverage, and you should not deploy SUNGLASSES expecting
@@ -901,7 +901,7 @@ If you meant the string, use `--text`.
 | | |
 |---|---|
 | **Deterministic facts → HARD BLOCK** | A credential in an outbound payload. A tool descriptor whose hash changed. A rule you wrote yourself. Checkable. Being wrong is a bug, not a judgement call. |
-| **Detections → ask you, never auto-block** | Pattern and intent matches are *probabilities*. Hard-denying on a probability is how a security tool becomes the thing that breaks your work. The check that asks you is the opt-in warn lane (`touch ~/.sunglasses/warn-lane`); it is off by default. |
+| **Detections → ask you, never block automatically** | Pattern and intent matches are *probabilities*. Denying outright on a probability is how a security tool becomes the thing that breaks your work. The check that asks you is the opt in warn lane (`touch ~/.sunglasses/warn-lane`); it is off by default. |
 
 That split is enforced by tests, not by good intentions. The WARN lane is swept
 across every keyword bearing pattern in the database and asserted to only ever
