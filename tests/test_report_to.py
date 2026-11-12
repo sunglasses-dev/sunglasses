@@ -226,6 +226,26 @@ def test_a_directory_scan_reports_its_files_and_lines(tmp_path, server):
     assert json.loads(srv.requests[1]["body"])["source"]["name"] == "web"
 
 
+def test_a_directory_scan_carries_raw_findings_and_a_file_scan_does_not_invent_it(tmp_path, server):
+    """`raw_findings` (the pattern-fire total a directory scan computes) was dropped by the field
+    list, so the receiver always stored NULL. It is sent when the scan has it, and a `--file`
+    scan, which has no such key, does not gain one."""
+    tree = tmp_path / "proj"
+    tree.mkdir()
+    (tree / "bad.md").write_text("one\n" + INJECTION)
+    (tree / "ok.md").write_text("fine\n")
+    srv = server()
+    proc = _run(["--dir", str(tree), "--json", "--report-to", srv.url])
+    assert proc.returncode == 1
+    scan = json.loads(srv.requests[0]["body"])["scan"]
+    assert scan["raw_findings"] == sum(r["threats"] for r in json.loads(proc.stdout)["file_results"])
+    assert scan["raw_findings"] >= 1
+    threat, _clean = _files(tmp_path)
+    one = _run(["--file", threat, "--json", "--report-to", srv.url])
+    assert one.returncode == 1
+    assert "raw_findings" not in json.loads(srv.requests[1]["body"])["scan"]
+
+
 def test_the_json_and_sarif_documents_stay_one_document(tmp_path, server):
     threat, _ = _files(tmp_path)
     srv = server()

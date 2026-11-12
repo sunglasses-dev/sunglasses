@@ -96,7 +96,7 @@ _SCAN_FIELDS = (
     "event_id", "decision", "severity", "channel", "source", "repo_name", "truncated",
     "bytes_scanned", "extraction_complete", "inspection_complete", "threat_found", "is_clean",
     "findings_count", "patterns_fired", "latency_ms", "files_scanned", "files_with_threats",
-    "files_incomplete", "files_skipped", "total_threats", "scan_time_ms", "exit_code")
+    "files_incomplete", "files_skipped", "total_threats", "raw_findings", "scan_time_ms", "exit_code")
 _COUNT_MAPS = ("severity_breakdown", "category_breakdown")      # {name: count}
 _FILE_FIELDS = ("file", "decision", "threats")
 _FINDING_FIELDS = ("id", "severity", "category", "line")
