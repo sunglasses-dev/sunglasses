@@ -15,6 +15,10 @@ All notable changes to Sunglasses are documented here.
 
 - GLS-GHSA-PI-202: description no longer claims advisory grounding; no cited advisory exists for this rule. Detection unchanged.
 
+- The published scan speed phrases in `stats/current.json` print the typical attack string time with one decimal
+  (`~3.8ms`), the way the README table does. The generator rounded it to a whole number (`~4ms`), so the two
+  disagreed about one measurement. The stored figures are unchanged.
+
 ### Fixed
 
 - `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan

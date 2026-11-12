@@ -1,7 +1,7 @@
 """
 SUNGLASSES Mechanism Layer — patterns that match attack SHAPE, not wording.
 
-The 1,089 patterns in patterns.py are CARRIERS: literal phrasings observed in
+The patterns in patterns.py are CARRIERS: literal phrasings observed in
 the wild ("ignore all previous instructions"). Carriers are precise and cheap,
 and they are why the scanner is fast — but they are brittle by construction. A
 carrier list catches the sentence it was written from and misses the same attack
