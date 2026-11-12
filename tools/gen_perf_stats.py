@@ -217,7 +217,7 @@ def measure():
 
 def _display(quickstart_ms, attack_ms):
     """One short public phrase, covering the range rather than its floor."""
-    return f"~{quickstart_ms:.1f}ms short input, ~{attack_ms:.0f}ms typical attack string"
+    return f"~{quickstart_ms:.1f}ms short input, ~{attack_ms:.1f}ms typical attack string"
 
 
 def _display_long(quickstart_ms, attack_ms, kb_per_sec):
@@ -228,7 +228,7 @@ def _display_long(quickstart_ms, attack_ms, kb_per_sec):
     rather than trust it.
     """
     return (f"Scan cost scales with input length: ~{quickstart_ms:.1f}ms on a short "
-            f"input, ~{attack_ms:.0f}ms on a typical attack string, "
+            f"input, ~{attack_ms:.1f}ms on a typical attack string, "
             f"~{kb_per_sec:.0f} KB/sec sustained. Every figure here is regenerated "
             f"by tools/gen_perf_stats.py.")
 
