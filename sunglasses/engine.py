@@ -3759,7 +3759,8 @@ class SunglassesEngine:
         decision is the worse of the two, every raw finding stays, a view finding is added
         only when its id is not already there and carries view="utf7" (a key no consumer
         copies: each one builds its fields by name). latency is the sum, and truncated and
-        bytes_scanned stay the raw scan's. The raw object is copied, not edited.
+        bytes_scanned stay the raw scan's; a view the scan limit cut makes the result
+        incomplete (extraction_complete False, with a warning). The raw object is copied, not edited.
         """
         try:
             extra = self._scan_in_context(view, channel)
@@ -3778,10 +3779,18 @@ class SunglassesEngine:
         merged.decision = max(raw.decision, extra.decision,
                               key=lambda d: self._DECISION_RANK.get(d, 3))
         merged.latency_ms = round(raw.latency_ms + extra.latency_ms, 2)
-        if not extra.extraction_complete:
-            merged.extraction_complete = False
         merged.extraction_warnings = list(raw.extraction_warnings) + [
             w for w in extra.extraction_warnings if w not in raw.extraction_warnings]
+        # A decoded view that was cut by the scan limit was not all inspected, whatever the raw text did (the view can be longer
+        # than the raw text it came from: the pipeline's compatibility folding runs before it is built). `truncated` and
+        # `bytes_scanned` stay the raw scan's, so the result says "incomplete" through the field that means it.
+        if extra.truncated:
+            merged.extraction_complete = False
+            warning = "a UTF-7 run was found and its decoded text was longer than the scan limit, so part of it was not scanned"
+            if warning not in merged.extraction_warnings:
+                merged.extraction_warnings.append(warning)
+        if not extra.extraction_complete:
+            merged.extraction_complete = False
         return merged
 
     def _scan(self, text: str, channel: str) -> ScanResult:
