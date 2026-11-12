@@ -12,6 +12,7 @@ Usage:
 
 import bisect
 import collections
+import copy
 import functools
 import html
 import keyword
@@ -36,6 +37,7 @@ from . import policy, taxonomy
 from .mechanisms import MECHANISM_PATTERNS
 from .validators import VALIDATORS
 from .patterns import PATTERNS
+from .utf7 import utf7_view
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_letter_references, decode_url_encoding, normalize_unicode,
@@ -3720,6 +3722,18 @@ class SunglassesEngine:
                 fail CLOSED (error) instead of silently scanning against
                 nothing and returning a clean allow.
         """
+        result = self._scan_in_context(text, channel)
+        # UTF-7 runs are read by a model that is asked to decode them and by no step of the
+        # pipeline, so the text is scanned a second time with each readable run decoded (C1191).
+        # The raw scan above is kept whole and the second one only adds to it, so a text that
+        # blocks without this step blocks with it. One level: the view is not decoded again.
+        view = utf7_view(text[:self.max_scan_bytes] if self.max_scan_bytes else text)
+        if view is None:
+            return result
+        return self._with_view_result(result, view, channel)
+
+    def _scan_in_context(self, text: str, channel: str) -> ScanResult:
+        """`_scan` with the per-scan thread state set up and put back (one scan, one state)."""
         previous = getattr(_SCAN_LOCAL, "ends", None)
         previous_channel = getattr(_SCAN_LOCAL, "channel", None)
         _SCAN_LOCAL.ends = _ViewEnds()
@@ -3729,6 +3743,39 @@ class SunglassesEngine:
         finally:
             _SCAN_LOCAL.ends = previous
             _SCAN_LOCAL.channel = previous_channel
+
+    _DECISION_RANK = {"allow": 0, "allow_redacted": 1, "quarantine": 2, "block": 3}
+
+    def _with_view_result(self, raw: ScanResult, view: str, channel: str) -> ScanResult:
+        """The raw result with the UTF-7 view's scan merged in. Never lowers it.
+
+        decision is the worse of the two, every raw finding stays, a view finding is added
+        only when its id is not already there and carries view="utf7" (a key no consumer
+        copies: each one builds its fields by name). latency is the sum, and truncated and
+        bytes_scanned stay the raw scan's. The raw object is copied, not edited.
+        """
+        try:
+            extra = self._scan_in_context(view, channel)
+        except Exception:
+            # The raw result stands. A view that could not be scanned is a part not inspected,
+            # so the result says so instead of passing as a complete clean one.
+            merged = copy.copy(raw)
+            merged.extraction_complete = False
+            merged.extraction_warnings = list(raw.extraction_warnings) + [
+                "a UTF-7 run was found and its decoded text could not be scanned"]
+            return merged
+        merged = copy.copy(raw)
+        seen = {f["id"] for f in raw.findings}
+        merged.findings = list(raw.findings) + [
+            {**f, "view": "utf7"} for f in extra.findings if f["id"] not in seen]
+        merged.decision = max(raw.decision, extra.decision,
+                              key=lambda d: self._DECISION_RANK.get(d, 3))
+        merged.latency_ms = round(raw.latency_ms + extra.latency_ms, 2)
+        if not extra.extraction_complete:
+            merged.extraction_complete = False
+        merged.extraction_warnings = list(raw.extraction_warnings) + [
+            w for w in extra.extraction_warnings if w not in raw.extraction_warnings]
+        return merged
 
     def _scan(self, text: str, channel: str) -> ScanResult:
         """The scan itself (see scan)."""
