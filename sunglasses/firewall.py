@@ -445,8 +445,10 @@ def _span_owners(found: list) -> list:
     asked "does anything else contain me?" by walking the ENTIRE match list for
     EVERY occurrence. On a document carrying 16,000 credential-shaped tokens
     that is 256,000,000 comparisons, and the hook's 10-second deadline passed
-    with no decision written -- a firewall that fails OPEN on a big input,
-    which is worse than the false positive the ownership rule was added to fix.
+    with no decision written -- a firewall that cannot answer on a big input
+    (the call goes through under `--fail-open` or on a host older than Claude
+    Code 2.1.295, and is refused on a default install), which is worse than the
+    false positive the ownership rule was added to fix.
     Measured before the repair: 1,000 occurrences 0.066 s, 2,000 0.251 s,
     4,000 1.003 s, 8,000 3.653 s, 16,000 never inside the deadline.
 
@@ -963,8 +965,9 @@ def build_pin_state(previous: dict, current: dict, coverage=None) -> dict:
 
 # ── Reading descriptors out-of-band (`sunglasses pin`) ──────────────────────
 # This half runs from the terminal, not the hook, so it may take seconds and may
-# talk to servers. Keeping it out of the hot path is what lets the hook stay at
-# ~27ms and fully offline.
+# talk to servers. Keeping it out of the hot path is what lets the hook stay
+# cheap and fully offline (the measured per-call cost is the `hook_speed` entry
+# in stats/current.json, written by tools/gen_perf_stats.py).
 
 _MCP_TIMEOUT = 10
 
@@ -1422,7 +1425,9 @@ def load_policy(path) -> dict:
     # STAT BEFORE READ, and before deciding the file is absent: only ENOENT is
     # absent (see `_stat_or_absent`). A FIFO with no writer blocks in the
     # kernel, so the hook sat past the harness's 10 second timeout with no
-    # stdout and no receipt, and a timed-out hook FAILS OPEN. A socket, a device
+    # stdout and no receipt, and what a timed-out hook does is the install's
+    # `onFailure` (the call goes through under `--fail-open`, is refused on a
+    # default install on Claude Code 2.1.295 and later). A socket, a device
     # node or a directory in that path is the same class: not a thing we can
     # read, and answering that from metadata costs nothing and cannot block.
     try:
@@ -2271,8 +2276,10 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
 
     # RED 5 — LIFECYCLE RECORDS.
     #
-    # A PreToolUse hook that is killed on the harness's timeout FAILS OPEN, and
-    # it does so in complete silence: nothing runs to write a receipt, so the
+    # A PreToolUse hook that is killed on the harness's timeout follows the
+    # install's `onFailure` (pass-through under `--fail-open` or on an older
+    # host, a refused call otherwise), and either way it does so in complete
+    # silence: nothing runs to write a receipt, so the
     # audit trail shows no evidence that the call was ever seen. "Every call
     # writes a receipt" was therefore false for exactly the failure that matters
     # most, and the absence was indistinguishable from the hook not being
@@ -2301,7 +2308,8 @@ def run_hook_ex(stdin_text: str, home=None) -> "tuple":
     # THE RECEIPTS PATH IS INSIDE THE GUARD, construction too. Building
     # `_HookReceipts` decides whether the user opted in, which reads the chain's
     # tail, so it runs inside a `try`: an exception there that left `run_hook`
-    # altogether would make the hook exit 1, which the host does not block on. A
+    # altogether would make the hook exit 1, a failure the host treats by the
+    # install's `onFailure` rather than by our own answer. A
     # failure here is F6 like the terminal's, below: the call asks, naming the
     # cause, and a deny stays a deny.
     receipts = None
@@ -3019,10 +3027,10 @@ def main(argv=None) -> int:
     """`python3 -m sunglasses.firewall` — the PreToolUse hook entry point.
 
     Invoked as a module rather than through `sunglasses.cli` on purpose:
-    importing cli.py measured 109ms on this Mac (it pulls in the engine,
-    reporter, mailer and sarif at module scope), which is the entire latency
-    budget spent before the first check runs. This path imports only stdlib
-    plus this module: ~22ms cold.
+    importing cli.py pulls in the engine, reporter, mailer and sarif at module
+    scope, which spends most of the per-call latency budget before the first
+    check runs. This path imports only stdlib plus this module. The measured
+    cost of this command is the `hook_speed` entry in stats/current.json.
     """
     import json as _json
     import sys as _sys

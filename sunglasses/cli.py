@@ -2452,8 +2452,10 @@ def _verify_lifecycle(rows, directory, unparseable=()):
     """Pair each in_flight record with its terminal record and name the orphans.
 
     An orphan is a call the firewall began evaluating and never finished: the
-    harness killed the hook on its timeout, or the process died. Both FAIL OPEN,
-    and before these records existed both were invisible — no receipt at all,
+    harness killed the hook on its timeout, or the process died. Each follows the
+    install's `onFailure` (a pass-through under `--fail-open` or on a host older
+    than Claude Code 2.1.295, a refused call otherwise), and before these
+    records existed both were invisible — no receipt at all,
     which reads exactly like a hook that was never installed.
 
     Receipts written before this existed carry no `kind`. They are terminal
@@ -4007,9 +4009,9 @@ def main():
     # firewall-hook (hidden) — Claude Code PreToolUse entry point.
     # NOTE: `sunglasses init` deliberately writes `python3 -m sunglasses.firewall`
     # into settings.json, NOT this subcommand. Reaching here means importing
-    # cli.py, which pulls in engine + reporter + mailer + sarif at module scope
-    # and measured ~109ms on an M-series Mac — the entire per-tool-call latency
-    # budget spent before the first check. This alias exists so a human who
+    # cli.py, which pulls in engine + reporter + mailer + sarif at module scope,
+    # a start-up cost the installed command does not pay (its measured cost is
+    # the `hook_speed` entry in stats/current.json). This alias exists so a human who
     # types the obvious command gets the right behaviour, not for the hot path.
     # No `help=` at all: argparse.SUPPRESS is honoured for OPTIONS but not for
     # subparsers, where it renders the literal sentinel "==SUPPRESS==" in the
