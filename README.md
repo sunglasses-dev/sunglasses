@@ -3,7 +3,7 @@
 
 [![pattern-integrity](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml/badge.svg?branch=main&event=push)](https://github.com/sunglasses-dev/sunglasses/actions/workflows/pattern-integrity.yml)
 [![PyPI](https://img.shields.io/pypi/v/sunglasses)](https://pypi.org/project/sunglasses/)
-[![python: 3.9 – 3.14](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/sunglasses-dev/sunglasses/blob/main/.github/workflows/pattern-integrity.yml)
+[![python 3.9 to 3.14](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/sunglasses-dev/sunglasses/blob/main/.github/workflows/pattern-integrity.yml)
 [![License: MIT](https://img.shields.io/pypi/l/sunglasses)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/sunglasses-dev/sunglasses/badge)](https://scorecard.dev/viewer/?uri=github.com/sunglasses-dev/sunglasses)
 [![installs (incl. mirrors)](https://img.shields.io/pypi/dm/sunglasses?label=installs%20%28incl.%20mirrors%29)](https://pypistats.org/packages/sunglasses)
@@ -22,12 +22,12 @@
   on its own. See [What the proxy enforces](#what-the-proxy-enforces).
 - Outside that lane this reads input, so a clean result is a confidence floor and not a guarantee
 
-Sunglasses is a local, open-source scanner for text and supported files. It reports what
+Sunglasses is a local, open source scanner for text and supported files. It reports what
 it matched **and what it could not read**, so you can decide what to pass onward. It
 produces findings and an exit status; a CI job, a Claude Code hook or your own code acts
 on that result.
 
-![The sixty-seconds demo recorded on 0.5.9: a clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
+![The sixty second demo recorded on 0.5.9. A clean file passes, a vendor brief with a buried instruction is blocked with six findings, an archive we do not extract comes back INCOMPLETE, a missing file exits 2](https://raw.githubusercontent.com/sunglasses-dev/sunglasses/main/demo/sixty-seconds.gif)
 
 ## Sixty seconds
 
@@ -48,7 +48,7 @@ twice (human output and JSON). The script's own commands execute; **scanned cont
 data** (it is never executed, and the ZIP is not extracted).
 
 Abbreviated output, recorded on 0.5.6. Finding rows 2-5 are omitted below; timings and
-presentation are not shown because they vary:
+presentation are not shown because they vary.
 
 ```
 $ sunglasses scan --file notes.md            # ordinary sprint notes

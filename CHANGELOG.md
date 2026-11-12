@@ -49,7 +49,7 @@ All notable changes to Sunglasses are documented here.
 
 ### Changed
 
-- The measured figures in the README (the scan-speed table and the sentence under it, the WARN-lane cost bullet
+- The measured figures in the README (the scan speed table and the sentence under it, the WARN lane cost bullet
   and the Cost line) are no longer typed. Each is a named slot in the README on `main`, and
   `tools/fill_readme_scan_slots.py` writes them from `stats/current.json` at the release cut. It refuses, writing
   nothing, when a slot or a stats key is missing, when a measurement is not a finite number above zero, or when any
@@ -78,30 +78,30 @@ All notable changes to Sunglasses are documented here.
   and stopped being true at 0.6.10, when the precomputed prefilter table (`sunglasses/_prefilter_table.py`)
   took that work out of every start. Measured on 0.6.21, 2026-11-11, an Apple silicon Mac (arm64, macOS),
   on the command `sunglasses init` writes into the hook entry (`python -m sunglasses.firewall`), minimum
-  of 15 runs: about 94 ms per tool call with the lane on and about 30 ms with it
-  off. The lane-off figure did not move in any release timed (0.4.0 to 0.6.21). The lane
+  of 15 runs. About 94 ms per tool call with the lane on and about 30 ms with it
+  off. The figure with the lane off did not move in any release timed (0.4.0 to 0.6.21). The lane
   is still off by default. (#602)
 
 - The README, `KNOWN_VERSION_GAPS.md` and `docs/integrations/claude-code.md` now say what a default install does when
   the hook runs out of time. A hook that times out or cannot start is refused on a default install (`sunglasses init`
   writes `onFailure: "block"` into the hook entry; Claude Code 2.1.295 and later honours it; `init --fail-open` lets
   the call through). A crash inside the check still defers to Claude Code's own permission flow with a "not checked"
-  notice. The pages no longer say a timed-out hook fails open, and no longer give a per-byte scan rate or call the
-  cost "quadratic": they say scan cost grows with input length and can grow faster on some input shapes (details:
+  notice. The pages no longer say a timed out hook fails open, and no longer give a per byte scan rate or call the
+  cost "quadratic". They say scan cost grows with input length and can grow faster on some input shapes (see
   `KNOWN_VERSION_GAPS.md`). The line `sunglasses receipts` prints for an orphaned hook invocation now reads "killed,
   timed out or crashed" and says what each one means. Documentation, plus that one output string; no rule, engine or
   hook logic changed. (#597, #598, #599)
 
 - Docstrings and comments in `sunglasses/scanner.py` and `sunglasses/integrations/langchain.py` no longer carry
-  hand-typed speed claims ("<1ms", "<3 seconds"). They say that scan cost grows with input length and point to
+  speed claims typed by hand ("<1ms", "<3 seconds"). They say that scan cost grows with input length and point to
   `stats/current.json`, where the measured figures are regenerated each release.
-  Documentation only: no code path, pattern, channel list or number changed. (#596)
+  Documentation only. No code path, pattern, channel list or number changed. (#596)
 
 - Comments and docstrings in `sunglasses/cli.py`, `sunglasses/engine.py` and `sunglasses/firewall.py` that quoted
-  a per-call cost now name the `hook_speed` block in `stats/current.json` instead, and where they said a timed-out
+  a cost per call now name the `hook_speed` block in `stats/current.json` instead, and where they said a timed out
   hook fails open they now say it follows the install's `onFailure` (the same facts as the README bullet above),
   and two test docstrings say the same.
-  Documentation only: no code path, pattern, channel list or number changed. (#601)
+  Documentation only. No code path, pattern, channel list or number changed. (#601)
 
 ## [0.6.20] — 2026-11-08
 
