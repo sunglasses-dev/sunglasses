@@ -15,6 +15,12 @@ All notable changes to Sunglasses are documented here.
 
 - GLS-GHSA-PI-202: description no longer claims advisory grounding; no cited advisory exists for this rule. Detection unchanged.
 
+### Fixed
+
+- `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan
+  counts. The upload field list did not name it, so it was dropped before sending and the receiver stored
+  nothing for it. A `--file` scan has no such count and is sent without one. Nothing else in the upload changes.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed
