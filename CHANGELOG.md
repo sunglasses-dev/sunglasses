@@ -37,6 +37,14 @@ All notable changes to Sunglasses are documented here.
   requires accepting `JSON-RPC` batches, which this server does not do.
   `tests/test_mcp_initialize_version_negotiation.py` pins it.
 
+- `python -m sunglasses.mcp` no longer stops on input it cannot read as a request. A `JSON-RPC` batch
+  (an array), or any other JSON value that is not an object, is now answered once with
+  `-32600 Invalid Request` and id `null`, and the server keeps running. A batch as the first line used
+  to crash it with a traceback, and after an earlier request it was answered under that request's id.
+  A blank line is skipped, and a `null` line is answered like the others; both used to end the
+  server without a word and drop the next request. Ordinary requests are unchanged.
+  `tests/test_mcp_malformed_message_shapes.py` pins it.
+
 ## [0.6.21] — 2026-11-11
 
 ### Changed
