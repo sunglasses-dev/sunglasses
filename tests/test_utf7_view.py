@@ -120,17 +120,15 @@ def test_plus_minus_literal_is_never_decoded():
 
 # 6 ---------------------------------------------------------------------------------------------
 def test_corpus_decisions_unchanged(engine):
-    """No text of the false positive corpus gets a view, and none changes its decision."""
+    """No text of the false positive corpus gets a view, and none changes its decision (every text, with its own channel)."""
     import fp_corpus_data as corpus
-    texts = [open(path, encoding="utf-8", errors="replace").read()
+    items = [(open(path, encoding="utf-8", errors="replace").read(), "file")
              for path in list(corpus.real_world_files()) + list(corpus.clean_files())]
-    texts += [t if isinstance(t, str) else t[0] for t in corpus.CLEAN_CORPUS]
-    assert texts
-    for text in texts:
+    items += [(text, channel) for _name, text, channel in corpus.CLEAN_CORPUS]       # (name, text, channel): the text is [1], not the label
+    assert len(items) >= 100 and all(len(text) > 20 for text, _ in items)             # documents, not labels
+    for text, channel in items:
         assert utf7_view(text) is None
-    # decisions: the wrapper returns the raw result object's decision untouched
-    for text in texts[:5]:
-        assert engine.scan(text).decision == raw_result(engine, text).decision
+        assert engine.scan(text, channel=channel).decision == engine._scan_in_context(text, channel).decision
 
 
 # 7 ---------------------------------------------------------------------------------------------
@@ -419,13 +417,35 @@ def test_deep_cli_json_carries_no_view_mark(tmp_path, text, findings):
     assert _marks(doc) == 0
 
 
-def test_the_mark_is_still_on_library_results(engine):
-    """The mark is a library field on the engine's own result, and normalize() takes it out of what it returns."""
+def test_the_mark_lives_only_on_what_the_engine_returns_itself(engine, tmp_path):
+    """One rule (T9 13:11): the key is on results returned straight from SunglassesEngine (scan, scan_file). SunglassesScanner, the
+    worker reply and every wire carry none. Benign twins: a plain text has no key anywhere."""
+    from sunglasses import scan_worker
     from sunglasses.result import normalize
-    result = engine.scan(_ATTACK_U7)
-    assert _marks({"findings": result.findings}) > 0
-    assert _marks(normalize(result)) == 0
-    assert _marks({"findings": result.findings}) > 0           # the engine's own list is not edited
+    from sunglasses.scanner import SunglassesScanner
+    path = tmp_path / "t.txt"
+    path.write_text(_ATTACK_U7)
+    twin = tmp_path / "twin.txt"
+    twin.write_text(_BENIGN_U7)
+    # the engine's own two calls carry the key
+    assert _marks({"findings": engine.scan(_ATTACK_U7).findings}) > 0
+    assert _marks({"findings": engine.scan_file(str(path)).findings}) > 0
+    assert _marks({"findings": engine.scan_file(str(twin)).findings}) == 0
+    # the Scanner: every public method
+    sc = SunglassesScanner()
+    got = sc.scan_text(_ATTACK_U7)
+    assert got.findings and _marks({"findings": got.findings}) == 0
+    assert got.decision == engine.scan(_ATTACK_U7).decision
+    assert [dict(f) for f in got.findings] == [{k: v for k, v in f.items() if k != "view"} for f in engine.scan(_ATTACK_U7).findings]   # only the field goes
+    assert _marks(sc.scan_email(_ATTACK_U7)) == 0
+    assert _marks(sc.scan_fast(str(path))) == 0
+    assert _marks(sc.scan_auto(str(path))) == 0
+    # the worker reply, built by the same function the child uses
+    reply = scan_worker._answer(engine, {"op": "path", "path": str(path)})
+    assert reply["ok"] and reply["result"]["findings"] and _marks(reply) == 0
+    # the engine's own list is not edited by any of it, and normalize() still strips by name
+    assert _marks({"findings": engine.scan(_ATTACK_U7).findings}) > 0
+    assert _marks(normalize(engine.scan(_ATTACK_U7))) == 0
 
 
 def u7_units(units):
@@ -520,3 +540,47 @@ def test_nine_letters_are_read_leniently():
     (from 8 letters on) reads the `ab` before them. (At exactly 8 letters, whole units, the two decoders agree.)"""
     assert utf7_view("+AGEAYgBBB-") is not None
     assert utf7_view("+AGEAYgBBB-").startswith("ab")
+
+
+# 15 (T9 13:11 hole A, ASTRA r2 gap 2) a sentence with a few letters of other scripts in the same run ---------------
+_FOREIGN = "\u6f22\u5b57\u8a9e"      # three Han letters, each its own script from the English around them
+
+
+@pytest.mark.parametrize("where", ["tail", "head", "middle"])
+@pytest.mark.parametrize("extra", [_FOREIGN[:2], _FOREIGN, "\ud55c\u0416\u0e01", "\u6f22\ud55c\u0416\u0e01"], ids=["han2", "han3", "mixed3", "mixed4"])
+def test_a_sentence_with_a_few_letters_of_other_scripts_is_read(engine, where, extra):
+    text = {"tail": _SENTENCE + extra, "head": extra + _SENTENCE, "middle": extra[:1] + _SENTENCE + extra[1:]}[where]
+    outer = "see " + u7(text) + " end"
+    assert engine._scan_in_context(outer, "message").decision != "block"          # the raw scan does not see it
+    result = engine.scan(outer)
+    assert result.decision == "block" and view_ids(result)
+    assert utf7_view(outer) == "see " + text + " end"                              # the whole decode goes into the view
+
+
+@pytest.mark.parametrize("text", ["Have a nice day, see you at lunch.", "Meeting moved to 3pm, bring the slides."])
+@pytest.mark.parametrize("extra", [_FOREIGN, "\ud55c\u0416\u0e01"])
+def test_the_same_shape_with_a_benign_sentence_builds_a_view_and_blocks_nothing(engine, text, extra):
+    outer = u7(text + extra)
+    assert utf7_view(outer) == text + extra
+    assert engine.scan(outer).decision == engine._scan_in_context(outer, "message").decision == "allow"
+
+
+def test_the_ascii_stretch_is_four_characters_in_a_row():
+    other = "\u6f22\u5b57\u8a9e\ud55c\u0416\u0e01"                 # six letters, three scripts, so the one script test fails
+    assert utf7_view(u7("abcd" + other)) is not None
+    assert utf7_view(u7("abc" + other)) is None                                 # three in a row is not a stretch
+    assert utf7_view(u7("ab" + other + "cd")) is None                           # two and two, split by the other letters
+    assert utf7_view(u7("ab\u200dcd" + other)) is not None                      # a zero width joiner inside does not break it, and does not count
+
+
+def test_a_character_the_engine_folds_to_ascii_counts_toward_the_stretch():
+    """Fullwidth letters fold to ASCII under NFKC, so four of them make the stretch where no plain ASCII letter is present."""
+    other = "\u6f22\u5b57\u8a9e\ud55c\u0416\u0e01"
+    assert utf7_view(u7("\uff21\uff22\uff23\uff24" + other)) is not None
+    assert utf7_view(u7("\uff21\uff22\uff23" + other)) is None
+
+
+def test_other_scripts_with_no_ascii_stretch_still_build_no_view():
+    """Random base64 looking text decodes to units spread over several scripts: no stretch, no view."""
+    assert utf7_view(u7("\u6f22\u5b57\u8a9e\ud55c\u0416\u0e01\u0531\u05d0")) is None
+    assert utf7_view(u7("\u6f22a\u5b57b\u8a9ec\ud55cd\u0416e\u0e01f\u0531g")) is None

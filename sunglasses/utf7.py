@@ -60,6 +60,24 @@ def _script(char):
     return "CJK" if word in _KANA_HAN else word
 
 
+# Characters in a row, ASCII or folding to ASCII, that make a decode with a mix of scripts text (see `read_run`).
+ASCII_STRETCH = 4
+
+
+def _has_ascii_stretch(text):
+    """True when `text` holds ASCII_STRETCH or more characters in a row that are ASCII or fold to ASCII. A neutral character that is not
+    ASCII (a zero width joiner, a no break space) may sit inside the stretch: it neither counts nor breaks it."""
+    run = 0
+    for c in text:
+        if c.isascii() or _folds_to_ascii(c):
+            run += 1
+            if run >= ASCII_STRETCH:
+                return True
+        elif unicodedata.category(c) not in _NEUTRAL:
+            run = 0
+    return False
+
+
 def read_run(decoded):
     """The text of one decoded run as it goes into the view, or None when the run is not text.
 
@@ -70,9 +88,9 @@ def read_run(decoded):
     - every character is ASCII, a control, format or space character, or one the engine folds to ASCII
       (the look alike map, or NFKC giving ASCII), at any length. English written in UTF-7 decodes to ASCII,
       and a lone look alike letter (`+BD4-` is Cyrillic o) is exactly how a sentence is split;
-    - at least 8 characters, at least 60 percent of the decode letters, controls or spaces, and at least 80 percent
-      of the non-ASCII ones in one script, and at most 20 percent of the decode dropped: other scripts, long runs only, so a random base64 looking token is not
-      taken for text.
+    - at least 8 characters, at least 60 percent of the decode letters, controls or spaces, at most 20 percent of the decode dropped, and
+      either at least 80 percent of the non-ASCII ones in one script or a stretch of 4 characters in a row that are ASCII or fold to ASCII
+      (a sentence with a few letters of other scripts in it): other scripts, long runs only, so a random base64 looking token is not taken for text.
     Nothing left after the drop is not text.
     """
     if not decoded:
@@ -94,6 +112,11 @@ def read_run(decoded):
         return None
     scripts = collections.Counter(_script(c) for c in text if not c.isascii() and unicodedata.category(c) not in _NEUTRAL)
     if scripts and max(scripts.values()) / sum(scripts.values()) >= 0.8:
+        return text
+    # A sentence with a few letters of other scripts in the same run (tail, head or middle) fails the one script test above, and
+    # a model still reads the sentence (T9 13:11, ASTRA r2 gap 2). So a stretch of ASCII_STRETCH characters in a row that are ASCII
+    # or fold to ASCII is also text. Random base64 looking text has no such stretch: a unit is ASCII or folds to ASCII about 1 time in 300.
+    if _has_ascii_stretch(text):
         return text
     return None
 
