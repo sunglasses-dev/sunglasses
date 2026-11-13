@@ -30,6 +30,8 @@ All notable changes to Sunglasses are documented here.
 
 ### Fixed
 
+- A file or email attachment scan that could not finish reading its input is now reported as incomplete by `scan_fast`, `scan_auto`, the MCP `scan_file` tool and `scan_email`, the way `SunglassesEngine` reports it. The result carries the scan's own warnings, and a file counts as read only when both the extractor and the scan say so.
+
 - `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan
   counts. The upload field list did not name it, so it was dropped before sending and the receiver stored
   nothing for it. A `--file` scan has no such count and is sent without one. Nothing else in the upload changes.
