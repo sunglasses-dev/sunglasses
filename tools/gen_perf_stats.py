@@ -12,7 +12,7 @@ A number nobody can regenerate is a claim, not a measurement. This script is the
 generator: it measures, it stamps what it measured on, and it writes the result.
 
     python3 tools/gen_perf_stats.py            # print, do not write
-    python3 tools/gen_perf_stats.py --write    # update stats/current.json
+    python3 tools/gen_perf_stats.py --write    # update stats/current.json (3 scan passes, the middle one kept)
     python3 tools/gen_perf_stats.py --hook-only --write   # refresh only hook_speed
 
 Corpus — public, in-repo, no network, no randomness:
@@ -36,6 +36,11 @@ dated block instead of a number typed by hand:
 Each is the minimum and the median of `repeats` runs of the whole child process, wall
 clock, in a throwaway HOME so nothing under the real ~/.sunglasses is read or written.
 The first run of each case is discarded (cold file cache).
+
+The scan block is `--runs` passes (default 3) over the corpus; the pass with the middle typical-attack
+time is the one written, whole, so the published figures agree with each other. The sentence the README
+prints under the speed table, `scan_speed_provenance`, is written by this script from that run (date,
+version of the tree, machine, Python, run count, corpus size); no one types it.
 """
 
 import argparse
@@ -62,6 +67,7 @@ WARMUP = 20
 REPEATS = 200
 DOC_REPEATS = 5      # 8 KB documents are ~100x the cost; fewer reps, same method
 HOOK_REPEATS = 15    # whole-process runs per case; min + median are reported
+SCAN_RUNS = 3        # full passes over the corpus; the middle one is published (same rule as the wheel measure)
 HOOK_INPUT = json.dumps({
     "hook_event_name": "PreToolUse",
     "tool_name": "Bash",
@@ -153,7 +159,8 @@ def write_hook_only(path, hook):
         fh.write("\n")
 
 
-def measure():
+def _measure_scan_once():
+    """One pass over the corpus: the `scan_speed` figures and the public phrases made from them."""
     engine = SunglassesEngine()
 
     with open(os.path.join(REPO, "tests/benchmark/attacks.json")) as fh:
@@ -202,16 +209,67 @@ def measure():
         "scan_speed_display_short": _display(quickstart_median, attack_median),
         "scan_speed_display_long": _display_long(
             quickstart_median, attack_median, kb_per_sec),
-        "scan_speed_measured_on": {
-            "machine": platform.machine(),
-            "processor": platform.processor() or platform.machine(),
-            "system": f"{platform.system()} {platform.release()}",
-            "python": platform.python_version(),
-        },
+    }
+
+
+def middle_run(runs):
+    """The run whose typical-attack-string median is the middle one; a tie goes to the earlier run.
+
+    Keeping a real run, not a per-figure median, means the published figures all come from one
+    pass and agree with each other (the throughput is derived from the same document medians).
+    """
+    ordered = sorted(enumerate(runs), key=lambda p: (p[1]["scan_speed"]["attack_median_ms"], p[0]))
+    return ordered[len(ordered) // 2][1]
+
+
+_RUN_WORDS = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven", 8: "Eight", 9: "Nine"}
+
+
+def build_provenance(date, version, measured_on, runs, corpus_n):
+    """The one sentence the README prints under the speed table, written from the run itself.
+
+    It states only what the generator knows: the date, the version of the tree it ran in, the
+    machine and Python it ran on, how many runs there were and which one is shown, and how many
+    documents were in the corpus. It never names a wheel, a person or a chip it was not told.
+    It is printed in the README, so it follows the copy rules there: no dash or colon in the prose
+    (the date and the version are data and keep their own punctuation).
+    """
+    head = (f"Measured {date} on the sunglasses {version} source tree "
+            f"({measured_on['machine']}, Python {measured_on['python']}).")
+    if runs == 1:
+        return f"{head} One run over a corpus of {corpus_n} documents."
+    count = _RUN_WORDS.get(runs, str(runs))
+    return (f"{head} {count} runs over a corpus of {corpus_n} documents. "
+            f"The run with the middle attack string time is the one shown.")
+
+
+def measure(runs=SCAN_RUNS, report=None):
+    """The full measurement: the scan block (`runs` passes, the middle one kept), the hook block, the provenance."""
+    if runs < 1:
+        raise ValueError("runs must be at least 1")
+    passes = []
+    for n in range(1, runs + 1):
+        load_before = os.getloadavg()[0] if hasattr(os, "getloadavg") else None
+        passes.append(_measure_scan_once())
+        if report is not None:
+            report(n, load_before, passes[-1]["scan_speed"])
+    kept = middle_run(passes)
+    measured_on = {
+        "machine": platform.machine(),
+        "processor": platform.processor() or platform.machine(),
+        "system": f"{platform.system()} {platform.release()}",
+        "python": platform.python_version(),
+    }
+    generated_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return {
+        **kept,
+        "scan_speed_measured_on": measured_on,
+        "scan_speed_provenance": build_provenance(
+            generated_at[:10], SUNGLASSES_VERSION, measured_on, runs,
+            kept["scan_speed"]["document_corpus_n"]),
         "hook_speed": measure_hook(),
         "scan_speed_generated_by": "tools/gen_perf_stats.py",
-        "scan_speed_generated_at": datetime.now(timezone.utc)
-            .astimezone().isoformat(timespec="seconds"),
+        "scan_speed_generated_at": generated_at,
     }
 
 
@@ -233,11 +291,38 @@ def _display_long(quickstart_ms, attack_ms, kb_per_sec):
             f"by tools/gen_perf_stats.py.")
 
 
+def write_full(path, measured):
+    """Write a full measurement into the stats file; the scan, hook and provenance keys come from `measured`."""
+    with open(path) as fh:
+        stats = json.load(fh)
+    # The unreproducible fields go. Leaving them beside the measured ones would
+    # let a page keep reading the old key and stay wrong.
+    for dead in ("scan_speed_avg_ms", "scans_per_second_single_thread"):
+        stats.pop(dead, None)
+    stats.update(measured)
+    # Engine-truth counts, from the same source CHECK 24 validates against.
+    # publish.sh writes these at ship time; regenerating them here keeps the
+    # repo copy honest between ships, which is when the site copy is edited.
+    from sunglasses.patterns import PATTERNS
+    info = SunglassesEngine().info()
+    stats.pop("patterns", None)
+    stats["patterns_with_matcher"] = info["patterns_with_matcher"]
+    stats["listed_patterns"] = info["listed_patterns"]
+    stats["keywords"] = info["keywords"]
+    stats["categories"] = len({(p.get("category") or "").strip()
+                               for p in PATTERNS if (p.get("category") or "").strip()})
+    with open(path, "w") as fh:
+        json.dump(stats, fh, indent=2)
+        fh.write("\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true",
                         help="update stats/current.json in place")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument("--runs", type=int, default=SCAN_RUNS,
+                        help=f"scan passes, the middle one is kept (default {SCAN_RUNS})")
     parser.add_argument("--hook-only", action="store_true",
                         help="measure only hook_speed; with --write, touch nothing else")
     args = parser.parse_args()
@@ -251,7 +336,13 @@ def main():
             print(f"wrote hook_speed in {path}")
         return
 
-    measured = measure()
+    def report(n, load_before, scan):
+        load = "n/a" if load_before is None else f"{load_before:.2f}"
+        print(f"scan pass {n}/{args.runs}: load {load} at start, short {scan['quickstart_median_ms']:.3f} ms, "
+              f"attack {scan['attack_median_ms']:.3f} ms, doc {scan['document_median_ms']:.1f} ms, "
+              f"{scan['throughput_kb_per_sec']:.1f} KB/s", file=sys.stderr if args.json else sys.stdout, flush=True)
+
+    measured = measure(runs=args.runs, report=report)
 
     if args.json:
         print(json.dumps(measured, indent=2))
@@ -271,27 +362,7 @@ def main():
 
     if args.write:
         path = os.path.join(REPO, "stats", "current.json")
-        with open(path) as fh:
-            stats = json.load(fh)
-        # The unreproducible fields go. Leaving them beside the measured ones would
-        # let a page keep reading the old key and stay wrong.
-        for dead in ("scan_speed_avg_ms", "scans_per_second_single_thread"):
-            stats.pop(dead, None)
-        stats.update(measured)
-        # Engine-truth counts, from the same source CHECK 24 validates against.
-        # publish.sh writes these at ship time; regenerating them here keeps the
-        # repo copy honest between ships, which is when the site copy is edited.
-        from sunglasses.patterns import PATTERNS
-        info = SunglassesEngine().info()
-        stats.pop("patterns", None)
-        stats["patterns_with_matcher"] = info["patterns_with_matcher"]
-        stats["listed_patterns"] = info["listed_patterns"]
-        stats["keywords"] = info["keywords"]
-        stats["categories"] = len({(p.get("category") or "").strip()
-                                   for p in PATTERNS if (p.get("category") or "").strip()})
-        with open(path, "w") as fh:
-            json.dump(stats, fh, indent=2)
-            fh.write("\n")
+        write_full(path, measured)
         print(f"wrote {path}")
 
 
