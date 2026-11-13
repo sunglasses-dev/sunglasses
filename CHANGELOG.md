@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- A rule that accepts either of two wordings in one check finds the second wording wherever it stands in the text.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed
