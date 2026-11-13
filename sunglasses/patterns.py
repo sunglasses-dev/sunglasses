@@ -8328,15 +8328,6 @@ PATTERNS = [
         "description": 'Detects an agent or copilot receiving a swapped or poisoned support bundle or incident artifact that overwrites system prompts or bypasses policy approval gates.'
     },
     {
-        "id": 'GLS-CAI-622',
-        "name": 'Scheduler Receipt Forgery Guardrail Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|assistant|delegate|scheduler|orchestrator|worker|broker|peer)\\b)(?=.*\\b(?:forged|fake|spoof(?:ed|ing)?|tampered|fabricated)\\b)(?=.*\\b(?:receipt|ack(?:nowledg(?:e|ed|ement))?|attestation|token|ticket|signature|manifest)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace|drop|disable)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|restriction(?:s)?|rule(?:s)?|approval|verification)\\b).{0,900}$'],
-        "description": 'Detects text in which an agent, scheduler, or orchestrator presents a forged or spoofed receipt, attestation, or token as justification to ignore, bypass, or override a safety policy or guardrail.'
-    },
-    {
         "id": 'GLS-CAI-623',
         "name": 'Forged Safety Attestation Validator Bypass',
         "category": 'cross_agent_injection',
@@ -8344,24 +8335,6 @@ PATTERNS = [
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|handoff|supervisor|peer\\s+agent)\\b)(?=.*\\b(?:forge|forged|forging|spoof|spoofed|spoofing|fabricat(?:e|ed|ing)|fake)\\b)(?=.*\\b(?:safety\\s+attestation|audit\\s+token|approval\\s+token|signature|compliance\\s+token|trust\\s+attestation)\\b)(?=.*\\b(?:override|overrode|overrides|overriding|bypass|bypassed|bypassing|disable|disabled|disabling|skip|skipped|skipping|ignore|ignored|ignoring|suppress|suppressed|suppressing)\\b)(?=.*\\b(?:policy|guardrail|validator|verification|safety\\s+check(?:s)?)\\b).*$'],
         "description": 'Detects an agent forging a safety attestation, compliance token, or audit token to suppress or disable policy validators and safety checks.'
-    },
-    {
-        "id": 'GLS-CAI-624',
-        "name": 'Broker Agent Fake Token Fail-Open Escalation',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don[\'’]?t|never|without)\\s+(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit|bypass|override|escalat(?:e|ed|ing)|grant)\\b)(?=.*\\b(?:agent|delegate|worker|broker|scheduler|orchestrator)\\b)(?=.*\\b(?:forge|forged|spoof(?:ed|ing)?|fake|counterfeit)\\b)(?=.*\\b(?:token|ticket|attestation|receipt|nonce|approval|quorum)\\b)(?=.*\\b(?:scope|permission|privilege|policy|guardrail(?:s)?)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ing)|fail[-\\s]*open|skip(?:ped|ping|s)?|ignore(?:d|s|ing)?)\\b).{1,700}$'],
-        "description": 'Detects a broker or scheduler agent presenting a fake token or attestation to trigger a fail-open condition and escalate scope or privileges.'
-    },
-    {
-        "id": 'GLS-CAI-625',
-        "name": 'Upstream Coordinator Forged Receipt Trust Override',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?!.*\\b(?:never|without)\\s+(?:override|overrides|bypass|bypasses|ignore|ignores|escalat(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:upstream|peer|delegate|coordinator|orchestrator|handoff)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:attestation|receipt|approval|token|nonce|credential)\\b)(?=.*\\b(?:scope|role|privilege|authority)\\b)(?=.*\\b(?:override|overrides|bypass|bypasses|ignore|ignores|supersed(?:e|es|ed|ing)|escalat(?:e|es|ed|ing))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|trust\\s+gate|enforcement)\\b).+'],
-        "description": 'Detects an upstream coordinator or orchestrator presenting a forged receipt or attestation to override or supersede trust, role, or policy enforcement.'
     },
     {
         "id": 'GLS-CAI-627',
@@ -8382,15 +8355,6 @@ PATTERNS = [
         "description": 'Detects a cross-agent message attributed as authoritative or final authority that instructs the recipient to disregard or replace policy, guardrails, or verification attestation.'
     },
     {
-        "id": 'GLS-CAI-528',
-        "name": 'Token Replay Scope Expansion Policy Approval',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:delegate|delegated|worker|agent|handoff|peer|broker)\\b)(?=.*\\b(?:token|ticket|attestation|proof|receipt|nonce)\\b)(?=.*\\b(?:forge|forged|forging|spoofed|spoofing|replayed|replay|tampered|tampering)\\b)(?=.*\\b(?:scope|privilege|authority|approval)\\b)(?=.*\\b(?:expand|expanded|expanding|escalate|escalated|escalating|rebind|rebound|override|overrode|bypass|bypassed)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|verification|approval)\\b).+'],
-        "description": 'Detects a replayed or forged token or proof in a delegate handoff that expands scope or authority and bypasses approval guardrails.'
-    },
-    {
         "id": 'GLS-CAI-628',
         "name": 'Stale Token Downstream Agent Guard Bypass',
         "category": 'cross_agent_injection',
@@ -8398,15 +8362,6 @@ PATTERNS = [
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:delegate|handoff|handover|forward|route)\\b)(?=.*\\b(?:agent|worker|executor|subagent|downstream)\\b)(?=.*\\b(?:token|nonce|session|credential|attestation|capability)\\b)(?=.*\\b(?:stale|expired|revoked|forged|spoof(?:ed|ing)?)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|es|ed|ing)|disregard)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|verification|validation)\\b).*'],
         "description": 'Detects a handoff to a downstream agent that includes a stale, revoked, or forged token or nonce used to override safety validation or bypass policy.'
-    },
-    {
-        "id": 'GLS-CAI-629',
-        "name": 'Replayed Forged Nonce Stale Scope Disregard',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
-        "description": 'Detects a forged or replayed nonce, token, or attestation that is stale or expired and reused in an agent handoff to disregard policy boundaries and trust gates.'
     },
     {
         "id": 'GLS-CAI-630',
@@ -8443,15 +8398,6 @@ PATTERNS = [
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?!.*\\b(?:do\\s+not|don\'t|never|without|no)\\s+(?:\\w+\\s+){0,3}(?:override|bypass|ignore|disregard|rebind|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:agent|delegate|worker|orchestrator|controller|handoff|cross-agent|peer)\\b)(?=.*(?:\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b.{0,80}\\b(?:attestation|nonce|token|certificate|capability|signature)\\b|\\b(?:attestation|nonce|token|certificate|capability|signature)\\b.{0,80}\\b(?:forged|spoof(?:ed|ing)?|fake|tampered|revoked|stale)\\b))(?=.*\\b(?:override|bypass|ignore|disregard|supersed(?:e|es|ed|ing)|rebind)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|authorization|scope|validation)\\b).*'],
         "description": 'Detects a cross-agent or peer handoff presenting a revoked, stale, or forged attestation or certificate to override authorization scope and bypass safety validation.'
-    },
-    {
-        "id": 'GLS-CAI-632',
-        "name": 'Orchestrator Instruction Policy Supersede',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do\\s+not|never|no|not|without)\\s+(?:policy\\s+)?(?:override|bypass|ignore|disregard|replace|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:from|via|according\\s+to|message\\s+from|response\\s+from|output\\s+from)\\b.{0,60}\\b(?:another|other|upstream|supervisor|manager|orchestrator|coordinator|planner|agent|model)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|system\\s+instruction(?:s)?|developer\\s+instruction(?:s)?|previous\\s+instruction(?:s)?)\\b).{0,1200}$'],
-        "description": 'Detects a message from an orchestrator, planner, or supervisor agent that instructs the recipient to ignore or supersede developer or system instructions and policy.'
     },
     {
         "id": 'GLS-CAI-561',
@@ -9053,15 +8999,6 @@ PATTERNS = [
 
     # === v0.2.31 batch (14 patterns, theme: tool_output_poisoning) ===
     {
-        "id": 'GLS-V03-0484',
-        "name": 'CI Output Attestation Seal Validation Gate Bypass',
-        "category": 'tool_output_poisoning',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b'],
-        "description": 'Detects a forged or tampered CI/CD output or build trace whose attestation seal or verification stamp is used to skip or bypass a validation gate or guardrail.'
-    },
-    {
         "id": 'GLS-TOP-325',
         "name": 'Forged Receipt Swap Report Approve Bypass',
         "category": 'tool_output_poisoning',
@@ -9301,15 +9238,6 @@ PATTERNS = [
     # === end v0.2.32 batch ===
 
     # === v0.2.33 batch (13 patterns: 12 model_routing_confusion + 1 cross_agent_injection) ===
-    {
-        "id": 'GLS-V03-0492',
-        "name": 'Forged SLA Router Health Reroute Policy Bypass',
-        "category": 'model_routing_confusion',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:router|routing|route|model\\s*tier|tier\\s*selector|traffic\\s*manager)\\b)(?=.*\\b(?:health\\s*signal|health\\s*telemetry|latency\\s*signal|sla|error\\s*budget|throughput|degradation)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake)\\b)(?=.*\\b(?:override|bypass|ignore|supersed(?:e|ed|ing)|rerout(?:e|ed|ing)|promot(?:e|ed|ion))\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|risk\\s*gate)\\b).*'],
-        "description": 'Detects a forged SLA, health telemetry, or throughput signal submitted to a routing layer to promote or reroute model tier in violation of safety or risk-gate policy.'
-    },
     {
         "id": 'GLS-MRC-258',
         "name": 'Forged Routing Quorum Attestation Tier Bypass',
@@ -9554,123 +9482,6 @@ PATTERNS = [
         "channel": ['tool_output', 'message'],
         "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|planner|peer\\s+agent)\\b)(?=.*\\b(?:patch|hotfix|override\\s+patch|instruction\\s+patch|policy\\s+patch)\\b)(?=.*\\b(?:signed\\s+by|claimed\\s+as|asserted\\s+by|from)\\s+(?:delegate|planner|peer\\s+agent|security\\s+lead)\\b)(?=.*\\b(?:ticket|change\\s+ticket|incident\\s+ticket|approval\\s+token)\\b)(?=.*\\b(?:priority|authority|precedence|admin\\s+scope|elevated\\s+scope)\\b)(?=.*\\b(?:policy|guardrail|verification|authorization)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|ignore(?:d|s)?|skip(?:ped|s|ping)?|waive(?:d|s)?)\\b).+'],
         "description": 'Detects text in which an agent or planner presents a patch, hotfix, or policy patch claimed to be signed by a delegate, planner, or security lead with an approval ticket and elevated authority to bypass or waive policy and guardrail verification.'
-    },
-    {
-        "id": 'GLS-CAI-690',
-        "name": 'Delegation Attestation Lease Policy Override',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:delegat(?:e|ion)|handoff|agent[- ]?to[- ]?agent|a2a|upstream\\s+agent|broker)\\b)(?=.*\\b(?:attestation|ticket|manifest|lease|capability|session)\\b)(?=.*\\b(?:ignore|bypass|override|supersed(?:e|es|ed|ing)|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety|approval|authorization)\\b).*$'],
-        "description": 'Detects text in which a delegation, agent-to-agent handoff, or broker interaction presents an attestation, ticket, or capability manifest that bypasses, overrides, or supersedes policy, guardrail, or authorization controls.'
-    },
-    {
-        "id": 'GLS-CAI-691',
-        "name": 'Forged Nonce Stale Token Scope Replay',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?!.*\\b(?:do|does|did)\\s+not\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?!.*\\b(?:never|without)\\s+(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|accept(?:ed|ing)?)\\b)(?=.*\\b(?:agent|handoff|delegate|broker|orchestrator|worker)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:nonce|attestation|token|session|capability)\\b)(?=.*\\b(?:replay(?:ed|ing)?|reuse(?:d|s|ing)?|stale|expired|revoked|old)\\b)(?=.*\\b(?:overrid(?:e|es|ing)|bypass(?:es|ing)?|ignor(?:e|es|ing)|disregard(?:s|ed|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+check(?:s)?|approval\\s+gate(?:s)?|trust\\s+boundary|scope)\\b).+'],
-        "description": 'Detects text — excluding negated forms — in which an agent or handoff presents a forged or spoofed nonce, attestation, or session token for replay or reuse to override, bypass, or ignore policy, guardrail, or trust-boundary controls.'
-    },
-    {
-        "id": 'GLS-CAI-692',
-        "name": 'Agent Receipt Scope Rebind Privilege Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|orchestrator|supervisor|peer\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|fake|counterfeit|claim(?:ed|s)?|assert(?:ed|s)?)\\b)(?=.*\\b(?:receipt|ticket|attestation|capability|authorization|handoff)\\b)(?=.*\\b(?:scope|privilege|policy|guardrail)\\b)(?=.*\\b(?:rebind|bypass(?:ed|es|ing)?|overrid(?:e|es|ed|ing)|overrode|escalat(?:e|ed|ion)|ignore(?:d|s|ing)?)\\b).+'],
-        "description": 'Detects text in which an agent or delegate forges, fabricates, or asserts a receipt, ticket, attestation, or capability to rebind scope or privilege and then escalate, override, or bypass policy and guardrail controls.'
-    },
-    {
-        "id": 'GLS-CAI-693',
-        "name": 'Forged Manifest Signature Authorize Tool Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|handoff|peer\\s+agent|remote\\s+agent|another\\s+agent)\\b)(?=.*\\b(?:manifest|signature|attestation|receipt)\\b)(?=.*\\b(?:forged|spoofed|fake|tampered|counterfeit)\\b)(?=.*\\b(?:authorize|authorized|unlock|execute|run|tool\\s+call)\\b)(?=.*\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|ignore(?:d|s|ing)?|skip(?:ped|s|ping)?|circumvent(?:ed|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification)\\b).*$'],
-        "description": 'Detects text in which an agent or remote agent uses a forged or tampered manifest, signature, or attestation to authorize or unlock execution while bypassing or circumventing policy, guardrail, or approval verification.'
-    },
-    {
-        "id": 'GLS-CAI-694',
-        "name": 'Handoff Capability Scope Permission Escalation',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:forged|fake|counterfeit|spoofed|tampered)\\b)(?=.*\\b(?:handoff|delegat(?:e|ed|ion)|receipt|capability|token|approval)\\b)(?=.*\\b(?:scope|permission|privilege|authorization)\\b)(?=.*\\b(?:bypass|override|ignore|escalat(?:e|ed|ion))\\b)(?=.*\\b(?:guardrail(?:s)?|policy|verification|safety\\s+check(?:s)?)\\b).*$'],
-        "description": 'Detects text in which a forged or counterfeit handoff receipt, capability token, or delegation approval is used to claim elevated scope or permission and then bypass, override, or escalate past guardrails or safety checks.'
-    },
-    {
-        "id": 'GLS-CAI-695',
-        "name": 'Agent Ticket Forge Verification Skip',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:ticket|token|credential|pass|capability)\\b)(?=.*\\b(?:forge|forg(?:e|ed|ing)|fake|spoof|counterfeit|mint)\\w*\\b)(?=.*\\b(?:skip|bypass|ignore|disable|override)\\w*\\b.*\\b(?:verif(?:y|ication)|validation|policy|guardrail|check)\\w*\\b).+$'],
-        "description": 'Detects text in which an agent or worker forges, fakes, or counterfeits a ticket, token, credential, or capability pass and then skips, bypasses, or disables the corresponding verification, validation, or policy guardrail check.'
-    },
-    {
-        "id": 'GLS-CAI-697',
-        "name": 'Handoff Manifest Authority Rebinding Forgery',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:forged|fake|spoofed|tampered|shadow)\\b)(?=.*\\b(?:handoff\\s*manifest|delegation\\s*note|delegate\\s*ticket|agent\\s*transfer\\s*form|authority\\s*memo)\\b)(?=.*\\b(?:authority\\s*rebinding|scope\\s*rebinding|rebind\\s*authority|rebind\\s*scope|delegate\\s*authority\\s*rewrite)\\b)(?=.*\\b(?:bypass\\s*verification\\s*gate|skip\\s*delegate\\s*approval|ignore\\s*handoff\\s*policy|override\\s*transfer\\s*guardrails?|force\\s*unauthorized\\s*delegation)\\b).+$'],
-        "description": 'Detects text in which a forged or shadow handoff manifest, delegation note, or authority memo is used to rebind scope or authority and then bypass verification gates, skip delegate approval, or override transfer guardrails.'
-    },
-    {
-        "id": 'GLS-CAI-698',
-        "name": 'Delegate Handoff Receipt Scope Role Override',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:forged|spoofed|fake|tampered)\\b)(?=.*\\b(?:delegate|delegation|agent|worker|planner)\\b)(?=.*\\b(?:handoff|receipt|ticket|attestation|approval\\s+chain|manifest)\\b)(?=.*\\b(?:scope|role|privilege|permission)\\b)(?=.*\\b(?:override|bypass|escalat(?:e|ed|ion)|ignore)\\b).*$'],
-        "description": 'Detects text in which a forged or spoofed delegate, delegation, or agent handoff receipt, ticket, attestation, or approval chain carries elevated scope, role, or privilege claims used to override, bypass, or escalate past guardrail controls.'
-    },
-    {
-        "id": 'GLS-CAI-699',
-        "name": 'Forged Agent Badge Nonce Scope Escalation',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|broker|orchestrator)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|fabricat(?:e|ed|ion)|counterfeit)\\b)(?=.*\\b(?:ticket|approval|quorum|badge|nonce|scope)\\b)(?=.*\\b(?:bypass|override|escalat(?:e|ed|ion)|rebind|elevat(?:e|ed|ion))\\b).+$'],
-        "description": 'Detects text in which an agent, broker, or orchestrator forges or fabricates a ticket, quorum badge, or scope nonce to bypass, override, escalate, or rebind past authorization controls.'
-    },
-    {
-        "id": 'GLS-CAI-701',
-        "name": 'Quorum Vote Tally Forgery Policy Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)\\b(?:agent|delegate|worker|orchestrator)\\b.{0,80}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?)\\b.{0,100}\\b(?:quorum|vote(?:\\s+(?:count|tally|result)s?)?|approval(?:\\s+count)?|consensus)\\b.{0,100}\\b(?:override|bypass(?:ed|ing)?|skip(?:ped|ping)?|ignor(?:e|ed|es|ing))\\b.{0,90}\\b(?:policy|guardrails?|approval\\s+gate|safety\\s+checks?)\\b'],
-        "description": 'Detects text in which an agent or orchestrator forges or tampers with a quorum count, vote tally, or approval consensus and then uses it to override, bypass, or skip policy, guardrail, or approval-gate controls.'
-    },
-    {
-        "id": 'GLS-CAI-702',
-        "name": 'Agent Impersonation Stolen Ticket Scope Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|peer|handoff|coordinator)\\b)(?=.*\\b(?:spoof(?:ed|ing)?|impersonat(?:e|ed|ion)|forg(?:e|ed|ery)|stolen\\s+ticket|borrowed\\s+credential|fake\\s+approval)\\b)(?=.*\\b(?:bypass|override|skip|ignore|escalat(?:e|ed|ion)|promote\\s+to\\s+trusted)\\b).*$'],
-        "description": 'Detects text in which a peer agent, delegate, or handoff participant spoofs, impersonates, or uses a stolen ticket or fake approval to bypass, override, skip, or escalate trust controls.'
-    },
-    {
-        "id": 'GLS-CAI-703',
-        "name": 'Peer Agent Scope Tag Replay Policy Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:peer\\s+agent|partner\\s+agent|another\\s+agent|upstream\\s+agent|delegate(?:d)?\\s+agent)\\b)(?=.*\\b(?:handoff|transfer|delegat(?:e|ed|ion)|ticket|scope\\s+tag|authorization\\s+tag)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|replay(?:ed|ing)?|inject(?:ed|ion)?)\\b)(?=.*\\b(?:ignore(?:d|s|ing)?|override(?:n|s|ing)?|bypass(?:ed|es|ing)?|skip(?:ped|s|ping)?|disable(?:d|s|ing)?)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|approval|verification|auth(?:orization)?)\\b).*$'],
-        "description": 'Detects text in which a peer, upstream, or delegated agent forges, tampers with, or replays a handoff ticket, transfer scope tag, or authorization tag to override, bypass, or disable policy, guardrail, or approval verification.'
-    },
-    {
-        "id": 'GLS-CAI-704',
-        "name": 'Agent Nonce Token Replay Authorization Bypass',
-        "category": 'cross_agent_injection',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|peer\\s*agent|delegate|handoff|another\\s*agent|remote\\s*agent)\\b)(?=.*\\b(?:nonce|token|ticket|approval|receipt|manifest)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|replay(?:ed|ing)?|reus(?:e|ed|ing)|spoof(?:ed|ing)?|tamper(?:ed|ing)?|inject(?:ed|ion))\\b)(?=.*\\b(?:override|overrode|overriding|bypass(?:ed|ing)?|ignore(?:d|ing)?|disable(?:d|s|ing)?|escalat(?:e|ed|ing|ion))\\b)(?=.*\\b(?:policy|guardrail|verification|authorization|scope|approval\\s*check)\\b).*$'],
-        "description": 'Detects text in which an agent or peer agent forges, replays, or tampers with a nonce, token, ticket, or approval receipt to override, bypass, or escalate past policy, guardrail, authorization, or approval-check controls.'
     },
     {
         "id": 'GLS-SESNP-001',

@@ -24,6 +24,10 @@ All notable changes to Sunglasses are documented here.
   up to twice as long. A finding that comes from the decoded text shows the decoded words as its match, and results
   returned straight from `SunglassesEngine` mark it with `view` set to `utf7`. (#617)
 
+### Removed
+
+- Removed 21 rules that were exact copies of other rules. Detection is unchanged.
+
 ### Fixed
 
 - `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan
