@@ -48,6 +48,16 @@ FAST_EXTENSIONS = {
 }
 
 
+def _merge_warnings(*lists) -> list:
+    """The warnings of each list, in order, each text once."""
+    out = []
+    for items in lists:
+        for w in items or ():
+            if w not in out:
+                out.append(w)
+    return out
+
+
 class SunglassesScanner:
     """
     Unified SUNGLASSES scanner with FAST and DEEP modes.
@@ -176,6 +186,10 @@ class SunglassesScanner:
 
         extraction = extract_file_sources(file_path)
         result = self.engine.scan(extraction.text, channel="file")
+        # A scan that could not finish reading what it was given says so on the result, next to
+        # what the extractor reported. Both count: the file was read only if each side says so.
+        complete = bool(extraction.complete) and bool(getattr(result, "extraction_complete", True))
+        warnings = _merge_warnings(extraction.warnings, getattr(result, "extraction_warnings", None))
 
         # The axes are no longer computed here. `normalize()` owns that decision for
         # every surface in the package (see sunglasses/result.py) -- this function's
@@ -184,9 +198,9 @@ class SunglassesScanner:
         # all agree.
         return normalize(
             {
-                "extraction_complete": bool(extraction.complete),
+                "extraction_complete": complete,
                 "truncated": bool(getattr(result, "truncated", False)),
-                "warnings": list(extraction.warnings),
+                "warnings": warnings,
                 "findings": list(result.findings),
                 "threat_found": bool(getattr(result, "threat_found", not result.is_clean)),
                 "decision": result.decision,
@@ -324,9 +338,9 @@ class SunglassesScanner:
         return normalize(
             {
                 "threat_found": bool(result.threat_found),
-                "extraction_complete": not warnings,
+                "extraction_complete": not warnings and bool(getattr(result, "extraction_complete", True)),
                 "truncated": bool(result.truncated),
-                "warnings": warnings,
+                "warnings": _merge_warnings(warnings, getattr(result, "extraction_warnings", None)),
                 "findings": list(result.findings),
                 "decision": result.decision,
                 "channel": "file",
