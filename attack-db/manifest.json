@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-07T05:58:13.293630Z",
+  "generated_at": "2026-11-12T23:50:00.238260Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1584,
+  "total_patterns": 1564,
   "categories": {
     "prompt-injection": 52,
     "data-exfiltration": 43,
@@ -44,10 +44,10 @@
     "multi-stage-encoding": 3,
     "tool-output-poisoning": 82,
     "provenance-chain-fracture": 11,
-    "cross-agent-injection": 111,
+    "cross-agent-injection": 92,
     "retrieval-poisoning": 76,
     "tool-chain-race": 11,
-    "model-routing-confusion": 28,
+    "model-routing-confusion": 27,
     "context-flooding": 5,
     "agent-persona-drift": 5,
     "error-message-leakage": 3,
