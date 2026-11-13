@@ -110,7 +110,7 @@ def main():
             "regex": pattern.get("regex", []),
             "examples": examples,
             "references": ["https://genai.owasp.org/llmrisk/llm01-prompt-injection/"],
-            "contributed_by": "AZ Rollin",
+            "contributed_by": "Sunglasses Team",
             "date_added": "2026-03-28"
         }
 

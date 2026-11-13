@@ -393,7 +393,7 @@ jobs:
           TITLE="stats: ${VERSION} last_updated is the PyPI upload time"
           BODY="Stats only (one file, the last_updated and last_updated_by fields). The local publish script, which used to write last_updated, does not run for a release cut by the release workflow, and the site stamp gate requires last_updated to fall on the same day as released. last_updated is the PyPI upload time of the ${VERSION} wheel in Pacific time, and last_updated_by is release.yml, the workflow that opened this pull request. It was opened with the workflow token, so CI does not start on it: close and reopen it once, then merge when it is green."
           git switch -c "$BRANCH"
-          git -c user.name="AZ Rollin" -c user.email="263686995+azrollin@users.noreply.github.com" \
+          git -c user.name="AZ" -c user.email="263686995+azrollin@users.noreply.github.com" \
             commit -q -m "$TITLE" -- stats/current.json
           git push origin "HEAD:refs/heads/$BRANCH"
           if gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"; then

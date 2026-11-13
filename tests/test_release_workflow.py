@@ -759,7 +759,7 @@ def test_the_pr_step_pushes_one_new_branch_and_opens_the_pull_request(tmp_path):
     assert g("for-each-ref", "--format=%(refname:short)", "refs/heads").split() == ["main", "stats/1.2.3-last-updated"]
     assert g("diff", "--name-only", "main", "stats/1.2.3-last-updated").split() == ["stats/current.json"]
     assert g("log", "-1", "--format=%an <%ae>|%B", "stats/1.2.3-last-updated").strip() == \
-        "AZ Rollin <263686995+azrollin@users.noreply.github.com>|stats: 1.2.3 last_updated is the PyPI upload time"
+        "AZ <263686995+azrollin@users.noreply.github.com>|stats: 1.2.3 last_updated is the PyPI upload time"
     log = (tmp_path / "gh.log").read_text()
     assert "pr create --repo o/r --base main --head stats/1.2.3-last-updated --title stats: 1.2.3 last_updated is the PyPI upload time" in log
     assert not re.search(r"claude|anthropic|opus|sonnet|fable|astra|codex|gpt|co-authored|generated with|\bT(8|9|10|11)\b", log, re.I)
