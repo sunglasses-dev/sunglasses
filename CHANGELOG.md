@@ -20,6 +20,9 @@ All notable changes to Sunglasses are documented here.
 
 - An OpenAI style or Anthropic style key written directly after another character is reported. After a digit, and for the Anthropic style after a letter, it keeps its full severity. An OpenAI style key directly after a letter is held for review (quarantine) by two new rules, because an id after a word such as task or disk looks the same.
 
+- The rule for context flooding matches text that names what is pushed out of the context, such as the system prompt or earlier
+  instructions.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

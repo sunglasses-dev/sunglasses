@@ -5911,7 +5911,7 @@ PATTERNS = [
             "pad window overflow earlier instructions",
         ],
         "regex": [
-            r'(?is)(?=.*\b(?:repeat|duplicate|pad(?:ding)?|flood|stuff|fill)\b)(?=.*\b(?:context|window|token(?:s)?|prompt)\b)(?=.*\b(?:ignore(?:d)?|drop(?:s|ped)?|evict(?:ed)?|cut(?:s)?\s*off|push(?:ed)?\s+out|overflow(?:s|ed)?)\b)',
+            r'(?is)(?=.*\b(?:repeat|duplicate|pad(?:ding)?|flood|stuff|fill)\b)(?=.*\b(?:context|prompt|(?:prompt|token)\s+window|tokens?\s+(?:limit|budget))\b)(?=.*\b(?:ignored|drop(?:s|ped)?|evict(?:ed|s)?|cut(?:s)?\s*off|push(?:ed|es)?\s+out|overflow(?:s|ed)?|(?:(?:will|would|should|must|may|can|to|then|and)\s+ignore|ignores)\s+(?:(?:the|all|any)\s+)?(?:system\s+(?:prompt|instructions?)|guardrails?|(?:earlier|prior|previous|original|initial|first)\s+(?:instructions?|rules)|safety\s+(?:rules|instructions?|guidelines)|polic(?:y|ies)))\b)(?=.*\b(?:system\s+(?:prompt|instructions?)|guardrails?|(?:earlier|prior|previous|original|initial|first)\s+(?:instructions?|rules)|safety\s+(?:rules|instructions?|guidelines)|polic(?:y|ies))\b)',
         ],
         "description": "Detects eviction-via-padding attacks — intentional context-window flooding via repeated/duplicated/padded tokens to push earlier guardrail/system-prompt instructions out of the window. First coverage for context_flooding — documented real vector for long-context models.",
     },
