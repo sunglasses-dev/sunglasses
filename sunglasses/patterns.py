@@ -864,8 +864,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "log_memory", "message"],
         "regex": [
-            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
-            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
+            r"(?<![A-Za-z])sk-[a-zA-Z0-9]{20,}",  # OpenAI shape, not right after a letter (a word like task or disk); that case is held by the medium rule pair
+            r"sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic shape
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -873,6 +873,17 @@ PATTERNS = [
             r"AKIA[0-9A-Z]{16}",               # AWS access key
         ],
         "description": "Known API key formats that should never appear in agent inputs."
+    },
+    {
+        "id": "GLS-SD-011",
+        "name": "API key pattern right after a letter",
+        "category": "secret_detection",
+        "severity": "medium",
+        "channel": ["file", "log_memory", "message"],
+        "regex": [
+            r"(?<=[A-Za-z])sk-(?=[a-zA-Z0-9]*(?-i:[A-Z]))(?=[a-zA-Z0-9]*(?-i:[a-z]))(?=[a-zA-Z0-9]*[0-9])[a-zA-Z0-9]{20,}",  # OpenAI shape directly after a letter, with a capital, a small letter and a digit in the run, as a real key has
+        ],
+        "description": "An OpenAI style key directly after a letter, with a capital, a small letter and a digit in the run. Held for review, because an id after a word like task or disk looks the same."
     },
     {
         "id": "GLS-SD-002",
@@ -2681,8 +2692,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "regex": [
-            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
-            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
+            r"(?<![A-Za-z])sk-[a-zA-Z0-9]{20,}",  # OpenAI shape, not right after a letter (a word like task or disk); that case is held by the medium rule pair
+            r"sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic shape
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -2690,6 +2701,17 @@ PATTERNS = [
             r"AKIA[0-9A-Z]{16}",               # AWS access key
         ],
         "description": "Known API key formats that should never appear in agent inputs."
+    },
+    {
+        "id": "GLS-SD-011-API",
+        "name": "API key pattern right after a letter (api_response)",
+        "category": "secret_detection",
+        "severity": "medium",
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
+        "regex": [
+            r"(?<=[A-Za-z])sk-(?=[a-zA-Z0-9]*(?-i:[A-Z]))(?=[a-zA-Z0-9]*(?-i:[a-z]))(?=[a-zA-Z0-9]*[0-9])[a-zA-Z0-9]{20,}",  # same shape as the rule for the other channels
+        ],
+        "description": "An OpenAI style key directly after a letter, with a capital, a small letter and a digit in the run. Held for review, because an id after a word like task or disk looks the same."
     },
     {
         "id": "GLS-SD-002-API",

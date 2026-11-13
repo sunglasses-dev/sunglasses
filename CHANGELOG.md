@@ -18,6 +18,8 @@ All notable changes to Sunglasses are documented here.
 
 - The environment config secret rule reads a line that starts with `export` and then one of its secret names the same way as the bare assignment, on the same channels.
 
+- An OpenAI style or Anthropic style key written directly after another character is reported. After a digit, and for the Anthropic style after a letter, it keeps its full severity. An OpenAI style key directly after a letter is held for review (quarantine) by two new rules, because an id after a word such as task or disk looks the same.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed
