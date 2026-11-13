@@ -23,6 +23,8 @@ All notable changes to Sunglasses are documented here.
 - The rule for context flooding matches text that names what is pushed out of the context, such as the system prompt or earlier
   instructions.
 
+- The rules for a metadata note that claims priority match when the note names the instructions, policy or rules it overrides.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed
