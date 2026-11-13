@@ -1401,6 +1401,32 @@ class _RawCopies:
         return shown
 
 
+class _PlacedMatch:
+    """A match made on a slice of a text, read at its place in the whole text.
+
+    `start`, `end`, `span` and `group` answer for the match as the text holds it, so the
+    context checks that read the words around a hit look at the right place. Only
+    the methods the engine's callers use are here."""
+    __slots__ = ("_m", "_at")
+
+    def __init__(self, match, at: int):
+        self._m = match
+        self._at = at
+
+    def start(self, *group):
+        return self._m.start(*group) + self._at
+
+    def end(self, *group):
+        return self._m.end(*group) + self._at
+
+    def span(self, *group):
+        a, b = self._m.span(*group)
+        return a + self._at, b + self._at
+
+    def group(self, *group):
+        return self._m.group(*group)
+
+
 class _ReadBudget:
     """The reads one walk over later occurrences of ONE regex in ONE text may make.
 
@@ -2272,7 +2298,7 @@ class SunglassesEngine:
                     return None
             return self._match_windowed(rx, text)
         if mode == "windowed":
-            return self._match_windowed(rx, text)
+            return self._match_windowed(rx, text, tail=True)
         if mode == "anchored":
             return self._match_anchored(rx, guards, text, start, memo)
         if mode == "leadin":
@@ -2516,19 +2542,34 @@ class SunglassesEngine:
                 pos = m.start() + 1
         return None
 
-    def _match_windowed(self, rx, text: str):
+    def _match_windowed(self, rx, text: str, tail: bool = False):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
         Short inputs (the normal attack-payload case) are matched whole; long
         documents only fire if the predicate's co-occurring signals appear inside
-        one window. Returns the first re.Match or None."""
+        one window. Returns the first re.Match or None.
+
+        `tail=True` (the windowed mode only, see `_eval_regex`) also tries the aligned
+        starts after the first window that reaches the end of the text, which the loop
+        used to skip: a phrase that starts in the last WINDOW - STRIDE characters of a
+        text a little over one window long sat at no window start and was never read.
+        The guarded mode keeps the old stop, because a rule that carries a length cap
+        in its own pattern (`^(?=.{0,500}$)`) would match a short tail window of a long
+        text and fire where its author meant it not to."""
         if len(text) <= self.COOCCUR_WINDOW:
             return rx.match(text)
+        past = False
         for i in range(0, len(text), self.COOCCUR_STRIDE):
             m = rx.match(text[i : i + self.COOCCUR_WINDOW])
             if m:
-                return m
+                # A match at a start the old loop never reached is returned at its
+                # place in the text, so the words before the window are read when
+                # the hit is checked for a negation. Matches at the old starts keep
+                # the span they always had.
+                return _PlacedMatch(m, i) if past else m
             if i + self.COOCCUR_WINDOW >= len(text):
-                break
+                if not tail:
+                    break
+                past = True
         return None
 
     @staticmethod
