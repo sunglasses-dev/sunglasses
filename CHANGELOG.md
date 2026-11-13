@@ -25,6 +25,8 @@ All notable changes to Sunglasses are documented here.
 
 - The rules for a metadata note that claims priority match when the note names the instructions, policy or rules it overrides.
 
+- The rules for a tool or prompt listing that poisons policy match when the text names what the listing overrides, suppresses or sends out.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

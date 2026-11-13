@@ -31,8 +31,6 @@
   "GLS-IDP-011": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-IP-006": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-IU-533": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-MCP-016": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-MCP-017": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-MCP-030": "2026-10-25 base-slow at 460b983, superlinear growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-MCP-057": "2026-10-25 base-slow at 460b983, superlinear growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-MCP-APT-209": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
