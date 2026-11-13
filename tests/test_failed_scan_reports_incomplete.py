@@ -106,6 +106,68 @@ def test_scan_fast_control_is_clean(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# an engine result that says incomplete without any warning in it
+# ---------------------------------------------------------------------------
+
+def engine_says_incomplete_without_a_warning(monkeypatch):
+    """The engine's own result is marked incomplete and carries no warning text. Only that flag says so."""
+    original = SunglassesEngine.scan
+
+    def scan(self, text, channel="message"):
+        result = original(self, text, channel=channel)
+        result.extraction_complete = False
+        result.extraction_warnings = []
+        return result
+
+    monkeypatch.setattr(SunglassesEngine, "scan", scan)
+
+
+def extractor_result(monkeypatch, complete):
+    """The extractor reports the file read as `complete` and holds no warning, whatever the engine says."""
+    from sunglasses import scanner
+    from sunglasses.extractors.dispatch import ExtractionResult
+
+    monkeypatch.setattr(
+        "sunglasses.extractors.dispatch.extract_file_sources",
+        lambda path: ExtractionResult([("note", BENIGN)], [], complete))
+    assert scanner  # the scanner imports the function when it runs, so the patch above is the one it uses
+
+
+def assert_incomplete_without_a_warning(doc):
+    assert doc["inspection_complete"] is False, doc
+    assert doc["extraction_complete"] is False, doc
+    assert doc["is_clean"] is False, doc
+    assert doc["threat_found"] is False, doc
+
+
+def test_scan_fast_preserves_engine_incomplete_without_warnings(monkeypatch, tmp_path):
+    extractor_result(monkeypatch, True)
+    engine_says_incomplete_without_a_warning(monkeypatch)
+    assert_incomplete_without_a_warning(SunglassesScanner().scan_fast(write(tmp_path, "note.txt", BENIGN_NOTE)))
+
+
+def test_text_file_helper_preserves_engine_incomplete_without_warnings(monkeypatch, tmp_path):
+    engine_says_incomplete_without_a_warning(monkeypatch)
+    assert_incomplete_without_a_warning(SunglassesScanner()._scan_text_file(write(tmp_path, "note.txt", BENIGN_NOTE)))
+
+
+@pytest.mark.parametrize("extractor_complete,engine_incomplete", [(False, False), (True, True), (False, True)])
+def test_scan_fast_requires_both_completeness_flags_without_warnings(
+        monkeypatch, tmp_path, extractor_complete, engine_incomplete):
+    """The file counts as read only when the extractor and the engine both say so. No flag pair gets a warning."""
+    extractor_result(monkeypatch, extractor_complete)
+    if engine_incomplete:
+        engine_says_incomplete_without_a_warning(monkeypatch)
+    doc = SunglassesScanner().scan_fast(write(tmp_path, "note.txt", BENIGN_NOTE))
+    assert_incomplete_without_a_warning(doc)
+
+
+def test_scan_fast_with_both_flags_complete_is_clean(monkeypatch, tmp_path):
+    extractor_result(monkeypatch, True)
+    assert_complete_and_clean(SunglassesScanner().scan_fast(write(tmp_path, "note.txt", BENIGN_NOTE)))
+
+
+# ---------------------------------------------------------------------------
 # scan_auto
 # ---------------------------------------------------------------------------
 
