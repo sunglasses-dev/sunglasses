@@ -1401,6 +1401,32 @@ class _RawCopies:
         return shown
 
 
+class _PlacedMatch:
+    """A match made on a slice of a text, read at its place in the whole text.
+
+    `start`, `end`, `span` and `group` answer for the match as the text holds it, so the
+    context checks that read the words around a hit look at the right place. Only
+    the methods the engine's callers use are here."""
+    __slots__ = ("_m", "_at")
+
+    def __init__(self, match, at: int):
+        self._m = match
+        self._at = at
+
+    def start(self, *group):
+        return self._m.start(*group) + self._at
+
+    def end(self, *group):
+        return self._m.end(*group) + self._at
+
+    def span(self, *group):
+        a, b = self._m.span(*group)
+        return a + self._at, b + self._at
+
+    def group(self, *group):
+        return self._m.group(*group)
+
+
 class _ReadBudget:
     """The reads one walk over later occurrences of ONE regex in ONE text may make.
 
@@ -2531,12 +2557,19 @@ class SunglassesEngine:
         text and fire where its author meant it not to."""
         if len(text) <= self.COOCCUR_WINDOW:
             return rx.match(text)
+        past = False
         for i in range(0, len(text), self.COOCCUR_STRIDE):
             m = rx.match(text[i : i + self.COOCCUR_WINDOW])
             if m:
-                return m
-            if not tail and i + self.COOCCUR_WINDOW >= len(text):
-                break
+                # A match at a start the old loop never reached is returned at its
+                # place in the text, so the words before the window are read when
+                # the hit is checked for a negation. Matches at the old starts keep
+                # the span they always had.
+                return _PlacedMatch(m, i) if past else m
+            if i + self.COOCCUR_WINDOW >= len(text):
+                if not tail:
+                    break
+                past = True
         return None
 
     @staticmethod

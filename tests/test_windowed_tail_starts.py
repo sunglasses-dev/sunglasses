@@ -78,3 +78,46 @@ def test_no_window_starts_past_the_end_of_the_text(engine):
     """A rule that matches an empty or a very short window must not be handed one that starts after the text ends."""
     short = re.compile(r"(?s)^(?=.{0,5}$)")
     assert engine._match_windowed(short, "y" * 1300, tail=True) is None
+
+
+# the place of a tail match ------------------------------------------------------------------------------------------
+def finding(engine, text):
+    result = engine.scan(text, channel="file")
+    return result, [f for f in result.findings if f["id"] == RULE]
+
+
+def lead(words):
+    """Text in which the phrase starts at 1200, a stride start whose window holds only the phrase and what follows."""
+    pad = 1200 - len(words)
+    return "a " * (pad // 2) + "a" * (pad % 2) + words + PHRASE + ".\n"
+
+
+def test_a_prohibition_in_front_of_a_tail_start_still_downgrades(engine):
+    """The words before the window are read: a prohibition that sits left of the window keeps the finding at review."""
+    text = lead("OK\nDo not ")
+    assert text.index(PHRASE) == 1200
+    result, found = finding(engine, text)
+    assert found and found[0]["severity"] == "review" and found[0].get("negation_context")
+    assert result.decision != "block"
+
+
+def test_the_affirmative_sentence_at_the_same_place_is_still_found(engine):
+    text = lead("OK\nPlease ")
+    assert text.index(PHRASE) == 1200
+    result, found = finding(engine, text)
+    assert found and found[0]["severity"] == "high" and not found[0].get("negation_context")
+    assert result.decision == "block"
+
+
+def test_a_tail_match_reports_its_place_in_the_text(engine):
+    m = engine._match_windowed(CAP, TEXT, tail=True)
+    assert (m.start(), m.end(), m.span(), m.group(0)) == (1200, 1201, (1200, 1201), "x")
+
+
+def test_a_match_at_an_old_start_keeps_the_span_it_always_had(engine):
+    """Only the starts the loop did not reach before are placed in the text; an old hit stays a plain match."""
+    rx = re.compile(r"(?s)^x")
+    text = "y" * 600 + "x" + "z" * 1500
+    m = engine._match_windowed(rx, text, tail=True)
+    assert isinstance(m, re.Match) and m.span() == (0, 1)
+    assert engine._match_windowed(rx, text) is not None and engine._match_windowed(rx, text).span() == (0, 1)
