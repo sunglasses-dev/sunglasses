@@ -237,6 +237,25 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
     }
 
 
+def _without_view_mark(node: Any) -> Any:
+    """`node` with the in-memory `view` mark (C1191, a finding that came from decoded UTF-7) removed from every
+    finding under a `findings` or `threats` key, however deep. Done by field name at the one place every file,
+    deep and MCP result passes through, so the mark stays a library field and never reaches a document an agent
+    or a file reads. A finding with no mark is passed on as it is."""
+    if isinstance(node, dict):
+        out = {}
+        for field, inner in node.items():
+            if field in ("findings", "threats") and isinstance(inner, list):
+                out[field] = [{k: v for k, v in item.items() if k != "view"}
+                              if isinstance(item, dict) and "view" in item else item for item in inner]
+            else:
+                out[field] = _without_view_mark(inner)
+        return out
+    if isinstance(node, list):
+        return [_without_view_mark(item) for item in node]
+    return node
+
+
 def normalize(obj: Any, *, source: Optional[str] = None, extra: Optional[dict] = None) -> dict:
     """Return the canonical result dict for any scan output in this package.
 
@@ -270,7 +289,7 @@ def normalize(obj: Any, *, source: Optional[str] = None, extra: Optional[dict] =
     if extra:
         merged.update({k: v for k, v in extra.items() if k not in CANONICAL_KEYS})
     merged.update(core)
-    return merged
+    return _without_view_mark(merged)
 
 
 def _is_scan_result(obj: Any) -> bool:
