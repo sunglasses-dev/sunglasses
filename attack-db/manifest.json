@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-11-12T23:50:00.238260Z",
+  "generated_at": "2026-11-13T00:21:58.157334Z",
   "source": "sunglasses/patterns.py",
-  "total_patterns": 1564,
+  "total_patterns": 1563,
   "categories": {
     "prompt-injection": 52,
     "data-exfiltration": 43,
@@ -42,7 +42,7 @@
     "social-engineering-ui": 13,
     "memory-eviction-rehydration": 8,
     "multi-stage-encoding": 3,
-    "tool-output-poisoning": 82,
+    "tool-output-poisoning": 81,
     "provenance-chain-fracture": 11,
     "cross-agent-injection": 92,
     "retrieval-poisoning": 76,

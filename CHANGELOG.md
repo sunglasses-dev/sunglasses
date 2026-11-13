@@ -26,7 +26,7 @@ All notable changes to Sunglasses are documented here.
 
 ### Removed
 
-- Removed 20 rules that were exact copies of other rules. Detection is unchanged.
+- Removed 21 rules that were exact copies of other rules. Detection is unchanged.
 
 ### Fixed
 

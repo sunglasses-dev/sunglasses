@@ -8999,15 +8999,6 @@ PATTERNS = [
 
     # === v0.2.31 batch (14 patterns, theme: tool_output_poisoning) ===
     {
-        "id": 'GLS-V03-0484',
-        "name": 'CI Output Attestation Seal Validation Gate Bypass',
-        "category": 'tool_output_poisoning',
-        "severity": 'high',
-        "channel": ['tool_output', 'message'],
-        "regex": ['(?is)\\b(?:stdout|log|trace|artifact|build\\s+output|ci(?:/cd)?\\s+output)\\b.{0,140}\\b(?:forg(?:e|ed|ing)|spoof(?:ed|ing)?|fake|tamper(?:ed|ing)?|counterfeit)\\b.{0,160}\\b(?:signature|attestation|checksum|verification\\s+stamp|audit\\s+seal)\\b.{0,160}\\b(?:bypass(?:ed|es|ing)?|override(?:d|s|ing)?|disable(?:d|s|ing)?|skip(?:ped|s|ping)?)\\b.{0,140}\\b(?:guardrail(?:s)?|policy(?:\\s+check)?|sanitizer|validation(?:\\s+gate)?)\\b'],
-        "description": 'Detects a forged or tampered CI/CD output or build trace whose attestation seal or verification stamp is used to skip or bypass a validation gate or guardrail.'
-    },
-    {
         "id": 'GLS-TOP-325',
         "name": 'Forged Receipt Swap Report Approve Bypass',
         "category": 'tool_output_poisoning',
