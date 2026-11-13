@@ -2468,7 +2468,7 @@ PATTERNS = [
             "AWS_SECRET_ACCESS_KEY=",
         ],
         "regex": [
-            r"(?m)^(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
+            r"(?m)^(?:export[ \t]+)?(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
         ],
         "description": "Detects environment variable / config file secret leakage patterns."
     },

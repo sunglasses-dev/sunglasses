@@ -16,6 +16,8 @@ All notable changes to Sunglasses are documented here.
   that fetches over the network and then runs a string as code is found as well. Lookalikes that do not run the
   downloaded text stay clear.
 
+- The environment config secret rule reads a line that starts with `export` and then one of its secret names the same way as the bare assignment, on the same channels.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed
