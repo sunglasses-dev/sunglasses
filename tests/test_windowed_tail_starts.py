@@ -1,16 +1,9 @@
-"""The windowed mode tries the aligned window starts at the end of a text (C1218 step 0).
+"""The windowed mode tries the aligned window starts at the end of a text.
 
-A lookahead-led rule is matched against windows of COOCCUR_WINDOW (1200) characters that start every COOCCUR_STRIDE (600). The loop used to stop at the
-first window that reached the end of the text, so the starts after it were never tried: a phrase that begins at a stride start inside the last
-WINDOW - STRIDE characters of a text a little over one window long sat at no window start and was not read. With the phrase at 1200, 1800 or 3000 and
-little text after it, the rule missed; with 600 characters after it, it hit.
+A lookahead-led rule is matched against windows of COOCCUR_WINDOW (1200) characters that start every COOCCUR_STRIDE (600). The loop tries every aligned start inside the text, the ones in the last window included, so the result does not depend on how much text follows a phrase.
 
 The fix is only for the `windowed` mode. The `guarded` mode keeps its stop: a rule that carries a length cap in its own pattern (`^(?=.{0,500}$)`)
 would match a short tail window of a long text and fire where its author meant it not to.
-
-KNOWN GAP, not fixed here (class P, next step of C1218): the geometry still reads only the starts at multiples of 600. A phrase-led rule whose
-phrase begins anywhere else (300, 450, 900, 5000) is missed on a text longer than one window. The two tests that pin those say so, and the test
-fails when the gap closes, so the note gets removed with it.
 """
 import re
 
@@ -44,7 +37,7 @@ def test_the_rule_is_a_windowed_one(engine):
 @pytest.mark.parametrize("pos", [1200, 1800, 3000, 6000])
 @pytest.mark.parametrize("after", [0, 30])
 def test_a_phrase_at_a_late_stride_start_is_read_with_little_text_after_it(engine, pos, after):
-    """Before this change: miss. With 600 or more characters after it the old loop still hit, so the same phrase at the same place hit or missed by what followed."""
+    """A phrase at a late window start is read whether little or a lot of text follows it."""
     assert fires(engine, at(pos, after))
 
 
@@ -61,13 +54,6 @@ def test_the_same_phrase_hits_with_text_after_it_as_before(engine, pos):
     assert fires(engine, at(pos, 600))
 
 
-@pytest.mark.parametrize("pos", [300, 450, 900, 5000])
-def test_known_gap_class_p_a_phrase_off_the_stride_grid_is_still_missed(engine, pos):
-    """KNOWN GAP (C1218 class P): not a window start, so not read. This FAILS when the phrase-led evaluator lands, and the gap note goes with it."""
-    for after in (0, 30, 600):
-        assert not fires(engine, at(pos, after)), f"no longer missed at {pos}+{after}: remove the known gap note"
-
-
 # the mode split, on a synthetic rule so no real rule's text decides the test ------------------------------------------
 CAP = re.compile(r"(?s)^(?=.{0,500}$)x")          # the shape of a length capped rule: it means a SHORT text
 TEXT = "y" * 1200 + "x" + "z" * 99               # 1300 characters; the only 'x' is at 1200, a stride start whose window has 100 characters
@@ -78,7 +64,7 @@ def test_the_windowed_mode_reads_the_tail_start(engine):
 
 
 def test_the_guarded_mode_does_not(engine):
-    """A long text must not fire a rule written for a short one because its tail window happens to be short."""
+    """The guarded mode stops at the first window that reaches the end, as before."""
     assert engine._eval_regex("guarded", CAP, [], TEXT) is None
 
 
