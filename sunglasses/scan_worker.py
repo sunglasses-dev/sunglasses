@@ -135,7 +135,7 @@ def _plain(result):
     """Every value a `ScanResult` holds, as JSON. The list is pinned by a test against the class."""
     return {
         "event_id": result.event_id, "decision": result.decision,
-        # the `view` mark (C1191) stays on the engine's own results and never goes over the wire
+        # the `view` mark stays on the engine's own results and never goes over the wire
         "findings": [{k: v for k, v in f.items() if k != "view"} if "view" in f else f for f in result.findings],
         "raw_input": result.raw_input, "normalized_input": result.normalized_input,
         "channel": result.channel, "latency_ms": result.latency_ms, "truncated": result.truncated,
