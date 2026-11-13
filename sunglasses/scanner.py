@@ -69,7 +69,7 @@ class SunglassesScanner:
         """FAST: Scan text directly. Scan cost grows with input length; measured figures live in
         stats/current.json (regenerated each release)."""
         result = self.engine.scan(text, channel=channel)
-        # The `view` mark (C1191) lives only on results returned straight from SunglassesEngine. A fresh result per call, so the
+        # The `view` mark lives only on results returned straight from SunglassesEngine. A fresh result per call, so the
         # findings are edited in place; a finding from the decoded text keeps its decoded words as its match, only the field goes.
         result.findings = [{k: v for k, v in f.items() if k != "view"} if "view" in f else f for f in result.findings]
         return result

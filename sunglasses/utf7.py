@@ -1,4 +1,4 @@
-"""UTF-7 runs, read the way a model reads them (C1191).
+"""UTF-7 runs, read the way a model reads them.
 
 A model asked to "decode this UTF-7" will do it, and `+AEkAZwBuAG8AcgBl-` is `Ignore`. The
 engine's own steps decode HTML entities, percent escapes and base64, but not this form, so a
@@ -56,7 +56,7 @@ def _folds_to_ascii(char):
 
 
 # A lone surrogate is not a character at all (UTF-16 half left over by the codec) and is the only thing the view drops.
-# Private use and unassigned code points stay in the text: the view is the faithful decode (T9 13:59, ASTRA r3 R3-2).
+# Private use and unassigned code points stay in the text: the view is the faithful decode.
 _SURROGATES = re.compile("[\ud800-\udfff]")
 
 # Neutral characters: controls, spaces and the characters that render as nothing. Written as code point ranges, never read from
@@ -86,8 +86,7 @@ ASCII_STRETCH = 4
 
 def _has_ascii_stretch(text):
     """True when `text` holds ASCII_STRETCH or more characters in a row that are ASCII or fold to ASCII. A neutral character (a space,
-    a control, a zero width joiner, a no break space, ASCII or not) sits inside the stretch without counting and without breaking it
-    (T9 13:59, rule A as written)."""
+    a control, a zero width joiner, a no break space, ASCII or not) sits inside the stretch without counting and without breaking it."""
     run = 0
     for c in text:
         if _is_neutral(c):
@@ -104,11 +103,11 @@ def _has_ascii_stretch(text):
 def read_run(decoded):
     """The text of one decoded run as it goes into the view, or None when the run is not text.
 
-    Judged per character, never the whole run (C1191, T8 and T9 11:45): a newline, a tab, a zero width
+    Judged per character, never the whole run: a newline, a tab, a zero width
     joiner or a no break space inside a run used to make the whole run "not printable" and hide a full
     sentence a model still reads. The view is the faithful decode: the only thing removed is a lone surrogate (a UTF-16
     half the codec left over), by code point range. Private use and unassigned characters stay and count as "other"
-    below (T9 13:59, ASTRA r3 R3-2: no category table decides what is deleted, so no Python version does). Then one of:
+    below (no category table decides what is deleted, so no Python version does). Then one of:
     - every character is ASCII, a neutral one (control, space, invisible: pinned code point ranges) or one the engine
       folds to ASCII (see `_folds_to_ascii`), at any length. English written in UTF-7 decodes to ASCII,
       and a lone look alike letter (`+BD4-` is Cyrillic o) is exactly how a sentence is split;
@@ -141,7 +140,7 @@ def read_run(decoded):
     if scripts and max(scripts.values()) / sum(scripts.values()) >= 0.8:
         return text
     # A sentence with a few letters of other scripts in the same run (tail, head or middle) fails the one script test above, and
-    # a model still reads the sentence (T9 13:11, ASTRA r2 gap 2). So a stretch of ASCII_STRETCH characters in a row that are ASCII
+    # a model still reads the sentence. So a stretch of ASCII_STRETCH characters in a row that are ASCII
     # or fold to ASCII is also text. Random base64 looking text has no such stretch: a unit is ASCII or folds to ASCII about 1 time in 300.
     if _has_ascii_stretch(text):
         return text
@@ -163,9 +162,9 @@ def utf7_view(text):
         if end - (i + 1) >= MIN_BODY:
             # A body of 8 letters or more is decoded with errors="ignore": a stray base64 letter at the end of a run is
             # a "partial character" to the strict decoder, which then refuses the whole run, while a model reads
-            # everything before it (T9 11:46). A shorter body is decoded strictly: measured on 300 commit diffs, an
+            # everything before it. A shorter body is decoded strictly: measured on 300 commit diffs, an
             # identifier after a plus (`+ALL_FIRES`) is a 3 to 5 letter body whose leftover bits are not zero, and
-            # with "ignore" 17 of them built a view for no reason. A short run with a stray letter is a known gap.
+            # with "ignore" 17 of them built a view for no reason.
             body = text[i + 1:end]
             try:
                 decoded = read_run(codecs.decode(("+" + body + "-").encode("ascii"), "utf-7",

@@ -238,7 +238,7 @@ def _normalize_mapping(obj: dict, source: Optional[str]) -> dict:
 
 
 def _without_view_mark(node: Any) -> Any:
-    """`node` with the in-memory `view` mark (C1191, a finding that came from decoded UTF-7) removed from every
+    """`node` with the in-memory `view` mark (a finding that came from decoded UTF-7) removed from every
     finding under a `findings` or `threats` key, however deep. Done by field name at the one place every file,
     deep and MCP result passes through, so the mark stays a library field and never reaches a document an agent
     or a file reads. A finding with no mark is passed on as it is."""

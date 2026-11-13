@@ -3724,7 +3724,7 @@ class SunglassesEngine:
         """
         result = self._scan_in_context(text, channel)
         # UTF-7 runs are read by a model that is asked to decode them and by no step of the
-        # pipeline, so the text is scanned a second time with each readable run decoded (C1191).
+        # pipeline, so the text is scanned a second time with each readable run decoded.
         # The raw scan above is kept whole and the second one only adds to it, so a text that
         # blocks without this step blocks with it. One level: the view is not decoded again.
         # It is built on the text after the pipeline's own character, entity and percent steps
