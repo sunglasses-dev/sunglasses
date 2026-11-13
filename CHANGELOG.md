@@ -27,6 +27,8 @@ All notable changes to Sunglasses are documented here.
 
 - The rules for a tool or prompt listing that poisons policy match when the text names what the listing overrides, suppresses or sends out.
 
+- The rule for a stolen handoff that escalates scope matches when the text names the scope, approval or permission that is bypassed.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

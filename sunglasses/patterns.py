@@ -8439,7 +8439,7 @@ PATTERNS = [
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:handoff|handover|ticket|capability|nonce|scope)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|escalat(?:e|ed|ing|ion)|ignore(?:d|s|ing)?)\\b).*'],
+        "regex": [r"""(?is)^(?=.*\b(?:agent|delegate|worker|service)\b)(?=.*\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen|steal)\b(?:\W+\w+){0,5}?\W+(?:handoff|handover|ticket|capability|nonce|scope)\b)(?=.*(?:\b(?:overrid(?:e|es|ing|den)|overrode|bypass(?:es|ed|ing)?|escalat(?:e|es|ed|ing)|ignor(?:e|es|ed|ing)|skip(?:s|ped|ping)?)\b(?:\W+\w+){0,5}?\W+(?:(?:scope|authori[sz]ation|approval|permission)s?\b|nonce\s+(?:check|validation)|to\s+admin|checks?|limits?|capabilit\w+|validation)\b|\b(?:(?:scope|authori[sz]ation|approval|permission)s?\b|nonce\s+(?:check|validation)|to\s+admin|checks?|limits?|capabilit\w+|validation)\b(?:\W+\w+){0,5}?\W+(?:overrid(?:e|es|ing|den)|overrode|bypass(?:es|ed|ing)?|escalat(?:e|es|ed|ing)|ignor(?:e|es|ed|ing)|skip(?:s|ped|ping)?)\b)).*"""],
         "description": 'Detects a stolen or forged handoff capability or nonce used by an agent or service to escalate scope and override authorization.'
     },
     {
