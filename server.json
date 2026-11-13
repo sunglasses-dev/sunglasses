@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://sunglasses.dev",
-  "version": "0.6.21",
+  "version": "0.6.22",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "sunglasses",
-      "version": "0.6.21",
+      "version": "0.6.22",
       "transport": {
         "type": "stdio"
       },
