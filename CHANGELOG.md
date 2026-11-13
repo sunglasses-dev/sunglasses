@@ -9,6 +9,8 @@ All notable changes to Sunglasses are documented here.
 
 - A rule that accepts either of two wordings in one check finds the second wording wherever it stands in the text.
 
+- The rule for a reproduced training record matches when its words stand close together. A long guideline file that uses them in different sections stays allowed.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

@@ -28131,7 +28131,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?:(?=(\s*))\1)(?!.*\b(?:privacy\s+guidance|unit\s+test|incident\s+report|security\s+scanner\s+rule|must\s+not|do\s+not\s+copy|blocked\s+the\s+output|refuses?\s+verbatim|without\s+requesting|fictional|generalized|paraphrased|aggregate)\b)(?=.*\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b)(?=.*\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b)(?=.*\b(?:patient|private|clinical|identifier|record|note|narrative)\b).*$""",
+            r"""(?is)^(?:(?=(\s*))\1)(?!.*\b(?:privacy\s+guidance|unit\s+test|incident\s+report|security\s+scanner\s+rule|must\s+not|do\s+not\s+copy|blocked\s+the\s+output|refuses?\s+verbatim|without\s+requesting|fictional|generalized|paraphrased|aggregate)\b)(?=.*\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b)(?=.*\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b)(?=.*(?:\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b.{0,200}\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b|\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b.{0,200}\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b))(?=.*\b(?:patient|private|clinical|identifier|record|note|narrative)\b).*$""",
         ],
         "description": "A model-generated clinical augmentation output reproduces a memorized private training record verbatim, and a downstream agent accepts it as fresh synthetic evidence rather than detecting privacy leakage."
     },
