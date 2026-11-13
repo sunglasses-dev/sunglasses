@@ -1,5 +1,5 @@
 {
-  "version": "0.6.21",
+  "version": "0.6.22",
   "patterns_with_matcher": 1492,
   "listed_patterns": 1563,
   "keywords": 6675,
@@ -21,7 +21,7 @@
   "last_updated": "2026-11-11T21:01:00-08:00",
   "last_updated_by": "release.yml",
   "_note": "THIS IS THE SINGLE SOURCE OF TRUTH. All pages, JSON-LD, meta tags, llms.txt, and sitemap must read from this file. Do NOT hardcode numbers anywhere else.",
-  "released": "2026-11-11",
+  "released": "2026-11-13",
   "scan_speed": {
     "quickstart_median_ms": 1.538,
     "quickstart_input_chars": 18,
@@ -62,23 +62,23 @@
   "scan_speed_provenance": "Measured 2026-10-30 on the published sunglasses 0.6.16 wheel, Apple M3 Max (48GB), macOS 27, Python 3.14, 3 quiet runs, median run shown; 77-document corpus.",
   "normalization_stats_generated_by": "tools/gen_normalization_stats.py",
   "hook_speed": {
-    "hook_lane_off_min_ms": 30.5,
-    "hook_lane_off_median_ms": 31.8,
-    "hook_lane_on_min_ms": 94.0,
-    "hook_lane_on_median_ms": 95.0,
-    "python_start_min_ms": 21.8,
-    "python_start_median_ms": 23.3,
+    "hook_lane_off_min_ms": 25.6,
+    "hook_lane_off_median_ms": 26.2,
+    "hook_lane_on_min_ms": 83.2,
+    "hook_lane_on_median_ms": 84.1,
+    "python_start_min_ms": 17.9,
+    "python_start_median_ms": 18.2,
     "repeats": 15,
     "command": "python -m sunglasses.firewall",
     "command_shape": "benign Bash call (ls -la)",
     "scope": "whole child process wall clock, interpreter start included",
-    "version": "0.6.21",
+    "version": "0.6.22",
     "measured_on": {
       "machine": "arm64",
       "system": "Darwin 27.0.0",
       "python": "3.14.7"
     },
-    "measured_at": "2026-11-11T17:18:34-08:00",
+    "measured_at": "2026-11-13T12:49:18-08:00",
     "generated_by": "tools/gen_perf_stats.py"
   }
 }

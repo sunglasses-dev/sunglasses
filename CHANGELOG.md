@@ -5,6 +5,8 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.22] — 2026-11-13
+
 ### Changed
 
 - The source package (sdist) on PyPI no longer carries the test suite. Setuptools had been adding the
@@ -13,7 +15,7 @@ All notable changes to Sunglasses are documented here.
   looked like a runnable suite and was not. Run the tests from a git checkout. The wheel (what
   `pip install sunglasses` installs) is unchanged.
 
-- GLS-GHSA-PI-202: description no longer claims advisory grounding; no cited advisory exists for this rule. Detection unchanged.
+- The description of `GLS-GHSA-PI-202` no longer claims advisory grounding, because no cited advisory exists for this rule. Detection is unchanged.
 
 - The published scan speed phrases in `stats/current.json` print the typical attack string time with one decimal
   (`~3.8ms`), the way the README table does. The generator rounded it to a whole number (`~4ms`), so the two
@@ -34,7 +36,7 @@ All notable changes to Sunglasses are documented here.
 
 - A scan that could not finish returns the decision `not_inspected` from `scan_fast`, `scan_auto` and `scan_email`. The MCP `scan_file` and `scan_text` tools open their reply with the line `INCOMPLETE SCAN` and still return the full result. A SARIF report built from such a result sets `inspectionComplete` to false and lists what was not read under `notInspected`. The command line exit code is unchanged. A client that reads only the decision string should treat `not_inspected` as not clean.
 
-- `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the pattern-fire total a directory scan
+- `sunglasses scan --dir ... --report-to` now sends `raw_findings`, the total of pattern fires a directory scan
   counts. The upload field list did not name it, so it was dropped before sending and the receiver stored
   nothing for it. A `--file` scan has no such count and is sent without one. Nothing else in the upload changes.
 
