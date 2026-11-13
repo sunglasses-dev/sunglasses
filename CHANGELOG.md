@@ -29,6 +29,8 @@ All notable changes to Sunglasses are documented here.
 
 - The rule for a stolen handoff that escalates scope matches when the text names the scope, approval or permission that is bypassed.
 
+- The rule for a well-known discovery file that poisons agent policy matches when the text names the secret it sends out or the guard it switches off.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

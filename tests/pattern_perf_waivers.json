@@ -12,7 +12,6 @@
   "GLS-CICD-004": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-DFP-002": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-DFP-004": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-DFP-006": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-DFP-014": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-DFP-040": "2026-10-25 base-slow at 460b983, run cap after fast growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-DFP-044": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",

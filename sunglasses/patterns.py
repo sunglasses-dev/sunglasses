@@ -20088,7 +20088,7 @@ PATTERNS = [
             "host-meta.json",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:host-meta|xrd|jrd|webfinger|\.well-known))(?=.*(?:ai\s*(?:assistant|agent)|coding\s*agent|model|llm))(?=.*(?:ignore\s+(?:all\s+)?(?:previous|system|developer|repository)\s+instructions|highest[-\s]?priority|outranks?|env(?:ironment)?\s+variables?|api\s*keys?|secrets?|disable\s+(?:security|scanner)|do\s+not\s+report)).*""",
+            r"""(?is)^(?=.*(?:host-meta|xrd|jrd|webfinger|\.well-known))(?=.*(?:ai\s*(?:assistant|agent)|coding\s*agent|model|llm))(?:(?=.*(?:ignore\s+(?:all\s+)?(?:previous|system|developer|repository)\s+instructions|highest[-\s]?priority|outranks?\s+(?:the\s+)?(?:system|developer|repository|previous|prior)\s+instructions?|disable\s+(?:the\s+)?(?:security|scanner)(?![.\w-])|\b(?:do\s+not\s+report)\b(?:\W+\w+){0,2}?\W+(?:this|that|these|it|findings?|issues?|results?|vulnerabilit\w+|attacks?)\b))|(?=.*\b(?:api|secrets?|env))(?=.*(?:\b(?:send(?:s|ing)?|forward(?:s|ing)?|read(?:s|ing)?|includ(?:e|es|ing)|exfiltrat(?:e|es|ing)|upload(?:s|ing)?|hand\s+over|put(?:s|ting)?|e-?mail(?:s|ing)?|post(?:s|ing)?|paste|copy|copies|leak(?:s|ing)?|write|send)\b(?:\W+\w+){0,10}?\W+(?:(?:api\s*keys?|secrets?|env(?:ironment)?\s+variables?))\b|\b(?:api\s*keys?|secrets?|env(?:ironment)?\s+variables?)\b(?:\W+\w+){0,10}?\W+(?:go(?:es)?|is|are|be)\s+(?:sent\s+)?to\b))).*""",
         ],
         "description": "`/.well-known/host-meta` or `/.well-known/host-meta.json` can hide agent-facing authority inversion and secret-access instructions inside standards-shaped XRD/JRD discovery metadata."
     },
