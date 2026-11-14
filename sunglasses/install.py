@@ -2658,6 +2658,44 @@ def install(config_path, name, *, artifact, home, argv=None):
                                argv=argv)
 
 
+def launch_form(entry):
+    """`"OLD"` for a wrapper entry written with the bare `-m sunglasses.proxy` start (before the
+    import-path fix), else `"OK"`. Call it on an entry `classify` already called WRAPPED."""
+    args = entry.get("args") if isinstance(entry, dict) else None
+    if isinstance(args, list) and args[:len(LAUNCH) + 1] == [*LAUNCH, "--"]:
+        return "OLD"
+    return "OK"
+
+
+def has_old_launch_wrapper(config_path, name, *, artifact):
+    """True when `name` in `config_path` is a verified wrapper that still carries the old start."""
+    try:
+        target = pathlib.Path(config_path)
+        entry = _servers(_parse(_read_bytes(target), target), target).get(name)
+    except (OSError, ConfigIOError, ConfigConflict):
+        return False
+    return (isinstance(entry, dict) and MARKER in entry
+            and classify(entry, artifact=artifact) == "WRAPPED"
+            and launch_form(entry) == "OLD")
+
+
+def rewrite_launch_form(config_path, name, *, artifact, home):
+    """Re-write an OLD-form wrapper in the current form: the recorded uninstall (which puts the
+    original entry back), then a fresh install. Each step is the ordinary transaction, so a
+    failure between them leaves the ORIGINAL entry in the file, never a half-written one, and
+    the error says so."""
+    if not has_old_launch_wrapper(config_path, name, artifact=artifact):
+        raise ConfigConflict(f"{name!r} is not a wrapper in the earlier launch form; nothing to rewrite")
+    uninstall(config_path, name, home=home)
+    try:
+        return install(config_path, name, artifact=artifact, home=home)
+    except (ConfigConflict, ConfigIOError) as e:
+        raise ConfigConflict(
+            f"the earlier wrapper for {name!r} was taken out and the original entry restored, but the "
+            f"new wrapper was not written ({e}); {name!r} is NOT wrapped now. Run: sunglasses install {name}"
+        ) from e
+
+
 def _install_locked(config_path, name, *, artifact, home, argv=None):
     artifact = pathlib.Path(artifact)
     try:

@@ -106,3 +106,30 @@ def test_doctor_reports_the_row_and_keeps_its_exit_code(tmp_path):
     js2 = run("--json", e=env2)
     assert "hook_launch" not in json.loads(js2.stdout)
     assert js.returncode == js2.returncode
+
+
+def test_init_over_an_old_hook_line_leaves_exactly_one_entry_of_ours_in_the_current_form(tmp_path):
+    """C1329, through the real `sunglasses init` in a sandboxed project and HOME: an OLD `-m` line
+    is replaced, not added to. One entry of ours remains, in the current form, and the entry
+    that belongs to someone else is untouched."""
+    home, project = tmp_path / "home", tmp_path / "proj"
+    project.mkdir()
+    home.mkdir()
+    settings = project / ".claude" / "settings.json"
+    settings.parent.mkdir()
+    other = {"matcher": "Bash", "hooks": [{"type": "command", "command": "/usr/bin/true"}]}
+    ours_old = {"matcher": ".*", "hooks": [{"type": "command", "command": OLD, "timeout": 10}]}
+    settings.write_text(json.dumps({"hooks": {"PreToolUse": [other, ours_old]}}))
+
+    env = {**os.environ, "HOME": str(home), "SUNGLASSES_HOME": str(home / ".sunglasses"),
+           "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.abspath(firewall.__file__)))}
+    done = subprocess.run([sys.executable, "-P", "-m", "sunglasses", "init"], cwd=str(project),
+                          env=env, capture_output=True, text=True, timeout=120)
+    assert done.returncode == 0, done.stderr
+
+    pre = json.loads(settings.read_text())["hooks"]["PreToolUse"]
+    ours = [h for e in pre for h in e["hooks"] if firewall.HOOK_MARKER in h["command"]]
+    assert len(ours) == 1
+    assert ours[0]["command"] == NEW
+    assert other in pre
+    assert [r["state"] for r in firewall.hook_launch_form([settings])] == ["OK"]
