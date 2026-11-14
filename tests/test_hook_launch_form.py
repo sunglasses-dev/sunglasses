@@ -92,7 +92,7 @@ def test_doctor_reports_the_row_and_keeps_its_exit_code(tmp_path):
     env = {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
     root = os.path.dirname(os.path.dirname(os.path.abspath(firewall.__file__)))
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
-    run = lambda *a, e=env: subprocess.run([sys.executable, "-P", "-m", "sunglasses", "doctor", *a],
+    run = lambda *a, e=env: subprocess.run([sys.executable, *_launch.module_args("sunglasses"), "doctor", *a],
                                            cwd=project, env=e, capture_output=True, text=True, timeout=120)
     js = run("--json")
     doc = json.loads(js.stdout)
@@ -123,7 +123,7 @@ def test_init_over_an_old_hook_line_leaves_exactly_one_entry_of_ours_in_the_curr
 
     env = {**os.environ, "HOME": str(home), "SUNGLASSES_HOME": str(home / ".sunglasses"),
            "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.abspath(firewall.__file__)))}
-    done = subprocess.run([sys.executable, "-P", "-m", "sunglasses", "init"], cwd=str(project),
+    done = subprocess.run([sys.executable, *_launch.module_args("sunglasses"), "init"], cwd=str(project),
                           env=env, capture_output=True, text=True, timeout=120)
     assert done.returncode == 0, done.stderr
 
