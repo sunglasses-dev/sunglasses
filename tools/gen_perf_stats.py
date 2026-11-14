@@ -28,9 +28,11 @@ The firewall hook is a different cost from a scan: it is a whole child process p
 call (interpreter start, imports, the check, exit). `hook_speed` records that, with the
 scope in the key names, so a page or README that quotes a per-call hook time cites one
 dated block instead of a number typed by hand:
-  hook_lane_off_*   the command the installer writes (`<python> -m <HOOK_MARKER>`, the marker is
-                    imported from sunglasses.firewall, never typed here) on a benign Bash call,
-                    warn lane off
+  hook_lane_off_*   the command the installer writes (built by sunglasses.firewall.build_hook_entry, the
+                    marker is never typed here) on a benign Bash call, warn lane off. It is started from
+                    this source checkout, put on the path the way an editable install would, so an
+                    installed copy can differ. The key `command` is a LABEL, not the argv: the argv
+                    differs per Python, so it is a fact about the machine
   hook_lane_on_*    the same with the lane marker present (`<SUNGLASSES_HOME>/warn-lane`)
   python_start_*    a bare interpreter start (`python -c pass`), the floor under both
 Each is the minimum and the median of `repeats` runs of the whole child process, wall
@@ -106,6 +108,9 @@ def _process_ms(argv, env, stdin, repeats):
     return min(samples), statistics.median(samples)
 
 
+HOOK_COMMAND_LABEL = "the hook command the installer writes"
+
+
 def hook_argv():
     """The argv of the hook the installer registers (`<python> -P -m <HOOK_MARKER>` on 3.11+, the start-up line on 3.9 and 3.10).
 
@@ -121,7 +126,6 @@ def hook_argv():
 def measure_hook(repeats=HOOK_REPEATS):
     """The whole-hook process time with the warn lane off and on, and the interpreter floor."""
     result = {}
-    ran = {}  # the argv each case actually ran, so the ledger names what was timed
     with tempfile.TemporaryDirectory() as off_home, tempfile.TemporaryDirectory() as on_home:
         open(os.path.join(on_home, "warn-lane"), "w").close()
         hook = hook_argv()
@@ -133,13 +137,12 @@ def measure_hook(repeats=HOOK_REPEATS):
             # checkout being measured is put there on purpose, the way an editable install would.
             env = {"HOME": home, "SUNGLASSES_HOME": home, "PYTHONPATH": REPO,
                    "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
-            ran[name] = list(argv)
             low, mid = _process_ms(argv, env, stdin, repeats)
             result[f"{name}_min_ms"] = round(low, 1)
             result[f"{name}_median_ms"] = round(mid, 1)
     result.update({
         "repeats": repeats,
-        "command": " ".join(["python"] + ran["hook_lane_off"][1:]),
+        "command": HOOK_COMMAND_LABEL,
         "command_shape": "benign Bash call (ls -la)",
         "scope": "whole child process wall clock, interpreter start included",
         "version": SUNGLASSES_VERSION,

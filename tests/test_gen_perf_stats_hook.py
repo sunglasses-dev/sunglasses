@@ -42,6 +42,9 @@ def test_measure_hook_emits_scoped_dated_keys():
     _check_block(block)
     assert block["repeats"] == 2
     assert block["version"] == gen.SUNGLASSES_VERSION
+    # a LABEL, not the argv (the argv differs per Python): no interpreter path, no flag, no module name
+    assert block["command"] == gen.HOOK_COMMAND_LABEL == "the hook command the installer writes"
+    assert HOOK_MARKER not in block["command"] and " -" not in block["command"]
 
 
 def test_hook_only_write_touches_nothing_else(tmp_path):
@@ -86,7 +89,7 @@ def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
     Pinning hook_argv() alone guards the helper, not the call site: a measure_hook that typed its
     own argv, or timed `python -c pass` as the hook, would stay green. Capture the argv at the
     timer and compare it with the installed command; the recorded `command` is derived from
-    the argv that ran, never a literal.
+    the argv that ran. The recorded `command` is a LABEL (the argv differs per Python).
     """
     seen = []
     lane_marker = []  # per call: does the HOME the child would get hold the warn-lane marker?
@@ -101,8 +104,7 @@ def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
     installed = shlex.split(build_hook_entry(interpreter=sys.executable)["hooks"][0]["command"])
     assert [argv for argv, _ in seen] == [installed, installed, [sys.executable, "-c", "pass"]]
     assert seen[0][1] is not None and seen[0][1] == seen[1][1]  # the same benign Bash call in both lanes
-    assert block["command"] == "python " + " ".join(installed[1:])
-    assert HOOK_MARKER in block["command"]
+    assert block["command"] == gen.HOOK_COMMAND_LABEL
     # lane off is timed in a HOME without the marker, lane on in a HOME with it: two lanes timed
     # in the same HOME would measure one thing twice (the interpreter-floor call is lane-less).
     assert lane_marker[:2] == [False, True]

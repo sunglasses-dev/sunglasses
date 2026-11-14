@@ -20,8 +20,9 @@ THE PACKAGE ROOT, for a child we start ourselves. A child must still find `sungl
 its parent got the package from the current folder (an uninstalled checkout, our own test
 suite). So the parent hands the child its own package root in the start-up line, and the
 child appends it to the END of the path, and only when `sunglasses` cannot be found any other
-way. It is never put ahead of the standard library, and it is the parent's own package
-folder, never the folder being scanned.
+way. It is never put ahead of the standard library. It is the folder that holds the package the
+parent itself imported, not a folder chosen by what is being scanned; it can be the scanned
+folder only when the checkout that holds the package is the thing being scanned.
 """
 
 import shlex
