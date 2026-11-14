@@ -306,8 +306,15 @@ _IGNORABLE_CLASS = "".join(
     for lo, hi in IGNORABLE_RANGES)
 IGNORABLE_CHARS = re.compile(f"[{_IGNORABLE_CLASS}]+")
 
-# Characters that are not whitespace to a regex but are drawn as a blank.
-BLANKS = {'\u2800': ' '}   # Braille pattern blank
+# Characters drawn as a blank that a literal space does not match. The Braille blank is not
+# whitespace to a regex at all. Next control (U+0085) and Ogham space mark (U+1680) are
+# whitespace to `\s` but NFKC leaves them alone (it turns no-break, en, em and ideographic
+# spaces into a plain space), so a rule that spells a word gap as a literal space for the
+# prefilter, such as the api key object of GLS-DFP-006, would otherwise stop reading them as the
+# gap they were before.
+BLANKS = {'\u2800': ' ',   # Braille pattern blank
+          '\x85': ' ',     # next line
+          '\u1680': ' '}   # Ogham space mark
 
 # One translation table: HOMOGLYPHS (look-alike letters), the punctuation
 # look-alikes and the blanks. Every entry maps one code point to one code point, so the fold

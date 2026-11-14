@@ -110,19 +110,19 @@ def test_exactly_the_tool_result_rules_reach_tool_output():
     declared = sorted(p["id"] for p in PATTERNS
                       if p["id"].startswith("GLS-SD-") and "tool_output" in p["channel"])
     assert declared == _TOOL_RESULT_RULES
-    assert len(declared) == 9
+    assert len(declared) == 10
 
 
 @pytest.mark.parametrize("parent", ["GLS-SD-001", "GLS-SD-002", "GLS-SD-003", "GLS-SD-004",
                                     "GLS-SD-006", "GLS-SD-007", "GLS-SD-008", "GLS-SD-009",
-                                    "GLS-SD-010"])
+                                    "GLS-SD-010", "GLS-SD-011"])
 def test_the_parents_do_not_reach_tool_output(parent):
     by_id = {p["id"]: p for p in PATTERNS}
     assert "tool_output" not in by_id[parent]["channel"], parent
 
 
-def test_removing_the_nine_reopens_tool_output():
-    """With the nine gone, a key printed by a tool is allowed again: this change is what closes it."""
+def test_removing_the_ten_reopens_tool_output():
+    """With the ten gone, a key printed by a tool is allowed again: this change is what closes it."""
     engine = SunglassesEngine(patterns=[p for p in PATTERNS if p["id"] not in _TOOL_RESULT_RULES])
     for rule_id in sorted(rows.TOKENS):
         text = cat_env(rows.TOKENS[rule_id])

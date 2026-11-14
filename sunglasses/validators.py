@@ -97,7 +97,7 @@ prompt can be turned off.
 
 This is a reader of words, not a shell. It does not model reachability beyond a few
 word-level cases (``false && ...``, ``exit``), heredoc bodies, functions, other downloaders,
-interpreter-native fetches, array-form commands, or hook formats that are not JSON. Those are
+other interpreter code, array-form commands, or hook formats that are not JSON. Those are
 documented limits; the carriers still run.
 
 GLS-STRUCT-005 -- Python that prints, logs, writes or sends every environment variable
@@ -1202,6 +1202,50 @@ def _run_interpreter(kind, args):
     return _Run("file", operand=args[i])
 
 
+# An interpreter one-liner that fetches a body and runs it in the same code string. Per language: the
+# calls that fetch over the network, and the calls that run a string as code.
+# `.eval(` and `literal_eval(` are not the runner (a preceding word character or dot is excluded).
+_INLINE_FETCH = {
+    "python": re.compile(r"\b(urlopen|requests\.get|httpx\.get)\s*\("),
+    "node": re.compile(r"(?<![\w.])(fetch)\s*\(|\b(https?\.get)\s*\(|(require\(\s*[\x27\x22]https?[\x27\x22]\s*\)\.get)\s*\(|\b(axios\.get)\s*\("),
+    "perl": re.compile(r"\b(LWP::Simple|LWP::UserAgent|HTTP::Tiny)\b"),
+    "ruby": re.compile(r"\b(Net::HTTP|URI\.open|open-uri)\b|\b(URI\.parse)\s*\("),
+}
+_INLINE_RUN = {
+    "python": re.compile(r"(?<![\w.])(?:exec|eval)\s*\("),
+    "node": re.compile(r"(?<![\w.])(?:eval|Function)\s*\(|\bnew\s+Function\b|\.then\s*\(\s*eval\s*\)"),
+    "perl": re.compile(r"(?<![\w:$@%&])eval\b"),
+    "ruby": re.compile(r"(?<![\w.])(?:eval|instance_eval|class_eval)\b|\.(?:instance_eval|class_eval)\b"),
+}
+
+
+def _inline_fetch_and_run(kind, code):
+    """The fetching call when interpreter code fetches over the network and runs a string as code,
+    else None. The run follows the first fetch, or is the call that holds it as an argument. Names
+    are matched in the one code string; no data flow is followed."""
+    fetch = _INLINE_FETCH[kind].search(code)
+    if fetch is None:
+        return None
+    name = next(g for g in fetch.groups() if g)
+    run = _INLINE_RUN[kind]
+    if run.search(code, fetch.end()) is not None:
+        return name
+    held = None
+    for held in run.finditer(code, 0, fetch.start()):
+        pass
+    if held is None:
+        return None
+    depth = 1                           # the run's own open bracket
+    for ch in code[held.end():fetch.start()]:
+        if ch in ";\n":
+            return None
+        depth += ch == "(" or ch == "{" or ch == "["
+        depth -= ch == ")" or ch == "}" or ch == "]"
+        if depth <= 0:
+            return None
+    return name
+
+
 def _evidence(link, fetch, runner):
     return {"link": link, "fetch": fetch, "runner": runner}
 
@@ -1467,6 +1511,11 @@ def _walk(cmd, depth, downloaded, links=True):
         if name in ("true", ":") and segment.sep_after == "||":
             dead_or = True
             continue
+        if links and head.lead and head.subs:
+            # the command word is itself a substitution: the shell runs what the substitution prints
+            fetched = _fetches_to_stdout(head.subs[0], depth + 1)
+            if fetched:
+                return _evidence("command_substitution", fetched, "command"), emitted
         if name in ("curl", "wget"):
             _forget_overwritten(segment, name, args, downloaded)   # every `>` target is emptied first
             fetch = _parse_fetch(name, args, _stdout_redirects(segment))
@@ -1565,6 +1614,11 @@ def _link(run, name, args, got, downloaded, depth):
                 fetched = _fetches_to_stdout(body, depth + 1)
                 if fetched:
                     return _evidence("command_substitution", fetched, name)
+        kind = _interpreter_kind(name)
+        if kind:
+            fetched = _inline_fetch_and_run(kind, word.value)
+            if fetched:
+                return _evidence("inline_code", fetched, name)
         if name in _SHELLS or name == "eval":
             if depth < _MAX_NESTED_COMMANDS:
                 text = word.value if name != "eval" else " ".join(a.value for a in args if a.kind == "w")

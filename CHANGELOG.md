@@ -5,6 +5,32 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- A rule that accepts either of two wordings in one check finds the second wording wherever it stands in the text.
+
+- The rule for a reproduced training record matches when its words stand close together. A long guideline file that uses them in different sections stays allowed.
+
+- A hook command that starts with a command substitution of a download is found, because the shell runs
+  whatever the download prints. Interpreter code given on the command line (`python`, `node`, `perl`, `ruby`)
+  that fetches over the network and then runs a string as code is found as well. Lookalikes that do not run the
+  downloaded text stay clear.
+
+- The environment config secret rule reads a line that starts with `export` and then one of its secret names the same way as the bare assignment, on the same channels.
+
+- An OpenAI style or Anthropic style key written directly after another character is reported. After a digit, and for the Anthropic style after a letter, it keeps its full severity. An OpenAI style key directly after a letter is held for review (quarantine) by two new rules, because an id after a word such as task or disk looks the same.
+
+- The rule for context flooding matches text that names what is pushed out of the context, such as the system prompt or earlier
+  instructions.
+
+- The rules for a metadata note that claims priority match when the note names the instructions, policy or rules it overrides.
+
+- The rules for a tool or prompt listing that poisons policy match when the text names what the listing overrides, suppresses or sends out.
+
+- The rule for a stolen handoff that escalates scope matches when the text names the scope, approval or permission that is bypassed.
+
+- The rule for a well-known discovery file that poisons agent policy matches when the text names the secret it sends out or the guard it switches off.
+
 ## [0.6.22] — 2026-11-13
 
 ### Changed

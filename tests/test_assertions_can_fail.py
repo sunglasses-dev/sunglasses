@@ -69,6 +69,24 @@ SANCTIONED_SUBSETS = [
     {"file", "tool_output", "code"},
 ]
 
+# Sets sanctioned for ONE test file only, and only while that file still carries the tests that
+# make the omission safe. A global entry would let any other file omit these channels unseen.
+# GLS-SD-010 reads exactly message, file and code. test_sd010_export_prefix.py walks those three
+# for the export form, and asserts on its own that every channel the rule does not list stays clear.
+# The other channels are out BY DESIGN, not because a test was red: the rule is line anchored, and
+# that anchor cannot match inside a JSON string, which is how a tool result or an API answer
+# carries a line of text. That direction is a documented open gap (CHANGELOG 0.5.x, "GLS-SD-010's
+# open gap", and README "GLS-SD-010 is line anchored, and that is a limit in every channel"); the
+# embedded content rule that closes it is a separate card, so these channels are not this rule's job.
+# file name -> (channel set, test functions that must exist in that same file)
+FILE_SCOPED_SUBSETS = {
+    "test_sd010_export_prefix.py": (
+        {"message", "file", "code"},
+        {"test_a_channel_the_rule_does_not_list_stays_clear",
+         "test_the_channels_of_the_rule_are_unchanged"},
+    ),
+}
+
 
 def _test_files():
     return sorted(p for p in TESTS_DIR.glob("test_*.py")
@@ -101,10 +119,11 @@ def test_no_assertion_is_unconditionally_true(path):
     )
 
 
-@pytest.mark.parametrize("path", _test_files(), ids=lambda p: p.name)
-def test_channel_lists_do_not_silently_omit_a_live_channel(path):
-    """A channel loop that skips a live channel tests less than it looks like."""
-    tree = ast.parse(path.read_text(), filename=str(path))
+def _partial_channel_offenders(file_name, tree):
+    """Channel lists in this file that omit a live channel without a sanction that applies to it."""
+    defined = {n.name for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    scoped_set, required = FILE_SCOPED_SUBSETS.get(file_name, (None, set()))
+    scope_holds = scoped_set is not None and required <= defined
     offenders = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.List, ast.Tuple, ast.Set)):
@@ -117,15 +136,26 @@ def test_channel_lists_do_not_silently_omit_a_live_channel(path):
             continue
         if known in SANCTIONED_SUBSETS or known == LIVE_CHANNELS:
             continue
+        if scope_holds and known == scoped_set:
+            continue
         missing = sorted(
             c for c in ("message", "file", "api_response", "tool_output")
             if c not in known)
         if missing:
             offenders.append((node.lineno, sorted(known), missing))
+    return offenders
+
+
+@pytest.mark.parametrize("path", _test_files(), ids=lambda p: p.name)
+def test_channel_lists_do_not_silently_omit_a_live_channel(path):
+    """A channel loop that skips a live channel tests less than it looks like."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    offenders = _partial_channel_offenders(path.name, tree)
     assert not offenders, (
         f"{path.name} iterates a partial channel list: {offenders}. "
         "If the omission is deliberate, add the set to SANCTIONED_SUBSETS with "
-        "the reason; otherwise the test is silent about the channel it skips."
+        "the reason (or to FILE_SCOPED_SUBSETS for one file, with the tests that make it safe); "
+        "otherwise the test is silent about the channel it skips."
     )
 
 
@@ -154,3 +184,23 @@ def test_this_lint_actually_catches_both_shapes(tmp_path):
             if len(known) >= 3 and known == names and "message" not in known:
                 hits.append(node.lineno)
     assert hits == [1], "the lint no longer detects a channel list missing message"
+
+
+def test_a_file_scoped_sanction_applies_to_its_own_file_and_only_while_its_tests_exist():
+    """The SD-010 omission is sanctioned in that one file, not as a set anyone may use."""
+    channels = 'CHANNELS = ["message", "file", "code"]\n'
+    # the reviewer's control: the same set in an unrelated file must be refused
+    assert _partial_channel_offenders("test_unrelated.py", ast.parse(channels)), \
+        "a channel list that omits live channels was accepted in a file with no sanction"
+    scoped_name = "test_sd010_export_prefix.py"
+    _, required = FILE_SCOPED_SUBSETS[scoped_name]
+    # in its own file with the complementary tests present: accepted
+    with_tests = channels + "".join(f"def {n}():\n    pass\n" for n in sorted(required))
+    assert _partial_channel_offenders(scoped_name, ast.parse(with_tests)) == []
+    # in its own file with one complementary test gone: refused again
+    one_gone = channels + "".join(f"def {n}():\n    pass\n" for n in sorted(required)[1:])
+    assert _partial_channel_offenders(scoped_name, ast.parse(one_gone)), \
+        "the sanction held with a complementary test missing"
+    # the real file still carries its tests
+    real = ast.parse((TESTS_DIR / scoped_name).read_text(), filename=scoped_name)
+    assert _partial_channel_offenders(scoped_name, real) == []

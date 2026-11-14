@@ -2,7 +2,7 @@
 
 `scan --channel tool_output` is a documented channel, and a reader could take it for the
 channel a tool's output is scanned under. The credential rules for a tool result are declared
-on it as well as on `api_response`: the eight `-API` rules and the JWT rule. The MCP proxy reads
+on it as well as on `api_response`: the nine `-API` rules and the JWT rule. The MCP proxy reads
 a tool result as `api_response`. The help text and the README say so, and this test compares
 those words with the rules and the proxy. It pins four facts: the proxy reads a tool result as
 `api_response`, every `-API` credential rule is declared on `api_response`, exactly those rules
@@ -87,7 +87,7 @@ def test_exactly_the_tool_result_credential_rules_are_declared_on_tool_output():
     expected = sorted(
         [p["id"] for p in _credential_rules() if p["id"].endswith("-API")] + ["GLS-SD-005"]
     )
-    assert len(expected) == 9
+    assert len(expected) == 10
     assert declared == expected, (
         f"credential rules declared on tool_output: {declared}; the reviewed set is {expected}. "
         "The help text and the README name this set; update them (and the CHANGELOG line) "

@@ -864,8 +864,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["file", "log_memory", "message"],
         "regex": [
-            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
-            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
+            r"(?<![A-Za-z])sk-[a-zA-Z0-9]{20,}",  # OpenAI shape, not right after a letter (a word like task or disk); that case is held by the medium rule pair
+            r"sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic shape
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -873,6 +873,17 @@ PATTERNS = [
             r"AKIA[0-9A-Z]{16}",               # AWS access key
         ],
         "description": "Known API key formats that should never appear in agent inputs."
+    },
+    {
+        "id": "GLS-SD-011",
+        "name": "API key pattern right after a letter",
+        "category": "secret_detection",
+        "severity": "medium",
+        "channel": ["file", "log_memory", "message"],
+        "regex": [
+            r"(?<=[A-Za-z])sk-(?=[a-zA-Z0-9]*(?-i:[A-Z]))(?=[a-zA-Z0-9]*(?-i:[a-z]))(?=[a-zA-Z0-9]*[0-9])[a-zA-Z0-9]{20,}",  # OpenAI shape directly after a letter, with a capital, a small letter and a digit in the run, as a real key has
+        ],
+        "description": "An OpenAI style key directly after a letter, with a capital, a small letter and a digit in the run. Held for review, because an id after a word like task or disk looks the same."
     },
     {
         "id": "GLS-SD-002",
@@ -2468,7 +2479,7 @@ PATTERNS = [
             "AWS_SECRET_ACCESS_KEY=",
         ],
         "regex": [
-            r"(?m)^(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
+            r"(?m)^(?:export[ \t]+)?(?:API_KEY|SECRET_KEY|ACCESS_KEY|TOKEN|PASSWORD|DATABASE_URL|OPENAI_API_KEY|ANTHROPIC_API_KEY|AWS_SECRET_ACCESS_KEY)\s*=",
         ],
         "description": "Detects environment variable / config file secret leakage patterns."
     },
@@ -2605,7 +2616,7 @@ PATTERNS = [
         "severity": 'high',
         "channel": ['api_response'],
         "regex": [
-            '(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|constraint(?:s)?)\\b).*',
+            '(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines|safety|security|guardrails?|constraints?)\\b)(?=.*\\b(?:ignor(?:e|es|ed|ing)|bypass(?:es|ed|ing)?|overrid(?:e|es|ing)|overrode|disregard(?:s|ed|ing)?|replac(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b(?:\\W+\\w+){0,12}?\\W+(?:(?:system|developer|previous|prior|earlier|original|initial)(?:\\s+(?:and|or)\\s+(?:system|developer|previous|prior))*\\s+(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines)|(?:safety|security)\\s+(?:rules?|checks?|instructions?|polic(?:y|ies)|guidelines|controls?)|guardrails?|(?:your|these|all\\s+(?:other\\s+)?)\\s*(?:previous\\s+|prior\\s+|earlier\\s+)?(?:instructions?|rules)|(?:instructions?|rules|constraints?|guidelines)\\s+(?:(?:that|which)\\s+)?(?:you\\s+(?:were|have\\s+been|had\\s+been|are)\\s+given|you\\s+(?:received|got|have\\s+received)|given\\s+to\\s+you))\\b).*',
         ],
         "description": 'Detects a metadata header, annotation, or manifest claiming authoritative precedence used to override or bypass policy, guardrails, or safety instructions.',
     },
@@ -2681,8 +2692,8 @@ PATTERNS = [
         "severity": "high",
         "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
         "regex": [
-            r"(?<![A-Za-z0-9])sk-[a-zA-Z0-9]{20,}",  # OpenAI, not inside a word (task-, disk-, risk-)
-            r"(?<![A-Za-z0-9])sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic, same left boundary
+            r"(?<![A-Za-z])sk-[a-zA-Z0-9]{20,}",  # OpenAI shape, not right after a letter (a word like task or disk); that case is held by the medium rule pair
+            r"sk-ant-[a-zA-Z0-9\-]{20,}",  # Anthropic shape
             r"AIza[0-9A-Za-z\-_]{35}",         # Google API
             r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
             r"glpat-[a-zA-Z0-9\-]{20}",        # GitLab PAT
@@ -2690,6 +2701,17 @@ PATTERNS = [
             r"AKIA[0-9A-Z]{16}",               # AWS access key
         ],
         "description": "Known API key formats that should never appear in agent inputs."
+    },
+    {
+        "id": "GLS-SD-011-API",
+        "name": "API key pattern right after a letter (api_response)",
+        "category": "secret_detection",
+        "severity": "medium",
+        "channel": ["api_response", "log_memory", "agent_input", "tool_output"],
+        "regex": [
+            r"(?<=[A-Za-z])sk-(?=[a-zA-Z0-9]*(?-i:[A-Z]))(?=[a-zA-Z0-9]*(?-i:[a-z]))(?=[a-zA-Z0-9]*[0-9])[a-zA-Z0-9]{20,}",  # same shape as the rule for the other channels
+        ],
+        "description": "An OpenAI style key directly after a letter, with a capital, a small letter and a digit in the run. Held for review, because an id after a word like task or disk looks the same."
     },
     {
         "id": "GLS-SD-002-API",
@@ -5889,7 +5911,7 @@ PATTERNS = [
             "pad window overflow earlier instructions",
         ],
         "regex": [
-            r'(?is)(?=.*\b(?:repeat|duplicate|pad(?:ding)?|flood|stuff|fill)\b)(?=.*\b(?:context|window|token(?:s)?|prompt)\b)(?=.*\b(?:ignore(?:d)?|drop(?:s|ped)?|evict(?:ed)?|cut(?:s)?\s*off|push(?:ed)?\s+out|overflow(?:s|ed)?)\b)',
+            r'(?is)(?=.*\b(?:repeat|duplicate|pad(?:ding)?|flood|stuff|fill)\b)(?=.*\b(?:context|prompt|(?:prompt|token)\s+window|tokens?\s+(?:limit|budget))\b)(?=.*\b(?:ignored|drop(?:s|ped)?|evict(?:ed|s)?|cut(?:s)?\s*off|push(?:ed|es)?\s+out|overflow(?:s|ed)?|(?:(?:will|would|should|must|may|can|to|then|and)\s+ignore|ignores)\s+(?:(?:the|all|any)\s+)?(?:system\s+(?:prompt|instructions?)|guardrails?|(?:earlier|prior|previous|original|initial|first)\s+(?:instructions?|rules)|safety\s+(?:rules|instructions?|guidelines)|polic(?:y|ies)))\b)(?=.*\b(?:system\s+(?:prompt|instructions?)|guardrails?|(?:earlier|prior|previous|original|initial|first)\s+(?:instructions?|rules)|safety\s+(?:rules|instructions?|guidelines)|polic(?:y|ies))\b)',
         ],
         "description": "Detects eviction-via-padding attacks — intentional context-window flooding via repeated/duplicated/padded tokens to push earlier guardrail/system-prompt instructions out of the window. First coverage for context_flooding — documented real vector for long-context models.",
     },
@@ -7976,7 +7998,7 @@ PATTERNS = [
         "category": 'tool_metadata_smuggling',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:ignore|bypass|override|disregard|replace)\\b)(?=.*\\b(?:policy|guardrail(?:s)?|safety\\s+(?:rule|rules|check|checks)|instruction(?:s)?|constraint(?:s)?)\\b).*'],
+        "regex": ['(?is)^(?=.*\\b(?:metadata|header|annotation|manifest|envelope|sidecar|front[- ]matter)\\b)(?=.*\\b(?:authoritative|source\\s+of\\s+truth|priority|precedence|takes?\\s+priority|priority\\s+over|supersed(?:e|es|ed|ing))\\b)(?=.*\\b(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines|safety|security|guardrails?|constraints?)\\b)(?=.*\\b(?:ignor(?:e|es|ed|ing)|bypass(?:es|ed|ing)?|overrid(?:e|es|ing)|overrode|disregard(?:s|ed|ing)?|replac(?:e|es|ed|ing)|supersed(?:e|es|ed|ing))\\b(?:\\W+\\w+){0,12}?\\W+(?:(?:system|developer|previous|prior|earlier|original|initial)(?:\\s+(?:and|or)\\s+(?:system|developer|previous|prior))*\\s+(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines)|(?:safety|security)\\s+(?:rules?|checks?|instructions?|polic(?:y|ies)|guidelines|controls?)|guardrails?|(?:your|these|all\\s+(?:other\\s+)?)\\s*(?:previous\\s+|prior\\s+|earlier\\s+)?(?:instructions?|rules)|(?:instructions?|rules|constraints?|guidelines)\\s+(?:(?:that|which)\\s+)?(?:you\\s+(?:were|have\\s+been|had\\s+been|are)\\s+given|you\\s+(?:received|got|have\\s+received)|given\\s+to\\s+you))\\b).*'],
         "description": 'Detects a metadata header, annotation, or manifest claiming authoritative precedence used to override or bypass policy, guardrails, or safety instructions.'
     },
     # --- tool_output_poisoning ---
@@ -8417,7 +8439,7 @@ PATTERNS = [
         "category": 'cross_agent_injection',
         "severity": 'high',
         "channel": ['tool_output', 'message'],
-        "regex": ['(?is)^(?=.*\\b(?:agent|delegate|worker|service)\\b)(?=.*\\b(?:handoff|handover|ticket|capability|nonce|scope)\\b)(?=.*\\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen)\\b)(?=.*\\b(?:(?:overrid(?:e|es|ed|ing)|overrode)|bypass(?:ed|es|ing)?|escalat(?:e|ed|ing|ion)|ignore(?:d|s|ing)?)\\b).*'],
+        "regex": [r"""(?is)^(?=.*\b(?:agent|delegate|worker|service)\b)(?=.*\b(?:forg(?:e|ed|ery)|fake|spoof(?:ed|ing)?|fabricat(?:e|ed|ing)|stolen|steal)\b(?:\W+\w+){0,5}?\W+(?:handoff|handover|ticket|capability|nonce|scope)\b)(?=.*(?:\b(?:overrid(?:e|es|ing|den)|overrode|bypass(?:es|ed|ing)?|escalat(?:e|es|ed|ing)|ignor(?:e|es|ed|ing)|skip(?:s|ped|ping)?)\b(?:\W+\w+){0,5}?\W+(?:(?:scope|authori[sz]ation|approval|permission)s?\b|nonce\s+(?:check|validation)|to\s+admin|checks?|limits?|capabilit\w+|validation)\b|\b(?:(?:scope|authori[sz]ation|approval|permission)s?\b|nonce\s+(?:check|validation)|to\s+admin|checks?|limits?|capabilit\w+|validation)\b(?:\W+\w+){0,5}?\W+(?:overrid(?:e|es|ing|den)|overrode|bypass(?:es|ed|ing)?|escalat(?:e|es|ed|ing)|ignor(?:e|es|ed|ing)|skip(?:s|ped|ping)?)\b)).*"""],
         "description": 'Detects a stolen or forged handoff capability or nonce used by an agent or service to escalate scope and override authorization.'
     },
     {
@@ -19314,7 +19336,7 @@ PATTERNS = [
             # 'bypass' on "SSRF bypass tests" changelog prose (claude-seo).
             # Same fix MCP-017 got in round 2: authority/suppression CLAIMS
             # only. Exfiltration verbs stay — they are the attack's payload.
-            r"""(?is)(?=.*\b(?:mcp(?:\.json|-server|\s+server)?|model\s+context\s+protocol|tools?\[?\]?\.description|tool\s+description|inputSchema|argument\s+schema|x-mcp|\.well-known/[^\s"'`]*mcp)\b)(?=.*\b(?:agent|assistant|model|tool\s+user|scanner)\b)(?=.*(?:\b(?:ignore|override|supersede|outrank|highest\s+priority|must\s+obey|takes\s+precedence|governing\s+policy)\b|do\s+not\s+(?:mention|report|flag)|\b(?:suppress|hide|omit|redact|exfiltrat\w*)\b))(?=.*\b(?:system|developer|previous\s+instructions|policy|secret|token|api[-_\s]*key|env(?:ironment)?\s*(?:var|variable)s?|hidden\s+config|workspace\s+policy|scanner\s+reports?)\b).*""",
+            r"""(?is)^(?=.*\b(?:mcp(?:\.json|-server|\s+server)?|model\s+context\s+protocol|tools?\[?\]?\.description|tool\s+description|inputSchema|argument\s+schema|x-mcp|\.well-known/[^\s\"'`]*mcp)\b)(?=.*\b(?:agent|assistant|model|tool\s+user|scanner)\b)(?=.*\b(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines|safety|security|guardrails?|secrets?|tokens?|api|credentials?|env\w*|runtime|hidden|findings?|reports?|vulnerabilit\w+|obey|follow|mention|governing|priority)\b)(?:(?=.*\b(?=[ostihdnmalgr])(?:\b(?:outranks?|supersed(?:e|es|ed|ing)|overrid(?:e|es|ing)|overrode|(?:takes?|has)\s+precedence\s+over|has\s+(?:the\s+)?(?:highest|top)\s+priority\s+over|ignor(?:e|es|ed|ing)|disregard(?:s|ed|ing)?)\b(?:\W+\w+){0,5}?\W+(?=[sdpeoig])(?:(?:system|developer|previous|prior|earlier|original|initial)(?:\s+(?:and|or)\s+(?:system|developer|previous|prior))*\s+(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines)|(?:safety|security)\s+(?:rules?|checks?|instructions?|polic(?:y|ies)|guidelines|controls?)|guardrails?)\b|\b(?:do\s+not|don't|never)\s+(?:mention|report|flag)\b|\b(?:must\s+obey\b|(?:agents?|assistants?|models?|llms?)\s+(?:must|should|shall)\s+(?:obey|follow)\s+(?:this|these)\b|(?:is|as)\s+the\s+governing\s+policy|governing\s+policy\s+for\s+the\s+(?:assistant|agent|model)|highest\s+priority)))|(?=.*\b(?:secrets?|tokens?|api|credentials?|env|runtime|hidden))(?=.*\b(?=[esfulh])(?:exfiltrate|send|forward|upload|leak|hand\s+over)\b(?:(?:[^\w.!?;]|[.!?;](?!\s|\Z))+\w+){0,5}?(?:[^\w.!?;]|[.!?;](?!\s|\Z))+(?=[stacerh])(?:(?:secrets?|tokens?|api[-_\s]*keys?|credentials?|env(?:ironment)?\s*(?:var|variable)s?|runtime\s+variables?|hidden\s+config))\b)).*""",
         ],
         "description": "Attacker-controlled MCP discovery or tool metadata can hide policy-overriding instructions in tool descriptions or schema descriptions, causing an agent to treat untrusted descriptor text as higher-priority control-plane policy."
     },
@@ -19346,7 +19368,7 @@ PATTERNS = [
             # only knew the SINGULAR forms — "assistants must treat this as
             # governing policy" (the documented attack) slid through while the
             # keyword lane stamped the verdict. Plurals added.
-            r"""(?is)(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agents?|assistants?|models?|llms?|scanners?|crawlers?)\b|agent\s+instructions?|ai\s+assistants?))(?=.*(?:\b(?:ignore|override|supersede|outrank|precedence|governing\s+policy|canonical|highest\s+priority|must\s+obey|takes\s+precedence)\b|do\s+not\s+(?:report|mention|flag)|\b(?:suppress|hide|omit|redact)\b))(?=.*(?:system|developer|previous\s+instructions?|policy|secret|token|api[-_\s]*keys?|env(?:ironment)?\s*(?:vars?|variables?)|runtime\s+variables?|hidden\s+config|workspace\s+policy|scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies))).*""",
+            r"""(?is)^(?=.*(?:\bmcp\b|model\s+context\s+protocol|prompts?/list|resources?/list))(?=.*(?:\b(?:agents?|assistants?|models?|llms?|scanners?|crawlers?)\b|agent\s+instructions?|ai\s+assistants?))(?=.*\b(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines|safety|security|guardrails?|secrets?|tokens?|api|credentials?|env\w*|runtime|hidden|findings?|reports?|vulnerabilit\w+|obey|follow|mention|governing|priority)\b)(?:(?=.*\b(?=[ostihdnmalgr])(?:\b(?:outranks?|supersed(?:e|es|ed|ing)|overrid(?:e|es|ing)|overrode|(?:takes?|has)\s+precedence\s+over|has\s+(?:the\s+)?(?:highest|top)\s+priority\s+over|ignor(?:e|es|ed|ing)|disregard(?:s|ed|ing)?)\b(?:\W+\w+){0,10}?\W+(?=[sdpeoig])(?:(?:system|developer|previous|prior|earlier|original|initial)(?:\s+(?:and|or)\s+(?:system|developer|previous|prior))*\s+(?:instructions?|prompts?|polic(?:y|ies)|rules|guidelines)|(?:safety|security)\s+(?:rules?|checks?|instructions?|polic(?:y|ies)|guidelines|controls?)|guardrails?)\b|\b(?:suppress|hide|omit|redact|do\s+not\s+(?:report|mention|flag))\b(?:\W+\w+){0,10}?\W+(?=[sfav])(?:(?:scanner\s+reports?|findings?|audit\s+reports?|vulnerabilit(?:y|ies)))\b|\b(?:must\s+obey\b|(?:agents?|assistants?|models?|llms?)\s+(?:must|should|shall)\s+(?:obey|follow)\s+(?:this|these)\b|(?:is|as)\s+the\s+governing\s+policy|governing\s+policy\s+for\s+the\s+(?:assistant|agent|model)|highest\s+priority)))|(?=.*\b(?:secrets?|tokens?|api|credentials?|env|runtime|hidden))(?=.*\b(?=[esfulh])(?:exfiltrate|send|forward|upload|leak|hand\s+over)\b(?:(?:[^\w.!?;]|[.!?;](?!\s|\Z))+\w+){0,10}?(?:[^\w.!?;]|[.!?;](?!\s|\Z))+(?=[stacerh])(?:(?:secrets?|tokens?|api[-_\s]*keys?|credentials?|env(?:ironment)?\s*(?:var|variable)s?|runtime\s+variables?|hidden\s+config))\b)).*""",
         ],
         "description": "Attacker-controlled MCP servers can place authority inversion, credential/local-state collection, or report-suppression instructions inside `prompts/list`, `prompts/get`, `resources/list`, resource-template, annotation, or resource-content metadata that agents may import as context for prompt/resour"
     },
@@ -20066,7 +20088,8 @@ PATTERNS = [
             "host-meta.json",
         ],
         "regex": [
-            r"""(?is)(?=.*(?:host-meta|xrd|jrd|webfinger|\.well-known))(?=.*(?:ai\s*(?:assistant|agent)|coding\s*agent|model|llm))(?=.*(?:ignore\s+(?:all\s+)?(?:previous|system|developer|repository)\s+instructions|highest[-\s]?priority|outranks?|env(?:ironment)?\s+variables?|api\s*keys?|secrets?|disable\s+(?:security|scanner)|do\s+not\s+report)).*""",
+            # The key object api\s*keys? has no 4 character literal (api and key are both 3), so the whole rule ran on every document. Written as apikey, or api then one ASCII whitespace character (tab, newline, vertical tab, form feed, return, the four separators 0x1c to 0x1f, space) then any more whitespace then key, each branch carries a 4 character literal and the decision is the same for any run of whitespace between the two words. Non ASCII whitespace reaches the rule through the engine's normalized reading, as before.
+            r"""(?is)^(?=.*(?:host-meta|xrd|jrd|webfinger|\.well-known))(?=.*(?:ai\s*(?:assistant|agent)|coding\s*agent|model|llm))(?:(?=.*(?:ignore\s+(?:all\s+)?(?:previous|system|developer|repository)\s+instructions|highest[-\s]?priority|outranks?\s+(?:the\s+)?(?:system|developer|repository|previous|prior)\s+instructions?|disable\s+(?:the\s+)?(?:security|scanner)(?![.\w-])|\b(?:do\s+not\s+report)\b(?:\W+\w+){0,2}?\W+(?:this|that|these|it|findings?|issues?|results?|vulnerabilit\w+|attacks?)\b))|(?=.*\b(?:api|secrets?|env))(?=.*(?:\b(?:send(?:s|ing)?|forward(?:s|ing)?|read(?:s|ing)?|includ(?:e|es|ing)|exfiltrat(?:e|es|ing)|upload(?:s|ing)?|hand\s+over|put(?:s|ting)?|e-?mail(?:s|ing)?|post(?:s|ing)?|paste|copy|copies|leak(?:s|ing)?|write|send)\b(?:\W+\w+){0,10}?\W+(?:(?:api(?:key|\x09\s*key|\x0a\s*key|\x0b\s*key|\x0c\s*key|\x0d\s*key|\x1c\s*key|\x1d\s*key|\x1e\s*key|\x1f\s*key|\x20\s*key)s?|secrets?|env(?:ironment)?\s+variables?))\b|\b(?:api(?:key|\x09\s*key|\x0a\s*key|\x0b\s*key|\x0c\s*key|\x0d\s*key|\x1c\s*key|\x1d\s*key|\x1e\s*key|\x1f\s*key|\x20\s*key)s?|secrets?|env(?:ironment)?\s+variables?)\b(?:\W+\w+){0,10}?\W+(?:go(?:es)?|is|are|be)\s+(?:sent\s+)?to\b))).*""",
         ],
         "description": "`/.well-known/host-meta` or `/.well-known/host-meta.json` can hide agent-facing authority inversion and secret-access instructions inside standards-shaped XRD/JRD discovery metadata."
     },
@@ -25852,7 +25875,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:documentation|runbook|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|prevent(?:ed|s|ing)?)\b)(?=.*\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|orchestrator|coordinator)\b)(?=.*\b(?:inherit(?:ed|s|ing)?|pass(?:ed|es|ing)?|reuse(?:d|s|ing)?|shared)\b)(?=.*\b(?:privileged|elevated|admin|parent)\s+(?:AI[- ]?service|RAG|retrieval|data|access|handle|capability|credential)\b|\b(?:AI[- ]?service|RAG|retrieval)\s+(?:handle|capability|access)\b)(?=.*\b(?:outside|beyond|exceed(?:ed|s|ing)?|cross[- ]?(?:tenant|workspace|scope)|out[- ]of[- ]scope|unauthori[sz]ed|restricted)\b)(?=.*\b(?:collect(?:ed|s|ing)?|enumerat(?:ed|es|ing)?|retriev(?:ed|es|ing)?|read(?:s|ing)?|exfiltrat(?:ed|es|ing)?)\b)(?=.*\b(?:record|document|customer|proprietary|sensitive|database|RAG)\w*\b)(?=.*\b(?:approved|accepted|trusted|treated)\b.*\b(?:output|result|collection|task)\b).*$""",
+            r"""(?is)^(?!.*\b(?:documentation|runbook|security\s+guide|unit\s+test|fixture|postmortem|defensive|must\s+not|do\s+not|never|reject(?:ed|s)?|block(?:ed|s)?|prevent(?:ed|s|ing)?)\b)(?=.*\b(?:delegat(?:ed|ion)|worker|sub[- ]?agent|orchestrator|coordinator)\b)(?=.*\b(?:inherit(?:ed|s|ing)?|pass(?:ed|es|ing)?|reuse(?:d|s|ing)?|shared)\b)(?=.*(?:\b(?:privileged|elevated|admin|parent)\s+(?:AI[- ]?service|RAG|retrieval|data|access|handle|capability|credential)\b|\b(?:AI[- ]?service|RAG|retrieval)\s+(?:handle|capability|access)\b))(?=.*\b(?:outside|beyond|exceed(?:ed|s|ing)?|cross[- ]?(?:tenant|workspace|scope)|out[- ]of[- ]scope|unauthori[sz]ed|restricted)\b)(?=.*\b(?:collect(?:ed|s|ing)?|enumerat(?:ed|es|ing)?|retriev(?:ed|es|ing)?|read(?:s|ing)?|exfiltrat(?:ed|es|ing)?)\b)(?=.*\b(?:record|document|customer|proprietary|sensitive|database|RAG)\w*\b)(?=.*\b(?:approved|accepted|trusted|treated)\b.*\b(?:output|result|collection|task)\b).*$""",
         ],
         "description": "A delegated worker inherits the parent agent's privileged AI-service/RAG handle instead of a task-scoped capability, enumerates restricted records outside its task scope, and the orchestrator launders the collection by accepting it as approved task output."
     },
@@ -26227,7 +26250,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|postmortem|defensive|benign|must\s+reject|rejected\s+because|state\s+matched|session\s+matched)\b)(?=.*\b(?:mcp|model\s+context\s+protocol)\b)(?=.*\b(?:oauth|authorization)\s*(?:callback|redirect)|callback\s*(?:server|endpoint)|redirect_uri\b)(?=.*\b(?:authorization[_ -]?code|code)\s*[:=])(?=.*\b(?:state|session|request)[^\n]{0,100}\b(?:mismatch|does\s+not\s+match|wrong|different|unbound|not\s+bound|ignored|absent|missing)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+guide|documentation|unit\s+test|postmortem|defensive|benign|must\s+reject|rejected\s+because|state\s+matched|session\s+matched)\b)(?=.*\b(?:mcp|model\s+context\s+protocol)\b)(?=.*(?:\b(?:oauth|authorization)\s*(?:callback|redirect)|callback\s*(?:server|endpoint)|redirect_uri\b))(?=.*\b(?:authorization[_ -]?code|code)\s*[:=])(?=.*\b(?:state|session|request)[^\n]{0,100}\b(?:mismatch|does\s+not\s+match|wrong|different|unbound|not\s+bound|ignored|absent|missing)\b).*$""",
         ],
         "description": "A local MCP OAuth callback handler accepts and exchanges an authorization code without binding it to the initiating state/PKCE/session, so a code from one authorization attempt can be attached to a different pending MCP session."
     },
@@ -26315,7 +26338,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:safe\s+control|benign\s+control|test\s+fixture|unit\s+test|defensive|preserve|retain|refuse|reject|block|untrusted)\b)(?=.*\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|evidence)(?:\s+\w+){0,2}\s+(?:pack|context|bundle|chunk|result|record|passage|snippet)\b)(?=.*\b(?:(?:finite|fixed|limited)\s+(?:(?:context|token)\s+)?(?:budget|window|capacity)|limited\s+by\s+(?:a\s+)?(?:context|token)\s+window)\b)(?=.*\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b.{0,120}\b(?:safety|policy|control|approval|verification)\b|\b(?:safety|policy|control|approval|verification)\b.{0,120}\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b)(?=.*\b(?:proceed|proceeds|continue|continues|allow|allows|allowed|answer|answers|execute|executes|act|acts)\b).*$""",
+            r"""(?is)^(?!.*\b(?:safe\s+control|benign\s+control|test\s+fixture|unit\s+test|defensive|preserve|retain|refuse|reject|block|untrusted)\b)(?=.*\b(?:retriev(?:ed|al)|RAG|knowledge[- ]base|evidence)(?:\s+\w+){0,2}\s+(?:pack|context|bundle|chunk|result|record|passage|snippet)\b)(?=.*\b(?:(?:finite|fixed|limited)\s+(?:(?:context|token)\s+)?(?:budget|window|capacity)|limited\s+by\s+(?:a\s+)?(?:context|token)\s+window)\b)(?=.*(?:\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b.{0,120}\b(?:safety|policy|control|approval|verification)\b|\b(?:safety|policy|control|approval|verification)\b.{0,120}\b(?:evict\w*|displace\w*|truncate\w*|drop\w*|omit\w*|push\w*\s+out|crowd\w*\s+out)\b))(?=.*\b(?:proceed|proceeds|continue|continues|allow|allows|allowed|answer|answers|execute|executes|act|acts)\b).*$""",
         ],
         "description": "Attacker-supplied plausible passages consume a finite retrieval context budget and evict the safety-control passage, and the downstream agent treats the missing control as permission to act."
     },
@@ -26767,7 +26790,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe target|validation passes)\b)(?=.*\b(?:rag|retrieval|knowledge[- ]base|memory|url\s+ingestion|retrieval\s+code|rag\s+fetcher)\b)(?=.*\b(?:url|uri|remote|fetch\w*|retriev\w*|ingest\w*|request\w*)\b)(?=.*\b(?:user[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|arbitrary)\s+(?:url|uri|host|target)\b|\b(?:no|without|missing|zero)\s+(?:scheme|ip|hostname|network)\s+(?:check|filter|validation|allowlist))(?=.*(?:169\.254\.169\.254|metadata(?: endpoint| service)?|localhost|127\.0\.0\.1|internal service|private\s+(?:ip|address|network)|cloud credentials?))(?=.*\b(?:response|content|body|result)\b.{0,120}\b(?:context|prompt|retrieved|answer|exfiltrat|expos|materiali[sz]e)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security research|unit test|test fixture|incident report|defensive|remediation|patched|fixed|blocked|quarantined|must not|do not|never|safe target|validation passes)\b)(?=.*\b(?:rag|retrieval|knowledge[- ]base|memory|url\s+ingestion|retrieval\s+code|rag\s+fetcher)\b)(?=.*\b(?:url|uri|remote|fetch\w*|retriev\w*|ingest\w*|request\w*)\b)(?=.*(?:\b(?:user[- ]supplied|user[- ]controlled|attacker[- ]controlled|untrusted|arbitrary)\s+(?:url|uri|host|target)\b|\b(?:no|without|missing|zero)\s+(?:scheme|ip|hostname|network)\s+(?:check|filter|validation|allowlist)))(?=.*(?:169\.254\.169\.254|metadata(?: endpoint| service)?|localhost|127\.0\.0\.1|internal service|private\s+(?:ip|address|network)|cloud credentials?))(?=.*\b(?:response|content|body|result)\b.{0,120}\b(?:context|prompt|retrieved|answer|exfiltrat|expos|materiali[sz]e)\b).*$""",
         ],
         "description": "A RAG ingestion fetcher accepts an attacker-selected URL with no scheme/IP/hostname validation, then materializes the loopback, private-network, or cloud-metadata response body into retrieved answer context, stripping its untrusted network provenance."
     },
@@ -26778,7 +26801,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test)|unit\s+test|benign|safe\s+example|defensive|postmortem|must\s+(?:reject|block|validate|deny)|do\s+not|never|patched|fixed|remediated|quarantined|blocked|fail[- ]closed|negative\s+fixture|without\s+(?:network|side[- ]effect))\b)(?=.*\b(?:agent\s+action|MCP|model\s+context\s+protocol|tool\s+fetch|remote\s+fetch)\b)(?=.*\b(?:DNS|hostname|name)\b.{0,100}\b(?:re-?bind|resolution|resolves?|lookup|answer|record)\b)(?=.*\b(?:private\s+IP|private\s+address|internal\s+(?:IP|address|endpoint)|link[- ]local|loopback)\b|\b(?:169\.254\.169\.254|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b)(?=.*\b(?:SSRF|server[- ]side\s+request|request\s+forgery|outbound\s+request)\b)(?=.*\b(?:RAG|retrieval|retrieved\s+memory|knowledge\s+base|memory\s+record)\b)(?=.*\b(?:ingest|store|persist|promote|save|index|import)\w*\b)(?=.*\b(?:response|body|content|result|record|evidence|memory|RAG|knowledge\s+base)\b).*$""",
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|test)|unit\s+test|benign|safe\s+example|defensive|postmortem|must\s+(?:reject|block|validate|deny)|do\s+not|never|patched|fixed|remediated|quarantined|blocked|fail[- ]closed|negative\s+fixture|without\s+(?:network|side[- ]effect))\b)(?=.*\b(?:agent\s+action|MCP|model\s+context\s+protocol|tool\s+fetch|remote\s+fetch)\b)(?=.*\b(?:DNS|hostname|name)\b.{0,100}\b(?:re-?bind|resolution|resolves?|lookup|answer|record)\b)(?=.*(?:\b(?:private\s+IP|private\s+address|internal\s+(?:IP|address|endpoint)|link[- ]local|loopback)\b|\b(?:169\.254\.169\.254|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b))(?=.*\b(?:SSRF|server[- ]side\s+request|request\s+forgery|outbound\s+request)\b)(?=.*\b(?:RAG|retrieval|retrieved\s+memory|knowledge\s+base|memory\s+record)\b)(?=.*\b(?:ingest|store|persist|promote|save|index|import)\w*\b)(?=.*\b(?:response|body|content|result|record|evidence|memory|RAG|knowledge\s+base)\b).*$""",
         ],
         "description": "A hostname that passes allowlist validation resolves to a private/link-local address at connection time during an agent-action or MCP fetch, and ingesting that internal response into RAG memory makes the SSRF durable agent-visible context."
     },
@@ -27176,7 +27199,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:defensive|documentation|patched|fixed|safe|read[- ]only|rejected|must\s+not|do\s+not|never|unit\s+test|example)\b)(?=.*\b(?:unauthenticated|no\s+authentication|missing\s+(?:auth|authentication))\b)(?=.*\b(?:browser[- ]origin|cross[- ]origin|dns[- ]rebind|host\s+header)\b)(?=.*\b(?:local|loopback|dashboard|flask|http)\b)(?=.*\b(?:api|server|endpoint)\b)(?=.*\b(?:write|store|save|persist|append|update)\w*\s+(?:attacker[- ]controlled\s+)?(?:persistent\s+)?(?:agent\s+)?(?:memory|memories|state|context)|\b(?:persistence|persistent)\s+(?:of\s+)?(?:agent\s+)?(?:memory|memories|state|context)\b)(?=.*\b(?:rehydrat|reload|startup|next\s+session|future\s+run)\w*\b)(?=.*\b(?:trusted|authoritative|obey|follow|suppress|forward|override)\w*\b).*$""",
+            r"""(?is)^(?!.*\b(?:defensive|documentation|patched|fixed|safe|read[- ]only|rejected|must\s+not|do\s+not|never|unit\s+test|example)\b)(?=.*\b(?:unauthenticated|no\s+authentication|missing\s+(?:auth|authentication))\b)(?=.*\b(?:browser[- ]origin|cross[- ]origin|dns[- ]rebind|host\s+header)\b)(?=.*\b(?:local|loopback|dashboard|flask|http)\b)(?=.*\b(?:api|server|endpoint)\b)(?=.*(?:\b(?:write|store|save|persist|append|update)\w*\s+(?:attacker[- ]controlled\s+)?(?:persistent\s+)?(?:agent\s+)?(?:memory|memories|state|context)|\b(?:persistence|persistent)\s+(?:of\s+)?(?:agent\s+)?(?:memory|memories|state|context)\b))(?=.*\b(?:rehydrat|reload|startup|next\s+session|future\s+run)\w*\b)(?=.*\b(?:trusted|authoritative|obey|follow|suppress|forward|override)\w*\b).*$""",
         ],
         "description": "A malicious webpage reaches an unauthenticated loopback dashboard API (no CSRF or Host validation, DNS-rebinding reachable), writes attacker-controlled persistent agent memory, and a later startup or session rehydration promotes that record into trusted standing policy."
     },
@@ -27515,7 +27538,7 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:defensive|documentation|runbook|unit\s+test|postmortem|benign|safe\s+(?:path|merger)|must\s+(?:preserve|bind|separate|reject)|fail[- ]closed|negative\s+fixture|do\s+not\s+(?:merge|treat|accept))\b)(?=.*\b(?:tri[- ]context|device\s+(?:diagnostic|evidence)|user\s+(?:profile|proficiency|inference)|service\s+(?:recommend(?:er|ation)|context))\b)(?=.*\b(?:merge|combine|conflat|corroborat|cross[- ]channel|(?:without|no|missing|lost)\s+(?:source|field)?[ -]?(?:identity|provenance|lineage)|field\s+identity)\w*\b)(?=.*\b(?:stale|attacker[- ]controlled|low[- ]trust|untrusted|poisoned|profile\s+claim)\b)(?=.*\b(?:device|security)\s+(?:fact|evidence|signal)|treat\w*\s+.*(?:device|security))(?=.*\b(?:unsafe|remote\s+support|install|forward|upload|execute|proceed|remediat|service\s+action)\w*\b).+$""",
+            r"""(?is)^(?!.*\b(?:defensive|documentation|runbook|unit\s+test|postmortem|benign|safe\s+(?:path|merger)|must\s+(?:preserve|bind|separate|reject)|fail[- ]closed|negative\s+fixture|do\s+not\s+(?:merge|treat|accept))\b)(?=.*\b(?:tri[- ]context|device\s+(?:diagnostic|evidence)|user\s+(?:profile|proficiency|inference)|service\s+(?:recommend(?:er|ation)|context))\b)(?=.*\b(?:merge|combine|conflat|corroborat|cross[- ]channel|(?:without|no|missing|lost)\s+(?:source|field)?[ -]?(?:identity|provenance|lineage)|field\s+identity)\w*\b)(?=.*\b(?:stale|attacker[- ]controlled|low[- ]trust|untrusted|poisoned|profile\s+claim)\b)(?=.*(?:\b(?:device|security)\s+(?:fact|evidence|signal)|treat\w*\s+(?=.*(?:device|security))))(?=.*\b(?:unsafe|remote\s+support|install|forward|upload|execute|proceed|remediat|service\s+action)\w*\b).+$""",
         ],
         "description": "A troubleshooting agent fuses device diagnostics, user-profile inference and service-recommender output into one personalization record without preserving channel provenance, letting a stale or attacker-controlled low-trust profile claim acquire the authority of a device/security fact and steer remediation."
     },
@@ -27789,7 +27812,7 @@ PATTERNS = [
         "severity": "medium",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:unit test|test fixture|training lab|incident report|postmortem|defensive analysis|documentation|docs say|reject(?:ed|s)? duplicate|do not award|must not|expected result)\b)(?=.*\b(?:student[_ -]?answer|submission|student|answer)\b)(?=.*\b(?:json|yaml|serialized|serialization|parser|duplicate|repeated|last[- ]key|field)\b|\{\s*")(?=.*"([^"]+)"\s*:\s*"[^"]*"\s*,\s*"\1"\s*:)(?=.*\b(?:rubric|grading(?:[_ -]?policy)?|criterion|policy)\b)(?=.*\b(?:award|full[- ]credit|score\s*[:=]?\s*10|accept any|ignore (?:missing|errors?|proof|steps)|replace|override)\b).*$""",
+            r"""(?is)^(?!.*\b(?:unit test|test fixture|training lab|incident report|postmortem|defensive analysis|documentation|docs say|reject(?:ed|s)? duplicate|do not award|must not|expected result)\b)(?=.*\b(?:student[_ -]?answer|submission|student|answer)\b)(?=.*(?:\b(?:json|yaml|serialized|serialization|parser|duplicate|repeated|last[- ]key|field)\b|\{\s*"))(?=.*"([^"]+)"\s*:\s*"[^"]*"\s*,\s*"\1"\s*:)(?=.*\b(?:rubric|grading(?:[_ -]?policy)?|criterion|policy)\b)(?=.*\b(?:award|full[- ]credit|score\s*[:=]?\s*10|accept any|ignore (?:missing|errors?|proof|steps)|replace|override)\b).*$""",
         ],
         "description": "A student-controlled serialized answer repeats a rubric/policy key so a last-key-wins JSON/YAML parser resolves the attacker's later value as the active grading rule, awarding credit without changing the visible answer evidence."
     },
@@ -27988,7 +28011,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+(?:guide|policy|training|documentation)|scanner\s+(?:rule|test|docs?)|unit\s+test|incident\s+report|postmortem|defensive|quarantin\w*|rejected|reject\w*|non[- ]authoriz\w*|must\s+not|do\s+not)\b)(?=.*\b(?:LLM\s+)?watermark\w*\b)(?=.*\b(?:paraphras\w*|meaning[- ]preserving|semantic(?:ally)?\s+equivalent|rewrit\w*|transform\w*)\b)(?=.*\b(?:spoof\w*|counterfeit\w*|shift\w*|alter\w*|change\w*)\b.{0,140}\b(?:watermark|signal|distribution|mark(?:ing)?)\w*\b|\b(?:watermark|signal|distribution|mark(?:ing)?)\w*\b.{0,140}\b(?:spoof\w*|counterfeit\w*|shift\w*|alter\w*|change\w*)\b)(?=.*\b(?:provenance|authorship|origin|authentic\w*)\b)(?=.*\b(?:accept\w*|trust\w*|admit\w*|promot\w*|approv\w*|proof)\b.{0,120}\b(?:provenance|authorship|origin|watermark|signal|text|output)\b|\b(?:provenance|authorship|origin|authentic\w*|watermark|signal)\b.{0,120}\b(?:accept\w*|trust\w*|admit\w*|promot\w*|approv\w*)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|policy|training|documentation)|scanner\s+(?:rule|test|docs?)|unit\s+test|incident\s+report|postmortem|defensive|quarantin\w*|rejected|reject\w*|non[- ]authoriz\w*|must\s+not|do\s+not)\b)(?=.*\b(?:LLM\s+)?watermark\w*\b)(?=.*\b(?:paraphras\w*|meaning[- ]preserving|semantic(?:ally)?\s+equivalent|rewrit\w*|transform\w*)\b)(?=.*(?:\b(?:spoof\w*|counterfeit\w*|shift\w*|alter\w*|change\w*)\b.{0,140}\b(?:watermark|signal|distribution|mark(?:ing)?)\w*\b|\b(?:watermark|signal|distribution|mark(?:ing)?)\w*\b.{0,140}\b(?:spoof\w*|counterfeit\w*|shift\w*|alter\w*|change\w*)\b))(?=.*\b(?:provenance|authorship|origin|authentic\w*)\b)(?=.*(?:\b(?:accept\w*|trust\w*|admit\w*|promot\w*|approv\w*|proof)\b.{0,120}\b(?:provenance|authorship|origin|watermark|signal|text|output)\b|\b(?:provenance|authorship|origin|authentic\w*|watermark|signal)\b.{0,120}\b(?:accept\w*|trust\w*|admit\w*|promot\w*|approv\w*)\b)).*$""",
         ],
         "description": "A black-box meaning-preserving paraphrase can spoof the watermark distribution, and a provenance consumer can mistake the counterfeit signal for trusted authorship evidence."
     },
@@ -28043,7 +28066,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+(?:advisory|guide|documentation|training|review)|scanner\s+(?:rule|docs?)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|runbook|blocked|quarantined|defensive|patched|fixed\s+in|must\s+(?:bind|check|enforce|reject|scope|verify)|should\s+(?:bind|check|enforce|reject|scope|verify)|do\s+not|never|same[- ](?:team|tenant)|authorized\s+(?:trace|record)|no\s+foreign)\b)(?=.*\b(?:FastGPT|Fast\s*GPT)\b)(?=.*\b(?:request[- ]?record|LLM\s+trace|record\s+lookup|getRecord|requestId)\b)(?=.*\b(?:authenticated|valid)\s+(?:caller|session|user|token)|session\s+(?:valid|authenticated)|caller\s+is\s+authenticated\b)(?=.*\b(?:foreign|another|different|cross[- ](?:team|tenant)|other\s+team|outside\s+(?:the\s+)?(?:caller|current)\s+(?:team|tenant))\b)(?=.*\b(?:team|tenant|organization)\b)(?=.*\b(?:missing|omitted|without|failed\s+to|not\s+(?:checked|verified|validated|bound|scoped)|no\s+(?:team|tenant)\s+(?:scope|binding|authorization)|ownership)\b)(?=.*\b(?:prompt|RAG|retrieved|completion|LLM\s+response|context)\b)(?=.*\b(?:return(?:ed|s)?|expos(?:e|ed|ure|ing)|disclos(?:e|d|ure|ing)|leak(?:ed|s|ing)?|ingest(?:ed|s|ing)?|project(?:ed|s|ing)?)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+(?:advisory|guide|documentation|training|review)|scanner\s+(?:rule|docs?)|unit\s+test|negative\s+fixture|incident\s+report|postmortem|runbook|blocked|quarantined|defensive|patched|fixed\s+in|must\s+(?:bind|check|enforce|reject|scope|verify)|should\s+(?:bind|check|enforce|reject|scope|verify)|do\s+not|never|same[- ](?:team|tenant)|authorized\s+(?:trace|record)|no\s+foreign)\b)(?=.*\b(?:FastGPT|Fast\s*GPT)\b)(?=.*\b(?:request[- ]?record|LLM\s+trace|record\s+lookup|getRecord|requestId)\b)(?=.*(?:\b(?:authenticated|valid)\s+(?:caller|session|user|token)|session\s+(?:valid|authenticated)|caller\s+is\s+authenticated\b))(?=.*\b(?:foreign|another|different|cross[- ](?:team|tenant)|other\s+team|outside\s+(?:the\s+)?(?:caller|current)\s+(?:team|tenant))\b)(?=.*\b(?:team|tenant|organization)\b)(?=.*\b(?:missing|omitted|without|failed\s+to|not\s+(?:checked|verified|validated|bound|scoped)|no\s+(?:team|tenant)\s+(?:scope|binding|authorization)|ownership)\b)(?=.*\b(?:prompt|RAG|retrieved|completion|LLM\s+response|context)\b)(?=.*\b(?:return(?:ed|s)?|expos(?:e|ed|ure|ing)|disclos(?:e|d|ure|ing)|leak(?:ed|s|ing)?|ingest(?:ed|s|ing)?|project(?:ed|s|ing)?)\b).*$""",
         ],
         "description": "A valid authenticated session and known requestId are correlated with a foreign-team FastGPT trace across separate request/response records, projecting prompts, retrieved RAG context, or completions into the agent context without tenant binding."
     },
@@ -28131,7 +28154,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?:(?=(\s*))\1)(?!.*\b(?:privacy\s+guidance|unit\s+test|incident\s+report|security\s+scanner\s+rule|must\s+not|do\s+not\s+copy|blocked\s+the\s+output|refuses?\s+verbatim|without\s+requesting|fictional|generalized|paraphrased|aggregate)\b)(?=.*\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b)(?=.*\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b)(?=.*\b(?:patient|private|clinical|identifier|record|note|narrative)\b).*$""",
+            r"""(?is)^(?:(?=(\s*))\1)(?!.*\b(?:privacy\s+guidance|unit\s+test|incident\s+report|security\s+scanner\s+rule|must\s+not|do\s+not\s+copy|blocked\s+the\s+output|refuses?\s+verbatim|without\s+requesting|fictional|generalized|paraphrased|aggregate)\b)(?=.*\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b)(?=.*\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b)(?=.*(?:\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b.{0,200}\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b|\b(?:verbatim|word[- ]for[- ]word|exact(?:ly)?|unchanged|repeat|reproduce|quote|emit)\b.{0,200}\b(?:memorized|training\s+(?:data|record|example)|learned\s+clinical)\b))(?=.*\b(?:patient|private|clinical|identifier|record|note|narrative)\b).*$""",
         ],
         "description": "A model-generated clinical augmentation output reproduces a memorized private training record verbatim, and a downstream agent accepts it as fresh synthetic evidence rather than detecting privacy leakage."
     },
@@ -28198,7 +28221,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|documentation)|scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+(?:payload|sample)|incident\s+report|postmortem|defensive|must\s+not|should\s+(?:reject|block|refuse)|safe\s+(?:handling|implementation))\b)(?=.*\b(?:browser|web)\s+(?:agent|automation)|navigation\s+(?:page|content|state)|page\s+content\b)(?=.*\b(?:current\s+)?task\s+(?:state|memory|context)|active\s+(?:task|goal)\s+(?:state|memory))(?=.*\b(?:fuse|merge|inject|insert|preserve|persist)\w*.{0,90}\b(?:secondary|attacker|hidden|injected)\b.{0,35}\b(?:goal|task|objective)\b|\b(?:secondary|attacker|hidden|injected)\b.{0,90}\b(?:fuse|merge|preserve|persist)\w*)(?=.*\b(?:execute|perform|carry\s+out|dispatch|upload|transfer|send|delete|purchase)\w*\b)(?=.*\b(?:resume|continue|return)\w*\b.{0,100}\b(?:original|user)\s+(?:task|goal)|\b(?:normal|seamless)\s+continuity\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|training|documentation)|scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+(?:payload|sample)|incident\s+report|postmortem|defensive|must\s+not|should\s+(?:reject|block|refuse)|safe\s+(?:handling|implementation))\b)(?=.*(?:\b(?:browser|web)\s+(?:agent|automation)|navigation\s+(?:page|content|state)|page\s+content\b))(?=.*(?:\b(?:current\s+)?task\s+(?:state|memory|context)|active\s+(?:task|goal)\s+(?:state|memory)))(?=.*(?:\b(?:fuse|merge|inject|insert|preserve|persist)\w*.{0,90}\b(?:secondary|attacker|hidden|injected)\b.{0,35}\b(?:goal|task|objective)\b|\b(?:secondary|attacker|hidden|injected)\b.{0,90}\b(?:fuse|merge|preserve|persist)\w*))(?=.*\b(?:execute|perform|carry\s+out|dispatch|upload|transfer|send|delete|purchase)\w*\b)(?=.*(?:\b(?:resume|continue|return)\w*\b.{0,100}\b(?:original|user)\s+(?:task|goal)|\b(?:normal|seamless)\s+continuity\b)).*$""",
         ],
         "description": "A hostile navigation page fuses a secondary goal into the active browser task memory, executes it, and then resumes the original task so the unauthorized transition looks like normal continuity."
     },
@@ -28474,7 +28497,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|negative\s+fixture|incident\s+report|postmortem|blocked|quarantined|must\s+not|do\s+not|never|safe\s+example|validated|signed\s+corpus)\b)(?=.*\b(?:historical\s+(?:exploit|attack)\s+(?:case|library)|exploit[- ]case|attack[- ]case|attack[- ]pattern\s+library|historical\s+case\s+record)\b)(?=.*\b(?:untrusted|unsigned|stale|spoofed|poisoned|attacker[- ]controlled|out[- ]of[- ]date)\b)(?=.*\b(?:semantic\s+(?:embedding|match)|(?:embedding\s+)?similarity\s+matched|matched\s+(?:by\s+)?(?:embedding|similarity|to)|function\s+call\s+sequence|current\s+function)\b)(?=.*\b(?:without|missing|absent|no)\s+(?:(?:source|current|valid)\s+)?(?:provenance|lineage|epoch|temporal\s+scope|freshness)|\b(?:lacked?|lacking)\s+(?:(?:source|current|valid)\s+)?(?:provenance|lineage|epoch|temporal\s+scope|freshness))(?=.*\b(?:approve|approved|allow|safe|suppress|omit|waive|bypass|mislead|wrong)\w*\b).*$""",
+            r"""(?is)^(?!.*\b(?:defensive|documentation|unit\s+test|negative\s+fixture|incident\s+report|postmortem|blocked|quarantined|must\s+not|do\s+not|never|safe\s+example|validated|signed\s+corpus)\b)(?=.*\b(?:historical\s+(?:exploit|attack)\s+(?:case|library)|exploit[- ]case|attack[- ]case|attack[- ]pattern\s+library|historical\s+case\s+record)\b)(?=.*\b(?:untrusted|unsigned|stale|spoofed|poisoned|attacker[- ]controlled|out[- ]of[- ]date)\b)(?=.*\b(?:semantic\s+(?:embedding|match)|(?:embedding\s+)?similarity\s+matched|matched\s+(?:by\s+)?(?:embedding|similarity|to)|function\s+call\s+sequence|current\s+function)\b)(?=.*(?:\b(?:without|missing|absent|no)\s+(?:(?:source|current|valid)\s+)?(?:provenance|lineage|epoch|temporal\s+scope|freshness)|\b(?:lacked?|lacking)\s+(?:(?:source|current|valid)\s+)?(?:provenance|lineage|epoch|temporal\s+scope|freshness)))(?=.*\b(?:approve|approved|allow|safe|suppress|omit|waive|bypass|mislead|wrong)\w*\b).*$""",
         ],
         "description": "An attacker-controlled or stale historical exploit case is semantically matched to a current function/call sequence without provenance or temporal-scope binding, and its misleading context changes the agent's current safety decision."
     },
@@ -28507,7 +28530,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|training)|scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+payload|incident\s+report|postmortem|defensive|must\s+(?:bind|verify|reject|revalidate)|do\s+not\s+(?:treat|approve|delegate)|safe\s+(?:handling|verification))\b)(?=.*\bwatermark(?:ing)?\b)(?=.*\b(?:local|neighboring|token[ -]*pair|binary\s+congruence|reed[ -]*solomon)\b)(?=.*\b(?:fingerprint|identity|provenance|authorship)\b)(?=.*\b(?:artifact|text|sequence|token)\s*(?:digest|hash|identity|binding|exact)\b|\b(?:digest|hash|identity)\s*(?:of|for)\s+(?:the\s+)?(?:submitted\s+)?(?:artifact|text|sequence)\b)(?=.*\b(?:missing|absent|without|skip(?:ped|ping)?|no\s+current|not\s+bound|unbound)\b)(?=.*\b(?:epoch|task|delegat\w*|approv\w*|publish\w*|release)\b)(?=.*\b(?:approve|approval|delegate|publish|release|accept|sufficient|complete)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|training)|scanner\s+rule|unit\s+test|negative\s+fixture|blocked\s+payload|incident\s+report|postmortem|defensive|must\s+(?:bind|verify|reject|revalidate)|do\s+not\s+(?:treat|approve|delegate)|safe\s+(?:handling|verification))\b)(?=.*\bwatermark(?:ing)?\b)(?=.*\b(?:local|neighboring|token[ -]*pair|binary\s+congruence|reed[ -]*solomon)\b)(?=.*\b(?:fingerprint|identity|provenance|authorship)\b)(?=.*(?:\b(?:artifact|text|sequence|token)\s*(?:digest|hash|identity|binding|exact)\b|\b(?:digest|hash|identity)\s*(?:of|for)\s+(?:the\s+)?(?:submitted\s+)?(?:artifact|text|sequence)\b))(?=.*\b(?:missing|absent|without|skip(?:ped|ping)?|no\s+current|not\s+bound|unbound)\b)(?=.*\b(?:epoch|task|delegat\w*|approv\w*|publish\w*|release)\b)(?=.*\b(?:approve|approval|delegate|publish|release|accept|sufficient|complete)\b).*$""",
         ],
         "description": "A valid self-contained local watermark fingerprint is promoted to delegated authorship/publication approval even though it is not bound to the exact submitted artifact, current verification epoch, or review task."
     },
@@ -28584,7 +28607,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+guide|scanner\s+rule|detector\s+design|unit\s+test|negative\s+fixture|postmortem|documentation|benign|must\s+not|refused|quarantined)\b)(?=.*\b(?:http|https|http/1\.1|honeypot|decoy\s+(?:backend|service)|response\s+body)\b)(?=.*\b(?:control[- ]task|capability[- ]check|baseline[- ]task)\b)(?=.*\b(?:exploit[- ]goal|goal\s+verification|verified\s+exploit|exploit\s+success)\b)(?=.*\b(?:pass(?:ed)?|success|verified|complete)\b.{0,100}\b(?:treat|count|accept|mark|record|report)\w*\b)(?=.*\b(?:skip|bypass|without)\s+(?:independent\s+)?(?:validation|approval|confirmation)|\b(?:next[- ]step|follow[- ]on)\s+(?:action|request|probe)\b)""",
+            r"""(?is)^(?!.*\b(?:security\s+guide|scanner\s+rule|detector\s+design|unit\s+test|negative\s+fixture|postmortem|documentation|benign|must\s+not|refused|quarantined)\b)(?=.*\b(?:http|https|http/1\.1|honeypot|decoy\s+(?:backend|service)|response\s+body)\b)(?=.*\b(?:control[- ]task|capability[- ]check|baseline[- ]task)\b)(?=.*\b(?:exploit[- ]goal|goal\s+verification|verified\s+exploit|exploit\s+success)\b)(?=.*\b(?:pass(?:ed)?|success|verified|complete)\b.{0,100}\b(?:treat|count|accept|mark|record|report)\w*\b)(?=.*(?:\b(?:skip|bypass|without)\s+(?:independent\s+)?(?:validation|approval|confirmation)|\b(?:next[- ]step|follow[- ]on)\s+(?:action|request|probe)\b))""",
         ],
         "description": "An attacker-controlled honeypot HTTP response can make a control-task capability pass look like verified exploit-goal evidence, causing an evaluator to record simulated success or authorize a follow-on action without independent validation."
     },
@@ -28771,7 +28794,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:defensive\s+(?:security\s+)?guide|unit\s+test|research\s+documentation|incident\s+report|parser\s+fixture|security\s+policy|must\s+not|reject(?:s|ed)?|withheld\s+approval|complete(?:d)?\s+(?:observed\s+)?trajectory)\b)(?=.*\b(?:execution\s+)?(?:trajectory|trace|log)\b)(?=.*\b(?:serializer|seriali[sz]ation|parser|normaliz(?:e|ation|ed)|dropped|omitted|missing|lossy)\b)(?=.*\b(?:unsafe|privileged|dangerous)\s+(?:intermediate\s+)?(?:tool[- ]call|action|event|operation|file[- ]export)\b|\b(?:tool[- ]call|action|event|operation|file[- ]export)\b.{0,80}\b(?:unsafe|privileged|dangerous)\b)(?=.*\b(?:final\s+outcome|final\s+result|safe[- ]looking|benign)\b)(?=.*\b(?:evaluator|evaluation|security\s+gate)\b.{0,100}\b(?:accept(?:s|ed)?|miss(?:es|ed)?|fail(?:s|ed)?\s+to\s+detect|allow(?:s|ed)?)\b).*$""",
+            r"""(?is)^(?!.*\b(?:defensive\s+(?:security\s+)?guide|unit\s+test|research\s+documentation|incident\s+report|parser\s+fixture|security\s+policy|must\s+not|reject(?:s|ed)?|withheld\s+approval|complete(?:d)?\s+(?:observed\s+)?trajectory)\b)(?=.*\b(?:execution\s+)?(?:trajectory|trace|log)\b)(?=.*\b(?:serializer|seriali[sz]ation|parser|normaliz(?:e|ation|ed)|dropped|omitted|missing|lossy)\b)(?=.*(?:\b(?:unsafe|privileged|dangerous)\s+(?:intermediate\s+)?(?:tool[- ]call|action|event|operation|file[- ]export)\b|\b(?:tool[- ]call|action|event|operation|file[- ]export)\b.{0,80}\b(?:unsafe|privileged|dangerous)\b))(?=.*\b(?:final\s+outcome|final\s+result|safe[- ]looking|benign)\b)(?=.*\b(?:evaluator|evaluation|security\s+gate)\b.{0,100}\b(?:accept(?:s|ed)?|miss(?:es|ed)?|fail(?:s|ed)?\s+to\s+detect|allow(?:s|ed)?)\b).*$""",
         ],
         "description": "A lossy trajectory serializer or normalizer drops an unsafe intermediate tool/action event while retaining a benign-looking final outcome; an evaluator accepts incomplete evidence and misses the unsafe execution."
     },
@@ -28782,7 +28805,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security guide|unit test|negative fixture|blocked sample|quarantined|defensive guidance|must not|do not obey|never reclassify|safe preservation)\b)(?=.*\b(?:SKILL\.md|SkIR|compiled skill|skill compiler)\b)(?=.*\b(?:lower(?:ing|ed)|render(?:ing|ed)|target framework|target dialect|role token|role label)\b)(?=.*\b(?:neutral|data[- ]only|metadata|annotation)\b)(?=.*\b(?:system|developer|assistant)\s+(?:role|channel|message)|privileged role|executable authority\b)(?=.*\b(?:rebound|reclassified|role collision|promoted|parsed as|mapped)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security guide|unit test|negative fixture|blocked sample|quarantined|defensive guidance|must not|do not obey|never reclassify|safe preservation)\b)(?=.*\b(?:SKILL\.md|SkIR|compiled skill|skill compiler)\b)(?=.*\b(?:lower(?:ing|ed)|render(?:ing|ed)|target framework|target dialect|role token|role label)\b)(?=.*\b(?:neutral|data[- ]only|metadata|annotation)\b)(?=.*(?:\b(?:system|developer|assistant)\s+(?:role|channel|message)|privileged role|executable authority\b))(?=.*\b(?:rebound|reclassified|role collision|promoted|parsed as|mapped)\b).*$""",
         ],
         "description": "A SkCC-style compiler can preserve a source skill's text and clean analyzer verdict while lowering a neutral field into a target framework role token that the target parser treats as trusted executable authority."
     },
@@ -28793,7 +28816,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|training)|unit\s+test|negative\s+fixture|blocked\s+payload|quarantined|incident\s+report|postmortem|must\s+(?:reject|rebind|validate|compare)|fail[- ]closed|safe\s+(?:example|control)|stale\s+(?:state|status)\s+(?:was\s+)?rejected)\b)(?=.*\b(?:SafeHarness|lifecycle\s+(?:dashboard|status|event|output|UI)|(?:rollback|event)\s+(?:status|event|receipt|output)|rendered\s+(?:status|rollback)\s+(?:output|view))\b)(?=.*\b(?:rollback|degrad(?:ed|ation)|tighten(?:ed)?\s+(?:tool\s+)?privileges?|recovery)\b)(?=.*\b(?:stale|old|previous|prior|carried|reused|aliased|mixed|shadow(?:ed)?)\b.{0,140}\b(?:epoch|generation|version|lifecycle\s+state|status|privilege)\b)(?=.*\b(?:without|missing|skip(?:ped)?|not|no)\b.{0,120}\b(?:rebind|re-?validate|verify|validation|lineage|current|scope|epoch|generation)\b)(?=.*\b(?:next|later|current)\s+(?:action|step|request|tool\s+call|browser\s+(?:action|request))|(?:apply|execute|dispatch|permit|allow)\w*\b.{0,100}\b(?:current|next|later)\b).*$""",
+            r"""(?is)^(?!.*\b(?:security\s+(?:guide|documentation|training)|unit\s+test|negative\s+fixture|blocked\s+payload|quarantined|incident\s+report|postmortem|must\s+(?:reject|rebind|validate|compare)|fail[- ]closed|safe\s+(?:example|control)|stale\s+(?:state|status)\s+(?:was\s+)?rejected)\b)(?=.*\b(?:SafeHarness|lifecycle\s+(?:dashboard|status|event|output|UI)|(?:rollback|event)\s+(?:status|event|receipt|output)|rendered\s+(?:status|rollback)\s+(?:output|view))\b)(?=.*\b(?:rollback|degrad(?:ed|ation)|tighten(?:ed)?\s+(?:tool\s+)?privileges?|recovery)\b)(?=.*\b(?:stale|old|previous|prior|carried|reused|aliased|mixed|shadow(?:ed)?)\b.{0,140}\b(?:epoch|generation|version|lifecycle\s+state|status|privilege)\b)(?=.*\b(?:without|missing|skip(?:ped)?|not|no)\b.{0,120}\b(?:rebind|re-?validate|verify|validation|lineage|current|scope|epoch|generation)\b)(?=.*(?:\b(?:next|later|current)\s+(?:action|step|request|tool\s+call|browser\s+(?:action|request))|(?:apply|execute|dispatch|permit|allow)\w*\b.{0,100}\b(?:current|next|later)\b)).*$""",
         ],
         "description": "A rendered rollback/degradation status from one lifecycle epoch is aliased into a later browser/tool action, so the agent applies the wrong privilege state without rebinding the current epoch and receipt lineage."
     },
@@ -28859,7 +28882,7 @@ PATTERNS = [
         "severity": "high",
         "channel": ["message", "file", "web_content"],
         "regex": [
-            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|training|review)|unit\s+test|test\s+fixture|incident\s+report|postmortem|defensive|blocked|quarantined|patched|fixed|must\s+(?:reject|deny|canonicalize|contain|review)|should\s+(?:reject|deny)|do\s+not\s+(?:write|modify|trust)|never\s+(?:write|modify|trust))\b)(?=.*\b(?:Cursor|code\s+editor|AI\s+coding\s+agent|agent)\b)(?=.*\b(?:opened|approved|configured|declared)\s+workspace\b|\bworkspace\s+(?:root|boundary|scope)\b)(?=.*\b(?:target\s+(?:path|file)|destination\s+path|file\s+(?:path|write|destination)|path)\b)(?=.*\b(?:outside|out[- ]of[- ]workspace|beyond|parent|external)\b)(?=.*\b(?:write|modify|edit|save|overwrite|create)\w*\b)(?=.*\b(?:automatic(?:ally)?|without\s+(?:re)?(?:checking|validat(?:ion|e)|approval|review)|without\s+re-?checking|skip\s+(?:scope|workspace|approval)|crafted\s+context|malicious(?:ly)?\s+crafted)\b).*$""",
+            r"""(?is)^(?!.*\b(?:documentation|security\s+(?:guide|training|review)|unit\s+test|test\s+fixture|incident\s+report|postmortem|defensive|blocked|quarantined|patched|fixed|must\s+(?:reject|deny|canonicalize|contain|review)|should\s+(?:reject|deny)|do\s+not\s+(?:write|modify|trust)|never\s+(?:write|modify|trust))\b)(?=.*\b(?:Cursor|code\s+editor|AI\s+coding\s+agent|agent)\b)(?=.*(?:\b(?:opened|approved|configured|declared)\s+workspace\b|\bworkspace\s+(?:root|boundary|scope)\b))(?=.*\b(?:target\s+(?:path|file)|destination\s+path|file\s+(?:path|write|destination)|path)\b)(?=.*\b(?:outside|out[- ]of[- ]workspace|beyond|parent|external)\b)(?=.*\b(?:write|modify|edit|save|overwrite|create)\w*\b)(?=.*\b(?:automatic(?:ally)?|without\s+(?:re)?(?:checking|validat(?:ion|e)|approval|review)|without\s+re-?checking|skip\s+(?:scope|workspace|approval)|crafted\s+context|malicious(?:ly)?\s+crafted)\b).*$""",
         ],
         "description": "A Cursor-like agent may automatically write to a caller/context-selected file outside the opened workspace while the UI presents the change as an ordinary review item, so review presentation does not repair the missing write-scope authorization."
     },

@@ -12,7 +12,7 @@
   "description": "A local MCP OAuth callback handler accepts and exchanges an authorization code without binding it to the initiating state/PKCE/session, so a code from one authorization attempt can be attached to a different pending MCP session.",
   "keywords": [],
   "regex": [
-    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|postmortem|defensive|benign|must\\s+reject|rejected\\s+because|state\\s+matched|session\\s+matched)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol)\\b)(?=.*\\b(?:oauth|authorization)\\s*(?:callback|redirect)|callback\\s*(?:server|endpoint)|redirect_uri\\b)(?=.*\\b(?:authorization[_ -]?code|code)\\s*[:=])(?=.*\\b(?:state|session|request)[^\\n]{0,100}\\b(?:mismatch|does\\s+not\\s+match|wrong|different|unbound|not\\s+bound|ignored|absent|missing)\\b).*$"
+    "(?is)^(?!.*\\b(?:security\\s+guide|documentation|unit\\s+test|postmortem|defensive|benign|must\\s+reject|rejected\\s+because|state\\s+matched|session\\s+matched)\\b)(?=.*\\b(?:mcp|model\\s+context\\s+protocol)\\b)(?=.*(?:\\b(?:oauth|authorization)\\s*(?:callback|redirect)|callback\\s*(?:server|endpoint)|redirect_uri\\b))(?=.*\\b(?:authorization[_ -]?code|code)\\s*[:=])(?=.*\\b(?:state|session|request)[^\\n]{0,100}\\b(?:mismatch|does\\s+not\\s+match|wrong|different|unbound|not\\s+bound|ignored|absent|missing)\\b).*$"
   ],
   "examples": {
     "malicious": [],

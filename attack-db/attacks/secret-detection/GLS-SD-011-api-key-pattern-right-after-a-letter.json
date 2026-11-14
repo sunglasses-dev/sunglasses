@@ -1,0 +1,25 @@
+{
+  "id": "GLS-SD-011",
+  "name": "API key pattern right after a letter",
+  "version": "1.0",
+  "category": "secret_detection",
+  "severity": "medium",
+  "channels": [
+    "file",
+    "log_memory",
+    "message"
+  ],
+  "description": "An OpenAI style key directly after a letter, with a capital, a small letter and a digit in the run. Held for review, because an id after a word like task or disk looks the same.",
+  "keywords": [],
+  "regex": [
+    "(?<=[A-Za-z])sk-(?=[a-zA-Z0-9]*(?-i:[A-Z]))(?=[a-zA-Z0-9]*(?-i:[a-z]))(?=[a-zA-Z0-9]*[0-9])[a-zA-Z0-9]{20,}"
+  ],
+  "examples": {
+    "malicious": [],
+    "benign": []
+  },
+  "references": [],
+  "contributed_by": "Sunglasses Team",
+  "date_added": "2026-11-13",
+  "source": "patterns.py:GLS-SD-011"
+}
