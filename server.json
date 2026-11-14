@@ -21,12 +21,12 @@
       "runtimeArguments": [
         {
           "type": "positional",
-          "value": "-m",
-          "description": "run the module"
+          "value": "-c",
+          "description": "run this start-up line: it leaves the current folder off the import path, then runs the server"
         },
         {
           "type": "positional",
-          "value": "sunglasses.mcp",
+          "value": "import sys; sys.path[:1] = [] if sys.path[:1] == [''] else sys.path[:1]; import importlib.util, runpy; runpy.run_module('sunglasses.mcp', run_name='__main__', alter_sys=True)",
           "description": "the SUNGLASSES MCP server (tools: scan_text, scan_file, scanner_info)"
         }
       ]

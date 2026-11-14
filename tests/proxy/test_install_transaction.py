@@ -578,6 +578,64 @@ def test_wrapped_requires_the_entry_to_actually_launch_the_artifact(cfg, home, a
     assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
 
 
+# ------------------------------------------------- IMPORT-PATH LAUNCH FORMS
+
+def _with_launch(entry, words):
+    entry = json.loads(json.dumps(entry))
+    entry["args"] = [*words, "--", *entry["args"][entry["args"].index("--") + 1:]]
+    return entry
+
+
+def test_install_writes_the_form_that_drops_the_implicit_path_entry(cfg, home, artifact):
+    """`python -m` puts the current folder first on the import path, so the wrapper
+    is written with `-P` (3.11+) or the start-up line (3.9, 3.10): never the bare `-m`."""
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    args = servers(cfg)["github"]["args"]
+    assert args[:args.index("--")] == inst.launch_args()
+    assert args[:2] != ["-m", "sunglasses.proxy"]
+    assert inst.classify(servers(cfg)["github"], artifact=artifact) == "WRAPPED"
+
+
+@pytest.mark.parametrize("form", ["old", "p", "bootstrap"])
+def test_a_wrapper_in_any_of_the_three_written_forms_is_wrapped(cfg, home, artifact, form):
+    """Entries written BEFORE the fix carry `-m sunglasses.proxy`; the upgrade must not
+    flip them to UNVERIFIED. Both new forms are ours too."""
+    from sunglasses import _launch
+    words = {"old": list(inst.LAUNCH),
+             "p": ["-P", "-m", "sunglasses.proxy"],
+             "bootstrap": ["-c", _launch.bootstrap("sunglasses.proxy")]}[form]
+    entry = _with_launch(_wrapped(cfg, home, artifact), words)
+    assert inst.classify(entry, artifact=artifact) == "WRAPPED"
+
+
+@pytest.mark.parametrize("words", [
+    ["-m", "sunglasses.proxy", "-X"],
+    ["-P", "-m", "sunglasses.other"],
+    ["-P", "-P", "-m", "sunglasses.proxy"],
+    ["-c", "import os; os.system('x')"],
+    ["-c", "import sys; sys.path[:1] = []; import runpy; runpy.run_module('sunglasses.proxy', run_name='__main__', alter_sys=True)"],
+    ["-I", "-m", "sunglasses.proxy"],
+])
+def test_a_lookalike_launch_is_unverified(cfg, home, artifact, words):
+    """The accepted forms are three exact argv prefixes. A near-miss is not ours."""
+    entry = _with_launch(_wrapped(cfg, home, artifact), words)
+    assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
+
+
+def test_uninstall_still_restores_a_wrapper_written_in_the_old_form(cfg, home, artifact, monkeypatch):
+    """A route installed before the upgrade (the old `-m` form, record and all) is
+    classified and uninstalled after it."""
+    before = servers(cfg)["github"]
+    monkeypatch.setattr(inst, "launch_args", lambda: list(inst.LAUNCH))
+    inst.install(cfg, "github", artifact=artifact, home=home)
+    monkeypatch.undo()
+    entry = servers(cfg)["github"]
+    assert entry["args"][:3] == [*inst.LAUNCH, "--"]
+    assert inst.classify(entry, artifact=artifact) == "WRAPPED"
+    inst.uninstall(cfg, "github", home=home)
+    assert servers(cfg)["github"] == before
+
+
 # --------------------------------------------------------------- R4-OPTIONS
 
 def test_wrapping_preserves_the_entrys_execution_options(cfg, home, artifact):
@@ -1050,7 +1108,7 @@ def test_a_command_that_merely_names_a_python_is_unverified_not_wrapped(
         # still passes, for the wrong reason, and the F2-EXACT mutation that
         # loosens `_could_execute` survives untouched. The mutation battery
         # caught exactly that. Build the argv the product writes.
-        "args": [*inst.LAUNCH, "--", "npx", "-y",
+        "args": [*inst.launch_args(), "--", "npx", "-y",
                  "@modelcontextprotocol/server-github"],
         inst.MARKER: {"artifact": resolved,
                       "sha256": inst._digest_file(artifact),

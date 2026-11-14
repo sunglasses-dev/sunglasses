@@ -2529,15 +2529,19 @@ def build_hook_entry(interpreter: str = None, fail_open: bool = False) -> dict:
     """
     import shlex
     import sys as _sys
+    from . import _launch
+    # The version is known only for the interpreter running this code; for any other one the
+    # start-up line is written, which behaves the same on every version (see _launch.py).
+    running = interpreter is None or interpreter == _sys.executable
     interpreter = interpreter or _sys.executable
     # Quoted because the command is run through a shell: an interpreter path
     # containing a space (`/Users/x/My Env/bin/python3` — ordinary for conda and
     # for anyone whose username has a space) would otherwise be split into two
     # words, breaking both the hook and its own self-test.
-    interpreter = shlex.quote(interpreter)
+    hook_command = _launch.command_line(interpreter, HOOK_MARKER, running=running)
     hook = {
         "type": "command",
-        "command": f"{interpreter} -m {HOOK_MARKER}",
+        "command": hook_command,
         # The schema default is 600s. A hook that can hang for ten minutes
         # on every tool call is a worse outage than the attacks it prevents.
         "timeout": _HOOK_TIMEOUT,
@@ -2644,6 +2648,100 @@ def _strip_our_hooks(pre_tool_use: list) -> list:
         elif not entry.get("hooks"):
             kept.append(entry)  # someone else's entry we do not understand
     return kept
+
+
+# ── Hook launch form (the `doctor` row) ─────────────────────────────────────
+# A hook line written before the import-path fix starts Python with `-m`, which puts the folder the
+# agent runs in first on the import path. An upgrade cannot edit someone's settings file, so this
+# READS it and says which form it holds. It never writes: `sunglasses init` rewrites the line.
+HOOK_FORM_OK = "OK"
+HOOK_FORM_OLD = "OLD"
+HOOK_FORM_UNVERIFIED = "UNVERIFIED"
+
+
+def _hook_form_of(command: str):
+    """(state, interpreter) for one hook command string that names our module.
+
+    A line is judged by its WHOLE text, not word by word: the shell reads the text, so a separator, a
+    redirect, a substitution or a variable glued to the first word changes what runs even when the words
+    after it look right. The line must be exactly what `_launch.command_line` writes for the interpreter
+    it names (or the same with that one word in double quotes), and nothing else is OK or OLD.
+    """
+    import shlex
+    from . import _launch
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in command):
+        # A control byte (0x00 to 0x1F, or 0x7F) is never part of a line we write. A NUL cannot be carried
+        # by a command line at all: the shell refuses to start anything with it, so such a line cannot run
+        # whatever it looks like. The rest change what the shell reads. One rule, no exceptions.
+        return HOOK_FORM_UNVERIFIED, None
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return HOOK_FORM_UNVERIFIED, None
+    if len(words) < 2:
+        return HOOK_FORM_UNVERIFIED, None
+    interpreter, rest = words[0], words[1:]
+    forms = ((HOOK_FORM_OK, ["-P", "-m", HOOK_MARKER]),
+             (HOOK_FORM_OK, ["-c", _launch.bootstrap(HOOK_MARKER)]),
+             (HOOK_FORM_OLD, ["-m", HOOK_MARKER]))
+    for state, tail in forms:
+        if rest != tail:
+            continue
+        written = " ".join(shlex.quote(w) for w in [interpreter, *tail])
+        accepted = {written}
+        if not any(c in interpreter for c in '"$`\\!\n'):
+            accepted.add('"%s" %s' % (interpreter, " ".join(shlex.quote(w) for w in tail)))
+        return (state if command in accepted else HOOK_FORM_UNVERIFIED), interpreter
+    return HOOK_FORM_UNVERIFIED, interpreter
+
+
+def hook_launch_form(settings_paths=None) -> list:
+    """One row per settings file that carries our hook: path, state, and what to do.
+
+    OK          the line drops the implicit first path entry (`-P`, or the start-up line).
+    OLD         the line is the `-m` form written before the fix; `fix` is `sunglasses init`.
+    UNVERIFIED  a line we cannot judge (not our exact shapes), or a file `init` cannot rewrite
+                (unwritable, unreadable); `by_hand` is the exact line to put there. Read-only.
+    """
+    import json as _json
+    import os
+    import pathlib
+    from . import _launch
+    if settings_paths is None:
+        settings_paths = [pathlib.Path.home() / ".claude" / "settings.json",
+                          pathlib.Path.cwd() / ".claude" / "settings.json",
+                          pathlib.Path.cwd() / ".claude" / "settings.local.json"]
+    rows, seen = [], set()
+    for settings in settings_paths:
+        settings = pathlib.Path(settings)
+        key = str(settings.resolve()) if settings.exists() else str(settings)
+        if key in seen or not settings.exists():
+            continue
+        seen.add(key)
+        try:
+            data = _json.loads(settings.read_text())
+            pre = (data.get("hooks") or {}).get("PreToolUse") or []
+        except (ValueError, OSError, AttributeError):
+            continue          # an unreadable file is init's refusal to report, not this row's
+        for entry in pre if isinstance(pre, list) else []:
+            for hook in (entry.get("hooks") or []) if isinstance(entry, dict) else []:
+                command = str(hook.get("command", "")) if isinstance(hook, dict) else ""
+                if HOOK_MARKER not in command:
+                    continue
+                state, interpreter = _hook_form_of(command)
+                by_hand = _launch.command_line(interpreter or "<python>", HOOK_MARKER, running=False)
+                row = {"path": str(settings), "state": state, "command": command,
+                       "fix": None, "by_hand": None}
+                if state == HOOK_FORM_OLD:
+                    row["fix"] = "sunglasses init"
+                    if not os.access(settings, os.W_OK):
+                        row["state"] = HOOK_FORM_UNVERIFIED
+                        row["fix"] = None
+                        row["by_hand"] = by_hand
+                elif state == HOOK_FORM_UNVERIFIED:
+                    row["by_hand"] = by_hand
+                rows.append(row)
+    return rows
 
 
 def install_hook(settings_path, interpreter: str = None, fail_open: bool = False) -> dict:

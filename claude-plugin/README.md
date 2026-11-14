@@ -10,7 +10,7 @@ Install the package first.
 pip install sunglasses
 ```
 
-It needs Python 3.9 or newer. The plugin starts the server with `python3 -m sunglasses.mcp`, so `python3` has to be the Python you installed it into. Images, PDFs and QR codes need the optional readers from `pip install "sunglasses[media]"`.
+It needs Python 3.9 or newer. The plugin starts the server with `python3` and a short start-up line that leaves the current folder off Python's import path, so `python3` has to be the Python you installed it into. If you would rather start it with the `sunglasses-mcp` script that `pip install sunglasses` creates, point the plugin's command at that script. Images, PDFs and QR codes need the optional readers from `pip install "sunglasses[media]"`.
 
 ## Tools
 

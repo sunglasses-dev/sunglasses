@@ -79,7 +79,9 @@ def test_hook_entry_quotes_an_interpreter_path_containing_spaces():
     import shlex
     spaced = "/Users/x/My Env/bin/python3"
     command = build_hook_entry(spaced)["hooks"][0]["command"]
-    assert shlex.split(command) == [spaced, "-m", "sunglasses.firewall"]
+    from sunglasses import _launch
+    # not the running interpreter, so its version is unknown here: the start-up line, which is the same on every version
+    assert shlex.split(command) == [spaced, "-c", _launch.bootstrap("sunglasses.firewall")]
 
 
 def test_self_test_survives_a_spaced_interpreter_path(tmp_path):

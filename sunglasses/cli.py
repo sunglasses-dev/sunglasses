@@ -4011,8 +4011,10 @@ def main():
     info_parser.set_defaults(func=cmd_info)
 
     # firewall-hook (hidden) — Claude Code PreToolUse entry point.
-    # NOTE: `sunglasses init` deliberately writes `python3 -m sunglasses.firewall`
-    # into settings.json, NOT this subcommand. Reaching here means importing
+    # NOTE: `sunglasses init` deliberately writes a start line for the `sunglasses.firewall`
+    # module into settings.json, NOT this subcommand: `<python> -P -m sunglasses.firewall` on
+    # Python 3.11 and newer, `<python> -c "<start-up line>"` on 3.9 and 3.10 (both leave the
+    # folder the agent runs in off the import path; see sunglasses/_launch.py). Reaching here means importing
     # cli.py, which pulls in engine + reporter + mailer + sarif at module scope,
     # a start-up cost the installed command does not pay (its measured cost is
     # the `hook_speed` entry in stats/current.json). This alias exists so a human who
@@ -4283,6 +4285,16 @@ def cmd_install(args):
         # proxy reads, and this function prints `state_root() / "captures"` a
         # few lines below: one message naming two different roots is how #204
         # happened.
+        # A wrapper written before the import-path fix starts the proxy with the bare `-m` form.
+        # Running install again over it re-writes it in the current form (the ordinary uninstall,
+        # then install) instead of stopping at "already wrapped".
+        if _inst.has_old_launch_wrapper(target, args.name, artifact=artifact):
+            _inst.rewrite_launch_form(target, args.name, artifact=artifact,
+                                      home=install_records_home())
+            print(f"\n  {GREEN}Re-wrapped {args.name!r}{RESET} in {_where(target)} "
+                  f"{DIM}(the proxy now starts without the current folder on Python's import path){RESET}")
+            print(f"  {DIM}Undo with: sunglasses uninstall {args.name}{RESET}\n")
+            sys.exit(0)
         _inst.install(target, args.name, artifact=artifact,
                       home=install_records_home(), argv=args.argv or None)
     except _inst.ArtifactUnresolved as e:
@@ -4525,6 +4537,16 @@ def cmd_doctor(args, _run=None):
         from .proxy import agent_discovery as _agents
         rendered["agents"] = _agents.discover()
 
+    # Read-only, and no part of the exit code: it reports a hook line written in an older start
+    # form. Shown only when a settings file holds our hook.
+    try:
+        from . import firewall as _fw
+        hook_rows = _fw.hook_launch_form()
+    except Exception:
+        hook_rows = []
+    if hook_rows:
+        rendered["hook_launch"] = hook_rows
+
     if getattr(args, "json", False):
         print(json.dumps(rendered, indent=2))
         sys.exit(rendered["exit_code"])
@@ -4633,6 +4655,9 @@ def cmd_doctor(args, _run=None):
         print()
     if "agents" in rendered:
         _print_agents(rendered["agents"])
+    _print_hook_launch(rendered.get("hook_launch") or [])
+    _print_wrapper_launch([r for r in rendered["inventory"] if r.get("launch") == "OLD"],
+                          config=getattr(args, "config", None))
     # Five NOT RUN lines beside a nonzero exit read as "broken" on a machine where nothing
     # was tried and nothing failed (the exit is 3 here, not 1). Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
@@ -4655,6 +4680,46 @@ def cmd_doctor(args, _run=None):
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
     print()
     sys.exit(rendered["exit_code"])
+
+
+def _print_wrapper_launch(rows, config=None):
+    """Wrapped servers that still start the proxy with the bare `-m` form. Informational: no exit code."""
+    if not rows:
+        return
+    print(f"  {BOLD}Wrapper launch form{RESET}  "
+          f"{DIM}(read-only: nothing was changed){RESET}")
+    for row in rows:
+        name = shown_name(row["name"])
+        print(f"    {YELLOW}OLD FORM{RESET}    {name}  {DIM}({_where(row['source'])}){RESET}")
+        print(f"      {DIM}started with the current folder first on Python's import path: a file named "
+              f"like a Python module (json.py) in the folder your client runs it from can run before the proxy.{RESET}")
+        where = f" --config {_where(config)}" if config else (
+            " --config ~/.claude.json" if row["source"] == "user" else "")
+        print(f"      {CYAN}Fix: sunglasses install {name}{where}{RESET} "
+              f"{DIM}(re-writes the wrapper in the current form; approvals are kept){RESET}")
+    print()
+
+
+def _print_hook_launch(rows):
+    """The `doctor` hook launch-form block. Informational: it never changes the exit code."""
+    if not rows:
+        return
+    print(f"  {BOLD}Hook launch form{RESET}  "
+          f"{DIM}(read-only: nothing was changed){RESET}")
+    for row in rows:
+        path = _where(row["path"])
+        if row["state"] == "OK":
+            print(f"    {GREEN}OK{RESET}          {path}  {DIM}the hook drops the current folder from the import path{RESET}")
+        elif row["state"] == "OLD":
+            print(f"    {YELLOW}OLD FORM{RESET}    {path}")
+            print(f"      {DIM}a file named like a Python module (json.py) in the folder your agent runs in "
+                  f"can run before the firewall.{RESET}")
+            print(f"      {CYAN}Fix: sunglasses init{RESET} {DIM}(rewrites the hook line){RESET}")
+        else:
+            print(f"    {YELLOW}UNVERIFIED{RESET}  {path}")
+            print(f"      {DIM}could not judge or rewrite this line; put this in it by hand:{RESET}")
+            print(f"      {row['by_hand']}")
+    print()
 
 
 def _print_agents(rows):

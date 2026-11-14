@@ -3,8 +3,8 @@
     "sunglasses": {
       "command": "python3",
       "args": [
-        "-m",
-        "sunglasses.mcp"
+        "-c",
+        "import sys; sys.path[:1] = [] if sys.path[:1] == [''] else sys.path[:1]; import importlib.util, runpy; runpy.run_module('sunglasses.mcp', run_name='__main__', alter_sys=True)"
       ]
     }
   }

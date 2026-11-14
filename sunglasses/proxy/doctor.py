@@ -137,6 +137,8 @@ class Entry:
     # `passed` alone cannot say "never launched": False meant both that
     # and "launched and failed", and the JSON rendered the first as FAIL.
     result: str = NOT_RUN
+    # "OLD" for a WRAPPED entry that still starts the proxy with the bare `-m` form.
+    launch: str = ""
 
 
 @dataclass
@@ -386,9 +388,10 @@ def read_sources(sources=None, artifact=None, artifact_sha=None, hash_of=None):
             unreadable.append(str(path))
             continue
         for name, spec in servers.items():
+            state = _install.classify(spec, artifact=artifact)
             entries.append(Entry(
-                name=name, source=label,
-                state=_install.classify(spec, artifact=artifact)))
+                name=name, source=label, state=state,
+                launch=_install.launch_form(spec) if state == WRAPPED and _install.launch_form(spec) == "OLD" else ""))
     return entries, unreadable
 
 
@@ -401,7 +404,8 @@ def aggregate(sources_readable, entries, unreadable=()) -> Outcome:
     per_wrapper = [{"name": e.name, "source": e.source,
                     "result": e.result}
                    for e in entries if e.state == WRAPPED]
-    inventory = [{"name": e.name, "source": e.source, "state": e.state}
+    inventory = [{"name": e.name, "source": e.source, "state": e.state,
+                  **({"launch": e.launch} if e.launch else {})}
                  for e in entries]
     # An unreadable source is NAMED, never omitted. Omitting it is how a file
     # we could not open becomes, in a reader's head, a file with nothing in it.

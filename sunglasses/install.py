@@ -54,6 +54,8 @@ import sys
 import tempfile
 import time
 
+from . import _launch
+
 MARKER = "x-sunglasses"
 
 # THE LAUNCH FORM. `-m sunglasses.proxy`, never the artifact's path.
@@ -70,7 +72,29 @@ MARKER = "x-sunglasses"
 # that same `proxy/__main__.py`, so the marker still records that file's path
 # and sha256 and `classify` still re-derives the digest from it. What moved is
 # only the shape of argv, which is why the assertion below moved with it.
-LAUNCH = ("-m", "sunglasses.proxy")
+LAUNCH = ("-m", "sunglasses.proxy")     # the form written BEFORE the import-path fix; entries already in people's files still carry it
+
+# THE FORM WRITTEN NOW, and why. `python -m` puts the current folder first on the import path, so
+# a json.py or _json.py in the folder the host starts the server from would run instead of the
+# standard library. The line drops that one implicit entry (`-P` on 3.11 and newer, the start-up
+# line from _launch.py on 3.9 and 3.10) and nothing else. `classify` below accepts exactly three
+# argv prefixes, each followed by `--`, and no other: the old one, `-P -m sunglasses.proxy`, and
+# `-c <the exact start-up line for sunglasses.proxy>`. A wrapper installed before the fix is
+# therefore still WRAPPED after the upgrade, and a lookalike is still UNVERIFIED.
+PROXY_MODULE = "sunglasses.proxy"
+
+
+def launch_args():
+    """The argv words written after `command` (which is `sys.executable`) before the `--`."""
+    return _launch.module_args(PROXY_MODULE, running=True)
+
+
+def _accepted_launches():
+    return (list(LAUNCH), ["-P", "-m", PROXY_MODULE], ["-c", _launch.bootstrap(PROXY_MODULE)])
+
+
+def _is_our_launch(args):
+    return any(args[:len(form) + 1] == [*form, "--"] for form in _accepted_launches())
 
 # The five fields a record carries. A record may carry more, never fewer.
 RECORD_FIELDS = ("original_entry", "installed_entry", "file_sha_before",
@@ -2512,7 +2536,7 @@ def classify(entry, *, artifact):
     if command != meta.get("command") or not _could_execute(command):
         return "UNVERIFIED"
     args = entry.get("args")
-    if not isinstance(args, list) or args[:3] != [*LAUNCH, "--"]:
+    if not isinstance(args, list) or not _is_our_launch(args):
         return "UNVERIFIED"
     return "WRAPPED"
 
@@ -2634,6 +2658,44 @@ def install(config_path, name, *, artifact, home, argv=None):
                                argv=argv)
 
 
+def launch_form(entry):
+    """`"OLD"` for a wrapper entry written with the bare `-m sunglasses.proxy` start (before the
+    import-path fix), else `"OK"`. Call it on an entry `classify` already called WRAPPED."""
+    args = entry.get("args") if isinstance(entry, dict) else None
+    if isinstance(args, list) and args[:len(LAUNCH) + 1] == [*LAUNCH, "--"]:
+        return "OLD"
+    return "OK"
+
+
+def has_old_launch_wrapper(config_path, name, *, artifact):
+    """True when `name` in `config_path` is a verified wrapper that still carries the old start."""
+    try:
+        target = pathlib.Path(config_path)
+        entry = _servers(_parse(_read_bytes(target), target), target).get(name)
+    except (OSError, ConfigIOError, ConfigConflict):
+        return False
+    return (isinstance(entry, dict) and MARKER in entry
+            and classify(entry, artifact=artifact) == "WRAPPED"
+            and launch_form(entry) == "OLD")
+
+
+def rewrite_launch_form(config_path, name, *, artifact, home):
+    """Re-write an OLD-form wrapper in the current form: the recorded uninstall (which puts the
+    original entry back), then a fresh install. Each step is the ordinary transaction, so a
+    failure between them leaves the ORIGINAL entry in the file, never a half-written one, and
+    the error says so."""
+    if not has_old_launch_wrapper(config_path, name, artifact=artifact):
+        raise ConfigConflict(f"{name!r} is not a wrapper in the earlier launch form; nothing to rewrite")
+    uninstall(config_path, name, home=home)
+    try:
+        return install(config_path, name, artifact=artifact, home=home)
+    except (ConfigConflict, ConfigIOError) as e:
+        raise ConfigConflict(
+            f"the earlier wrapper for {name!r} was taken out and the original entry restored, but the "
+            f"new wrapper was not written ({e}); {name!r} is NOT wrapped now. Run: sunglasses install {name}"
+        ) from e
+
+
 def _install_locked(config_path, name, *, artifact, home, argv=None):
     artifact = pathlib.Path(artifact)
     try:
@@ -2688,7 +2750,7 @@ def _install_locked(config_path, name, *, artifact, home, argv=None):
         wrapper = {k: v for k, v in original_entry.items()
                    if k not in ("command", "args")}
         wrapper["command"] = sys.executable
-        wrapper["args"] = [*LAUNCH, "--", original_entry["command"],
+        wrapper["args"] = [*launch_args(), "--", original_entry["command"],
                            *(original_entry.get("args") or [])]
         wrapper[MARKER] = {"artifact": resolved, "sha256": digest,
                            "command": sys.executable}
