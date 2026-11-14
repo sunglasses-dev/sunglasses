@@ -95,7 +95,10 @@ def available():
 
 def default_argv():
     # -B: the child never writes a bytecode cache, wherever the folder being scanned is.
-    return [sys.executable, "-B", "-m", "sunglasses.scan_worker"]
+    # The folder being scanned is NOT on the child's import path (`python -m` would put it
+    # first, and a json.py or _json.py in it would run); see _launch.py.
+    from . import _launch
+    return _launch.child_argv("sunglasses.scan_worker", flags=("-B",))
 
 
 # ---------------------------------------------------------------- framing

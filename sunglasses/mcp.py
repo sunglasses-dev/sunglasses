@@ -6,10 +6,10 @@ Exposes SUNGLASSES as a tool that Claude Code (or any MCP client) can call.
 Uses raw stdio JSON-RPC 2.0 — zero external dependencies beyond the sunglasses package.
 
 Usage:
-    python -m sunglasses.mcp
+    sunglasses-mcp
 
 Register with Claude Code:
-    claude mcp add sunglasses -- python -m sunglasses.mcp
+    claude mcp add sunglasses -- sunglasses-mcp
 """
 
 import argparse
@@ -21,7 +21,7 @@ import threading
 # Ensure the package is importable when run as a module
 _pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _pkg_dir not in sys.path:
-    sys.path.insert(0, _pkg_dir)
+    sys.path.append(_pkg_dir)   # at the END: the package is already imported, and this must never go ahead of the standard library
 
 from sunglasses import __version__
 from sunglasses.engine import SunglassesEngine

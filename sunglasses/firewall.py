@@ -2529,15 +2529,19 @@ def build_hook_entry(interpreter: str = None, fail_open: bool = False) -> dict:
     """
     import shlex
     import sys as _sys
+    from . import _launch
+    # The version is known only for the interpreter running this code; for any other one the
+    # start-up line is written, which behaves the same on every version (see _launch.py).
+    running = interpreter is None or interpreter == _sys.executable
     interpreter = interpreter or _sys.executable
     # Quoted because the command is run through a shell: an interpreter path
     # containing a space (`/Users/x/My Env/bin/python3` — ordinary for conda and
     # for anyone whose username has a space) would otherwise be split into two
     # words, breaking both the hook and its own self-test.
-    interpreter = shlex.quote(interpreter)
+    hook_command = _launch.command_line(interpreter, HOOK_MARKER, running=running)
     hook = {
         "type": "command",
-        "command": f"{interpreter} -m {HOOK_MARKER}",
+        "command": hook_command,
         # The schema default is 600s. A hook that can hang for ten minutes
         # on every tool call is a worse outage than the attacks it prevents.
         "timeout": _HOOK_TIMEOUT,

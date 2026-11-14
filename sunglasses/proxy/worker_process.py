@@ -188,8 +188,8 @@ def _close_stdin(child, writer):
 
 
 def default_argv():
-    import sys
-    return [sys.executable, "-m", "sunglasses._proxy_worker"]
+    from .. import _launch
+    return _launch.child_argv("sunglasses._proxy_worker", flags=())
 
 
 class _TooMuch(Exception):

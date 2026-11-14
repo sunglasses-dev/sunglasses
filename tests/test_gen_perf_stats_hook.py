@@ -70,13 +70,14 @@ def test_measured_command_is_the_one_the_installer_writes():
     entry = build_hook_entry(interpreter=sys.executable)
     installed = shlex.split(entry["hooks"][0]["command"])
     assert gen.hook_argv() == installed
-    assert gen.hook_argv()[-2:] == ["-m", HOOK_MARKER]
+    assert HOOK_MARKER in " ".join(gen.hook_argv())
+    assert gen.hook_argv()[-2:] == ["-m", HOOK_MARKER] or gen.hook_argv()[1] == "-c"   # -P -m ... on 3.11+, the start-up line below
     assert "firewall-hook" not in gen.hook_argv()
 
 
 def test_block_names_the_command_it_timed():
     block = json.loads(STATS.read_text(encoding="utf-8"))["hook_speed"]
-    assert block["command"] == f"python -m {HOOK_MARKER}"
+    assert HOOK_MARKER in block["command"] and block["command"].startswith("python ")
 
 
 def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
@@ -101,7 +102,7 @@ def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
     assert [argv for argv, _ in seen] == [installed, installed, [sys.executable, "-c", "pass"]]
     assert seen[0][1] is not None and seen[0][1] == seen[1][1]  # the same benign Bash call in both lanes
     assert block["command"] == "python " + " ".join(installed[1:])
-    assert block["command"] == f"python -m {HOOK_MARKER}"
+    assert HOOK_MARKER in block["command"]
     # lane off is timed in a HOME without the marker, lane on in a HOME with it: two lanes timed
     # in the same HOME would measure one thing twice (the interpreter-floor call is lane-less).
     assert lane_marker[:2] == [False, True]

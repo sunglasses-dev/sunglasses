@@ -107,12 +107,15 @@ def _process_ms(argv, env, stdin, repeats):
 
 
 def hook_argv():
-    """The argv of the hook the installer registers: `<python> -m <HOOK_MARKER>`.
+    """The argv of the hook the installer registers (`<python> -P -m <HOOK_MARKER>` on 3.11+, the start-up line on 3.9 and 3.10).
 
-    Built from the same HOOK_MARKER `build_hook_entry` uses, so the number measured is the cost of
-    the command that actually runs on every tool call, not of a sibling entry point.
+    Split from the command `build_hook_entry` itself writes, so the number measured is the cost of
+    the command that actually runs on every tool call, not of a sibling entry point and not of an
+    older launch form.
     """
-    return [sys.executable, "-m", HOOK_MARKER]
+    import shlex
+    from sunglasses.firewall import build_hook_entry
+    return shlex.split(build_hook_entry(interpreter=sys.executable)["hooks"][0]["command"])
 
 
 def measure_hook(repeats=HOOK_REPEATS):
@@ -126,7 +129,9 @@ def measure_hook(repeats=HOOK_REPEATS):
                  ("hook_lane_on", hook, on_home, HOOK_INPUT),
                  ("python_start", [sys.executable, "-c", "pass"], off_home, None))
         for name, argv, home, stdin in cases:
-            env = {"HOME": home, "SUNGLASSES_HOME": home,
+            # The hook command no longer puts the current folder on the import path (-P), so the
+            # checkout being measured is put there on purpose, the way an editable install would.
+            env = {"HOME": home, "SUNGLASSES_HOME": home, "PYTHONPATH": REPO,
                    "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
             ran[name] = list(argv)
             low, mid = _process_ms(argv, env, stdin, repeats)

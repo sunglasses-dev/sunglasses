@@ -352,7 +352,7 @@ Use SUNGLASSES alone, or use it alongside cloud tools. We even built an **adapte
 
 ## Privacy
 
-This section is about the MCP server, `python -m sunglasses.mcp`, the process an agent or a Claude plugin starts.
+This section is about the MCP server, `sunglasses-mcp`, the process an agent or a Claude plugin starts.
 
 The server reads only the text you pass to `scan_text` and the file you name in `scan_file`. The scan runs on your machine. The server opens no network connection and sends nothing anywhere, except that a deep audio or video scan downloads its Whisper model when the scan needs it and no intact copy is cached. It keeps no copy of what it scans. It collects no data, so there is nothing to store, share or retain.
 
@@ -735,7 +735,7 @@ print(result.latency_ms)   # milliseconds; grows with input length
 
 ### Connect the MCP server
 
-The root `mcp.json` starts the server with `command` set to `python3` and `args` set to `["-m", "sunglasses.mcp"]`. A desktop client may not use the same PATH as your terminal, so set `command` to the absolute path of the Python that has Sunglasses installed. In a virtual environment that is `/absolute/path/to/.venv/bin/python`. CI runs on Linux. Windows is not supported. Proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested. Keep `args` as it is.
+The root `mcp.json` starts the server with `command` set to `sunglasses-mcp`, the script `pip install sunglasses` puts next to your Python. A desktop client may not use the same PATH as your terminal, so set `command` to the absolute path of that script. In a virtual environment that is `/absolute/path/to/.venv/bin/sunglasses-mcp`. CI runs on Linux. Windows is not supported. Proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested. Keep `args` as it is.
 
 To check the connection, confirm that your client lists `scan_text`, `scan_file` and `scanner_info`. Call `scanner_info` with `{}`. Then call `scan_text` with `{"text": "The team lunch is at noon on Friday."}`. The answer has `isError` false. Its result reads `"decision": "allow"`, `"inspection_complete": true` and `"is_clean": true`. `scan_file` takes an absolute path on the machine that runs the server.
 
@@ -859,7 +859,7 @@ language contributions welcome; see `KNOWN_VERSION_GAPS.md` for the measured det
 - ✅ **CLI.** `sunglasses scan`, `sunglasses check`, `sunglasses demo`, `sunglasses info`, `sunglasses report`
 - ✅ **Python API.** `SunglassesEngine` for text, `SunglassesScanner` for media
 - ✅ LangChain + CrewAI integrations
-- ✅ MCP scanning server. Run `python -m sunglasses.mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
+- ✅ MCP scanning server. Run `sunglasses-mcp` in the Python environment where Sunglasses is installed. It speaks over stdio and exposes `scan_text`, `scan_file` and `scanner_info`, which your client calls explicitly. The root `mcp.json` holds the client configuration. [Connect the MCP server](#connect-the-mcp-server) shows how to check it
 - ✅ SARIF 2.1.0 output for CI integration
 - ✅ Measured on a shipped dataset, recall 97.4% (37/38) and precision 86.1%, reproduce with `python3 tests/benchmark/precision_recall.py`
 - ✅ Local scanning with zero telemetry. Only audio and video need a download, the Whisper model on first use
