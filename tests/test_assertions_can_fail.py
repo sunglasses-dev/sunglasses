@@ -69,6 +69,11 @@ SANCTIONED_SUBSETS = [
     {"file", "tool_output", "code"},
     # GLS-SD-010 reads exactly message, file and code. test_sd010_export_prefix.py walks those three
     # for the export form, and asserts on its own that every channel the rule does not list stays clear.
+    # The other channels are out BY DESIGN, not because a test was red: the rule is line anchored, and
+    # that anchor cannot match inside a JSON string, which is how a tool result or an API answer
+    # carries a line of text. That direction is a documented open gap (CHANGELOG 0.5.x, "GLS-SD-010's
+    # open gap", and README "GLS-SD-010 is line anchored, and that is a limit in every channel"); the
+    # embedded content rule that closes it is a separate card, so these channels are not this rule's job.
     {"message", "file", "code"},
 ]
 
