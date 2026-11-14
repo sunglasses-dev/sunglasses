@@ -232,3 +232,49 @@ def test_a_child_finds_an_uninstalled_checkout_through_the_root_the_parent_hands
     assert done.returncode == 0 and "sunglasses" in (done.stdout + done.stderr).lower(), done.stderr[-300:]
     assert not marker.exists(), "the planted sunglasses folder was imported"
     assert "append(" in _launch.bootstrap("sunglasses", root=ROOT), "the root is added to the END of the path"
+
+
+# ------------------------------------------------------------------ published MCP start files
+
+def _published_mcp_starts():
+    """(label, command, args) for each file we publish that tells a client how to start the server."""
+    out = []
+    for rel in ("mcp.json", "claude-plugin/.mcp.json"):
+        entry = json.loads(open(os.path.join(ROOT, rel), encoding="utf-8").read())["mcpServers"]["sunglasses"]
+        out.append((rel, entry["command"], entry["args"]))
+    server = json.loads(open(os.path.join(ROOT, "server.json"), encoding="utf-8").read())
+    for package in server["packages"]:
+        out.append(("server.json", package["runtimeHint"],
+                    [a["value"] for a in package["runtimeArguments"]]))
+    return out
+
+
+@pytest.mark.parametrize("label,command,args", _published_mcp_starts(), ids=lambda v: v if isinstance(v, str) and "." in v else None)
+def test_the_published_mcp_start_leaves_the_current_folder_off_the_path(planted, label, command, args):
+    """The start line a client is told to use runs the server from a folder with a planted json.py
+    and _json.py: the server answers `initialize`, and nothing planted ran."""
+    folder, marker = planted
+    assert args[:1] == ["-c"] and args[1] == _launch.bootstrap("sunglasses.mcp"), label
+    exe = sys.executable if command in ("python", "python3") else command
+    request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                          "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                                     "clientInfo": {"name": "t", "version": "0"}}}) + "\n"
+    done = _run([exe, *args], folder, stdin=request)
+    assert done.returncode == 0, done.stderr
+    assert '"protocolVersion"' in done.stdout
+    assert not marker.exists()
+
+
+def test_the_same_start_without_the_strip_runs_the_plant(planted):
+    """Control: the published line minus its first step does run a planted file, so the test above can fail.
+    (The old `-m sunglasses.mcp` start is also covered now, by the guard in the package's __init__.)"""
+    folder, marker = planted
+    bare = "import runpy; runpy.run_module('sunglasses.mcp', run_name='__main__', alter_sys=True)"
+    _run([sys.executable, "-c", bare], folder, stdin="")
+    assert marker.exists()
+
+
+def test_the_old_mcp_m_start_is_covered_by_the_package_guard(planted):
+    folder, marker = planted
+    _run([sys.executable, "-m", "sunglasses.mcp"], folder, stdin="")
+    assert not marker.exists()
