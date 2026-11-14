@@ -18,7 +18,7 @@ SCRIPT = ROOT / "scripts" / "pattern_perf_gate.py"
 TEXT = WORKFLOW.read_text(encoding="utf-8")
 
 # Update only after re-reading every assertion below against the new text.
-WORKFLOW_SHA256 = "55e2a8e91cebbd29d05a948f32fed1b62a1d539a905a3d8b93902b5fe7f73b5f"
+WORKFLOW_SHA256 = "416596332b8dab998e1c15a5bc5494a75b343da6627b82cef67d0e57d91d5f1e"
 
 ENV_NAMES = {"GH_TOKEN", "REPO", "HEAD", "RUN_URL", "PR", "BASE", "OUTCOME"}
 FORBIDDEN = (

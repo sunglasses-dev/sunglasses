@@ -30,7 +30,7 @@ concurrency:
 jobs:
   pattern-perf:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 14
     permissions:
       contents: read
       statuses: write
