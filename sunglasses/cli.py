@@ -4537,8 +4537,8 @@ def cmd_doctor(args, _run=None):
         from .proxy import agent_discovery as _agents
         rendered["agents"] = _agents.discover()
 
-    # Read-only, and no part of the exit code: it reports the folder-first import-path hole in a
-    # hook line written before the fix. Shown only when a settings file holds our hook.
+    # Read-only, and no part of the exit code: it reports a hook line written in an older start
+    # form. Shown only when a settings file holds our hook.
     try:
         from . import firewall as _fw
         hook_rows = _fw.hook_launch_form()
