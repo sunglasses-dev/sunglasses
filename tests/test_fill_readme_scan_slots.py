@@ -53,22 +53,22 @@ Reproduce with `python3 tools/gen_perf_stats.py`. @@SCAN_PROVENANCE@@ Your hardw
 """
 # The WARN-lane bullet and the Cost line, copied from the README (a test below keeps them equal).
 HOOK_TEMPLATE = """\
-  taste: a few ordinary tool calls escalate (a plain `curl -s pypi.org` has read
-  as a dangerous shell command), and the lane adds time to every call: about
+  taste. A few ordinary tool calls escalate (a plain `curl -s pypi.org` has read
+  as a dangerous shell command), and the lane adds time to every call, about
   @@LANE_ON_MS@@ ms per tool call with it on against @@LANE_OFF_MS@@ ms with it
   off, measured on @@VERSION@@, @@DATE@@ (ledger entry). Enable with
 About @@LANE_OFF_MS@@ ms per tool call with the pattern lane off (the default) and about
-@@LANE_ON_MS@@ ms with it on (the installed hook command, whole process, min of @@REPEATS@@ runs,
+@@LANE_ON_MS@@ ms with it on (the hook command, whole process, min of @@REPEATS@@ runs,
 a benign Bash call, measured on @@VERSION@@, @@DATE@@, on @@MACHINE_CLASS@@; bare Python
 startup is @@PY_START_MS@@ ms of that). Zero network calls (nothing about your work leaves the
 """
 HOOK_EXPECTED = """\
-  taste: a few ordinary tool calls escalate (a plain `curl -s pypi.org` has read
-  as a dangerous shell command), and the lane adds time to every call: about
+  taste. A few ordinary tool calls escalate (a plain `curl -s pypi.org` has read
+  as a dangerous shell command), and the lane adds time to every call, about
   100 ms per tool call with it on against 32 ms with it
   off, measured on 0.6.20, 2026-11-09 (ledger entry). Enable with
 About 32 ms per tool call with the pattern lane off (the default) and about
-100 ms with it on (the installed hook command, whole process, min of 15 runs,
+100 ms with it on (the hook command, whole process, min of 15 runs,
 a benign Bash call, measured on 0.6.20, 2026-11-09, on an Apple silicon Mac (arm64, macOS); bare Python
 startup is 23 ms of that). Zero network calls (nothing about your work leaves the
 """
@@ -121,6 +121,10 @@ def test_the_committed_readme_is_slotted_or_matches_the_stats():
         for line in _expected_scan_lines(FILE_STATS):
             assert line in README, line
         assert re.search(r"about\s+\d+\s+ms per tool call with it on against \d+ ms", README)
+        # The hook lines too: the template filled from the committed stats must be what the README says.
+        filled = fill_slots.fill(TEMPLATE, FILE_STATS).splitlines()
+        for line in filled[-len(HOOK_TEMPLATE.splitlines()):]:
+            assert line in README, line
 
 
 def test_fill_writes_the_stats_values_and_leaves_no_slot():
