@@ -80,7 +80,8 @@ def test_measured_command_is_the_one_the_installer_writes():
 
 def test_block_names_the_command_it_timed():
     block = json.loads(STATS.read_text(encoding="utf-8"))["hook_speed"]
-    assert HOOK_MARKER in block["command"] and block["command"].startswith("python ")
+    # the committed block carries the label the generator writes (the argv differs per Python)
+    assert block["command"] == gen.HOOK_COMMAND_LABEL
 
 
 def test_measure_hook_runs_the_installed_command_in_both_lanes(monkeypatch):
