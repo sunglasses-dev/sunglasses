@@ -2669,6 +2669,11 @@ def _hook_form_of(command: str):
     """
     import shlex
     from . import _launch
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in command):
+        # A control byte (0x00 to 0x1F, or 0x7F) is never part of a line we write. A NUL cannot be carried
+        # by a command line at all: the shell refuses to start anything with it, so such a line cannot run
+        # whatever it looks like. The rest change what the shell reads. One rule, no exceptions.
+        return HOOK_FORM_UNVERIFIED, None
     try:
         words = shlex.split(command)
     except ValueError:

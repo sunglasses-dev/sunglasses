@@ -170,6 +170,35 @@ def test_the_forms_the_writer_makes_and_quoted_interpreter_paths_stay_as_they_we
     assert firewall._hook_form_of(command)[0] == state
 
 
+@pytest.mark.parametrize("command", [
+    f'"/usr/bin/py\x00thon3" -P -m {firewall.HOOK_MARKER}',          # NUL inside the interpreter word, double quotes
+    f"'/usr/bin/py\x00thon3' -P -m {firewall.HOOK_MARKER}",          # single quotes
+    f"/usr/bin/py\x00thon3 -P -m {firewall.HOOK_MARKER}",            # no quotes
+    f'"/usr/bin/py\x00thon3" -m {firewall.HOOK_MARKER}',             # the old form with a NUL is not OLD either
+    f"{PY} -P -m {firewall.HOOK_MARKER}\x00",                         # NUL at the end of the line
+])
+def test_a_line_with_a_nul_byte_cannot_run_and_is_unverified(command):
+    assert firewall._hook_form_of(command)[0] == "UNVERIFIED"
+
+
+@pytest.mark.parametrize("byte", ["\x01", "\x07", "\x08", "\x09", "\x0b", "\x0c", "\x0d", "\x1b", "\x1f", "\x7f"])
+@pytest.mark.parametrize("make", [
+    lambda b: f'"/usr/bin/py{b}thon3" -P -m {firewall.HOOK_MARKER}',      # inside the word, double quotes
+    lambda b: f"'/usr/bin/py{b}thon3' -P -m {firewall.HOOK_MARKER}",      # inside the word, single quotes
+    lambda b: f"{PY} -P -m {firewall.HOOK_MARKER}{b}",                    # after the last word
+    lambda b: f"{PY}{b}-P -m {firewall.HOOK_MARKER}",                     # in place of the space
+    lambda b: f"{PY} -m {firewall.HOOK_MARKER}{b}",                       # the old form
+])
+def test_any_control_byte_in_the_line_is_unverified_not_ok_or_old(make, byte):
+    assert firewall._hook_form_of(make(byte))[0] == "UNVERIFIED"
+
+
+def test_a_nul_byte_in_a_settings_file_line_gets_the_line_to_use(tmp_path):
+    path = _settings(tmp_path, f'"/usr/bin/py\x00thon3" -P -m {firewall.HOOK_MARKER}')
+    rows = firewall.hook_launch_form([path])
+    assert rows[0]["state"] == "UNVERIFIED" and rows[0]["by_hand"] and "\x00" not in rows[0]["by_hand"]
+
+
 def test_the_start_up_line_with_a_quoted_interpreter_stays_ok():
     line = " ".join(shlex.quote(w) for w in ["/Users/x/My Env/bin/python3", "-c", _launch.bootstrap(firewall.HOOK_MARKER)])
     assert firewall._hook_form_of(line)[0] == "OK"
