@@ -2660,7 +2660,13 @@ HOOK_FORM_UNVERIFIED = "UNVERIFIED"
 
 
 def _hook_form_of(command: str):
-    """(state, interpreter) for one hook command string that names our module."""
+    """(state, interpreter) for one hook command string that names our module.
+
+    A line is judged by its WHOLE text, not word by word: the shell reads the text, so a separator, a
+    redirect, a substitution or a variable glued to the first word changes what runs even when the words
+    after it look right. The line must be exactly what `_launch.command_line` writes for the interpreter
+    it names (or the same with that one word in double quotes), and nothing else is OK or OLD.
+    """
     import shlex
     from . import _launch
     try:
@@ -2670,10 +2676,17 @@ def _hook_form_of(command: str):
     if len(words) < 2:
         return HOOK_FORM_UNVERIFIED, None
     interpreter, rest = words[0], words[1:]
-    if rest == ["-P", "-m", HOOK_MARKER] or rest == ["-c", _launch.bootstrap(HOOK_MARKER)]:
-        return HOOK_FORM_OK, interpreter
-    if rest == ["-m", HOOK_MARKER]:
-        return HOOK_FORM_OLD, interpreter
+    forms = ((HOOK_FORM_OK, ["-P", "-m", HOOK_MARKER]),
+             (HOOK_FORM_OK, ["-c", _launch.bootstrap(HOOK_MARKER)]),
+             (HOOK_FORM_OLD, ["-m", HOOK_MARKER]))
+    for state, tail in forms:
+        if rest != tail:
+            continue
+        written = " ".join(shlex.quote(w) for w in [interpreter, *tail])
+        accepted = {written}
+        if not any(c in interpreter for c in '"$`\\!\n'):
+            accepted.add('"%s" %s' % (interpreter, " ".join(shlex.quote(w) for w in tail)))
+        return (state if command in accepted else HOOK_FORM_UNVERIFIED), interpreter
     return HOOK_FORM_UNVERIFIED, interpreter
 
 
