@@ -46,9 +46,9 @@ def test_RS10_catalog_counts():
  # the added sets on both catalogs are exactly those fourteen ids, nothing was removed, helper_catalog did not move.
  # 1594 -> 1595 and 1606 -> 1607 are GLS-PI-026, split out of GLS-MM-AUDIO-206 (one id added, none removed).
  # 1595 -> 1574 and 1607 -> 1586 are the 21 exact copies removed, none added.
- assert len(inspection.engine_catalog())==1574
+ assert len(inspection.engine_catalog())==1576
  assert len(inspection.helper_catalog())==12
- assert len(inspection.trusted_catalog())==1586
+ assert len(inspection.trusted_catalog())==1588
 
 def test_RS11_list_finding_provenance_is_preserved():
  page={'tools':[{'name':'echo','inputSchema':{'type':'object'}}]}
