@@ -1,4 +1,4 @@
-"""C1329. A wrapper written BEFORE the import-path fix starts the proxy with the bare
+"""A wrapper written BEFORE the import-path fix starts the proxy with the bare
 `-m sunglasses.proxy`, so a json.py in the folder the client runs it from ran first.
 
 An upgrade cannot edit a user's config. What it can do, and what these tests pin:

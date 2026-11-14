@@ -1,4 +1,4 @@
-"""The `doctor` hook launch-form row (C1329): reads a settings file, says which form the hook line
+"""The `doctor` hook launch-form row reads a settings file, says which form the hook line
 holds, never writes, never changes the exit code."""
 import json
 import os
@@ -109,7 +109,7 @@ def test_doctor_reports_the_row_and_keeps_its_exit_code(tmp_path):
 
 
 def test_init_over_an_old_hook_line_leaves_exactly_one_entry_of_ours_in_the_current_form(tmp_path):
-    """C1329, through the real `sunglasses init` in a sandboxed project and HOME: an OLD `-m` line
+    """Through the real `sunglasses init` in a sandboxed project and HOME: an OLD `-m` line
     is replaced, not added to. One entry of ours remains, in the current form, and the entry
     that belongs to someone else is untouched."""
     home, project = tmp_path / "home", tmp_path / "proj"
@@ -135,12 +135,10 @@ def test_init_over_an_old_hook_line_leaves_exactly_one_entry_of_ours_in_the_curr
     assert [r["state"] for r in firewall.hook_launch_form([settings])] == ["OK"]
 
 
-# ---- the whole line is judged, not word by word (C1329 r2) ------------------------------------
+# ---- the whole line is judged, not word by word  ------------------------------------
 
 PY = "/usr/bin/python3"
 QUOTED = "'/Users/x/My Env/bin/python3'"
-LOCAL_ROWS = os.path.expanduser("~/.claude/state/warroom/C1365_B2_NEAR_MISS_2026-11-14.json")
-CHOICE = {"N1", "N2"}          # either answer accepted when the table was written
 
 
 @pytest.mark.parametrize("command", [
@@ -185,11 +183,47 @@ def test_a_compound_line_in_a_settings_file_gets_the_line_to_use_and_nothing_is_
     assert (path.read_bytes(), path.stat().st_mtime_ns) == before
 
 
-@pytest.mark.skipif(not os.path.exists(LOCAL_ROWS), reason="the near-miss table lives on one machine")
-def test_every_row_of_the_local_near_miss_table_gets_its_expected_state():
-    with open(LOCAL_ROWS, encoding="utf-8") as handle:
-        rows = json.load(handle)
-    assert len(rows) >= 34
-    wrong = [(r["id"], r["expected"], firewall._hook_form_of(r["line"])[0])
-             for r in rows if r["id"] not in CHOICE and firewall._hook_form_of(r["line"])[0] != r["expected"]]
-    assert not wrong, wrong
+# Each row: (number, a hook line, the state the doctor row must give).
+# Lines hold a separator, redirect, pipe, substitution, variable, newline, extra word or quote glued in
+# somewhere; only the exact forms the writer makes (and the old form) may be OK or OLD.
+NEAR_MISS_ROWS = (
+    (1, '/usr/bin/python3 -P -m sunglasses.firewall', 'OK'),
+    (2, "'/Users/x/My Env/bin/python3' -P -m sunglasses.firewall", 'OK'),
+    (3, '/usr/bin/python3 -c \'import sys; sys.path[:1] = [] if sys.path[:1] == [\'"\'"\'\'"\'"\'] else sys.path[:1]; import importlib.util, runpy; runpy.run_module(\'"\'"\'sunglasses.firewall\'"\'"\', run_name=\'"\'"\'__main__\'"\'"\', alter_sys=True)\'', 'OK'),
+    (4, '\'/Users/x/My Env/bin/python3\' -c \'import sys; sys.path[:1] = [] if sys.path[:1] == [\'"\'"\'\'"\'"\'] else sys.path[:1]; import importlib.util, runpy; runpy.run_module(\'"\'"\'sunglasses.firewall\'"\'"\', run_name=\'"\'"\'__main__\'"\'"\', alter_sys=True)\'', 'OK'),
+    (5, '"/usr/bin/python3" -P -m sunglasses.firewall', 'OK'),
+    (6, '/usr/bin/python3 -m sunglasses.firewall', 'OLD'),
+    (7, "'/Users/x/My Env/bin/python3' -m sunglasses.firewall", 'OLD'),
+    (8, '/usr/bin/python3>/tmp/marker;sh -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (9, '/usr/bin/python3;touch /tmp/marker;sh -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (10, 'true&&/usr/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (11, 'false||/usr/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (12, '/usr/bin/python3|cat -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (13, '/usr/bin/python3&sh -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (14, '$(id)/usr/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (15, '`id`/usr/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (16, '/usr/bin/python3<in.txt -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (17, '/usr/bin/python3>>/tmp/marker;sh -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (18, '$HOME/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (19, 'PYTHONPATH=/tmp/x /usr/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+    (20, '/usr/bin/python3 -P -m sunglasses.firewall; touch /tmp/marker', 'UNVERIFIED'),
+    (21, '/usr/bin/python3 -P -m sunglasses.firewall && touch /tmp/marker', 'UNVERIFIED'),
+    (22, '/usr/bin/python3 -P -m sunglasses.firewall >/tmp/marker', 'UNVERIFIED'),
+    (23, '/usr/bin/python3 -P -m sunglasses.firewall 2>/dev/null', 'UNVERIFIED'),
+    (24, '/usr/bin/python3 -P -m sunglasses.firewall;', 'UNVERIFIED'),
+    (25, '/usr/bin/python3 -P -m sunglasses.firewall\ntouch /tmp/marker', 'UNVERIFIED'),
+    (26, '/usr/bin/python3\ntouch /tmp/marker\n-P -m sunglasses.firewall', 'UNVERIFIED'),
+    (27, '/usr/bin/python3 -P -m sunglasses.firewall; touch /tmp/marker', 'UNVERIFIED'),
+    (28, '/usr/bin/python3>/tmp/marker;sh -m sunglasses.firewall', 'UNVERIFIED'),
+    (29, '/usr/bin/python3 -P -m sunglasses.firewall_extra', 'UNVERIFIED'),
+    (30, '/usr/bin/python3 -P -m sunglasses.firewall --extra', 'UNVERIFIED'),
+    (31, "/usr/bin/python3 -c 'import os' -P -m sunglasses.firewall", 'UNVERIFIED'),
+    (32, "/usr/bin/python3 -P -m sunglasses.firewall'", 'UNVERIFIED'),
+    (33, "'/odd;path/python3' -P -m sunglasses.firewall", 'OK'),
+    (34, '~/venv/bin/python3 -P -m sunglasses.firewall', 'UNVERIFIED'),
+)
+
+
+@pytest.mark.parametrize("number,line,expected", NEAR_MISS_ROWS, ids=[str(r[0]) for r in NEAR_MISS_ROWS])
+def test_each_near_miss_row_gets_its_expected_state(number, line, expected):
+    assert firewall._hook_form_of(line)[0] == expected

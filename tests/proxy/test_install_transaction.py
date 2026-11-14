@@ -587,7 +587,7 @@ def _with_launch(entry, words):
 
 
 def test_install_writes_the_form_that_drops_the_implicit_path_entry(cfg, home, artifact):
-    """C1329. `python -m` puts the current folder first on the import path, so the wrapper
+    """`python -m` puts the current folder first on the import path, so the wrapper
     is written with `-P` (3.11+) or the start-up line (3.9, 3.10): never the bare `-m`."""
     inst.install(cfg, "github", artifact=artifact, home=home)
     args = servers(cfg)["github"]["args"]
@@ -598,7 +598,7 @@ def test_install_writes_the_form_that_drops_the_implicit_path_entry(cfg, home, a
 
 @pytest.mark.parametrize("form", ["old", "p", "bootstrap"])
 def test_a_wrapper_in_any_of_the_three_written_forms_is_wrapped(cfg, home, artifact, form):
-    """C1329. Entries written BEFORE the fix carry `-m sunglasses.proxy`; the upgrade must not
+    """Entries written BEFORE the fix carry `-m sunglasses.proxy`; the upgrade must not
     flip them to UNVERIFIED. Both new forms are ours too."""
     from sunglasses import _launch
     words = {"old": list(inst.LAUNCH),
@@ -617,13 +617,13 @@ def test_a_wrapper_in_any_of_the_three_written_forms_is_wrapped(cfg, home, artif
     ["-I", "-m", "sunglasses.proxy"],
 ])
 def test_a_lookalike_launch_is_unverified(cfg, home, artifact, words):
-    """C1329. The accepted forms are three exact argv prefixes. A near-miss is not ours."""
+    """The accepted forms are three exact argv prefixes. A near-miss is not ours."""
     entry = _with_launch(_wrapped(cfg, home, artifact), words)
     assert inst.classify(entry, artifact=artifact) == "UNVERIFIED"
 
 
 def test_uninstall_still_restores_a_wrapper_written_in_the_old_form(cfg, home, artifact, monkeypatch):
-    """C1329. A route installed before the upgrade (the old `-m` form, record and all) is
+    """A route installed before the upgrade (the old `-m` form, record and all) is
     classified and uninstalled after it."""
     before = servers(cfg)["github"]
     monkeypatch.setattr(inst, "launch_args", lambda: list(inst.LAUNCH))
