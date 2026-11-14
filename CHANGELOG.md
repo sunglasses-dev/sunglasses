@@ -5,16 +5,25 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.23] — 2026-11-14
+
+### Security
+
+- Starting the scanner from a folder no longer lets a file in that folder take the place of part of the scanner's own startup. Every start of its own code that the scanner makes or writes now ignores the folder it was started in, unless you put that folder on the Python path yourself. A server you configured yourself starts the way you wrote it.
+  Hook entries, proxy wrappers and MCP entries written by an earlier version keep their old start until you update them.
+  For the hook, run `sunglasses init` again. For a proxy wrapper, run `sunglasses install NAME` again. For an MCP entry copied from our README, copy the new line.
+  `sunglasses doctor` names old hooks and old wrappers, and marks a hook line it cannot read as unverified, showing the line to use. It does not check the start line of an MCP entry that runs the Sunglasses server.
+
 ### Changed
 
 - A rule that accepts either of two wordings in one check finds the second wording wherever it stands in the text.
 
-- The rule for a reproduced training record matches when its words stand close together. A long guideline file that uses them in different sections stays allowed.
+- The rule for a reproduced training record matches when its words stand close together. A long guideline file that uses them in different sections is no longer matched by that rule.
 
 - A hook command that starts with a command substitution of a download is found, because the shell runs
   whatever the download prints. Interpreter code given on the command line (`python`, `node`, `perl`, `ruby`)
   that fetches over the network and then runs a string as code is found as well. Lookalikes that do not run the
-  downloaded text stay clear.
+  downloaded text are not matched.
 
 - The environment config secret rule reads a line that starts with `export` and then one of its secret names the same way as the bare assignment, on the same channels.
 
@@ -29,7 +38,15 @@ All notable changes to Sunglasses are documented here.
 
 - The rule for a stolen handoff that escalates scope matches when the text names the scope, approval or permission that is bypassed.
 
-- The rule for a well-known discovery file that poisons agent policy matches when the text names the secret it sends out or the guard it switches off.
+- The rule for a discovery file at a standard address that poisons agent policy matches when the text names the secret it sends out or the guard it switches off.
+
+- A key written right after another character is now reported on the `tool_output` channel the same way as on the `api_response` channel. A doubtful case is held for review instead of allowed.
+
+- In the rule for tool and prompt listings, a wording that sends something out is read inside one sentence. A verb in one sentence and a secret in the next is no longer matched.
+
+- Two more blank characters are read as a space before the rules run, the way other blanks already were.
+
+- The hook timing in the README and in the stats file now names what it times, the hook command the installer writes, started from a development copy of the code.
 
 ## [0.6.22] — 2026-11-13
 
