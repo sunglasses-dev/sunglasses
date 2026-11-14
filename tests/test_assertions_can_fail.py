@@ -67,6 +67,9 @@ SANCTIONED_SUBSETS = [
     # The settings validator's reach: the channels that carry a settings file (`code` is the
     # alias of `file`). Every other channel is asserted clear in the same test, from the full list.
     {"file", "tool_output", "code"},
+    # GLS-SD-010 reads exactly message, file and code. test_sd010_export_prefix.py walks those three
+    # for the export form, and asserts on its own that every channel the rule does not list stays clear.
+    {"message", "file", "code"},
 ]
 
 

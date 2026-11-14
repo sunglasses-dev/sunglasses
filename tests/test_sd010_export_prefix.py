@@ -67,6 +67,15 @@ def test_a_line_with_other_text_in_front_is_read_as_it_was_before(engine, text):
     assert not found(engine, text)
 
 
+LIVE = {"message", "file", "api_response", "web_content", "log_memory", "tool_output", "agent_input", "code", "prompt"}
+
+
+@pytest.mark.parametrize("channel", sorted(LIVE - {"message", "file", "code"} - {"prompt"}))   # prompt is the alias of message
+def test_a_channel_the_rule_does_not_list_stays_clear(engine, channel):
+    assert not found(engine, f"export API_KEY={VALUE}", channel)
+    assert not found(engine, f"API_KEY={VALUE}", channel)
+
+
 def test_the_channels_of_the_rule_are_unchanged():
     rule = next(p for p in PATTERNS if p["id"] == RULE)
     assert sorted(rule["channel"]) == ["code", "file", "message"]

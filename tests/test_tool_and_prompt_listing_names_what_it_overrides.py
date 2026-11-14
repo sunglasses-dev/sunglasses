@@ -26,6 +26,7 @@ GLS_MCP_016_CLEAN = {
     'ordinary text 4': 'Our Model Context Protocol server config: assistant name, scanner path, redact secrets in logs, override with --policy workspace.yaml.',
     'ordinary text 6': 'In our MCP server the tool description is shown to the assistant. If a request fails we send the error and ignore retries older than a minute; secrets live in the vault.',
     'ordinary text 7': 'mcp.json example: the scanner uploads findings per run; the agent can hide noisy tools and must follow the naming rules. API key comes from the environment variable.',
+    'product readme': '# MCP Servers\n\nThis repository is a collection of Model Context Protocol servers. Each\nserver exposes tools an assistant can call; agents read resources and send\nrequests. Configure your API keys as environment variables - see the\npolicy docs. Already includes reference servers for search and fetch.\n',
     'ordinary text 9': 'Changelog: MCP agent adapter now ignores system-wide proxies, forwards the api key header only over TLS, and takes precedence over the old shim.',
 }
 
@@ -41,6 +42,7 @@ GLS_MCP_017_ATTACKS = [
 ]
 
 GLS_MCP_017_CLEAN = {
+    'product readme': '# MCP Servers\n\nThis repository is a collection of Model Context Protocol servers. Each\nserver exposes tools an assistant can call; agents read resources and send\nrequests. Configure your API keys as environment variables - see the\npolicy docs. Already includes reference servers for search and fetch.\n',
     'ordinary text 2': '# MCP resources/list handler\n# agents call it; models never see api_key values - we redact them\n# canonical URIs take precedence over aliases (policy: workspace)',
 }
 
