@@ -466,27 +466,26 @@ GLS-PT-001 (path traversal, file channel) blocks real package.json files whose s
 relative parent paths: 213 of 1,907 distinct npm packages on one Mac (581 of 5,691 top-level files), measured
 Nov 9 2026 on 0.6.20. `scan --dir` skips node_modules, so this reaches a user who scans a single manifest or a
 vendored tree. GLS-CI-007 quarantines our own action.yml the same way. Present since v0.2.4; not a regression.
-Fix: design round C1065, target 0.6.22.
+The fix is a rule change that needs review and a false-positive run, and no release is named for it yet.
 
 GLS-CI-007 (workflow shell-step interpolation, file channel) misses some forms of the step it is aimed at: of 72
 attacker-source workflow shapes we wrote, it flags 48 and misses 24; a list of misses we wrote, not a miss rate on
-real workflows. Measured Nov 9 2026 on 0.6.20. Fix: design round C1065, target 0.6.22.
+real workflows. Measured Nov 9 2026 on 0.6.20.
 
 GLS-TS-251, GLS-GHSA-PI-202 and GLS-APIP-005 block real workflow, issue-template and Dockerfile files on comment,
 URL or glob text: 20 of 298 distinct files found on one Mac (copies of our own repos and installed npm packages
 included), measured Nov 9 2026 on 0.6.20; 4 of the 113 files in the Poisoned Build Manifests report
-(sunglasses.dev/reports/poisoned-build-manifests). Fix card C1069.
+(sunglasses.dev/reports/poisoned-build-manifests).
 
 ## Open limit as of 0.6.20 (2026-11-09) — tool-description poisoning: three gaps in the 58 class rules
 
 GLS-MECH-006 flagged 2 of 309 real descriptions. 309 distinct tool descriptions from 11 sources on one Mac (120 from
-one vendor's connector caches). Both are false positives. Measured Nov 9 2026 on 0.6.20. Design card C1072.
+one vendor's connector caches). Both are false positives. Measured Nov 9 2026 on 0.6.20.
 
 0 of 5 reworded attacks fired a class rule, and 4 of 5 were allowed on every channel. n=5, written by us: a list of
-misses, not a miss rate. Measured Nov 9 2026 on 0.6.20. Design card C1072.
+misses, not a miss rate. Measured Nov 9 2026 on 0.6.20.
 
-Benchmark case HARD-08: 0 findings on all 9 documented channels on 0.6.20. Fix is a rule change, 0.6.22 at the
-earliest. Measured Nov 9 2026 on 0.6.20. Card C1061.
+Benchmark case HARD-08: 0 findings on all 9 documented channels on 0.6.20. The fix is a rule change, and no release is named for it yet. Measured Nov 9 2026 on 0.6.20.
 
 ## Documented bound — the proxy keeps per-request-id records for the whole session
 
