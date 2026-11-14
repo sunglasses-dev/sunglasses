@@ -2650,6 +2650,82 @@ def _strip_our_hooks(pre_tool_use: list) -> list:
     return kept
 
 
+# ── Hook launch form (the `doctor` row) ─────────────────────────────────────
+# A hook line written before the import-path fix starts Python with `-m`, which puts the folder the
+# agent runs in first on the import path. An upgrade cannot edit someone's settings file, so this
+# READS it and says which form it holds. It never writes: `sunglasses init` rewrites the line.
+HOOK_FORM_OK = "OK"
+HOOK_FORM_OLD = "OLD"
+HOOK_FORM_UNVERIFIED = "UNVERIFIED"
+
+
+def _hook_form_of(command: str):
+    """(state, interpreter) for one hook command string that names our module."""
+    import shlex
+    from . import _launch
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return HOOK_FORM_UNVERIFIED, None
+    if len(words) < 2:
+        return HOOK_FORM_UNVERIFIED, None
+    interpreter, rest = words[0], words[1:]
+    if rest == ["-P", "-m", HOOK_MARKER] or rest == ["-c", _launch.bootstrap(HOOK_MARKER)]:
+        return HOOK_FORM_OK, interpreter
+    if rest == ["-m", HOOK_MARKER]:
+        return HOOK_FORM_OLD, interpreter
+    return HOOK_FORM_UNVERIFIED, interpreter
+
+
+def hook_launch_form(settings_paths=None) -> list:
+    """One row per settings file that carries our hook: path, state, and what to do.
+
+    OK          the line drops the implicit first path entry (`-P`, or the start-up line).
+    OLD         the line is the `-m` form written before the fix; `fix` is `sunglasses init`.
+    UNVERIFIED  a line we cannot judge (not our exact shapes), or a file `init` cannot rewrite
+                (unwritable, unreadable); `by_hand` is the exact line to put there. Read-only.
+    """
+    import json as _json
+    import os
+    import pathlib
+    from . import _launch
+    if settings_paths is None:
+        settings_paths = [pathlib.Path.home() / ".claude" / "settings.json",
+                          pathlib.Path.cwd() / ".claude" / "settings.json",
+                          pathlib.Path.cwd() / ".claude" / "settings.local.json"]
+    rows, seen = [], set()
+    for settings in settings_paths:
+        settings = pathlib.Path(settings)
+        key = str(settings.resolve()) if settings.exists() else str(settings)
+        if key in seen or not settings.exists():
+            continue
+        seen.add(key)
+        try:
+            data = _json.loads(settings.read_text())
+            pre = (data.get("hooks") or {}).get("PreToolUse") or []
+        except (ValueError, OSError, AttributeError):
+            continue          # an unreadable file is init's refusal to report, not this row's
+        for entry in pre if isinstance(pre, list) else []:
+            for hook in (entry.get("hooks") or []) if isinstance(entry, dict) else []:
+                command = str(hook.get("command", "")) if isinstance(hook, dict) else ""
+                if HOOK_MARKER not in command:
+                    continue
+                state, interpreter = _hook_form_of(command)
+                by_hand = _launch.command_line(interpreter or "<python>", HOOK_MARKER, running=False)
+                row = {"path": str(settings), "state": state, "command": command,
+                       "fix": None, "by_hand": None}
+                if state == HOOK_FORM_OLD:
+                    row["fix"] = "sunglasses init"
+                    if not os.access(settings, os.W_OK):
+                        row["state"] = HOOK_FORM_UNVERIFIED
+                        row["fix"] = None
+                        row["by_hand"] = by_hand
+                elif state == HOOK_FORM_UNVERIFIED:
+                    row["by_hand"] = by_hand
+                rows.append(row)
+    return rows
+
+
 def install_hook(settings_path, interpreter: str = None, fail_open: bool = False) -> dict:
     """Add (or refresh) our PreToolUse hook. Idempotent, merging, backed up."""
     data = _read_settings(settings_path)

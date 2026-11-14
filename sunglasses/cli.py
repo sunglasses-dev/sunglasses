@@ -4525,6 +4525,16 @@ def cmd_doctor(args, _run=None):
         from .proxy import agent_discovery as _agents
         rendered["agents"] = _agents.discover()
 
+    # Read-only, and no part of the exit code: it reports the folder-first import-path hole in a
+    # hook line written before the fix. Shown only when a settings file holds our hook.
+    try:
+        from . import firewall as _fw
+        hook_rows = _fw.hook_launch_form()
+    except Exception:
+        hook_rows = []
+    if hook_rows:
+        rendered["hook_launch"] = hook_rows
+
     if getattr(args, "json", False):
         print(json.dumps(rendered, indent=2))
         sys.exit(rendered["exit_code"])
@@ -4633,6 +4643,7 @@ def cmd_doctor(args, _run=None):
         print()
     if "agents" in rendered:
         _print_agents(rendered["agents"])
+    _print_hook_launch(rendered.get("hook_launch") or [])
     # Five NOT RUN lines beside a nonzero exit read as "broken" on a machine where nothing
     # was tried and nothing failed (the exit is 3 here, not 1). Say which it is, only when that is exactly the
     # case: the self-test is unavailable and nothing else the report holds is
@@ -4655,6 +4666,28 @@ def cmd_doctor(args, _run=None):
     print(f"  {BOLD}{rendered['aggregate']}{RESET}  {DIM}exit {rendered['exit_code']}{RESET}")
     print()
     sys.exit(rendered["exit_code"])
+
+
+def _print_hook_launch(rows):
+    """The `doctor` hook launch-form block. Informational: it never changes the exit code."""
+    if not rows:
+        return
+    print(f"  {BOLD}Hook launch form{RESET}  "
+          f"{DIM}(read-only: nothing was changed){RESET}")
+    for row in rows:
+        path = _where(row["path"])
+        if row["state"] == "OK":
+            print(f"    {GREEN}OK{RESET}          {path}  {DIM}the hook drops the current folder from the import path{RESET}")
+        elif row["state"] == "OLD":
+            print(f"    {YELLOW}OLD FORM{RESET}    {path}")
+            print(f"      {DIM}a file named like a Python module (json.py) in the folder your agent runs in "
+                  f"can run before the firewall.{RESET}")
+            print(f"      {CYAN}Fix: sunglasses init{RESET} {DIM}(rewrites the hook line){RESET}")
+        else:
+            print(f"    {YELLOW}UNVERIFIED{RESET}  {path}")
+            print(f"      {DIM}could not judge or rewrite this line; put this in it by hand:{RESET}")
+            print(f"      {row['by_hand']}")
+    print()
 
 
 def _print_agents(rows):
