@@ -163,6 +163,56 @@ def test_a_program_that_only_imports_sunglasses_keeps_its_own_path(tmp_path):
     assert done.returncode == 0 and "own ok 7" in done.stdout, done.stderr[-300:]
 
 
+# ---- the package guard when the safe-path flag is already on --------------------------------
+
+def _explicit_root(tmp_path):
+    """A folder that holds the package (symlinked file by file, plus a probe module) and a sibling helper."""
+    import pathlib
+    root = tmp_path / "root"
+    pkg = root / "sunglasses"
+    pkg.mkdir(parents=True)
+    for item in pathlib.Path(ROOT, "sunglasses").iterdir():
+        if item.name != "__pycache__":
+            (pkg / item.name).symlink_to(item)
+    (pkg / "_probe.py").write_text(
+        "try:\n    import helper\n    print('kept')\nexcept ImportError:\n    print('dropped')\n", encoding="utf-8")
+    (root / "helper.py").write_text("X = 1\n", encoding="utf-8")
+    return root
+
+
+def _interpreters_with_dash_p():
+    import shutil
+    found = {sys.executable} if sys.version_info >= (3, 11) else set()
+    for name in ("python3.11", "python3.12", "python3.13", "python3.14"):
+        path = shutil.which(name)
+        if path:
+            found.add(path)
+    return sorted(found)
+
+
+@pytest.mark.parametrize("python", _interpreters_with_dash_p() or [pytest.param("", marks=pytest.mark.skip(reason="needs 3.11+"))])
+def test_dash_p_with_the_current_folder_named_on_pythonpath_keeps_that_entry(tmp_path, python):
+    """`-P` kept the implicit entry off, so the first entry is one the person put there on purpose."""
+    root = _explicit_root(tmp_path)
+    done = _run([python, "-B", "-P", "-m", "sunglasses._probe"], root, env=_env(PYTHONPATH=str(root)))
+    assert done.stdout.strip() == "kept", (done.stdout, done.stderr[-300:])
+
+
+def test_the_plain_m_form_still_drops_the_current_folder_when_it_is_not_on_pythonpath(tmp_path):
+    """The older form (no `-P`): the package guard drops the implicit entry, so the sibling is not found."""
+    root = _explicit_root(tmp_path)
+    env = _env()
+    env.pop("PYTHONPATH")
+    done = _run([sys.executable, "-B", "-m", "sunglasses._probe"], root, env=env)
+    assert done.stdout.strip() == "dropped", (done.stdout, done.stderr[-300:])
+
+
+def test_the_plain_m_form_keeps_an_entry_named_on_pythonpath(tmp_path):
+    root = _explicit_root(tmp_path)
+    done = _run([sys.executable, "-B", "-m", "sunglasses._probe"], root, env=_env(PYTHONPATH=str(root)))
+    assert done.stdout.strip() == "kept", (done.stdout, done.stderr[-300:])
+
+
 # ---- what the start-up line does, and does not do ------------------------------------------
 
 def test_the_start_up_line_drops_only_the_implicit_entry_and_keeps_pythonpath(tmp_path):

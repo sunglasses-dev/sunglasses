@@ -9,13 +9,16 @@ def _drop_implicit_first_path_entry():
 
     This runs before any other import of the package, so the modules that follow (json, re, ...)
     come from Python and not from the folder the command was started in. It is what `-P` does,
-    for command lines written BEFORE `-P` was used (an older hook in someone's settings file).
+    for command lines written BEFORE `-P` was used (an older hook in someone's settings file). When `-P` is
+    already on, the first entry is one the person put there (PYTHONPATH) and nothing is dropped.
     Limits, stated: `python -m` has already imported what `runpy` needs, and a `sunglasses`
     folder in the current folder was found before this file ran. It does nothing unless
     `python -m sunglasses...` is the command being run, so a program that merely imports
     sunglasses keeps its own path. See _launch.py.
     """
     import sys
+    if getattr(sys.flags, "safe_path", False):   # `-P` already kept the implicit entry off; what is first now is explicit
+        return
     if sys.argv[:1] != ["-m"]:          # `-m` is the placeholder until runpy has located the module
         return
     frame = sys._getframe(1)
