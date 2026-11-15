@@ -5,6 +5,10 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- The README now says in one sentence what its hook timing times, the hook command the installer writes, started from a development copy of the code, so an installed copy can differ.
+
 ## [0.6.23] — 2026-11-14
 
 ### Security

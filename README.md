@@ -1091,10 +1091,10 @@ private key files are named individually and matching is boundary aware, so
 ### Cost
 
 About 27 ms per tool call with the pattern lane off (the default) and about
-87 ms with it on (the installed hook command, whole process, min of 15 runs,
+87 ms with it on (the hook command, whole process, min of 15 runs,
 a benign Bash call, measured on 0.6.23, 2026-11-14, on an Apple silicon Mac (arm64, macOS); bare Python
 startup is 18 ms of that). Zero network calls (nothing about your work leaves the
-machine). An invocation appends two lines when both writes succeed, one when the check
+machine). These figures time the hook command the installer writes, started from a development copy of the code, so an installed copy can differ. An invocation appends two lines when both writes succeed, one when the check
 starts and one when it decides, to `~/.sunglasses/receipts/YYYY-MM-DD.jsonl`,
 recording a SHA-256 of the tool input and never the input itself. A hook killed
 between the two leaves only the first, which is the case these records exist to
