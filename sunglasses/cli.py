@@ -2307,14 +2307,14 @@ def _run_scan(args):
                   f"Use {CYAN}--file{RESET} to be explicit.", file=sys.stderr)
             args.file = text
             return cmd_scan(args)
-        if len(args.text) == 1 and _looks_like_path(text):
-            # It is shaped like a path and it is not a readable file. Scanning the
-            # string would answer a question nobody asked, in a format that looks
-            # exactly like the answer they wanted.
+        if len(args.text) == 1 and (_looks_like_path(text) or os.path.isdir(text)):
+            # It is shaped like a path, or it names a folder that exists, and it is
+            # not a readable file. Scanning the string would answer a question nobody
+            # asked, in a format that looks exactly like the answer they wanted.
             if os.path.isdir(text):
                 _usage_error(args, f"Not a file: {text} is a directory.",
-                             "Nothing was scanned. Use --text to scan this as a string, "
-                             "or scan the files inside it.")
+                             f"Nothing was scanned. To scan the folder, use --dir {text}. "
+                             "To scan this as a string, use --text.")
             if os.path.exists(text):
                 _usage_error(args, f"Not a regular file: {text}",
                              "Nothing was scanned. Use --text to scan this as a string.")
