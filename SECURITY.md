@@ -8,13 +8,13 @@ reporting it is a contribution rather than an attack on the project.
 
 ## Reporting a vulnerability
 
-**Please do not open a public issue for a working exploit.**
+**Please do not open a public issue for a working exploit or a text that got past the scan.**
 
 | channel | use it for |
 |---|---|
-| [**Report a vulnerability**](https://github.com/sunglasses-dev/sunglasses/security/advisories/new) (Security tab) | anything exploitable — private, coordinated disclosure built in. **Preferred.** |
+| [**Report a vulnerability**](https://github.com/sunglasses-dev/sunglasses/security/advisories/new) (Security tab) | anything exploitable, and any text that got past the scan. Private, coordinated disclosure built in. **Preferred.** |
 | `security@sunglasses.dev` | same, if you would rather use email |
-| [Bypass or false positive issue](https://github.com/sunglasses-dev/sunglasses/issues/new?template=bypass_report.yml) | a detection gap with no live exploit attached — public is fine and helps other users |
+| [Wrong block issue](https://github.com/sunglasses-dev/sunglasses/issues/new?template=bypass_report.yml) | ordinary content that was blocked, public is fine and helps other users |
 
 Private reporting through the Security tab is **enabled** on this repository; you
 do not need to be a maintainer to open a report.

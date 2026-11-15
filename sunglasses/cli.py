@@ -1890,6 +1890,23 @@ def _print_single_policy(args, result):
     print(f"  Fails on:        {BOLD}{level}{RESET}{note}")
 
 
+_REPORT_WRONG_BLOCK_URL = "https://github.com/sunglasses-dev/sunglasses/issues/new?template=bypass_report.yml"
+_REPORT_PRIVATE_URL = "https://github.com/sunglasses-dev/sunglasses/security/advisories/new"
+
+
+def _print_report_line(result):
+    """One dim line after a human single scan, saying where to report it if the result is wrong.
+
+    A block can be a wrong block, so it points at the public form. A pass or an incomplete
+    result can hide a miss, so it points at the private report, because a text that got past
+    the scan should not be posted in public.
+    """
+    if result.threat_found:
+        print(f"  {DIM}Blocked something harmless? Report it at {_REPORT_WRONG_BLOCK_URL}{RESET}\n")
+    else:
+        print(f"  {DIM}Got past the scan? Report it in private at {_REPORT_PRIVATE_URL}{RESET}\n")
+
+
 def _emit_scan_result(args, result, source):
     """The ONE place a scan outcome leaves the process. Never returns.
 
@@ -1932,6 +1949,7 @@ def _emit_scan_result(args, result, source):
     print_result(result, verbose=args.verbose)
     _print_single_policy(args, result)
     _print_extraction_warnings(result)
+    _print_report_line(result)
     sys.exit(_single_exit_code(args, result))
 
 

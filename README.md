@@ -1332,8 +1332,16 @@ See [sunglasses.dev/thesis](https://sunglasses.dev/thesis.html) for our security
 
 [MIT](LICENSE). Use it anywhere (personal, commercial, enterprise). Paid review, by scope call. See <https://sunglasses.dev/pricing>
 
+## Report a wrong block or a miss
+
+Sunglasses can miss something, and it can block something harmless. Both help us.
+
+If something harmless was blocked, open the [wrong block form](https://github.com/sunglasses-dev/sunglasses/issues/new?template=bypass_report.yml). Paste the text if you can share it. The form is public.
+
+If something got through, use the [private report](https://github.com/sunglasses-dev/sunglasses/security/advisories/new) and do not post the text in public. SECURITY.md has the details.
+
 ## Links
 
 - **Website.** [sunglasses.dev](https://sunglasses.dev)
 - **Threat Database.** [`attack-db/`](attack-db/)
-- **Issues.** [github.com/sunglasses-dev/sunglasses/issues](https://github.com/sunglasses-dev/sunglasses/issues)
+- **Issues and reports.** [github.com/sunglasses-dev/sunglasses/issues](https://github.com/sunglasses-dev/sunglasses/issues)
