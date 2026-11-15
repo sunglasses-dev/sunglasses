@@ -7,7 +7,7 @@ the row in the same change and delete the matching assertion here.
 
 The slow-entry limit is not re-tested here: the timed check from lab finding B1
 (tests/test_lab_b1_quadratic_whitespace_gate.py) already lists each open entry
-as a strict expected failure. The look-alike limit (lab finding E3) has no
+and keeps it listed only while its run time still grows faster than its input. The look-alike limit (lab finding E3) has no
 behavioral test in this tree on purpose: a public test would have to spell out
 which letters pass, and the row states the limit without listing them.
 """
@@ -45,31 +45,31 @@ def test_the_unbounded_proxy_id_records_are_listed_with_the_bounded_sibling():
 
 
 def test_the_manifest_path_false_positives_are_listed_until_the_fix_ships():
-    # C1066: remove this test in the change that ships the C1065 fix (GLS-PT-001, GLS-CI-007), together with its paragraph.
+    # Remove this test in the change that ships this fix (GLS-PT-001, GLS-CI-007), together with its paragraph.
     for rule_id in ("GLS-PT-001", "GLS-CI-007"):
         assert rule_id in GAPS, f"{rule_id} is missing from KNOWN_VERSION_GAPS.md"
     assert "581 of 5,691" in GAPS
 
 def test_the_ci_007_misses_are_listed_until_the_fix_ships():
-    # T9 14:23 Nov 9 (C1089): remove this test in the change that closes the GLS-CI-007 miss side (C1065), together with its paragraph.
+    # Remove this test in the change that ships this fix (the GLS-CI-007 miss side), together with its paragraph.
     assert "flags 48 and misses 24" in GAPS
     assert "a list of misses we wrote, not a miss rate" in GAPS
 
 
 
 def test_the_comment_text_false_positives_are_listed_until_the_fix_ships():
-    # C1066: remove this test in the change that ships the C1069 fix (GLS-TS-251, GLS-GHSA-PI-202, GLS-APIP-005), together with its paragraph.
+    # Remove this test in the change that ships this fix (GLS-TS-251, GLS-GHSA-PI-202, GLS-APIP-005), together with its paragraph.
     for rule_id in ("GLS-TS-251", "GLS-GHSA-PI-202", "GLS-APIP-005"):
         assert rule_id in GAPS, f"{rule_id} is missing from KNOWN_VERSION_GAPS.md"
     assert "20 of 298" in GAPS
 
 
 def test_the_tool_description_gaps_are_listed_until_the_fix_ships():
-    # C1084: remove this test in the change that ships the C1072 fix (GLS-MECH-006 and the plain-wording rows), together with its two paragraphs.
+    # Remove this test in the change that ships this fix (GLS-MECH-006 and the plain-wording rows), together with its two paragraphs.
     assert "GLS-MECH-006 flagged 2 of 309" in GAPS
     assert "0 of 5 reworded attacks fired a class rule" in GAPS
 
 
 def test_benchmark_case_hard_08_is_listed_until_the_fix_ships():
-    # C1084: remove this test in the change that ships the C1061 fix (HARD-08), together with its paragraph.
+    # Remove this test in the change that ships this fix (HARD-08), together with its paragraph.
     assert "Benchmark case HARD-08: 0 findings on all 9 documented channels" in GAPS
