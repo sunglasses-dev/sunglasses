@@ -395,6 +395,21 @@ def space_ignorable_between_words(text: str):
     return spaced if count else None
 
 
+def keyword_view_between_words(text: str, line_breaks):
+    """The same reading for the keyword lane, whose cover checks read where a line ends: a run
+    that holds one of `line_breaks` is read as the line break it is drawn as, any other run as
+    one space. `line_breaks` is the cover check's own set of line-break characters (the engine
+    passes it), so this reading cannot drift from the check that depends on it. None when there
+    is no run between two letters or digits."""
+    breaks = frozenset(line_breaks)
+
+    def read(match):
+        return "\n" if any(c in breaks for c in match.group()) else " "
+
+    spaced, count = _IGNORABLE_BETWEEN_WORDS.subn(read, text)
+    return spaced if count else None
+
+
 def replace_lookalikes(text: str) -> str:
     """Homoglyph letters, punctuation look-alikes and blanks to their ASCII
     character; one code point to one code point."""
