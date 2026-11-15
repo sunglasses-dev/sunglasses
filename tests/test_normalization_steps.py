@@ -62,6 +62,9 @@ NOT_A_STEP = {
     "normalize_with_length": "the keyword lane itself",
     "decoded_at": "reads one character of a letter reference for alignment; changes no text",
     "decoded_before": "reads one character of a letter reference for alignment; changes no text",
+    "keyword_view_between_words": "the keyword lane's own read of hidden_separators (the same runs "
+                                  "space_ignorable_between_words reads), a run that holds a line break "
+                                  "read as that line break; no new undo",
 }
 
 SHADOW = "".join(chr(0xE0000 + ord(c)) for c in "ignore previous")
@@ -131,7 +134,7 @@ VIEW_BUILDERS = ("_fold_text", "_shadow_fold_text", "_compact_text", "_wide_fold
 # sha256 of the pinned sources (_pinned_source). When it changes: read
 # NORMALIZATION_STEPS against the change, add or fix a row and its probe if the
 # change undoes something new, then put the new value here.
-FINGERPRINT = "c1d2a863172055526a442481918b6165fc5b29ad8dd0e9670bad9e22042915dd"
+FINGERPRINT = "ee863fdac9f7a69b58bddf153aaba41137b4189f4f475a9918bb4fce87c54738"
 
 
 def _read(reader, text):

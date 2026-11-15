@@ -45,7 +45,7 @@ from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLB
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_letter_references, decode_url_encoding, normalize_unicode,
                            normalize_with_length, replace_homoglyphs, replace_lookalikes,
-                           space_ignorable_between_words, strip_ignorable, strip_invisible,
+                           space_ignorable_between_words, keyword_view_between_words, strip_ignorable, strip_invisible,
                            BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES, WORD_CHAR, decoded_at,
                            decoded_before)
 
@@ -4215,58 +4215,91 @@ class SunglassesEngine:
         # taken in one canonical order (start, end, keyword) whichever answered, so
         # a scan reports the same findings, order and excerpts with or without
         # the optional extension.
-        first_hits = {}
-        if self._automaton:
-            for end_idx, keyword in self._automaton.iter(normalized):
-                if keyword in first_hits:
-                    continue
-                at = end_idx - len(keyword) + 1
-                if self._word_bounded(normalized, at, keyword):
-                    first_hits[keyword] = at
-        else:
-            for keyword in self._keyword_to_patterns:
-                first = self._first_bounded(normalized, keyword)
-                if first is not None:
-                    first_hits[keyword] = first
+        def keyword_pass(normalized, align, negated_kw, view_candidates):
+            first_hits = {}
+            if self._automaton:
+                for end_idx, keyword in self._automaton.iter(normalized):
+                    if keyword in first_hits:
+                        continue
+                    at = end_idx - len(keyword) + 1
+                    if self._word_bounded(normalized, at, keyword):
+                        first_hits[keyword] = at
+            else:
+                for keyword in self._keyword_to_patterns:
+                    first = self._first_bounded(normalized, keyword)
+                    if first is not None:
+                        first_hits[keyword] = first
 
-        for keyword, first in sorted(
-                first_hits.items(), key=lambda hit: (hit[1], hit[1] + len(hit[0]), hit[0])):
-            patterns = self._keyword_to_patterns[keyword]
-            for pattern in patterns:
-                if match_channels.isdisjoint(pattern.get("channel", ())):
-                    continue
-                held = negated_kw.get(pattern["id"])
-                if held is not None:
-                    live = self._live_occurrence(normalized, keyword, 0, align,
-                                                 pattern["id"] in self._REFUSAL_STRING_RULES,
-                                                 decoded_strict=True)
-                    if live is not None:
-                        self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
-                        del negated_kw[pattern["id"]]
-                    continue
-                if pattern["id"] in seen_ids or pattern["id"] in candidates:
-                    continue
-                if pattern["id"] in self._regex_bearing_ids:
-                    candidates[pattern["id"]] = pattern
-                    continue
-                seen_ids.add(pattern["id"])
-                idx = first
-                finding = {
-                    **pattern,
-                    "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
-                }
-                refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
-                if not pattern.get("negation_immune") and self._check_negation(
-                        normalized, idx, align, idx + len(keyword), refusal_ok):
-                    finding["severity"] = "review"
-                    finding["negation_context"] = True
-                    finding["original_severity"] = pattern["severity"]
-                    live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
-                    if live is not None:
-                        self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
-                    else:
-                        negated_kw[pattern["id"]] = finding
-                findings.append(finding)
+            for keyword, first in sorted(
+                    first_hits.items(), key=lambda hit: (hit[1], hit[1] + len(hit[0]), hit[0])):
+                patterns = self._keyword_to_patterns[keyword]
+                for pattern in patterns:
+                    if match_channels.isdisjoint(pattern.get("channel", ())):
+                        continue
+                    held = negated_kw.get(pattern["id"])
+                    if held is not None:
+                        live = self._live_occurrence(normalized, keyword, 0, align,
+                                                     pattern["id"] in self._REFUSAL_STRING_RULES,
+                                                     decoded_strict=True)
+                        if live is not None:
+                            self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
+                            del negated_kw[pattern["id"]]
+                        continue
+                    if pattern["id"] in seen_ids or pattern["id"] in view_candidates:
+                        continue
+                    if pattern["id"] in self._regex_bearing_ids:
+                        view_candidates[pattern["id"]] = pattern
+                        continue
+                    seen_ids.add(pattern["id"])
+                    idx = first
+                    finding = {
+                        **pattern,
+                        "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
+                    }
+                    refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
+                    if not pattern.get("negation_immune") and self._check_negation(
+                            normalized, idx, align, idx + len(keyword), refusal_ok):
+                        finding["severity"] = "review"
+                        finding["negation_context"] = True
+                        finding["original_severity"] = pattern["severity"]
+                        live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
+                        if live is not None:
+                            self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
+                        else:
+                            negated_kw[pattern["id"]] = finding
+                    findings.append(finding)
+
+        keyword_pass(normalized, align, negated_kw, candidates)
+        # The keyword lane's one view deletes an invisible character, so a phrase whose
+        # space is an invisible character reads as joined words ("atAnthropic") and no
+        # keyword stands in it. The regex lane already reads such a run as a space (the
+        # spaced reading). The keyword lane takes the same reading as a second view of the
+        # text: the text with each ignorable run between two letters or digits written as
+        # a space (as a line break where the run holds a line or paragraph separator), the
+        # reading the plain twin has with a real space or line break there, read with the
+        # same cover checks. It reads for rules no earlier view found, and it can add a
+        # finding that stands in for a mechanism finding of the same text. A rule the first view held at review
+        # behind a prohibition is restored by a later occurrence this view reads and nothing
+        # covers, as it would be in the twin. A rule that also carries a regex becomes a candidate of
+        # this view and is corroborated on this view's own normalized text (step 3.5), the text its
+        # keyword stood in. Nothing else about a finding that stands changes. A text
+        # without such a run (every ASCII text with no control character or letter
+        # reference) gets no second reading.
+        wide_input = not text.isascii() or "&#" in text or bool(CONTROL_CHARS.search(text))
+        decoded = spaced = keyword_view = None
+        spaced_candidates = {}
+        if wide_input:
+            decoded = decode_letter_references(text)
+            spaced = space_ignorable_between_words(decoded)
+            if spaced is not None:
+                # This view is for the cover checks, which read where a line ends, so a line or
+                # paragraph separator in a run is kept as a line break here (the regex readings
+                # below keep the plain space).
+                keyword_view = keyword_view_between_words(decoded, self._LINE_BREAK_CHARS)
+                spaced_record = []
+                spaced_normalized, spaced_length = normalize_with_length(keyword_view, spaced_record)
+                spaced_align = _RawAlign(keyword_view, spaced_record)
+                keyword_pass(spaced_normalized, spaced_align, negated_kw, spaced_candidates)
 
         # Step 3: Regex patterns (for things like API keys)
         #
@@ -4376,10 +4409,8 @@ class SunglassesEngine:
                 if view is not None:
                     folded_subjects.append(
                         [view, self._literal_index.present(_prefilter.fold(view)), build, cut, None])
-        if not text.isascii() or "&#" in text or CONTROL_CHARS.search(text):
-            decoded = decode_letter_references(text)
+        if wide_input:
             readings = [(strip_ignorable(decoded), _wide_fold_text, _wide_compact_text)]
-            spaced = space_ignorable_between_words(decoded)
             if spaced is not None:
                 readings.append((strip_ignorable(spaced), _fold_spaced_text, _compact_spaced_text))
             for stripped, fold_build, compact_build in readings:
@@ -4530,71 +4561,92 @@ class SunglassesEngine:
         # window exists to prevent (measured Jul-16: claude-seo README pulled
         # 9 extra findings through this pass before the gate). Long inputs
         # keep raw-view regex (step 3) as their corroboration lane.
-        if folded_length > self.CORROBORATE_NORM_MAX:
-            candidates = {}
-        norm_source = None
-        for pid, pattern in candidates.items():
-            if pid in seen_ids and pid not in negated_regex:
-                continue  # regex already confirmed on raw text in step 3
-            # A rule that only matched negated in step 3 gets this view too: the
-            # occurrence that is not negated may be the one written in an
-            # encoding.
-            held = negated_regex.get(pid)
-            provisional = None
-            tripped = set()
-            for mode, rx, guards in self._compiled_by_id.get(pid, ()):
-                match = self._eval_regex(mode, rx, guards, normalized, tripped=tripped, key=pid)
-                if match:
-                    seen_ids.add(pid)
-                    how = None
-                    framed = pid.startswith("GLS-MECH-")
-                    negation = not pattern.get("negation_immune")
-                    if negation or framed:
-                        if norm_source is None:
-                            norm_source = (text, *norm_frame)
-                        match, how = self._resolve_cover(
-                            mode, rx, guards, normalized, match, norm_source, align,
-                            framed, negation)
-                    if how is not None:
-                        if provisional is None:
-                            provisional = (match, how)
-                        continue
-                    if held is not None and pid not in floor_held:
-                        self._restore_live(held, match.group(0)[:50])
-                    else:
-                        # What stood for the rule was its floor copy: a held one is replaced, and the rule's own
-                        # finding carries the rule's own severity (the copy remembers only its lowered one).
-                        if held is not None:
-                            findings[:] = [f for f in findings if f is not held]
-                        floor_hit = floor_found.pop(pid, None)
-                        if floor_hit is not None:
-                            findings[:] = [f for f in findings if f is not floor_hit]
-                        findings.append({**pattern, "matched_text": match.group(0)[:50]})
-                    provisional = None
-                    held = None
-                    break
-            if (provisional is None and held is None and pid not in seen_ids and pid not in floor_found
-                    and (tripped or pid in _GUARD_FLOOR_ALWAYS)):
-                # The rule's guard hit on this view (or the rule keeps one the engine cannot see): its floor copy
-                # gets the same look, so a word in the text cannot turn the rule off here either.
-                floor = self._floor_entry(pid)
-                if floor is not None and not any(f.get("severity") in ("critical", "high") for f in findings):
-                    for mode, rx, guards in floor[1]:
-                        match = self._eval_regex(mode, rx, guards, normalized)
-                        if match:
-                            findings.append({**floor[0], "matched_text": match.group(0)[:50]})
-                            break
-            if provisional is not None and held is None and pid not in floor_found:
-                # Every occurrence in this view is covered too. (When the floor copy already stands for the
-                # rule, it outranks a held finding and the rule does not get a second one.)
-                findings.append({
-                    **pattern,
-                    "matched_text": provisional[0].group(0)[:50],
-                    "severity": "review",
-                    ("negation_context" if provisional[1] == "negation"
-                     else "defensive_context"): True,
-                    "original_severity": pattern["severity"],
-                })
+        # A rule whose keyword stands only in the spaced reading (see the second keyword pass) is
+        # corroborated on that reading's own normalized view, with the keyword view (the reading that keeps a
+        # line break its run holds) as its raw text: it is the text its alignment describes and the view the
+        # keyword matched in, as the first view is for the rest.
+        corroboration_views = [(candidates, normalized, folded_length, align, text, norm_frame)]
+        if spaced_candidates:
+            spaced_frame = self._raw_frame(spaced_align, _RawCopies(keyword_view, self._check_negation),
+                                           spaced_normalized, _normal_text, shape=True)
+            corroboration_views.append(
+                (spaced_candidates, spaced_normalized, spaced_length, spaced_align, keyword_view, spaced_frame))
+        decided_live = set()   # rules an earlier view decided live: closed for every later view
+        for view_candidates, view_norm, view_length, view_align, view_text, view_frame in corroboration_views:
+            if view_length > self.CORROBORATE_NORM_MAX:
+                continue
+            norm_source = None
+            for pid, pattern in view_candidates.items():
+                if pid in decided_live:
+                    continue  # one rule, one verdict: the first view that found it uncovered closed it
+                if pid in seen_ids and pid not in negated_regex:
+                    continue  # regex already confirmed on raw text in step 3
+                # A rule that only matched negated in step 3 gets this view too: the
+                # occurrence that is not negated may be the one written in an
+                # encoding.
+                held = negated_regex.get(pid)
+                provisional = None
+                tripped = set()
+                for mode, rx, guards in self._compiled_by_id.get(pid, ()):
+                    match = self._eval_regex(mode, rx, guards, view_norm, tripped=tripped, key=pid)
+                    if match:
+                        seen_ids.add(pid)
+                        how = None
+                        framed = pid.startswith("GLS-MECH-")
+                        negation = not pattern.get("negation_immune")
+                        if negation or framed:
+                            if norm_source is None:
+                                norm_source = (view_text, *view_frame)
+                            match, how = self._resolve_cover(
+                                mode, rx, guards, view_norm, match, norm_source, view_align,
+                                framed, negation)
+                        if how is not None:
+                            if provisional is None:
+                                provisional = (match, how)
+                            continue
+                        if held is not None and pid not in floor_held:
+                            self._restore_live(held, match.group(0)[:50])
+                        else:
+                            # What stood for the rule was its floor copy: a held one is replaced, and the rule's own
+                            # finding carries the rule's own severity (the copy remembers only its lowered one).
+                            if held is not None:
+                                findings[:] = [f for f in findings if f is not held]
+                            floor_hit = floor_found.pop(pid, None)
+                            if floor_hit is not None:
+                                findings[:] = [f for f in findings if f is not floor_hit]
+                            findings.append({**pattern, "matched_text": match.group(0)[:50]})
+                        provisional = None
+                        held = None
+                        decided_live.add(pid)
+                        break
+                if (provisional is None and held is None and pid not in seen_ids and pid not in floor_found
+                        and (tripped or pid in _GUARD_FLOOR_ALWAYS)):
+                    # The rule's guard hit on this view (or the rule keeps one the engine cannot see): its floor copy
+                    # gets the same look, so a word in the text cannot turn the rule off here either.
+                    floor = self._floor_entry(pid)
+                    if floor is not None and not any(f.get("severity") in ("critical", "high") for f in findings):
+                        for mode, rx, guards in floor[1]:
+                            match = self._eval_regex(mode, rx, guards, view_norm)
+                            if match:
+                                floor_hit = {**floor[0], "matched_text": match.group(0)[:50]}
+                                findings.append(floor_hit)
+                                floor_found[pid] = floor_hit   # a later view may replace it, never add a second
+                                break
+                if provisional is not None and held is None and pid not in floor_found:
+                    # Every occurrence in this view is covered too. (When the floor copy already stands for the
+                    # rule, it outranks a held finding and the rule does not get a second one.)
+                    covered = {
+                        **pattern,
+                        "matched_text": provisional[0].group(0)[:50],
+                        "severity": "review",
+                        ("negation_context" if provisional[1] == "negation"
+                         else "defensive_context"): True,
+                        "original_severity": pattern["severity"],
+                    }
+                    findings.append(covered)
+                    # Held like a step 3 one: a later view that finds the rule uncovered restores this finding
+                    # instead of adding a second one.
+                    negated_regex[pid] = covered
 
         # Step 3b: Mechanisms are a FALLBACK layer, not a second opinion.
         # A mechanism rule earns its keep by catching what the carrier list
