@@ -36,10 +36,10 @@ def _subjects_seen(engine, text, channel="message"):
     seen = []
     original = engine._eval_regex
 
-    def spy(mode, rx, guards, subject):
+    def spy(mode, rx, guards, subject, **kw):
         if not any(subject is s for s in seen):
             seen.append(subject)
-        return original(mode, rx, guards, subject)
+        return original(mode, rx, guards, subject, **kw)
 
     engine._eval_regex = spy
     try:

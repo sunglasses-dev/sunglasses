@@ -15,6 +15,7 @@ import collections
 import copy
 import functools
 import html
+import itertools
 import keyword
 import re
 import threading
@@ -34,6 +35,8 @@ except ImportError:
     HAS_AHOCORASICK = False
 
 from . import policy, taxonomy
+from ._floor_quiet import FLOOR_QUIET_IDS as _FLOOR_QUIET_IDS
+from ._floor_quiet import FLOOR_WINDOWED_IDS as _FLOOR_WINDOWED_IDS
 from .mechanisms import MECHANISM_PATTERNS
 from .validators import VALIDATORS
 from .patterns import PATTERNS
@@ -367,6 +370,293 @@ def _shipped_anchor(source):
     if source not in _shipped_regex_sources():
         return None
     return _derivation_table()[1].get(_prefilter.table_key(source))
+
+
+# The guard floor. Some rules carry a negative lookahead (`^(?!.*\bword\b)...`): the word it names
+# anywhere in the document defuses the rule. A defused rule now stays in place one step lower: critical
+# and high become medium (quarantine), and no rule's own guard ever produces an allow. The floor is a
+# second copy of the rule with its negative lookaheads taken out; the engine builds it when it is needed.
+_GUARD_FLOOR_SEVERITY = {"critical": "medium", "high": "medium"}
+_GUARD_ATOM = "(?:(?=(\\s*))\\1)"   # the possessive blank run some rules put right after the caret
+_GUARD_LEAD = re.compile(r"(\(\?[a-z]+\))?(\s*)(\^|\\A)")
+
+
+# Most guards are read before the rule's core runs (`_split_caret_predicate`), so the engine sees the hit. These
+# rules keep a negative lookahead somewhere it cannot see (after a positive one, or in a form the split does not
+# take), so their floor copy is tried whenever the rule itself is quiet.
+# tests/test_guard_floor.py computes this set from the shipped rules and fails if it differs.
+_GUARD_FLOOR_ALWAYS = frozenset((
+    "GLS-AB-003",
+    "GLS-ABX-013",
+    "GLS-APIP-004",
+    "GLS-APIP-007",
+    "GLS-AW-584",
+    "GLS-AW-671",
+    "GLS-AW-676",
+    "GLS-AW-679",
+    "GLS-AW-683",
+    "GLS-AW-685",
+    "GLS-AW-712",
+    "GLS-AW-743",
+    "GLS-DFP-016",
+    "GLS-DFP-023",
+    "GLS-DFP-044",
+    "GLS-DFP-048",
+    "GLS-DFP-139",
+    "GLS-DFP-140",
+    "GLS-DS-002",
+    "GLS-IDP-002",
+    "GLS-IDP-003",
+    "GLS-IDP-005",
+    "GLS-IDP-011",
+    "GLS-IP-008",
+    "GLS-IU-531",
+    "GLS-MCP-APT-209",
+    "GLS-MM-AUDIO-206",
+    "GLS-MR-003",
+    "GLS-MR-004",
+    "GLS-MR-015",
+    "GLS-MR-035",
+    "GLS-MR-036",
+    "GLS-MR-039",
+    "GLS-MR-040",
+    "GLS-MR-041",
+    "GLS-MR-047",
+    "GLS-MR-049",
+    "GLS-MR-056",
+    "GLS-MR-063",
+    "GLS-PCF-666",
+    "GLS-PI-026",
+    "GLS-RMP-002",
+    "GLS-RP-568",
+    "GLS-SC-036",
+    "GLS-SCHEMA-LEAK-215",
+    "GLS-SE-010",
+    "GLS-SSRF-018",
+    "GLS-TMS-240",
+    "GLS-TMS-240-API",
+    "GLS-TOP-637",
+))
+
+
+_FLAG_GROUP = re.compile(r"\(\?([a-zL]*)(?:-([a-zL]+))?([:)])")
+
+
+def _verbose_map(source):
+    """For each index of `source`, whether verbose mode (`x`) is in force at that character.
+
+    A flag group with no colon, `(?x)`, sets the mode for the whole pattern. A scoped one, `(?x:...)` or
+    `(?-x:...)`, sets or clears it inside its own group only, and the group around it comes back at the
+    closing bracket. Brackets in a class, after a backslash, or in a verbose comment open nothing."""
+    def walk(base):
+        n = len(source)
+        out, stack, cur, found, i, in_class = [False] * n, [], base, False, 0, False
+        while i < n:
+            c = source[i]
+            if c == "\\":
+                for k in range(i, min(i + 2, n)):
+                    out[k] = cur
+                i += 2
+                continue
+            out[i] = cur
+            if in_class:
+                if c == "]":
+                    in_class = False
+            elif c == "[":
+                in_class = True
+                j = _class_body_start(source, i)
+                for k in range(i, min(j, n)):
+                    out[k] = cur
+                i = j
+                continue
+            elif cur and c == "#":
+                j = source.find("\n", i)
+                j = n if j < 0 else j
+                for k in range(i, j):
+                    out[k] = cur
+                i = j
+                continue
+            elif c == "(":
+                m = _FLAG_GROUP.match(source, i)
+                if m and m.group(3) == ")":
+                    found = found or "x" in m.group(1)
+                    for k in range(i, m.end()):
+                        out[k] = cur
+                    i = m.end()
+                    continue
+                stack.append(cur)
+                if m:
+                    for k in range(i, m.end()):
+                        out[k] = cur
+                    if "x" in m.group(1):
+                        cur = True
+                    elif m.group(2) and "x" in m.group(2):
+                        cur = False
+                    i = m.end()
+                    continue
+            elif c == ")":
+                if stack:
+                    cur = stack.pop()
+            i += 1
+        return out, found
+    out, found = walk(False)
+    return walk(True)[0] if found else out
+
+
+def _class_body_start(source, i):
+    """Index of the first character after the `[` at `i`, past a leading `^` and a literal `]`."""
+    i += 1
+    if source.startswith("^", i):
+        i += 1
+    if source.startswith("]", i):
+        i += 1
+    return i
+
+
+def _lookaround_end(source, start, verbose=None):
+    """Index just past the lookaround group that opens at `start`. `verbose` is `_verbose_map(source)`."""
+    if verbose is None:
+        verbose = _verbose_map(source)
+    depth, in_class, j, n = 0, False, start, len(source)
+    while j < n:
+        c = source[j]
+        if c == "\\":
+            j += 2
+            continue
+        if in_class:
+            if c == "]":
+                in_class = False
+        elif c == "[":
+            in_class = True
+            j = _class_body_start(source, j)
+            continue
+        elif verbose[j] and c == "#":
+            j = source.find("\n", j)
+            if j < 0:
+                return n
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return j + 1
+        j += 1
+    return n
+
+
+# A negative lookahead that reads ahead through the text (`.*`, `.{0,N}`, `[\s\S]{0,N}`, alone or inside a
+# positive group) is a guard wherever it sits at the top level of the pattern: one word inside its window
+# defuses the rule.
+_GUARD_SCAN = re.compile(r"\s*(?:\((?:\?[=:])?\s*)*(?:\.\*|\.\+|\.\{|\[\\s\\S\][*{])")
+# Rules whose negative is a short continuation, not a scan, and still defuses on one word.
+_GUARD_FLOOR_EXTRA = frozenset(("GLS-IP-008",))
+
+
+def _guard_free_source(source, extra=False):
+    """`source` with its guards removed, or None when it has none."""
+    zone = _guard_zone(source, extra)
+    return None if zone is None else zone[0]
+
+
+def _depth0_negatives(source):
+    """[(start, end)] of every `(?!...)` group that sits at the top level of `source`."""
+    found, i, n, depth, in_class = [], 0, len(source), 0, False
+    verbose = _verbose_map(source)
+    while i < n:
+        c = source[i]
+        if c == "\\":
+            i += 2
+            continue
+        if in_class:
+            if c == "]":
+                in_class = False
+        elif c == "[":
+            in_class = True
+            i = _class_body_start(source, i)
+            continue
+        elif verbose[i] and c == "#":
+            i = source.find("\n", i)
+            if i < 0:
+                break
+        elif c == "(":
+            if depth == 0 and source.startswith("(?!", i):
+                end = _lookaround_end(source, i, verbose)
+                found.append((i, end))
+                i = end
+                continue
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        i += 1
+    return found
+
+
+def _guard_zone(source, extra=False):
+    """(`source` without its guards, the bodies of the removed lookaheads), or None.
+
+    A guard is a negative lookahead in the leading predicate zone (every consecutive `(?=...)` and `(?!...)`
+    group after the caret and the blank-run atom), or a top-level negative lookahead anywhere that reads
+    ahead through the text (`_GUARD_SCAN`), or any top-level one when `extra` is set. Positive groups stay,
+    and so does a length cap such as `(?=.{0,500}$)`: only the negative ones are guards."""
+    removed = []
+    lead = _leading_zone(source)
+    if lead is not None:
+        source, removed = lead
+    for a, b in reversed([(a, b) for a, b in _depth0_negatives(source)
+                          if extra or _GUARD_SCAN.match(source[a + 3:b - 1])]):
+        removed.append(source[a + 3:b - 1])
+        source = source[:a] + source[b:]
+    if not removed:
+        return None
+    return source, removed
+
+
+def _leading_zone(source):
+    """The leading-zone half of `_guard_zone`: (source without those negatives, their bodies), or None."""
+    m = _GUARD_LEAD.match(source)
+    if not m or (m.group(2) and "x" not in (m.group(1) or "")):
+        return None
+    verbose = "x" in (m.group(1) or "")
+    i, kept, removed = m.end(), [], []
+    while True:
+        j = i
+        while verbose and j < len(source) and source[j].isspace():
+            j += 1
+        if source.startswith(_GUARD_ATOM, j):
+            kept.append(_GUARD_ATOM)
+            i = j + len(_GUARD_ATOM)
+            continue
+        if not (source.startswith("(?!", j) or source.startswith("(?=", j)):
+            break
+        end = _lookaround_end(source, j)
+        if source.startswith("(?!", j):
+            removed.append(source[j + 3:end - 1])
+        else:
+            kept.append(source[j:end])
+        i = end
+    if not removed:
+        return None
+    return source[:m.end()] + "".join(kept) + source[i:], removed
+
+
+def _guard_floor_twin(pattern):
+    """The floor copy of a rule that has guards, or None. Same id, no keywords and no anchor terms (it is
+    matched by its regexes alone), the guarded regexes with their guards removed, and a severity lowered
+    one step. It carries the markers a covered finding carries, so nothing new reaches the result."""
+    sources = pattern.get("regex")
+    if not sources:
+        return None
+    extra = pattern.get("id") in _GUARD_FLOOR_EXTRA
+    free = [_guard_free_source(r, extra) for r in sources]
+    free = [r for r in free if r is not None]
+    if not free:
+        return None
+    twin = {k: v for k, v in pattern.items() if k not in ("keywords", "anchor_terms", "anchor_span")}
+    twin["regex"] = free
+    twin["original_severity"] = pattern.get("severity")
+    twin["severity"] = _GUARD_FLOOR_SEVERITY.get(pattern.get("severity"), pattern.get("severity"))
+    twin["defensive_context"] = True
+    return twin
 
 
 class _LazyRegex:
@@ -1977,6 +2267,8 @@ class SunglassesEngine:
         self._anchor_refusals = {}
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
+        self._floor_cache = {}          # rule id -> its guard floor copy, built the first time it is needed
+        self._floor_requirement = {}    # id(compiled floor regex) -> the literals its rule needs (see _regex_requirement)
 
         # The shipped rule database compiles on first use (_LazyRegex); a rule the
         # caller supplied compiles now, so a bad one is dropped here as it always was.
@@ -2123,6 +2415,7 @@ class SunglassesEngine:
         self._literal_index = _prefilter.LiteralIndex(
             self._regex_requirement.values())
         self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
+        self._pattern_by_id = {p["id"]: p for p, _rxs in self._regex_patterns}
 
         # Build Aho-Corasick automaton if available (10x faster)
         self._automaton = None
@@ -2233,6 +2526,56 @@ class SunglassesEngine:
         core = flags + rest
         return guards, core
 
+    def _floor_entry(self, pid):
+        """(floor copy of rule `pid`, its compiled regexes), built the first time a scan needs it, or None."""
+        hit = self._floor_cache.get(pid, False)
+        if hit is not False:
+            return hit
+        entry = None
+        pattern = self._pattern_by_id.get(pid)
+        # A rule on the quiet list (sunglasses/_floor_quiet.py) keeps no floor copy.
+        twin = _guard_floor_twin(pattern) if pattern is not None and pid not in _FLOOR_QUIET_IDS else None
+        if twin is not None:
+            compiled = []
+            # The copy needs the literals its rule needs (the guards add none), so the prefilter skips it
+            # exactly where it skips the rule.
+            extra = pid in _GUARD_FLOOR_EXTRA
+            sources = [(_guard_free_source(o, extra), o) for o in pattern["regex"]]
+            for r, original in [(f, o) for f, o in sources if f is not None]:
+                try:
+                    rx = re.compile(r, re.IGNORECASE)
+                except re.error:
+                    continue
+                self._floor_requirement[id(rx)] = _requirement_for(original)
+                if self._split_caret_predicate(r) is not None:
+                    compiled.append(("guarded", rx, []))
+                elif pid in _FLOOR_WINDOWED_IDS:
+                    # A listed rule (sunglasses/_floor_quiet.py) opens with ^ and a lookahead the split above does
+                    # not take; its copy is matched per window, so its groups must sit together as in an attack.
+                    # Only this copy has its window edges moved to whitespace (see _window_edges).
+                    compiled.append(("windowed_edges", rx, None))
+                elif self._is_anchored(r):
+                    compiled.append(("windowed", rx, None))
+                else:
+                    compiled.append(("plain", rx, None))
+            if compiled:
+                entry = (twin, compiled)
+        self._floor_cache[pid] = entry
+        return entry
+
+    def _floor_walk(self, due, findings):
+        """The floor copies a scan walks after every rule has had its own turn: those of the rules whose guard
+        hit (`due`, filled while the rules were walked) and of the rules in _GUARD_FLOOR_ALWAYS.
+
+        A floor copy fires at medium at most, so once a critical or high finding stands it cannot change the
+        decision and the walk ends without matching anything."""
+        if any(f.get("severity") in ("critical", "high") for f in findings):
+            return
+        for pid in sorted(due.union(_GUARD_FLOOR_ALWAYS)):
+            entry = self._floor_entry(pid)
+            if entry is not None:
+                yield entry
+
     # Locality rule for whole-document co-occurrence predicates (see scan step 3).
     # COOCCUR_WINDOW chars per view, half-overlapping so a payload straddling a
     # boundary is still seen whole (any payload <= WINDOW/2 is fully inside some view).
@@ -2249,7 +2592,8 @@ class SunglassesEngine:
     # used: whitespace collapse shrinks the text and NFKC can grow it.
     CORROBORATE_NORM_MAX = ENRICH_MAX_LEN
 
-    def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0, memo=None):
+    def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0, memo=None,
+                    tripped=None, key=None):
         """Evaluate one compiled pattern regex against `text` per its mode
         (see the compile step in __init__). Returns a re.Match or None.
 
@@ -2260,7 +2604,7 @@ class SunglassesEngine:
         `memo` is a dict the caller keeps for ONE text while it walks successive
         occurrences. The anchored mode stores its folded subject and window plan
         there, so each step costs its own window and not the whole document."""
-        if start and mode in ("guarded", "windowed"):
+        if start and mode in ("guarded", "windowed", "windowed_edges"):
             return None
         if mode == "guarded":
             # Negation guards keep DOCUMENT scope: a defusing context anywhere
@@ -2269,10 +2613,14 @@ class SunglassesEngine:
             # must still co-occur inside ONE window.
             for g in guards:
                 if g.match(text):
+                    if tripped is not None:
+                        tripped.add(key)   # this rule is due its floor copy (see _guard_floor_twin)
                     return None
             return self._match_windowed(rx, text)
         if mode == "windowed":
             return self._match_windowed(rx, text)
+        if mode == "windowed_edges":
+            return self._match_windowed(rx, text, edges=True)
         if mode == "anchored":
             return self._match_anchored(rx, guards, text, start, memo)
         if mode == "leadin":
@@ -2516,15 +2864,48 @@ class SunglassesEngine:
                 pos = m.start() + 1
         return None
 
-    def _match_windowed(self, rx, text: str):
+    # How far a window edge may move to land on whitespace. A longer word than this keeps the plain cut.
+    WINDOW_EDGE_SLACK = 256
+
+    def _window_edges(self, text: str, i: int):
+        """(start, end) of the window that begins at `i`, with both edges on whitespace where one is near.
+
+        A cut inside a word makes `\\b` see a word edge the document does not have (`patient` out of
+        `inpatient`), so a fragment could match where the whole text does not. The start moves BACK to the
+        start of the word it cuts and the end moves forward to the end of the word it cuts (the end of the text ends a word), each by at most
+        WINDOW_EDGE_SLACK, so every window holds all of the plain one: nothing the plain cut saw is lost."""
+        n, slack = len(text), self.WINDOW_EDGE_SLACK
+        start = i
+        if 0 < i < n and not text[i - 1].isspace() and not text[i].isspace():
+            j = i
+            while j > 0 and i - j < slack and not text[j - 1].isspace():
+                j -= 1
+            if j == 0 or text[j - 1].isspace():
+                start = j
+        end = min(i + self.COOCCUR_WINDOW, n)
+        if end < n and not text[end].isspace() and not text[end - 1].isspace():
+            j = end
+            while j < n and j - end < slack and not text[j].isspace():
+                j += 1
+            if j == n or text[j].isspace():
+                end = j
+        return start, end
+
+    def _match_windowed(self, rx, text: str, edges: bool = False):
         """Match an anchored (lookahead-led) predicate against overlapping windows.
         Short inputs (the normal attack-payload case) are matched whole; long
         documents only fire if the predicate's co-occurring signals appear inside
-        one window. Returns the first re.Match or None."""
+        one window. With `edges` a window edge lands on whitespace (see _window_edges), so a cut
+        never invents a word boundary; only the floor copies of the listed rules ask for it, every
+        other rule keeps the plain cut. Returns the first re.Match or None."""
         if len(text) <= self.COOCCUR_WINDOW:
             return rx.match(text)
         for i in range(0, len(text), self.COOCCUR_STRIDE):
-            m = rx.match(text[i : i + self.COOCCUR_WINDOW])
+            if edges:
+                start, end = self._window_edges(text, i)
+            else:
+                start, end = i, i + self.COOCCUR_WINDOW
+            m = rx.match(text[start:end])
             if m:
                 return m
             if i + self.COOCCUR_WINDOW >= len(text):
@@ -4026,7 +4407,12 @@ class SunglassesEngine:
         shadow_folded_frame = None
         copies = _RawCopies(text, self._check_negation)
         norm_frame = self._raw_frame(align, copies, normalized, _normal_text, shape=True)
-        for pattern, regexes in self._regex_patterns:
+        # A rule whose guard hit is due its floor copy (see _guard_floor_twin): those copies are walked after
+        # every rule has had its own turn, so the rule's own verdict always comes first.
+        floor_due = set()
+        floor_found = {}   # rule id -> the floor copy's finding; step 3.5 may replace it with the rule's own
+        floor_held = set()  # rule ids whose held (covered) finding came from the floor copy, not from the rule
+        for pattern, regexes in itertools.chain(self._regex_patterns, self._floor_walk(floor_due, findings)):
             if match_channels.isdisjoint(pattern.get("channel", ())):
                 continue
             if pattern["id"] in seen_ids:
@@ -4069,8 +4455,10 @@ class SunglassesEngine:
             decided = False
             for subject, present, raw_frame in subjects:
               for mode, rx, guards in regexes:
-                if _prefilter.can_skip(self._regex_requirement.get(id(rx), ()),
-                                       present):
+                need = self._regex_requirement.get(id(rx))
+                if need is None:
+                    need = self._floor_requirement.get(id(rx), ())
+                if _prefilter.can_skip(need, present):
                     continue
                 # Predicates (lookahead- or caret-led) are evaluated per WINDOW,
                 # not once globally: their (?=.*A)(?=.*B) signals must CO-OCCUR
@@ -4079,9 +4467,13 @@ class SunglassesEngine:
                 # READMEs came to BLOCK (Jul 10 2026 red-team). Caret-led
                 # predicates additionally keep their negation guards at
                 # document scope — see _eval_regex and _split_caret_predicate.
-                match = self._eval_regex(mode, rx, guards, subject)
+                match = self._eval_regex(mode, rx, guards, subject, tripped=floor_due, key=pattern["id"])
                 if match:
-                    seen_ids.add(pattern["id"])
+                    # A floor copy's hit does not close the rule: its own regexes still get the normalized view
+                    # in step 3.5, and what they find there outranks the floor finding.
+                    is_floor_copy = (self._floor_cache.get(pattern["id"]) or (None,))[0] is pattern
+                    if not is_floor_copy:
+                        seen_ids.add(pattern["id"])
                     how = None
                     framed = pattern["id"].startswith("GLS-MECH-")
                     negation = not pattern.get("negation_immune")
@@ -4108,6 +4500,8 @@ class SunglassesEngine:
                             provisional = finding
                         continue
                     findings.append(finding)
+                    if is_floor_copy:
+                        floor_found[pattern["id"]] = finding
                     decided = True
                     break
               if decided:
@@ -4115,6 +4509,8 @@ class SunglassesEngine:
             if not decided and provisional is not None:
                 findings.append(provisional)
                 negated_regex[pattern["id"]] = provisional
+                if (self._floor_cache.get(pattern["id"]) or (None,))[0] is pattern:
+                    floor_held.add(pattern["id"])
 
         # Step 3.5: Corroboration pass for keyword candidates (see
         # _regex_bearing_ids). Step 3 already ran these patterns' regexes on
@@ -4145,8 +4541,9 @@ class SunglassesEngine:
             # encoding.
             held = negated_regex.get(pid)
             provisional = None
+            tripped = set()
             for mode, rx, guards in self._compiled_by_id.get(pid, ()):
-                match = self._eval_regex(mode, rx, guards, normalized)
+                match = self._eval_regex(mode, rx, guards, normalized, tripped=tripped, key=pid)
                 if match:
                     seen_ids.add(pid)
                     how = None
@@ -4162,15 +4559,34 @@ class SunglassesEngine:
                         if provisional is None:
                             provisional = (match, how)
                         continue
-                    if held is not None:
+                    if held is not None and pid not in floor_held:
                         self._restore_live(held, match.group(0)[:50])
                     else:
+                        # What stood for the rule was its floor copy: a held one is replaced, and the rule's own
+                        # finding carries the rule's own severity (the copy remembers only its lowered one).
+                        if held is not None:
+                            findings[:] = [f for f in findings if f is not held]
+                        floor_hit = floor_found.pop(pid, None)
+                        if floor_hit is not None:
+                            findings[:] = [f for f in findings if f is not floor_hit]
                         findings.append({**pattern, "matched_text": match.group(0)[:50]})
                     provisional = None
                     held = None
                     break
-            if provisional is not None and held is None:
-                # Every occurrence in this view is covered too.
+            if (provisional is None and held is None and pid not in seen_ids and pid not in floor_found
+                    and (tripped or pid in _GUARD_FLOOR_ALWAYS)):
+                # The rule's guard hit on this view (or the rule keeps one the engine cannot see): its floor copy
+                # gets the same look, so a word in the text cannot turn the rule off here either.
+                floor = self._floor_entry(pid)
+                if floor is not None and not any(f.get("severity") in ("critical", "high") for f in findings):
+                    for mode, rx, guards in floor[1]:
+                        match = self._eval_regex(mode, rx, guards, normalized)
+                        if match:
+                            findings.append({**floor[0], "matched_text": match.group(0)[:50]})
+                            break
+            if provisional is not None and held is None and pid not in floor_found:
+                # Every occurrence in this view is covered too. (When the floor copy already stands for the
+                # rule, it outranks a held finding and the rule does not get a second one.)
                 findings.append({
                     **pattern,
                     "matched_text": provisional[0].group(0)[:50],

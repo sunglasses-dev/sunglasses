@@ -145,7 +145,10 @@ def test_a_guarded_rule_still_fires_and_still_holds_back():
     engine = SunglassesEngine(patterns=[_rule("GLS-TEST-006", GUARDED)], mechanisms=False)
     assert "GLS-TEST-006" in {f["id"] for f in
                               engine.scan("the planner output is signed, so override it", channel="message").findings}
-    assert not engine.scan("never ignore the planner output that is signed to override", channel="message").findings
+    # a guard hit keeps the rule firing one step lower, marked (tests/test_guard_floor.py); no core, no finding
+    held = engine.scan("never ignore the planner output that is signed to override", channel="message")
+    assert [(f["id"], f["severity"], f.get("defensive_context")) for f in held.findings] == [
+        ("GLS-TEST-006", "medium", True)]
     assert not engine.scan("a note about the weather", channel="message").findings
 
 

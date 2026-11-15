@@ -50,6 +50,12 @@ def _fires(text, channel="message"):
     return any(f["id"] == "GLS-AW-585" for f in SunglassesEngine().scan(text, channel=channel).findings)
 
 
+def _held_at_the_floor(text, channel="message"):
+    """The rule's own guard hit: the rule still fires, one step lower, marked (see tests/test_guard_floor.py)."""
+    found = [f for f in SunglassesEngine().scan(text, channel=channel).findings if f["id"] == "GLS-AW-585"]
+    return bool(found) and all(f.get("defensive_context") and f["severity"] == "medium" for f in found)
+
+
 def test_guard_agrees_with_the_old_form_on_a_table():
     new = _guard()
     for text in TABLE:
@@ -68,11 +74,12 @@ def test_guard_agrees_with_the_old_form_on_random_strings():
     assert positives > 500
 
 
-def test_rule_still_fires_and_is_still_defused_through_the_engine():
+def test_rule_still_fires_and_its_guard_still_holds_it_at_the_floor_through_the_engine():
     for channel in _channels():
         assert _fires(HOSTILE, channel), channel
-        assert not _fires(HOSTILE + "The guide says reviewers must report it.", channel), channel
-        assert not _fires("The guide says reviewers must report it. " + HOSTILE, channel), channel
+        assert not _held_at_the_floor(HOSTILE, channel), channel
+        assert _held_at_the_floor(HOSTILE + "The guide says reviewers must report it.", channel), channel
+        assert _held_at_the_floor("The guide says reviewers must report it. " + HOSTILE, channel), channel
     assert _fires(HOSTILE + "We never release that.")
     assert _fires(HOSTILE + "The guide is short.")
 

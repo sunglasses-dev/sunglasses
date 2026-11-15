@@ -797,8 +797,8 @@ def _walk(rule, text):
     original = eng._eval_regex
     steps = []
 
-    def counted(mode, rx_, guards, text_, start=0, memo=None):
-        hit = original(mode, rx_, guards, text_, start, memo)
+    def counted(mode, rx_, guards, text_, start=0, memo=None, **kw):
+        hit = original(mode, rx_, guards, text_, start, memo, **kw)
         if start:
             steps.append((start, None if hit is None else hit.start()))
         return hit
