@@ -8,6 +8,7 @@ load_negatives), so a corpus change fails here until the truth file follows.
 import importlib.util
 import json
 import pathlib
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -42,6 +43,17 @@ def test_benchmark_recall_and_precision_match_a_live_run():
     assert recorded.get("benchmark_recall") == f'{m["true_positives"]}/{m["positives"]}'
     assert recorded.get("benchmark_recall_pct") == round(m["recall"] * 100, 1)
     assert recorded.get("benchmark_precision_pct") == round(m["precision"] * 100, 1)
+    # The README prints the same figures three times (the facts table, the
+    # benchmark table, the feature list). Each print must equal this run, so a
+    # corpus change that moves precision fails here until every print follows.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    precision = f'{round(m["precision"] * 100, 1)}%'
+    f1 = f'{m["f1"]:.3f}'
+    prints = re.findall(r"precision (\d+(?:\.\d+)?%)", readme)
+    assert prints and set(prints) == {precision}, (
+        f"README prints precision {sorted(set(prints))}, the benchmark prints {precision}")
+    assert f"| Precision | {precision} |" in readme
+    assert f"| F1 | {f1} |" in readme, f"README F1 cell is not {f1}, the benchmark prints it"
 
 
 def test_the_retired_recall_claim_is_gone_from_the_truth_file_and_the_readme():

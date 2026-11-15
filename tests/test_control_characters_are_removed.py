@@ -89,10 +89,10 @@ def _regex_subjects(text, channel):
     seen = []
     original = ENGINE._eval_regex
 
-    def spy(mode, rx, guards, subject):
+    def spy(mode, rx, guards, subject, **kw):
         if not any(subject is s for s in seen):
             seen.append(subject)
-        return original(mode, rx, guards, subject)
+        return original(mode, rx, guards, subject, **kw)
 
     ENGINE._eval_regex = spy
     try:
