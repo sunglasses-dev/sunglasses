@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Report a security vulnerability
+  - name: Private report
     url: https://github.com/sunglasses-dev/sunglasses/security/advisories/new
-    about: A working exploit or a bypass affecting a real system — reported privately, credited in the release notes.
+    about: Something got past the scan, or a security problem in Sunglasses. Report it in private and we credit you in the release notes.
   - name: Security policy
     url: https://github.com/sunglasses-dev/sunglasses/blob/main/SECURITY.md
     about: Scope, response window, and how disclosure works.

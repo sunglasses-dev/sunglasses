@@ -1,28 +1,14 @@
-name: Bypass or false positive
-description: Content that should have matched and did not, or benign content that fired
-title: "[bypass] "
+name: Wrong block
+description: Ordinary content that was blocked
+title: "[wrong block] "
 labels: ["detection"]
 body:
   - type: markdown
     attributes:
       value: |
-        This is the most valuable issue you can open. Two shapes belong here:
+        This form is for ordinary content that was blocked and should not have been.
 
-        - **Bypass** — content that should have been flagged and was not.
-        - **False positive** — ordinary, benign content that was flagged.
-
-        ⚠️ **If the bypass is a working exploit against a real system, do not post it here.**
-        Report it privately via [SECURITY.md](https://github.com/sunglasses-dev/sunglasses/blob/main/SECURITY.md)
-        and we will credit you in the release notes.
-  - type: dropdown
-    id: kind
-    attributes:
-      label: Which is it?
-      options:
-        - Bypass — should have matched, did not
-        - False positive — benign content, fired anyway
-    validations:
-      required: true
+        If something got past the scan, do not post it here and use the [private report](https://github.com/sunglasses-dev/sunglasses/security/advisories/new) instead, where we credit you in the release notes.
   - type: textarea
     id: input
     attributes:
@@ -43,14 +29,14 @@ body:
     attributes:
       label: Exit code you expected
       description: "0 clean · 1 threat found · 2 usage/operational error · 3 incomplete inspection"
-      placeholder: "1"
+      placeholder: "0"
     validations:
       required: true
   - type: input
     id: actual
     attributes:
       label: Exit code you got
-      placeholder: "0"
+      placeholder: "1"
     validations:
       required: true
   - type: textarea

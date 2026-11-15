@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        For content that should or should not have matched, use **Bypass or false positive** instead.
+        For ordinary content that was blocked, use **Wrong block** instead. If something got past the scan, use the private report.
   - type: textarea
     id: what
     attributes:

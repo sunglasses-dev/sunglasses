@@ -86,14 +86,13 @@ to match. That is the rule this section adds, not a criticism of the PR.
   while the file is stale, and `tests/test_generated_tables_marked.py` runs that command for every
   generated module it finds.
 
-## Found a bypass?
+## Found something the scan got wrong?
 
-That is the most useful thing you can bring us, and reporting one is a
-contribution, not an attack on the project.
+Both kinds of report are a contribution, not an attack on the project.
 
-- **Affects a real system, or is a working exploit** → report it privately via
-  [SECURITY.md](SECURITY.md). We credit you in the release notes.
-- **Otherwise** → open a *Bypass or false positive* issue with the exact input,
+- **Something got past the scan** → report it privately via
+  [SECURITY.md](SECURITY.md). Do not post the text in public. We credit you in the release notes.
+- **Something harmless was blocked** → open a *Wrong block* issue with the exact input,
   the exact command, and the exit code you expected versus the one you got.
 
 ## Code of Conduct
