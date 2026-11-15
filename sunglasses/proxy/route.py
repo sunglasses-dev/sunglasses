@@ -899,12 +899,11 @@ class Route:
         # Refused BEFORE inspection, because the point of the bound is that the
         # scan never runs on that much input.
         #
-        # Counted over `bound_surface`, as the notification side is: a top-level
-        # member beside the envelope is not scanned for most methods, and counting
-        # only what is scanned would let an oversized one cross past the bound that
-        # exists to stop it. Counted, not scanned: what a scan reads is unchanged.
+        # Counted over `bound_surface`, as the notification side is: the surface a
+        # scan reads, `params` and any member beside the envelope, so an oversized
+        # extra member is counted like the rest.
         over = bounds.check_content(
-            selector.content_bytes(selector.bound_surface(method, message)))
+            selector.bound_bytes(selector.bound_surface(method, message)))
         if over:
             # This refusal (#168, #179) must pass this call's admitted
             # attempt, so it settles the correct generation; omitting it would
@@ -1107,7 +1106,7 @@ class Route:
         # response to give, so it is dropped like an unknown notification above:
         # one receipt carrying the budget, nothing to either side.
         over = bounds.check_content(
-            selector.content_bytes(selector.bound_surface(method, message)))
+            selector.bound_bytes(selector.bound_surface(method, message)))
         if over:
             self._record("SETTLED", reason_code=over.reason, rule=over.rule,
                          budget=over.budget, forwarded=False)
