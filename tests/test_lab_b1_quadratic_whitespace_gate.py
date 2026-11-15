@@ -48,9 +48,13 @@ own id.
    the parsed regex), then the run.
    A linear entry finishes far inside the cap.
 
-KNOWN_SHAPE and KNOWN_SLOW list the entries that are red today, each a strict
-xfail: fixing one without removing it from the list fails the suite, which is
-the ratchet. Never widen the cap or the lists to make an entry green.
+KNOWN_SHAPE lists the shape entries that are red today, each a strict xfail:
+fixing one without removing it from the list fails the suite, which is the
+ratchet. KNOWN_SLOW lists the entries whose run time grows faster than the
+input; their ratchet is the growth test, which compares the run time at two
+input sizes and so does not depend on how fast the machine is (a wall clock
+limit alone turned the smallest margin entry red on a fast runner). Never
+widen the cap or the lists to make an entry green.
 """
 import re
 import signal
@@ -81,6 +85,19 @@ SHAPES = (
 
 PROBE_LEN = 16_000
 CAP_S = 0.5
+
+# Growth test for KNOWN_SLOW. A probe is run at GROW_START characters, then at double
+# the size, and so on. Linear work about doubles per step, quadratic work about
+# quadruples, so GROW_RATIO sits between the two. A step counts only when its smaller run
+# took at least GROW_MIN_S (below that the clock noise is a large part of the time), and a
+# family of probes stops once a run is over GROW_STOP_S, so the test stays short on a
+# slow entry and cheap on a fast machine.
+GROW_START = 250
+GROW_MIN_S = 0.004
+GROW_STOP_S = 0.25
+GROW_CAP_S = 1.0
+GROW_RATIO = 3.0
+assert GROW_CAP_S / GROW_STOP_S >= GROW_RATIO, "a run over the budget must mean growth over the ratio"
 
 ENGINE = SunglassesEngine()
 
@@ -122,7 +139,6 @@ KNOWN_SLOW = {
     # over the cap. GLS-AW-001 was made linear in #354; GLS-SC-018, GLS-CF-251 and GLS-AW-713
     # were made linear with lab finding H5 (one quantifier per whitespace run).
     # The six KNOWN_SHAPE sources did not, because the engine judges them on the twin.
-    ("GLS-CICD-004", 0): "guarded predicate with a large per-byte constant; 9 probes over (guarded)",
     # Found by the bracket probe row (a run of blanks right after an opening bracket): over the cap
     # at the probe size, growing with the square of the run. `\(\s*['"]?[^)]*\b` splits
     # the run between `\s*` and `[^)]*`, the same shape GLS-SQLFS-001 had. Fix like SQLFS-001.
@@ -141,6 +157,13 @@ KNOWN_SLOW = {
     ("GLS-CF-250", 0): "window then a run; 0.17 s / 2.6 s; 2 probes over (plain)",
     ("GLS-MP-005", 0): "forever then a run; 0.22 s / 3.4 s; 2 probes over (plain)",
     ("GLS-JBE-002", 0): "pretend then a run; 0.045 s / 0.72 s; 2 probes over (plain)",
+}
+
+# Entries over the cap because the work per byte is large, not because it grows faster than
+# the input. The growth test does not apply to them. Not strict: a faster machine may bring
+# one inside the cap, and that says nothing about the entry.
+KNOWN_SLOW_HEAVY = {
+    ("GLS-CICD-004", 0): "guarded predicate with a large per-byte constant; 9 probes over (guarded)",
 }
 
 # Entries whose shape (b) sits only in the positive core of a guarded predicate,
@@ -236,6 +259,8 @@ def test_the_known_lists_name_only_entries_that_exist():
     live = {(p["id"], i) for p in ENGINE._patterns for i, _ in enumerate(p.get("regex", []))}
     assert set(KNOWN_SHAPE) <= live, set(KNOWN_SHAPE) - live
     assert set(KNOWN_SLOW) <= live, set(KNOWN_SLOW) - live
+    assert set(KNOWN_SLOW_HEAVY) <= live, set(KNOWN_SLOW_HEAVY) - live
+    assert not set(KNOWN_SLOW) & set(KNOWN_SLOW_HEAVY)
     assert set(BOUNDED_SHAPE) <= live, set(BOUNDED_SHAPE) - live
     assert not set(BOUNDED_SHAPE) & set(KNOWN_SHAPE)
 
@@ -291,6 +316,19 @@ def _best_timed(fn, cap, tries=3):
     return best
 
 
+def _min_timed(fn, cap, tries=3):
+    """The fastest of `tries` runs of _timed, always all of them, so a step of the growth test
+    never rests on one run. A run over `cap` ends it at once and is reported as over."""
+    best = None
+    for _ in range(tries):
+        seconds, over = _timed(fn, cap)
+        if over:
+            return seconds, True
+        if best is None or seconds < best:
+            best = seconds
+    return best, False
+
+
 def _seeds(requirement):
     """Seeds for the timed probe. The joined seed (one literal per CNF clause)
     makes the rule findable; each single literal (longest eight) placed right
@@ -304,19 +342,19 @@ def _seeds(requirement):
     return seeds
 
 
-def _probe_texts(seeds):
+def _probe_texts(seeds, n=PROBE_LEN):
     joined = seeds[0]
     unit_nl = joined + "\n"
     unit_sp = joined + " "
     texts = {
-        "seed+newline repeated": (unit_nl * (PROBE_LEN // len(unit_nl) + 1))[:PROBE_LEN],
-        "seed+space repeated": (unit_sp * (PROBE_LEN // len(unit_sp) + 1))[:PROBE_LEN],
+        "seed+newline repeated": (unit_nl * (n // len(unit_nl) + 1))[:n],
+        "seed+space repeated": (unit_sp * (n // len(unit_sp) + 1))[:n],
     }
     for seed in seeds:
-        texts[f"{seed!r}+newline run"] = seed + "\n" * PROBE_LEN
-        texts[f"{seed!r}+space run"] = seed + " " * PROBE_LEN
-        texts[f"{seed!r}+bracket then space run"] = seed + "(" + " " * PROBE_LEN
-        texts[f"{seed!r}+bulk then space run"] = seed + "(BULK" + " " * PROBE_LEN
+        texts[f"{seed!r}+newline run"] = seed + "\n" * n
+        texts[f"{seed!r}+space run"] = seed + " " * n
+        texts[f"{seed!r}+bracket then space run"] = seed + "(" + " " * n
+        texts[f"{seed!r}+bulk then space run"] = seed + "(BULK" + " " * n
     return texts
 
 
@@ -424,11 +462,11 @@ def _shape_seeds(rx, guards, mode):
     return seeds[:8]
 
 
-def _shape_texts(seeds):
+def _shape_texts(seeds, n=PROBE_LEN):
     texts = {}
     for seed in seeds:
-        texts[f"shape lead {seed!r}+newline run"] = seed + "\n" * PROBE_LEN
-        texts[f"shape lead {seed!r}+space run"] = seed + " " * PROBE_LEN
+        texts[f"shape lead {seed!r}+newline run"] = seed + "\n" * n
+        texts[f"shape lead {seed!r}+space run"] = seed + " " * n
     return texts
 
 
@@ -438,7 +476,11 @@ def _timed_params():
             key = (pattern["id"], index)
             marks = ()
             if key in KNOWN_SLOW:
-                marks = pytest.mark.xfail(strict=True, reason=f"known slow: {KNOWN_SLOW[key]}")
+                # Not strict: whether the wall clock goes over CAP_S depends on the runner. The
+                # ratchet for a quadratic entry is test_each_known_slow_entry_still_grows below.
+                marks = pytest.mark.xfail(strict=False, reason=f"known slow: {KNOWN_SLOW[key]}")
+            elif key in KNOWN_SLOW_HEAVY:
+                marks = pytest.mark.xfail(strict=False, reason=f"known slow: {KNOWN_SLOW_HEAVY[key]}")
             yield pytest.param(pattern["id"], index, mode, rx, guards,
                                id=f"{key[0]}-{index}-{mode}", marks=marks)
 
@@ -460,6 +502,101 @@ def test_regex_entry_is_linear_on_whitespace_runs(rule_id, index, mode, rx, guar
             slow.append(f"on {shape}: {'over' if over else ''} {seconds:.2f} s")
     assert not slow, (f"{rule_id} #{index} ({mode}) exceeded {CAP_S} s at "
                       f"{PROBE_LEN} characters:\n" + "\n".join(slow))
+
+
+def _growth_texts(rx, guards, mode, n):
+    seeds = _seeds(ENGINE._regex_requirement.get(id(rx), ()))
+    texts = _probe_texts(seeds, n)
+    texts.update(_shape_texts(_shape_seeds(rx, guards, mode), n))
+    return texts
+
+
+def _family_grows(run, sizes=None):
+    """True when `run(n)` (seconds, over_budget) grows faster than linear. Doubles n from
+    GROW_START. Returns (grows, steps) where steps lists (n, seconds, ratio_to_previous)."""
+    steps, prev = [], None
+    n = GROW_START
+    while n <= PROBE_LEN:
+        seconds, over = run(n)
+        if over:
+            # Over the budget right after a step that could be measured: the budget is at least
+            # GROW_RATIO times the stop time, so this step grew by more than the ratio.
+            if prev and prev[1] >= GROW_MIN_S:
+                steps.append((n, seconds, None))
+                return True, steps
+            break
+        ratio = (seconds / prev[1]) if prev and prev[1] >= GROW_MIN_S else None
+        steps.append((n, seconds, ratio))
+        if ratio is not None and ratio >= GROW_RATIO:
+            return True, steps
+        if seconds > GROW_STOP_S:
+            break
+        prev = (n, seconds)
+        n *= 2
+    return False, steps
+
+
+def _entry_grows(rule_id, index, mode, rx, guards):
+    """True when some probe of the entry grows faster than linear with its size. Each step is
+    the best of three runs."""
+    first = _growth_texts(rx, guards, mode, GROW_START)
+    for name in first:
+        def run(n, name=name):
+            text = _growth_texts(rx, guards, mode, n)[name]
+            fn = lambda: ENGINE._eval_regex(mode, rx, guards, text)
+            return _min_timed(fn, GROW_CAP_S)
+        grows, _steps = _family_grows(run)
+        if grows:
+            return True
+    return False
+
+
+def _slow_entry_params():
+    for pattern, compiled in ENGINE._regex_patterns:
+        for index, (mode, rx, guards) in enumerate(compiled):
+            if (pattern["id"], index) in KNOWN_SLOW:
+                yield pytest.param(pattern["id"], index, mode, rx, guards,
+                                   id=f"{pattern['id']}-{index}-{mode}")
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("rule_id,index,mode,rx,guards", list(_slow_entry_params()))
+def test_each_known_slow_entry_still_grows(rule_id, index, mode, rx, guards):
+    # The ratchet for KNOWN_SLOW. It compares run times at two sizes, so a fast or a slow
+    # runner gives the same answer. Fixing an entry without removing it from the list fails here.
+    if not hasattr(signal, "SIGALRM"):
+        pytest.skip("the per-probe budget needs SIGALRM")
+    if threading.current_thread() is not threading.main_thread():
+        pytest.skip("the per-probe budget needs the main thread")
+    assert _entry_grows(rule_id, index, mode, rx, guards), (
+        f"{rule_id} #{index} no longer grows faster than its input; remove it from KNOWN_SLOW")
+
+
+@pytest.mark.parametrize("speed", [0.1, 1, 10], ids=["ten_times_faster", "as_measured", "ten_times_slower"])
+def test_the_growth_check_tells_linear_from_quadratic(speed):
+    # Synthetic work, no engine: a linear and a quadratic loop, sized so the smaller run is
+    # long enough to measure. The measured seconds are scaled by `speed`, so the same two
+    # loops stand for a runner ten times faster and ten times slower. A run past GROW_CAP_S
+    # is reported as over, as the real probe reports it. Runs at once, needs no SIGALRM.
+    def timed(work):
+        def run(n):
+            best = None
+            for _ in range(3):
+                t0 = time.perf_counter()
+                work(n)
+                spent = (time.perf_counter() - t0) * speed
+                best = spent if best is None else min(best, spent)
+            return best, best > GROW_CAP_S
+        return run
+
+    def linear(n):
+        sum(range(n * 400))
+
+    def quadratic(n):
+        sum(i * j for i in range(n // 4) for j in range(n // 4))
+
+    assert _family_grows(timed(quadratic))[0]
+    assert not _family_grows(timed(linear))[0]
 
 
 def test_one_slow_run_among_fast_ones_is_not_over_the_cap():
