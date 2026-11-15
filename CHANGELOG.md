@@ -5,9 +5,25 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.24] — 2026-11-15
+
 ### Changed
 
 - The README now says in one sentence what its hook timing times, the hook command the installer writes, started from a development copy of the code, so an installed copy can differ.
+
+- A rule that carries an exception stays in place one level lower when the exception applies. Critical and high rules fire as medium, so the decision is quarantine. Plain attack text still blocks. A short list of rules keeps its exception as it is, because without it the rule matches ordinary project text.
+
+- The keyword lane reads a run of invisible characters between two words as a space. A line or paragraph separator inside such a run is read as a line break.
+
+- `sunglasses scan NAME`, where NAME is a folder, ends with a usage error that names `--dir` to scan the folder and `--text` to scan the word. Nothing is scanned and the exit code is 2.
+
+- The benchmark measured on the release build gives precision 86.1%, recall 97.4% (37/38) and F1 0.914. 6 of the 77 clean READMEs are flagged.
+
+- The first scan in a new process does more setup for the rules that carry an exception. The hook with the pattern lane on takes about 138 ms per tool call, measured the same way as the README figure. The default hook, with the lane off, is unchanged.
+
+### Fixed
+
+- The proxy size limit is measured on what the scanner is shown, object keys included, with a small fixed allowance for the usual wrapper of a message. A message on the limit is still accepted. A message over it is refused as over budget. Receipts report the same content count.
 
 ## [0.6.23] — 2026-11-14
 
