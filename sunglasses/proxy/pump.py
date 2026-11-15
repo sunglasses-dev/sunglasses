@@ -1217,7 +1217,7 @@ class Session:
         # bound cannot be walked around by putting the bytes one level further
         # in.
         if frame is not None and "result" in frame:
-            over = bounds.check_content(selector.content_bytes(frame["result"]))
+            over = bounds.check_content(selector.bound_bytes(frame["result"]))
             if over:
                 self._close(over.reason, over.detail, rule=over.rule,
                             budget=over.budget, kind=over.kind)

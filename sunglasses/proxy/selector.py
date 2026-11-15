@@ -167,6 +167,56 @@ def content_bytes(value):
     return _walk_bytes(value, parent_key=None, opaque=False)
 
 
+# What the content bound adds to `content_bytes`: the bytes of the scanner
+# input that `content_bytes` leaves out (object keys, the string values under a
+# protocol-scalar or discriminant name, numbers and booleans in their JSON
+# spelling) and ONE byte for every leaf the scanner is shown, which stands for the
+# newline that joins it to the next. It is charged only beyond this many bytes.
+# The standard MCP envelope costs a few dozen of them, so a message that sits
+# exactly on the cap today still sits exactly on it; the whole slack a peer gains
+# is this number.
+UNCOUNTED_ALLOWANCE = 16_384
+
+
+def bound_bytes(value):
+    """What the content bound compares with the cap: `content_bytes`, plus the
+    scanner input bytes it leaves out once those pass `UNCOUNTED_ALLOWANCE`.
+
+    The scanner input is every coverage leaf joined by one newline each
+    (`inspection.scanner_input`). Its byte length is exactly
+    `content_bytes(value) + _walk_uncounted(value) - 1` for a value with at least
+    one leaf, so a message the bound admits hands the scanner at most the cap
+    plus the allowance, less one byte. `content_bytes` stays the number the
+    receipts and the worker contract use (keys and fixed vocabulary are not
+    content, row 3.1).
+    """
+    uncounted = _walk_uncounted(value, parent_key=None, opaque=False)
+    return content_bytes(value) + max(0, uncounted - UNCOUNTED_ALLOWANCE)
+
+
+def _walk_uncounted(value, parent_key, opaque):
+    """Bytes of the scanner input that `_walk_bytes` does not count: what
+    `coverage_leaves` shows beyond the counted strings, plus one byte for every
+    leaf it shows (the newline that joins it to the next)."""
+    if isinstance(value, dict):
+        total = 0
+        for key, item in value.items():
+            if opaque or key not in _PROTOCOL_SCALARS:
+                total += len(str(key).encode("utf-8", "surrogatepass")) + 1
+            total += _walk_uncounted(item, key, opaque or key in _OPAQUE_CONTAINERS)
+        return total
+    if isinstance(value, list):
+        return sum(_walk_uncounted(item, parent_key, opaque) for item in value)
+    if isinstance(value, str):
+        if not opaque and (parent_key in _DISCRIMINANTS
+                           or parent_key in _PROTOCOL_SCALARS):
+            return len(value.encode("utf-8", "surrogatepass")) + 1
+        return 1
+    if value is None or isinstance(value, (bool, int, float)):
+        return len(json.dumps(value)) + 1
+    return 0
+
+
 def _walk_bytes(value, parent_key, opaque):
     if isinstance(value, dict):
         return sum(_walk_bytes(item, key, opaque or key in _OPAQUE_CONTAINERS)
@@ -206,15 +256,11 @@ def client_surface(method, message):
 
 
 def bound_surface(method, message):
-    """What the content bound counts of a CLIENT frame: the scan surface, and
-    every other member beside the envelope.
+    """What the content bound counts of a CLIENT frame: the surface a scan reads.
 
-    `client_surface` is what a scan reads and is left as it was: `params` only,
-    but for the two zero-leaf methods. The bound has to count more than that. A
-    top-level member other than `params` is not scanned for most methods, and
-    counting only what is scanned meant an oversized one crossed past the very
-    bound that exists to stop it. Counted here, not scanned: that is a separate
-    question and is not changed.
+    That is `params` alone, or, when a member other than `params` sits beside
+    the envelope, every member beside the envelope, read as one object. The
+    extra member is scanned with the rest, so the bound counts it too.
     """
     extras = {key: value for key, value in message.items()
               if key not in _CLIENT_ENVELOPE}
