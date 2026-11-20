@@ -165,3 +165,17 @@ def pytest_collection_modifyitems(config, items):
     # The part belongs to this run only. A test that starts its own pytest
     # (collection checks, mutation runs) must see the whole suite, not part i.
     _os.environ.pop("CI_SHARD", None)
+
+
+# The cost rows (tests/_host_factor.py) multiply their time limits by a host factor.
+# The run prints it once at the end, quiet runs included, so a CI log shows the
+# host workload seconds and the factor without a failure. The line calls nothing
+# of the package and nothing here can fail a run.
+def pytest_terminal_summary(terminalreporter):
+    try:
+        import _host_factor
+        line = _host_factor.report_line()
+        if line:
+            terminalreporter.write_line(line)
+    except Exception:
+        return

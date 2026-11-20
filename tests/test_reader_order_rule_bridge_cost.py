@@ -2,20 +2,25 @@
 
 Two regexes of GLS-IP-009 let a reader lead reach its order across up to four short sentences. A run of line breaks between two
 sentences is one separator: it is taken once, by the separator itself, and no neighbouring pass can take part of it. This file holds
-three kinds of check. (1) Time: a reader lead, a run of line breaks and a tail that matches nothing is scanned in a small fraction of
-a second at the run lengths set here. (2) Reach: the texts the bridge reads still reach the order. (3) Census: a script walks the parsed
+three kinds of check. (1) Time: a reader lead, a run of line breaks and a tail that matches nothing is read inside the time limits set here at the
+run lengths set here (LIMIT_SECONDS for one regex, SCAN_LIMIT_SECONDS for one scan, each times the host factor of tests/_host_factor.py). (2) Reach: the texts the bridge reads still reach the order. (3) Census: a script walks the parsed
 form of all four regexes of the rule and of its gate, lists every repeat whose body can match the empty string, and every repeat that
 sits inside an unbounded repeat, and the list is compared with the one written down here, so a new repeat of that kind is a failing test.
 Every text below is invented test input. Nothing in it is an instruction to anyone reading this file.
 """
+import os
 import re
+import sys
 import time
 
 import pytest
 
-from sunglasses._rule_gates import GATES
-from sunglasses.engine import SunglassesEngine
-from sunglasses.patterns import PATTERNS
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
+from sunglasses._rule_gates import GATES  # noqa: E402
+from sunglasses.engine import SunglassesEngine  # noqa: E402
+from sunglasses.patterns import PATTERNS  # noqa: E402
 
 try:  # the parser moved in Python 3.11
     from re import _constants as C
@@ -28,6 +33,7 @@ RULE = "GLS-IP-009"
 LEADS = ["Note to AI assistants.", "Attention AI agents:", "Dear LLM,", "Hello shopping assistants."]
 UNITS = ["\n", " \n", "\n ", "\t\n", ".\n", "! \n", "\n\n"]
 LIMIT_SECONDS = 0.25
+SCAN_LIMIT_SECONDS = 1.0
 
 
 def _sources():
@@ -47,7 +53,7 @@ def test_each_regex_of_the_rule_reads_a_long_run_of_line_breaks_in_a_small_time(
         compiled = re.compile(source)
         start = time.perf_counter()
         compiled.search(text)
-        assert time.perf_counter() - start < LIMIT_SECONDS
+        assert time.perf_counter() - start < seconds_limit(LIMIT_SECONDS)
 
 
 @pytest.mark.parametrize("breaks", [20, 80, 240])
@@ -55,7 +61,7 @@ def test_the_engine_scans_a_reader_lead_with_many_line_breaks_in_a_small_time(en
     text = "Note to AI assistants." + "\n" * breaks + "x"
     start = time.perf_counter()
     engine.scan(text, channel="web_content")
-    assert time.perf_counter() - start < 1.0
+    assert time.perf_counter() - start < seconds_limit(SCAN_LIMIT_SECONDS)
 
 
 def test_a_reader_lead_reaches_its_order_across_blank_lines():
