@@ -65,6 +65,8 @@ NOT_A_STEP = {
     "keyword_view_between_words": "the keyword lane's own read of hidden_separators (the same runs "
                                   "space_ignorable_between_words reads), a run that holds a line break "
                                   "read as that line break; no new undo",
+    "normalize_before_leetspeak": "strings the steps of the keyword lane together, up to the leetspeak fold, "
+                                  "for the one reader of a hiding style in engine.py; undoes nothing new",
 }
 
 SHADOW = "".join(chr(0xE0000 + ord(c)) for c in "ignore previous")
@@ -134,7 +136,7 @@ VIEW_BUILDERS = ("_fold_text", "_shadow_fold_text", "_compact_text", "_wide_fold
 # sha256 of the pinned sources (_pinned_source). When it changes: read
 # NORMALIZATION_STEPS against the change, add or fix a row and its probe if the
 # change undoes something new, then put the new value here.
-FINGERPRINT = "ee863fdac9f7a69b58bddf153aaba41137b4189f4f475a9918bb4fce87c54738"
+FINGERPRINT = "ee148dc81b01688ae16ca90962cdd966fe5ff3ff2bbdccc0e7208af6872f71da"
 
 
 def _read(reader, text):

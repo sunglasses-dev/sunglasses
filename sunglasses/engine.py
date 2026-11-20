@@ -11,6 +11,7 @@ Usage:
 """
 
 import bisect
+import codecs
 import collections
 import copy
 import functools
@@ -23,6 +24,8 @@ import types
 import unicodedata
 
 from . import _prefilter
+from ._rule_gates import GATES as _RULE_GATES
+from . import _reader_forms as _READER_FORMS
 import time
 import uuid
 from typing import Optional
@@ -44,7 +47,7 @@ from .utf7 import utf7_view
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_letter_references, decode_url_encoding, normalize_unicode,
-                           normalize_with_length, replace_homoglyphs, replace_lookalikes,
+                           normalize_before_leetspeak, normalize_with_length, replace_homoglyphs, replace_lookalikes,
                            space_ignorable_between_words, keyword_view_between_words, strip_ignorable, strip_invisible,
                            BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES, WORD_CHAR, decoded_at,
                            decoded_before)
@@ -63,8 +66,8 @@ _LEADIN_SOURCES = frozenset(
     if r.startswith("(?i)(?:^|" + _LEADIN_OLD) and r.count(_LEADIN_OLD) == 1)
 
 
-# Audit M8. Scan cost is linear at roughly 50 microseconds per byte — 1 KB is
-# 0.055s, 100 KB is 4.9s, 1 MB is 49.6s. Uncapped, a front-line filter handed a
+# Audit M8. Scan cost was measured at roughly 50 microseconds per byte on one input — 1 KB is
+# 0.055s, 100 KB is 4.9s, 1 MB is 49.6s; other inputs cost more or less. Uncapped, a front-line filter handed a
 # 10 MB page stalls an agent for about eight minutes, which is a denial of service
 # an attacker can trigger by sending a large benign document.
 #
@@ -870,6 +873,11 @@ def _compact_spaced_text(text: str) -> str:
 def _normal_text(text: str) -> str:
     """The normalized view, built the way scan() builds it."""
     return normalize_with_length(text)[0]
+
+
+# Every view scan() hands to a rule beside the text as written, each by the function that builds it.
+_SUBJECT_BUILDS = (decode_shadow_ascii, _shadow_fold_text, _fold_text, _compact_text, _wide_fold_text,
+                   _wide_compact_text, _fold_spaced_text, _compact_spaced_text, _normal_text)
 
 
 def _braille(ch: str) -> bool:
@@ -1788,6 +1796,10 @@ def _shipped_regex_sources():
                      for src in rule.get("regex", ()))
 
 
+class _HiddenReadLimit(Exception):
+    """A page spent everything it may on reading its hidden elements (see _hidden_style_carries_ask)."""
+
+
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
@@ -2414,6 +2426,10 @@ class SunglassesEngine:
         }
         self._literal_index = _prefilter.LiteralIndex(
             self._regex_requirement.values())
+        # A rule's gate is the part all of its regexes need (see _rule_gates). A page without it cannot match the
+        # rule, so step 3 skips the rule there. Only rules that carry a matcher get one.
+        self._rule_gate = {pid: re.compile(src, re.IGNORECASE) for pid, src in _RULE_GATES.items()
+                           if pid in self._regex_bearing_ids}
         self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
         self._pattern_by_id = {p["id"]: p for p, _rxs in self._regex_patterns}
 
@@ -4080,6 +4096,519 @@ class SunglassesEngine:
             return False
         return True
 
+    # ── Hiding style on web content ──────────────────────────────────────────
+    # Real pages hide menus, dialogs, empty forms and settings blobs with a hiding style, so
+    # the style alone says nothing about the person's agent. On web_content the hidden text
+    # rule is recorded (severity "review", the id stays in the findings) unless the hidden
+    # element carries an ask: a mail address, or text in range with an order word or with prose.
+    # The reader looks for every hiding style on the page up to the hit cap and the read budget (below), and it may stop early with the
+    # block kept (below), so it does not read every element. The element ends by the cases of the HTML
+    # standard that this reader follows: an end tag inside a comment, a quoted attribute value or script text does not end it.
+    # A hit that cannot be read keeps the block (no hit located, outside a start tag, no end
+    # tag in reach, too many hits, more to read than a page may spend). The style is the
+    # attribute named style, read after its character references are decoded; a hiding style
+    # on a body or html start tag keeps the block; when the hidden text of the page names an
+    # AI reader, by the list of reader names or by the gate of GLS-IP-009, the block stays (the hits are counted up to
+    # _HIDDEN_MAX_HITS and the read has a step and character budget). The urgency rule blocks only next to another finding at high
+    # or above, or on a page that names an AI reader in the same two ways.
+    _HIDDEN_RULE_ID = "GLS-HI-002"
+    _ASCII_FOLD = {c: c + 32 for c in range(65, 91)}
+    _URGENCY_RULE_ID = "GLS-SEM-UI-217"
+    _HIDDEN_MAX_HITS = 200
+    _HIDDEN_REGION_CAP = 20000
+    _HIDDEN_TEXT_MIN = 40
+    _HIDDEN_TEXT_MAX = 400
+    _HIDDEN_VOID_TAGS = frozenset((
+        "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+        "param", "source", "track", "wbr", "frame", "basefont", "bgsound", "keygen", "menuitem"))
+    # Elements whose end tag a page may leave out: one of these still open at the end of the
+    # hidden element does not change where a parser ends it.
+    _HIDDEN_OPTIONAL_END_TAGS = frozenset((
+        "p", "li", "dt", "dd", "option", "optgroup", "tr", "td", "th", "thead", "tbody", "tfoot",
+        "colgroup", "rp", "rt"))
+    _HIDDEN_RAW_TAGS = frozenset((
+        "script", "style", "textarea", "title", "iframe", "xmp", "noembed", "noframes", "noscript"))
+    _HIDDEN_FOREIGN_TAGS = frozenset(("svg", "math"))
+    # The HTML standard sections "tree construction dispatcher" and "in foreign content", as this code takes them: inside svg or
+    # math the HTML integration points (svg foreignObject, desc, title) and the math text
+    # integration points (mi, mo, mn, ms, mtext, annotation-xml) hand their children to the
+    # HTML rules, where a slash closes nothing.
+    _HIDDEN_FOREIGN_HOLDERS = frozenset((
+        "foreignobject", "desc", "title", "mi", "mo", "mn", "ms", "mtext", "annotation-xml"))
+    # Same section: these start tags leave svg or math at once and become ordinary open HTML
+    # elements, so a page that has one inside svg or math keeps its block (font is on the list
+    # only when it carries color, face or size; any font is taken as one here).
+    _HIDDEN_FOREIGN_BREAKOUT = frozenset((
+        "b", "big", "blockquote", "body", "br", "center", "code", "dd", "div", "dl", "dt", "em",
+        "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr", "i", "img", "li", "listing",
+        "menu", "meta", "nobr", "ol", "p", "pre", "ruby", "s", "small", "span", "strong",
+        "strike", "sub", "sup", "table", "tt", "u", "ul", "var", "font"))
+    # Same standard, "closing elements that have implied end tags": only these end the
+    # hidden element on their own name when nothing at all is open inside it. optgroup, rt and
+    # rp close on their own name only inside a select or a ruby, so they never do here.
+    _HIDDEN_ENDS_ON_OWN_NAME = frozenset(("li", "p", "dt", "dd", "option", "tr", "td", "th"))
+    # HTML standard, "in body" end tags: these end tags close THROUGH open implied end tag
+    # elements (they generate implied end tags, then pop to the named element).
+    _HIDDEN_CLOSES_THROUGH = frozenset((
+        "address", "article", "aside", "blockquote", "button", "center", "details", "dialog",
+        "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup",
+        "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "summary", "ul",
+        "li", "dd", "dt", "p", "h1", "h2", "h3", "h4", "h5", "h6", "applet", "marquee", "object"))
+    # Same section, "any other end tag": the parser walks up the open elements and, on meeting a
+    # special element before the name, drops the end tag. These are the special elements.
+    _HIDDEN_SPECIAL = frozenset((
+        "address", "applet", "area", "article", "aside", "base", "basefont", "bgsound",
+        "blockquote", "body", "br", "button", "caption", "center", "col", "colgroup", "dd",
+        "details", "dir", "div", "dl", "dt", "embed", "fieldset", "figcaption", "figure",
+        "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head",
+        "header", "hgroup", "hr", "html", "iframe", "img", "input", "keygen", "li", "link",
+        "listing", "main", "marquee", "menu", "meta", "nav", "noembed", "noframes", "noscript",
+        "object", "ol", "p", "param", "plaintext", "pre", "script", "search", "section",
+        "select", "source", "style", "summary", "table", "tbody", "td", "template", "textarea",
+        "tfoot", "th", "thead", "title", "tr", "track", "ul", "wbr", "xmp", "dialog",
+        "foreignobject", "desc", "mi", "mo", "mn", "ms", "mtext", "annotation-xml"))
+    # A tag name with a character a parser keeps in the name but the tokenizer splits on, or one
+    # the pipeline folds to another letter. A page that holds one keeps its block.
+    _HIDDEN_ODD_TAG_NAME = re.compile(
+        r"<[/]?[A-Za-z0-9:_-]*(?:[^\x00-\x7f]|[&%\\\x00-\x08\x0b\x0e-\x1f\x7f])")
+    _HIDDEN_TAG_OPEN = re.compile(r"<(/?)([A-Za-z][^\s/>]*)")
+    _HIDDEN_TAG_STEP = re.compile(r"""=\s*["']|>""")
+    # One attribute as a tokenizer reads it: the name, then the value in double quotes, in single quotes or bare.
+    _HIDDEN_ATTR = re.compile(r"""[\s/]*([^\s/>=][^\s/>=]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]*)))?""")
+    # What one page may spend on reading its hidden elements: start tags walked, and characters read.
+    # A page that spends it all keeps its block.
+    _HIDDEN_READ_STEPS = 60000
+    _HIDDEN_READ_CHARS = 400000
+    _HIDDEN_NAMES_CHARS = 8000
+    _HIDDEN_DEPTH_CAP = 64
+    # A body or html start tag that carries a hiding style puts it on the page itself.
+    _HIDDEN_BLOCK_TAGS = frozenset(("body", "html"))
+    _HIDDEN_CAMEL_JOIN = re.compile(r"(?<=[a-z])(?=[A-Z])")
+    # A list of reader names, kept in _reader_forms.py. The hiding rule and the urgency rule ask it beside the compiled gate of
+    # GLS-IP-009 (self._rule_gate); each of the two accepts forms the other does not. The urgency switch takes the gate's answer
+    # from the scan, which asks it on every subject the rule reads: a yes sets a flag for that scan (reader_gate_seen). The hiding
+    # switch reads the hidden text alone, on the views the scan builds (_names_ai_reader), and asks the list and the gate there:
+    # on real pages the gate says yes on ordinary visible prose, and the hiding rule records those pages.
+    _HIDDEN_READER = _READER_FORMS.READER
+    _READER_RULE_ID = "GLS-IP-009"
+    # A mail address is found from each at sign: one local character in front of it, and a domain behind it that starts at the
+    # at sign and is matched there, never searched for. A run of local characters with no at sign is not read again from each
+    # of its characters.
+    _HIDDEN_MAIL_LOCAL = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._%+-")
+    _HIDDEN_MAIL_DOMAIN = re.compile(r"[A-Za-z0-9\-]+(?:\.[A-Za-z0-9\-]+)+")
+
+    @classmethod
+    def _has_hidden_mail(cls, text: str) -> bool:
+        at = text.find("@")
+        while at != -1:
+            if at > 0 and text[at - 1] in cls._HIDDEN_MAIL_LOCAL and cls._HIDDEN_MAIL_DOMAIN.match(text, at + 1):
+                return True
+            at = text.find("@", at + 1)
+        return False
+
+    _HIDDEN_ORDER = re.compile(
+        r"\b(?:ignore\s+previous\b|new\s+instruction|directive|must\s+be\b|you\s+must\b|"
+        r"do\s+not\s+tell\b|immediately\b|urgent\b|required\b|kindly\b)", re.I)
+    # Hidden prose is an ask whatever it says: a word list never ends. Prose is six or more
+    # counts of letters. Tokens that hold a settings blob (a quote then a colon, a brace then a quote, or a
+    # quote then a brace) are dropped. In the rest every run of two or more letters counts one, and one more for each
+    # further eight letters, so words glued together still count; a letter of a script written
+    # without spaces counts one each, whatever stands next to it. A label, a settings blob or
+    # an empty element is not prose.
+    _HIDDEN_PROSE_WORDS = 6
+    # Scripts written without spaces between words: Tibetan, Thai, Lao, Myanmar, Khmer, kana, Han.
+    _HIDDEN_NO_SPACE_SCRIPTS = (
+        (0x0F00, 0x0FFF), (0x0E00, 0x0EFF), (0x1000, 0x109F), (0x1780, 0x17FF), (0x3040, 0x30FF),
+        (0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0x20000, 0x2FA1F))
+
+    @classmethod
+    def _hidden_prose_count(cls, text: str) -> int:
+        """The prose count of `text`, counted up to the prose line."""
+        kept = " ".join(t for t in text.split() if '":' not in t and '{"' not in t and '"}' not in t)
+        count = 0
+        run = 0
+        for c in kept + " ":
+            kind = unicodedata.category(c)[0]
+            if kind == "L" and any(lo <= ord(c) <= hi for lo, hi in cls._HIDDEN_NO_SPACE_SCRIPTS):
+                count += (run + 7) // 8 if run >= 2 else 0
+                run = 0
+                count += 1
+            elif kind == "L" or (kind == "M" and run):
+                run += kind == "L"
+            else:
+                count += (run + 7) // 8 if run >= 2 else 0
+                run = 0
+            if count >= cls._HIDDEN_PROSE_WORDS:
+                break
+        return count
+
+    @classmethod
+    def _html_tokens(cls, text: str):
+        """The tags of `text` as this tokenizer reads them (the cases of the HTML standard named in the comments below, not a full parser), in order: a list of
+        (kind, name, start, end) with kind "start", "end" or "other" (comment, declaration,
+        raw text, a tag that never ends). Every step moves the position forward (by find), so the loop ends."""
+        tokens = []
+        n = len(text)
+        i = 0
+        # Where the next "-->" and the next "--!>" stand, looked up again only once the page has moved past them
+        # (-1 stays -1: nothing is left to find).
+        bare_close = bang_close = -2
+        while True:
+            i = text.find("<", i)
+            if i == -1:
+                return tokens
+            if text.startswith("<!--", i):
+                # HTML standard, "comment start" states: "<!-->" and "<!--->" are whole comments,
+                # and a comment ends at "-->" or at "--!>".
+                if text.startswith(">", i + 4):
+                    end = i + 5
+                elif text.startswith("->", i + 4):
+                    end = i + 6
+                else:
+                    if bare_close != -1 and bare_close < i + 4:
+                        bare_close = text.find("-->", i + 4)
+                    if bang_close != -1 and bang_close < i + 4:
+                        bang_close = text.find("--!>", i + 4)
+                    j, k = bare_close, bang_close
+                    if j == -1 and k == -1:
+                        end = n
+                    elif k == -1 or (j != -1 and j < k):
+                        end = j + 3
+                    else:
+                        end = k + 4
+                tokens.append(("other", "", i, end))
+                i = end
+                continue
+            if text.startswith(("<!", "<?"), i):
+                j = text.find(">", i)
+                end = n if j == -1 else j + 1
+                # A CDATA section is text up to "]]>" inside svg or math and a bogus comment up to the
+                # first ">" elsewhere: the tokenizer cannot tell which, so it names the token.
+                tokens.append(("other", "cdata" if text.startswith("<![CDATA[", i) else "", i, end))
+                i = end
+                continue
+            opened = cls._HIDDEN_TAG_OPEN.match(text, i)
+            if opened is None:
+                i += 1
+                continue
+            j = opened.end()
+            end = None
+            while True:
+                step = cls._HIDDEN_TAG_STEP.search(text, j)
+                if step is None:
+                    break
+                if step.group() == ">":
+                    end = step.end()
+                    break
+                close = text.find(step.group()[-1], step.end())
+                if close == -1:
+                    break
+                j = close + 1
+            name = opened.group(2).lower()
+            if end is None:
+                tokens.append(("other", name, i, n))
+                return tokens
+            tokens.append(("end" if opened.group(1) else "start", name, i, end))
+            i = end
+            if not opened.group(1) and name == "plaintext":
+                if i < n:
+                    tokens.append(("other", name, i, n))
+                return tokens
+            if not opened.group(1) and name in cls._HIDDEN_RAW_TAGS:
+                raw = re.compile(r"</%s(?![^\s/>])" % re.escape(name), re.I).search(text, i)
+                stop = n if raw is None else raw.start()
+                if stop > i:
+                    tokens.append(("other", name, i, stop))
+                i = stop
+
+    @classmethod
+    def _hidden_attrs(cls, tag: str):
+        """The attributes of a start tag as a tokenizer reads them: a list of (name, value), the name
+        folded to ASCII lower case, the value as written (None when there is none). A name that
+        stands twice keeps its first value (the duplicate-attribute rule of the HTML standard)."""
+        found = []
+        seen = set()
+        opened = cls._HIDDEN_TAG_OPEN.match(tag)
+        i = opened.end() if opened else 0
+        while True:
+            attr = cls._HIDDEN_ATTR.match(tag, i)
+            if attr is None:
+                return found
+            i = attr.end()
+            name = attr.group(1).translate(cls._ASCII_FOLD)
+            if name in seen:
+                continue
+            seen.add(name)
+            found.append((name, next((g for g in attr.groups()[1:] if g is not None), None)))
+
+    def _hidden_hit_carries_ask(self, text: str, tokens, foreign, place: int, budget: list):
+        """True when the hiding style on the start tag `place` must keep its block: its element
+        holds an ask, or it cannot be read. Otherwise the text of the element, for the reader
+        switch. `budget` is what the whole page may spend on reading hidden elements; when it
+        runs out, _HiddenReadLimit is raised."""
+        kind, name, start, end = tokens[place]
+        if name in self._HIDDEN_BLOCK_TAGS:
+            return True                      # by the parsing rules the attributes land on the page itself
+        start_tag = text[start:end]
+        if "<" in start_tag[1:] or name in self._HIDDEN_FOREIGN_TAGS or foreign[place]:
+            return True                      # a tag that swallowed another, or foreign content
+        budget[1] -= len(start_tag)
+        if budget[1] < 0:
+            raise _HiddenReadLimit()
+        if name in self._HIDDEN_VOID_TAGS and len(start_tag) > self._HIDDEN_REGION_CAP:
+            return True                      # a void tag is its own region: over the region cap it cannot be read, as an element over it
+        tags = [start_tag]
+        inner = ""
+        if name not in self._HIDDEN_VOID_TAGS:
+            open_inside = []
+            close = None
+            close_at = place
+            in_foreign = 0
+            for k in range(place + 1, len(tokens)):
+                later = tokens[k]
+                if later[2] - end > self._HIDDEN_REGION_CAP:
+                    break
+                budget[0] -= 1
+                if budget[0] < 0 or len(open_inside) > self._HIDDEN_DEPTH_CAP:
+                    raise _HiddenReadLimit()
+                if later[0] == "other":
+                    if later[1] == "cdata":
+                        return True          # where a CDATA section ends depends on svg or math around it
+                    if later[1] == "script":
+                        said_script = text[later[2]:later[3]].lower()
+                        opener = said_script.find("<!--")
+                        if opener != -1 and said_script.find("<script", opener) != -1:
+                            return True      # a comment opener then a script start tag: a parser ends the script elsewhere
+                    continue
+                inner_name = later[1]
+                if later[0] == "start":
+                    if in_foreign and inner_name in self._HIDDEN_FOREIGN_BREAKOUT:
+                        return True          # leaves svg or math and stays open as an HTML element
+                    if (inner_name == name and name in self._HIDDEN_ENDS_ON_OWN_NAME
+                            and not open_inside):
+                        close = later        # a parser ends the hidden element at its own next start tag
+                        close_at = k
+                        break
+                    if inner_name in self._HIDDEN_VOID_TAGS:
+                        continue
+                    if text[later[2]:later[3]].endswith("/>"):
+                        if inner_name in self._HIDDEN_FOREIGN_TAGS:
+                            continue         # svg and math take the slash as a self-close, whatever is open
+                        if in_foreign and not any(o in self._HIDDEN_FOREIGN_HOLDERS for o in open_inside):
+                            continue         # a real svg or math child outside every integration point closes itself
+                    if (inner_name in self._HIDDEN_ENDS_ON_OWN_NAME and open_inside
+                            and open_inside[-1] == inner_name):
+                        continue             # the same implied end tag element starts again: the old one ends
+                    open_inside.append(inner_name)
+                    if inner_name in self._HIDDEN_FOREIGN_TAGS:
+                        in_foreign += 1
+                    continue
+                if inner_name in self._HIDDEN_VOID_TAGS:
+                    continue
+                if open_inside and open_inside[-1] == inner_name:
+                    open_inside.pop()
+                    if inner_name in self._HIDDEN_FOREIGN_TAGS:
+                        in_foreign = max(0, in_foreign - 1)
+                elif inner_name in open_inside:
+                    deeper = len(open_inside) - 1 - open_inside[::-1].index(inner_name)
+                    if any(o not in self._HIDDEN_OPTIONAL_END_TAGS for o in open_inside[deeper + 1:]):
+                        return True          # elements closed out of order
+                    if (inner_name not in self._HIDDEN_CLOSES_THROUGH
+                            and any(o in self._HIDDEN_SPECIAL for o in open_inside[deeper + 1:])):
+                        return True          # the same rule for an element nested inside
+                    if any(o in self._HIDDEN_FOREIGN_TAGS for o in open_inside[deeper:]):
+                        in_foreign = 0
+                    del open_inside[deeper:]
+                elif inner_name == name:
+                    if any(o not in self._HIDDEN_OPTIONAL_END_TAGS for o in open_inside):
+                        return True          # an end tag a parser may ignore: something is still open inside
+                    if (name not in self._HIDDEN_CLOSES_THROUGH
+                            and any(o in self._HIDDEN_SPECIAL for o in open_inside)):
+                        return True          # "any other end tag": a special element inside makes a parser drop it
+                    close = later
+                    close_at = k
+                    break
+            if close is None:
+                return True                  # no end tag in reach
+            inner = text[end:close[2]]
+            budget[1] -= len(inner)
+            if budget[1] < 0:
+                raise _HiddenReadLimit()
+            tags = [text[t[2]:t[3]] for t in tokens[place:close_at] if t[0] == "start"]
+        values = [
+            html_value
+            for tag in tags
+            for attr_name, value in self._hidden_attrs(tag)
+            if attr_name != "style" and value
+            for html_value in (decode_html_entities(value),)]
+        attrs = " ".join(values)
+        prose_attrs = " ".join(v for v in values if any(c.isspace() for c in v))
+        if self._has_hidden_mail(normalize_before_leetspeak(start_tag + " " + inner + " " + attrs)):
+            return True
+        shown = []
+        last = end
+        for t in tokens[place + 1:close_at] if inner else ():
+            if t[0] in ("start", "end"):
+                shown.append(text[last:t[2]])
+                last = t[3]
+        shown.append(text[last:end + len(inner)])
+        spoken = " ".join(shown) + " " + attrs
+        said = normalize_before_leetspeak(spoken)
+        # The size bound counts the words: a value with no space in it is a token, not prose.
+        prose = normalize_before_leetspeak(" ".join(shown) + " " + prose_attrs)
+        if (len(said) >= self._HIDDEN_TEXT_MIN and len(prose) <= self._HIDDEN_TEXT_MAX
+                and (self._HIDDEN_ORDER.search(said) is not None
+                     or self._hidden_prose_count(prose) >= self._HIDDEN_PROSE_WORDS)):
+            return True
+        return spoken
+
+    def _bounded_hits(self, text: str, keyword: str):
+        """Offsets of every word bounded occurrence of `keyword` in `text`."""
+        found = []
+        at = text.find(keyword)
+        while at != -1:
+            if self._word_bounded(text, at, keyword):
+                found.append(at)
+            at = text.find(keyword, at + 1)
+        return found
+
+    def _names_ai_reader(self, text: str, subjects=None) -> bool:
+        """True when `text` names an AI reader, by the list of reader names or by the gate of GLS-IP-009. It never makes a block. The urgency
+        switch also keeps the block on the gate answer from the scan's own walk (reader_gate_seen); the hiding switch does not read it.
+
+        Without `subjects` the text is read on every view scan() hands to a rule, each built here by the function scan()
+        builds it with, and on its camel-split variant: the list and the gate are asked on each. With `subjects`, the
+        views scan() already built for this text, only the list is asked: scan() has asked the gate on those views itself
+        while it walked the rule. The camel-split variant is made first; every other view is built only when the ones before it did not answer."""
+        gate = None if subjects is not None else self._rule_gate.get(self._READER_RULE_ID)
+        def views():
+            if subjects is not None:
+                yield from subjects
+            for variant in (text, self._HIDDEN_CAMEL_JOIN.sub(" ", text)):
+                yield variant
+                yield normalize_before_leetspeak(variant)
+                if subjects is None:
+                    for build in _SUBJECT_BUILDS:
+                        yield build(variant)
+                elif variant is not text:
+                    yield normalize_with_length(variant)[0]
+        seen = set()
+        for view in views():
+            if view is None or view in seen:
+                continue
+            seen.add(view)
+            if self._HIDDEN_READER.search(view) or (gate is not None and gate.search(view)):
+                return True
+        return False
+
+    def _hidden_style_carries_ask(self, text: str, normalized: str, keywords, notes: list) -> bool:
+        """True when any hiding style on the page keeps its block (see above).
+
+        The reader accounts for every hit the rule matched on its own copy: it must locate at
+        least as many of each style as the rule saw, and none may sit in a decoded view or
+        come from markup the page wrote in an encoded form. Anything it cannot account for,
+        it cannot read, and the block stays. A page it cannot finish reading keeps the block
+        too, and `notes` says so."""
+        try:
+            return self._read_hidden_styles(text, normalized, tuple(keywords))
+        except _HiddenReadLimit:
+            notes.append("the hiding styles of this page could not all be read; the hiding finding keeps its block")
+            return True
+
+    def _read_hidden_styles(self, text: str, normalized: str, keywords) -> bool:
+        if not keywords:
+            return True
+        views = normalized.split(VIEW_SEP)
+        if self._HIDDEN_ODD_TAG_NAME.search(text):
+            return True                      # a tag name a parser and the tokenizer may split differently
+        written = " ".join(text.lower().split())
+        for k in keywords:
+            turned = (k[::-1], codecs.encode(k, "rot13"), codecs.encode(k[::-1], "rot13"))
+            if any(t in written for t in turned):
+                return True                  # a style written backwards or rotated: no parser reads it
+        # The page is read as written, as the token list above gives it: an encoded bracket or quote
+        # stays plain text, so it cannot end an element or open one. The style itself is the
+        # attribute named exactly style, and its value is read after its character references are
+        # decoded, as a browser reads it. Only the ASCII capitals fold.
+        tokens = self._html_tokens(text)
+        starts = [t[2] for t in tokens]
+        folded = text.translate(self._ASCII_FOLD)
+        located = dict.fromkeys(keywords, 0)
+        places = []
+        at = folded.find("style")
+        while at != -1:
+            place = bisect.bisect_right(starts, at) - 1
+            if place >= 0 and tokens[place][0] == "start" and at < tokens[place][3]:
+                at = tokens[place][3]
+                tag = text[tokens[place][2]:tokens[place][3]]
+                value = dict(self._hidden_attrs(tag)).get("style")
+                if value:
+                    value = decode_html_entities(value).translate(self._ASCII_FOLD)
+                    counts = [len(self._bounded_hits(value, k)) for k in keywords]
+                    if any(counts):
+                        places.append(place)
+                        for k, n in zip(keywords, counts):
+                            located[k] += n
+            else:
+                at += 1
+            at = folded.find("style", at)
+        for k in keywords:
+            if located[k] < max(len(self._bounded_hits(v, k)) for v in views):
+                return True                  # fewer found as written than the rule saw on any view
+        total = sum(located.values())
+        if total == 0 or total > self._HIDDEN_MAX_HITS:
+            return True
+        foreign = []
+        depth = 0
+        for kind, name, begin, end in tokens:
+            foreign.append(depth)
+            if name in self._HIDDEN_FOREIGN_TAGS:
+                if kind == "start" and not text[begin:end].endswith("/>"):
+                    depth += 1
+                elif kind == "end":
+                    depth = max(0, depth - 1)
+        budget = [self._HIDDEN_READ_STEPS, self._HIDDEN_READ_CHARS]
+        hidden = []
+        for place in places:
+            read = self._hidden_hit_carries_ask(text, tokens, foreign, place, budget)
+            if read is True:
+                return True
+            hidden.append(read)
+        # The hidden text of the page, every hidden element in page order, names an AI reader (the list of reader names or the
+        # gate of GLS-IP-009): the block stays; this runs after the read above, inside its budget.
+        # The check for an AI reader runs on what the reader collected from each hidden element: the text inside it as written, with a
+        # space where a tag stood, then the attribute values of its own start tag and of the start tags inside it other than style,
+        # entities decoded, with a space between the pieces. When the reader comes here and the lengths of what it collected, summed
+        # over the hidden elements of the page, come to more than _HIDDEN_NAMES_CHARS characters, it stops as it does at the read
+        # budget: the block stays and the page says so.
+        if sum(len(h) for h in hidden) > self._HIDDEN_NAMES_CHARS:
+            raise _HiddenReadLimit()
+        return self._names_ai_reader(" ".join(hidden)) or self._names_ai_reader("".join(hidden))
+
+    def _record_hidden_style_alone(self, findings: list, text: str, normalized: str, notes: list, reader_seen: bool = False, subjects=None) -> list:
+        """The web_content reading of a hiding style and the urgency rule (see above).
+        The hidden elements are read on the page as written, as the token list gives them; the ask
+        is looked for in the decoded text before the leetspeak fold, where an address still has
+        its at sign."""
+        out = []
+        for finding in findings:
+            if finding["id"] == self._HIDDEN_RULE_ID and finding["severity"] != "review":
+                if self._hidden_style_carries_ask(text, normalized, finding.get("keywords", ()), notes):
+                    out.append(finding)
+                    continue
+                finding = {**finding, "severity": "review", "original_severity": finding["severity"]}
+            out.append(finding)
+        top = max((self.SEVERITY_ORDER.get(f["severity"], 0) for f in out
+                   if f["id"] != self._URGENCY_RULE_ID), default=0)
+        # The urgency rule alone is recorded only on a page that names no AI reader.
+        if top < self.SEVERITY_ORDER["high"] and any(
+                f["id"] == self._URGENCY_RULE_ID and f["severity"] != "review" for f in out):
+            if not (reader_seen or self._names_ai_reader(text, subjects)):
+                out = [{**f, "severity": "review", "original_severity": f["severity"]}
+                       if f["id"] == self._URGENCY_RULE_ID and f["severity"] != "review" else f
+                       for f in out]
+        return out
+
     def scan(self, text: str, channel: str = "message") -> ScanResult:
         """
         Scan text for attack patterns.
@@ -4183,7 +4712,7 @@ class SunglassesEngine:
         match_channels = {channel, self.CHANNEL_ALIASES.get(channel, channel)}
         start = time.perf_counter()
 
-        # Step 0: Bound the input (audit M8). Cost is linear in length, so an
+        # Step 0: Bound the input (audit M8). Cost grows with the length, so an
         # oversized input is a stall an attacker can trigger with a large benign
         # document. Truncation is recorded on the result rather than applied
         # silently — the caller has to be able to tell a full clean scan from a
@@ -4441,6 +4970,7 @@ class SunglassesEngine:
         # A rule whose guard hit is due its floor copy (see _guard_floor_twin): those copies are walked after
         # every rule has had its own turn, so the rule's own verdict always comes first.
         floor_due = set()
+        reader_gate_seen = False
         floor_found = {}   # rule id -> the floor copy's finding; step 3.5 may replace it with the rule's own
         floor_held = set()  # rule ids whose held (covered) finding came from the floor copy, not from the rule
         for pattern, regexes in itertools.chain(self._regex_patterns, self._floor_walk(floor_due, findings)):
@@ -4484,7 +5014,13 @@ class SunglassesEngine:
             # and the rule must be judged on that one.
             provisional = None
             decided = False
+            gate = self._rule_gate.get(pattern["id"])
             for subject, present, raw_frame in subjects:
+              if gate is not None:
+                  if gate.search(subject) is None:
+                      continue          # the part every regex of this rule needs is not in this view
+                  if pattern["id"] == self._READER_RULE_ID:
+                      reader_gate_seen = True
               for mode, rx, guards in regexes:
                 need = self._regex_requirement.get(id(rx))
                 if need is None:
@@ -4693,6 +5229,12 @@ class SunglassesEngine:
             except Exception as exc:
                 validator_failures.append(
                     f"validator {validator.id} failed ({type(exc).__name__}); its check was skipped")
+
+        # Step 3d: a hiding style that stands alone, and the urgency rule, on web content.
+        if findings and self.CHANNEL_ALIASES.get(channel, channel) == "web_content":
+            findings = self._record_hidden_style_alone(findings, text, normalized, validator_failures,
+                reader_gate_seen or any(f['id'] == self._READER_RULE_ID for f in findings),
+                (text, shadow, shadow_folded, *(sub[0] for sub in folded_subjects), normalized))
 
         # Step 4: Determine decision based on worst finding severity
         if not findings:

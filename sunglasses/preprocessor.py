@@ -129,6 +129,29 @@ VIEW_SEP = "\x1e"
 ENRICH_MAX_LEN = 2000
 
 
+def normalize_before_leetspeak(text: str) -> str:
+    """The plain view as the pipeline has it just before the leetspeak fold: the same
+    steps as normalize_with_length up to that point, then the same whitespace steps, and
+    none of the views behind the separator. Digits and the at sign are still what the page
+    wrote (the fold reads 0 as o and @ as a), so a mail address can be read in it and a
+    hiding style written with a digit is still a hiding style. One reader uses it, the web
+    content reading of a hiding style in engine.py."""
+    text = text.replace(VIEW_SEP, " ")
+    text = strip_invisible(text)
+    text = normalize_unicode(text)
+    text = replace_homoglyphs(text)
+    for _ in range(3):
+        before = text
+        text = decode_html_entities(text, None)
+        text = decode_url_encoding(text)
+        text = decode_hex_escapes(text)
+        text = decode_base64_segments(text, None)
+        if text == before:
+            break
+    text = strip_delimiter_padding(text)
+    return collapse_whitespace(text)
+
+
 def normalize(text: str) -> str:
     """Full normalization pipeline. Returns cleaned text for pattern matching."""
     return normalize_with_length(text)[0]
