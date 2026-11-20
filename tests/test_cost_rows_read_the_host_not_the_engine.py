@@ -97,9 +97,9 @@ def test_the_factor_is_the_host_time_over_the_reference_between_one_and_the_cap(
 
 def test_a_latency_at_the_engine_entry_turns_a_reader_order_row_red_at_factor_one(engine, factor_one):
     module = importlib.import_module("test_reader_order_rule_cost")
-    slow = SlowEntry(engine, module.LIMIT_SECONDS + 0.2)
+    slow = SlowEntry(engine, module.row_limit(module.LONG_CLAUSES) + 0.2)
     with pytest.raises(AssertionError):
-        module.test_a_long_input_is_scanned_inside_the_time_limit(slow, "long clauses with no stop")
+        module.test_a_long_input_is_scanned_inside_the_time_limit(slow, module.LONG_CLAUSES)
 
 
 def test_a_latency_at_the_engine_entry_turns_a_hidden_style_row_red_at_factor_one(engine, factor_one):
