@@ -5,6 +5,42 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.25] — 2026-11-20
+
+### Added
+
+- A rule reads web pages, files, API responses and tool output for text that is written to an AI reader and orders it to act against the person it works for. It covers buying, paying, using a saved card, emptying or cancelling an order, sending the person's data, changing a delivery or billing address, switching off a protection, and keeping something from the person. A line that forbids the act or reports such an attack, in a wording the rule knows, is not read as such an order.
+
+### Changed
+
+- On web content a hiding style on an element is recorded as a review finding with its id kept. Hidden text that the scan reads as a request, or as written to an AI reader, keeps the block, and so does a hiding style the scan cannot read to its end. Hidden content the scan reads as a short label or an empty form is recorded as that review finding. The file and message channels read a hiding style as before.
+
+- On web content urgent wording that stands alone on a page is recorded as a review finding, unless the scan reads the page as written to an AI reader.
+
+- The reader of hiding styles counts the hidden text it reads against a budget per page, and the check for an AI reader in that text has a smaller budget of its own. When the reader stops at either budget, the page keeps its block and says so in the extraction warnings.
+
+- A scan run by a person ends with one line that says where to report a wrong block, and where to report in private a text that got past the scan. JSON and SARIF output are unchanged. The README, SECURITY.md and CONTRIBUTING.md name both kinds of report.
+
+### Fixed
+
+- The README Python example prints the severity the release returns, which is critical. The README lines that state the decision for a quoted sentence, the Python example and the MCP example are each tested for the outcome they state.
+
+- The CLAUDE.md in this repository describes its test fixture instead of quoting it.
+
+- The `last_updated` date of release 0.6.24 in `stats/current.json` is the PyPI upload time.
+
+### Known limits
+
+- On web content, hidden text of ordinary wording, such as a menu of several links or a short notice, can still keep the block.
+
+- On web content, a number such as 41 or 4.1 can read as the name of an AI reader, because the scan also reads digits as letters. A page with urgent wording that holds such a number, and hidden text that holds one, can keep the block.
+
+- A line that tells agents, assistants or bots by that name to act reads as an order to an AI reader, also where staff are meant.
+
+- A page or a file that quotes such an order as an example, without saying that it is one, reads as the order.
+
+- The new rule reads a fixed set of wordings for the reader, for the order and for the act. An order worded another way reads as ordinary text until its wording joins the rule.
+
 ## [0.6.24] — 2026-11-15
 
 ### Changed

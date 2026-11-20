@@ -733,6 +733,8 @@ print(result.is_clean)     # False — v0.5.6: this now means "no findings AND f
 print(result.latency_ms)   # milliseconds; grows with input length
 ```
 
+`SunglassesEngine.scan_file()` returns the engine's own `decision`. For a file that could not be read all the way through it can be `allow` while `is_clean` and `inspection_complete` are `False`, so check `is_clean` before you call a file clean.
+
 ### Connect the MCP server
 
 The simplest start is `sunglasses-mcp`, the script `pip install sunglasses` puts next to your Python. A desktop client may not use the same PATH as your terminal, so set `command` to the absolute path of that script. In a virtual environment that is `/absolute/path/to/.venv/bin/sunglasses-mcp`, with `args` set to `[]`. The root `mcp.json` is the fallback: it sets `command` to `python3` and `args` to a short start-up line that runs the same server without putting the current folder on Python's import path. Set `command` to the absolute path of the Python that has Sunglasses installed and keep `args` as it is. Starting the server with `python -m sunglasses.mcp` in a folder you do not trust puts that folder first on the import path, so use the script or the start-up line there. CI runs on Linux. Windows is not supported. Proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested.
@@ -812,7 +814,7 @@ Both runs print which engine they measured. `--installed` refuses to run when th
 
 Labeled dataset shipped in this repo. It holds 38 real agent input attacks (positives) + 77 famous open source READMEs (react, kubernetes, numpy, ollama…) that must stay clean (negatives). No randomness, no network, no LLM judge (same clone + same command → byte identical results, sealed by a SHA-256 of the metrics block).
 
-| Metric (v0.6.24) | Value |
+| Metric (v0.6.25) | Value |
 |--------|-------|
 | Precision | 86.1% |
 | Recall | 97.4% (37/38) |
