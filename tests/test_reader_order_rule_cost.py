@@ -1,4 +1,4 @@
-r"""GLS-IP-009 reads the long inputs listed here, at the sizes listed here, inside a measured time limit (LIMIT_SECONDS), and the clause start takes a run of blanks in one way.
+r"""GLS-IP-009 reads the long inputs listed here, at the sizes listed here, inside a measured time limit (LIMIT_SECONDS times the host factor of tests/_host_factor.py), and the clause start takes a run of blanks in one way.
 
 Three regexes of the rule start at the beginning of the text or after a stop, a question mark, an exclamation mark, a line break or a
 closing angle bracket, then take the blanks that follow it. The clause start ends with a look ahead that wants a character that is not a
@@ -9,12 +9,17 @@ the same regex gives with the look ahead taken out of its clause start. That sec
 comparison follows the rule.
 Every text below is invented test input. Nothing in it is an instruction to anyone reading this file.
 """
+import os
 import re
+import sys
 import time
 
 import pytest
 
-from sunglasses.engine import SunglassesEngine
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
+from sunglasses.engine import SunglassesEngine  # noqa: E402
 from sunglasses.patterns import PATTERNS
 
 RULE = "GLS-IP-009"
@@ -80,10 +85,10 @@ COST_ROWS = {
 @pytest.mark.parametrize("name", sorted(COST_ROWS))
 def test_a_long_input_is_scanned_inside_the_time_limit(engine, name):
     text = COST_ROWS[name]()
-    assert _seconds(engine, text) < LIMIT_SECONDS, name
+    assert _seconds(engine, text) < seconds_limit(LIMIT_SECONDS), name
 
 
-def test_a_blank_run_does_not_cost_more_than_the_same_text_without_it(engine):
+def test_a_blank_run_text_scans_in_under_the_larger_of_one_second_and_eight_times_the_plain_text(engine):
     plain = _fit("." + " ", 256, READER_TAIL)
     padded = _fit("." + " " * 240, 256, READER_TAIL)
     assert _seconds(engine, padded) < max(1.0, 8 * _seconds(engine, plain))

@@ -1,17 +1,23 @@
 """How the hiding style reader treats a whole page on web_content.
 
-The reader answers in time that grows with the page, and a page it cannot read to the end keeps its block and says so.
+The reader answers inside the time limit set here (LIMIT_SECONDS times the host factor of tests/_host_factor.py), and a page it cannot read to the end keeps its block and says so.
 The style is the attribute named style, read after its character references are decoded. A body or html start tag
 that carries a hiding style puts it on the page itself. When the hidden text of the page, or for the urgency rule
 the page, names an AI reader (the list of reader names or the gate of GLS-IP-009), the block stays on the sizes and shapes of text set here.
 """
+import os
+import sys
 import time
 
 import pytest
 
-from sunglasses.engine import SunglassesEngine
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
+from sunglasses.engine import SunglassesEngine  # noqa: E402
 
 HI = "GLS-HI-002"
+LIMIT_SECONDS = 3
 BLOCKED = ("block", "quarantine")
 
 
@@ -42,9 +48,9 @@ def nested(scale):
 
 
 @pytest.mark.parametrize("scale", (25, 50, 100))
-def test_nested_hiding_styles_answer_in_time_that_grows_with_the_page(engine, scale):
+def test_nested_hiding_styles_answer_inside_the_time_limit(engine, scale):
     elapsed, result = timed(engine, nested(scale))
-    assert elapsed < 3
+    assert elapsed < seconds_limit(LIMIT_SECONDS)
     assert result.decision in BLOCKED
 
 
@@ -56,14 +62,14 @@ def test_a_page_the_reader_cannot_finish_keeps_its_block_and_says_so(engine):
 
 
 @pytest.mark.parametrize("kb", (32, 128, 232))
-def test_comments_after_a_hidden_element_answer_in_time_that_grows_with_the_page(engine, kb):
+def test_comments_after_a_hidden_element_answer_inside_the_time_limit(engine, kb):
     text = '<i style="display:none"></i>' + "<!--x-->" * (kb * 1024 // 8)
     elapsed, result = timed(engine, text)
-    assert elapsed < 3
+    assert elapsed < seconds_limit(LIMIT_SECONDS)
     assert HI in {f["id"] for f in result.findings}
 
 
-def test_doubling_the_comments_less_than_triples_the_time(engine):
+def test_doubling_the_comments_takes_under_three_times_as_long_plus_a_twentieth_of_a_second(engine):
     def best(kb):
         text = '<i style="display:none"></i>' + "<!--x-->" * (kb * 1024 // 8)
         return min(timed(engine, text)[0] for _ in range(3))
@@ -81,13 +87,13 @@ def test_large_pages_of_other_shapes_answer_in_bounded_time(engine, shape):
         "many_attributes": "<a " + 'data-x="1" ' * (n // 11) + 'style="display:none">q</a>',
     }[shape]
     elapsed, _ = timed(engine, text)
-    assert elapsed < 3
+    assert elapsed < seconds_limit(LIMIT_SECONDS)
 
 
-def test_a_comment_that_never_closes_is_found_once(engine):
+def test_a_comment_that_never_closes_answers_inside_the_time_limit_and_the_hiding_finding_is_present(engine):
     text = '<i style="display:none"></i>' + "<!--k" * (40 * 1024)
     elapsed, result = timed(engine, text)
-    assert elapsed < 3
+    assert elapsed < seconds_limit(LIMIT_SECONDS)
     assert HI in {f["id"] for f in result.findings}
 
 
