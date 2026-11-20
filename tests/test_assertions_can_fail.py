@@ -80,6 +80,15 @@ SANCTIONED_SUBSETS = [
 # embedded content rule that closes it is a separate card, so these channels are not this rule's job.
 # file name -> (channel set, test functions that must exist in that same file)
 FILE_SCOPED_SUBSETS = {
+    # GLS-IP-009 declares the four channels that carry content an agent reads. The person's own channels
+    # (message, prompt) are out of scope on purpose, so that a person's order to their own assistant is not
+    # touched. test_reader_directed_orders.py walks the four for the rule, asserts on its own that every
+    # other channel stays clear, and asserts that the rule declares exactly those four.
+    "test_reader_directed_orders.py": (
+        {"web_content", "file", "api_response", "tool_output"},
+        {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
+         "test_the_rule_declares_only_the_channels_that_carry_content_the_agent_reads"},
+    ),
     "test_sd010_export_prefix.py": (
         {"message", "file", "code"},
         {"test_a_channel_the_rule_does_not_list_stays_clear",
