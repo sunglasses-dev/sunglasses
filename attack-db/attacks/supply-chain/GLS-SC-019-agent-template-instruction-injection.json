@@ -10,7 +10,8 @@
   "description": "Detects Jinja/template injection via agent instructions that reach tool execution \u2014 SSTI to RCE (PraisonAI CVE-2026-39891).",
   "keywords": [],
   "regex": [
-    "(?is)\\b(?:agent\\.start|instructions?|prompts?|user\\s*input)\\b.{0,200}(?:\\b(?:templates?|jinja|render(?:s|ed|ing)?)\\b|\\{\\{.*\\}\\}).{0,200}\\b(?:acp_create_file|tools?|file\\s*creation|auto\\s*approve|approval_mode)\\b"
+    "(?is)\\b(?:agent\\.start|instructions?|prompts?|user\\s*input)\\b.{0,200}(?:\\b(?:templates?|jinja|render(?:s|ed|ing)?)\\b|\\{\\{(?=.{0,604}?\\b(?:acp_create_file|tools?|file\\s*creation|auto\\s*approve|approval_mode)\\b).{0,400}\\}\\}).{0,200}\\b(?:acp_create_file|tools?|file\\s*creation|auto\\s*approve|approval_mode)\\b",
+    "(?is)\\A(?:(?=((?:(?!\\b(?:agent\\.start|instructions?|prompts?|user\\s*input)\\b.{0,200}?\\{\\{).)*))\\1)(?=(\\b(?:agent\\.start|instructions?|prompts?|user\\s*input)\\b.{0,200}?\\{\\{))\\2.*\\}\\}.{0,200}\\b(?:acp_create_file|tools?|file\\s*creation|auto\\s*approve|approval_mode)\\b"
   ],
   "examples": {
     "malicious": [],
