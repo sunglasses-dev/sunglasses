@@ -1,4 +1,6 @@
-r"""GLS-IP-009 reads the long inputs listed here, at the sizes listed here, inside a measured time limit (LIMIT_SECONDS times the host factor of tests/_host_factor.py), and the clause start takes a run of blanks in one way.
+r"""GLS-IP-009 reads the long inputs listed here, at the sizes listed here, inside a measured time limit (a base limit times the host factor of tests/_host_factor.py), and the clause start takes a run of blanks in one way.
+
+The base limit is LIMIT_SECONDS for every row but one. The row of long clauses with no stop has a base limit of its own for each interpreter of the CI matrix (LONG_CLAUSES_BASE_SECONDS), because the time of that row follows the interpreter more than the host.
 
 Three regexes of the rule start at the beginning of the text or after a stop, a question mark, an exclamation mark, a line break or a
 closing angle bracket, then take the blanks that follow it. The clause start ends with a look ahead that wants a character that is not a
@@ -25,6 +27,11 @@ from sunglasses.patterns import PATTERNS
 RULE = "GLS-IP-009"
 CHANNEL = "web_content"
 LIMIT_SECONDS = 3.0
+LONG_CLAUSES = "long clauses with no stop"
+# Base limit of the long clauses row for each interpreter, seconds before the host factor. Each is 1.5 times the slowest time of the
+# row on that interpreter divided by the host factor of the same run (floor 1.0), rounded up to a quarter second. The numbers come from
+# 13 legs of one CI run and from runs on one machine with the six interpreters of the matrix.
+LONG_CLAUSES_BASE_SECONDS = {(3, 9): 3.75, (3, 10): 3.75, (3, 11): 3.25, (3, 12): 3.25, (3, 13): 3.25, (3, 14): 3.25}
 KB = 1024
 CLAUSE_START = r"(?:^|[.!?\n>][ \t]*(?![ \t]))"
 PLAIN_START = r"(?:^|[.!?\n>][ \t]*)"
@@ -78,14 +85,36 @@ COST_ROWS = {
     "clauses that carry send and pay words and never complete": lambda: _fit(
         "." + " " * 80 + "send " + "total " * 6 + "pay " * 40 + "z" * 30, 64, READER_TAIL
     ),
-    "long clauses with no stop": lambda: _fit("alpha beta gamma delta ", 256, READER_TAIL),
+    LONG_CLAUSES: lambda: _fit("alpha beta gamma delta ", 256, READER_TAIL),
 }
+
+
+def row_limit(name):
+    """The base limit of one row on this interpreter: its own table for the long clauses row, LIMIT_SECONDS for every other row."""
+    if name == LONG_CLAUSES:
+        return LONG_CLAUSES_BASE_SECONDS.get(sys.version_info[:2], max(LONG_CLAUSES_BASE_SECONDS.values()))
+    return LIMIT_SECONDS
 
 
 @pytest.mark.parametrize("name", sorted(COST_ROWS))
 def test_a_long_input_is_scanned_inside_the_time_limit(engine, name):
     text = COST_ROWS[name]()
-    assert _seconds(engine, text) < seconds_limit(LIMIT_SECONDS), name
+    assert _seconds(engine, text) < seconds_limit(row_limit(name)), name
+
+
+@pytest.mark.parametrize("version", [(3, 9), (3, 10), (3, 11), (3, 12), (3, 13), (3, 14)])
+def test_every_interpreter_of_the_matrix_has_a_base_limit_for_the_long_clauses_row_of_at_least_the_common_one(version):
+    assert LONG_CLAUSES_BASE_SECONDS[version] >= LIMIT_SECONDS
+
+
+def test_the_long_clauses_row_of_an_interpreter_outside_the_table_takes_the_largest_base_limit(monkeypatch):
+    monkeypatch.setattr(sys, "version_info", (3, 15, 0, "final", 0))
+    assert row_limit(LONG_CLAUSES) == max(LONG_CLAUSES_BASE_SECONDS.values())
+
+
+@pytest.mark.parametrize("name", sorted(set(COST_ROWS) - {LONG_CLAUSES}))
+def test_every_other_row_keeps_the_common_base_limit(name):
+    assert row_limit(name) == LIMIT_SECONDS
 
 
 def test_a_blank_run_text_scans_in_under_the_larger_of_one_second_and_eight_times_the_plain_text(engine):
