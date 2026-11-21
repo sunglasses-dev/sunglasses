@@ -5,6 +5,22 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.26] — 2026-11-21
+
+### Security
+
+- Scan time. In our measures on generated texts of growing length, four rules each read a text in time that grows in step with its length. On release 0.6.25 a text written for that purpose can hold a scan far longer than its length explains. Upgrade to this release.
+
+### Changed
+
+- The template instruction rule and the SQL file read rule can stop a text that release 0.6.25 records as a review finding or passes. The template instruction rule reports a template expression at full severity, also in a sentence that forbids the act.
+
+- The compound command rule can report a match that starts earlier in the text than it does on release 0.6.25. It reports at full severity, also in a sentence that forbids the act.
+
+### Known limits
+
+- Scan time. Other rules can read a text in time that grows faster than its length. Set your own time limit around a scan of text you do not trust.
+
 ## [0.6.25] — 2026-11-20
 
 ### Added

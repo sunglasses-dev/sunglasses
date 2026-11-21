@@ -40,4 +40,4 @@ except Exception:                       # a guard must never be the reason the p
     pass
 del _drop_implicit_first_path_entry
 
-__version__ = "0.6.25"
+__version__ = "0.6.26"
