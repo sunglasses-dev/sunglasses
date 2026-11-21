@@ -4,7 +4,6 @@
   "GLS-ALP-005": "2026-10-25 base-slow at 460b983, superlinear growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-APIP-004": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-APIP-007": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-AW-007": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-AW-010": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-AW-012": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-CAI-259": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
@@ -45,12 +44,10 @@
   "GLS-RMP-002": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-RP-278": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-RP-457": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-SC-019": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-SCHEMA-LEAK-215": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-SDH-001": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-SI-001": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-SPI-001": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-SQLFS-001": "2026-10-25 base-slow at 460b983, run cap after fast growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-SSRF-008": "2026-10-25 base-slow at 460b983, run cap after fast growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-TOP-637": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES"
 }

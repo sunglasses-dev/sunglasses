@@ -15,7 +15,7 @@
     "deny rule bypass"
   ],
   "regex": [
-    "(?i)(?:true\\s*&&\\s*){50,}.*(?:curl|wget|rm|scp|nc)"
+    "(?i)(?<![\\s&])(?:(?<!true)|(?!\\s*&&\\s*(?![\\s&])))(?=([\\s&]*))\\1(?=((?:true\\s*&&\\s*){50,}))\\2.*(?:curl|wget|rm|scp|nc)"
   ],
   "examples": {
     "malicious": [],
