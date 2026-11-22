@@ -23,6 +23,13 @@ is kept; a run of ADAPT_S or more is confirmed by a second run and the lower of 
 because noise only adds time. A run near RUN_CAP_S, or with too little budget left for a second run,
 is kept unconfirmed.
 
+A rule may declare a start key, `start_memo`, which makes the engine try one of its regexes only at the
+starts the rule names and not again on a line whose start already failed. The gate times such an entry
+the way the engine runs it (MemoSearch below, the same walk), not as a plain `re.search`, and only when
+the declaration is one the engine would use (the declared parts are in the entry's source and compile).
+A rule whose declaration differs between the merge-base and the head counts as changed, and every
+expression of it is timed, so dropping a declaration is judged on the plain search it leaves.
+
 The engine's lead-in, window and guard bounding is NOT modelled, so a flagged id can be one the
 engine already bounds; that is what tests/pattern_perf_waivers.json is for:
 {id: "YYYY-MM-DD reason"}. A waived id is still printed; a waiver suppresses growth, ratio and cap
@@ -203,8 +210,31 @@ def _within(seconds, what, fn):
             signal.signal(signal.SIGALRM, previous if previous is not None else signal.SIG_DFL)
 
 
-def _read_table(source, path, table):
-    """[(id, (regex, ...)), ...] of `table` in `source`, checked, then evaluated as the validated subset."""
+def declared_start(row, regexes):
+    """(entry, memo, plain) when `row` declares `start_memo` the way the engine uses it, else None.
+
+    The engine uses a declaration only when it is a dict, names an entry of the rule, and its parts are
+    in that entry's source; a part that does not compile is dropped later, at the time the entry is
+    compiled. This reads the same tests, so the gate times what the engine runs and nothing else."""
+    declared = row.get("start_memo")
+    if not isinstance(declared, dict):
+        return None
+    entry = declared.get("entry", 0)
+    if isinstance(entry, bool) or not isinstance(entry, int) or not 0 <= entry < len(regexes):
+        return None
+    memo, plain = declared.get("memo"), declared.get("plain")
+    if not (isinstance(memo, str) and memo) or not (plain is None or isinstance(plain, str)):
+        return None
+    source = regexes[entry]
+    if memo not in source or (plain is not None and plain not in source):
+        return None
+    return (entry, memo, plain or None)
+
+
+def _read_table(source, path, table, keys=None):
+    """[(id, (regex, ...)), ...] of `table` in `source`, checked, then evaluated as the validated subset.
+
+    When `keys` is a dict it is filled with {id: (entry, memo, plain)} for each rule that declares a start key."""
     try:
         tree = ast.parse(source, path)
     except (SyntaxError, ValueError) as e:
@@ -227,11 +257,17 @@ def _read_table(source, path, table):
                 and isinstance(rx, (list, tuple)) and all(isinstance(x, str) for x in rx)):
             raise GateError(f"the {table} table has an entry without a string id and a list of regex strings")
         out.append((r["id"], tuple(rx)))
+        if keys is not None:
+            declared = declared_start(r, tuple(rx))
+            if declared is not None:
+                keys[r["id"]] = declared
     return out
 
 
-def rules_from_sources(sources, budget=None):
+def rules_from_sources(sources, budget=None, keys=None):
     """{path: source text} -> {rule id: tuple of regex strings}.
+
+    `keys`, when a dict, is filled with the declared start keys of the rules (see declared_start).
 
     Every table must be present and non-empty, and an id may appear once across all tables: a table
     that is missing, empty or ambiguous cannot be compared, so the run fails closed. Reading takes
@@ -244,7 +280,7 @@ def rules_from_sources(sources, budget=None):
         if text is None:
             raise GateError(f"{path} is not readable")
         left = LOAD_CAP_S if budget is None else min(LOAD_CAP_S, budget.left())
-        rules = _within(left, f"the {table} table was read", lambda: _read_table(text, path, table))
+        rules = _within(left, f"the {table} table was read", lambda: _read_table(text, path, table) if keys is None else _read_table(text, path, table, keys))
         if not rules:
             raise GateError(f"the {table} table is empty")
         for rid, regexes in rules:
@@ -489,22 +525,83 @@ def median_time(rxs, text, repeats, budget=None):
     return statistics.median(runs)
 
 
+class MemoSearch:
+    """The search the engine runs for an entry that declares a start key (engine.py `_match_memo`).
+
+    The regex is attempted only at the places the declared start finder gives, and a start that fails
+    ends its gap line: a later start whose own end is on that line is not tried. A `plain` start is
+    always tried and never ends a line. The result is the match `search` would give for a rule that
+    declares the key rightly; the point here is the time it takes. `pattern` is the entry's source, so
+    a caller that reads `.pattern` of what it times sees the regex."""
+
+    def __init__(self, source, memo, plain=None):
+        self.pattern = source
+        self._rx = re.compile(source, re.IGNORECASE)
+        self._finder = re.compile(memo, re.IGNORECASE)
+        self._plain = re.compile(plain, re.IGNORECASE) if plain else None
+
+    def search(self, text):
+        dead, length = -1, len(text)
+        at_memo = at_plain = 0
+        next_memo = next_plain = None
+        while True:
+            if next_memo is None and at_memo is not None:
+                found = self._finder.search(text, at_memo)
+                while found is not None and found.end() <= dead:
+                    found = self._finder.search(text, found.start() + 1)
+                if found is None:
+                    at_memo = None
+                else:
+                    next_memo = found
+            if self._plain is not None and next_plain is None and at_plain is not None:
+                found = self._plain.search(text, at_plain)
+                if found is None:
+                    at_plain = None
+                else:
+                    next_plain = found
+            if next_memo is None and next_plain is None:
+                return None
+            use_memo = next_plain is None or (next_memo is not None and next_memo.start() <= next_plain.start())
+            chosen = next_memo if use_memo else next_plain
+            hit = self._rx.match(text, chosen.start())
+            if hit is not None:
+                return hit
+            if use_memo:
+                newline = text.find("\n", chosen.end())
+                dead = length if newline == -1 else newline
+                at_memo, next_memo = chosen.start() + 1, None
+            else:
+                at_plain, next_plain = chosen.start() + 1, None
+
+
+def entry_search(source, declared=None):
+    """What to time for one entry: a MemoSearch when `declared` is its start key and the parts compile,
+    else the plain compiled regex (a part that does not compile is dropped, as the engine drops it)."""
+    if declared is not None:
+        try:
+            return MemoSearch(source, declared[1], declared[2])
+        except re.error:
+            pass
+    return re.compile(source, re.IGNORECASE)
+
+
 def compile_all(sources):
     return [re.compile(s, re.IGNORECASE) for s in sources]
 
 
-def pick_units(regexes, keep, budget=None, capped=None):
+def pick_units(regexes, keep, budget=None, capped=None, declared=None):
     """The `keep` slowest units of the given regexes together, ranked by a pre-pass at PREPASS_SIZE.
 
     The gate calls this once per regex, so every expression of a rule is judged on the units that
     are slow for IT. The pre-pass stops when the budget is spent. A unit whose pre-pass run reached
     the run cap ranks first and is appended to `capped`, so the caller can fail it: the ranking alone
-    would lose the fact once later, smaller measurements finish.
+    would lose the fact once later, smaller measurements finish. `declared` is the start key of the
+    expression, when it has one the engine uses: the ranking times it the way the engine runs it.
     """
     ranked = []
     for src in regexes:
         try:
-            rx = re.compile(src, re.IGNORECASE)
+            rx = entry_search(src, declared)
         except re.error:
             continue
         for u in sampled_units([src]):
@@ -552,7 +649,7 @@ def judge(base, head, sizes, growth_floor=GROWTH_FLOOR_S, ratio_floor=RATIO_FLOO
 def gate(base_rules, head_rules, waivers_base, waivers_head, sizes=SIZES, added_sizes=ADDED_SIZES,
          repeats=REPEATS, wall_cap=WALL_CAP_S, only=None, clock=time.monotonic, started=None,
          growth_floor=GROWTH_FLOOR_S, ratio_floor=RATIO_FLOOR_S, probe_added_fully=False, budget=None,
-         removed_waivers=()):
+         removed_waivers=(), head_keys=None, base_keys=None):
     """Run the gate. Returns (rows, failures, notes); an empty failures list is a pass.
 
     One row per (regex, unit). Row ids are neutral labels `rN/uM`: regex N of the rule, unit M of
@@ -564,18 +661,27 @@ def gate(base_rules, head_rules, waivers_base, waivers_head, sizes=SIZES, added_
     failures = check_waivers(waivers_head, head_rules)
     waivers = waivers_base or {}
     changed, added = changed_ids(base_rules, head_rules)
+    head_keys, base_keys = head_keys or {}, base_keys or {}
+    # A rule whose declared start key differs is a changed rule: the engine runs its expressions another
+    # way. Every expression of it is timed (below), so a dropped declaration is judged on the plain
+    # search it leaves.
+    key_changed = {i for i in head_rules if head_rules[i] and i in base_rules and head_keys.get(i) != base_keys.get(i)}
+    changed = changed | key_changed
     # Every regex of a waived id that changed is timed, changed or not: "does not trip" is a
     # statement about the whole id, so it cannot rest on the changed expression alone. The same
     # holds for an id whose waiver the head removed: it is judged with no waiver, and an unchanged
     # expression of it that still trips must not be skipped, nor may an id the head left wholly
     # unchanged (it is queued here with every expression it still has).
     unwaived = {i for i in removed_waivers if head_rules.get(i)} - set(added)
-    retime_all = {i for i in changed if i in waivers} | unwaived
+    retime_all = {i for i in changed if i in waivers} | unwaived | key_changed
     todo = sorted(changed | unwaived)
     new = sorted(added)
     if only is not None:
         todo, new = [i for i in todo if i in only], [i for i in new if i in only]
     notes = [f"changed {len(changed)}, added {len(added)}; timing {len(todo)} + {len(new)} new"]
+    if head_keys or base_keys:
+        notes.append(f"start key declared: head {len(head_keys)}, merge-base {len(base_keys)}; "
+                     f"{len(key_changed)} rule(s) differ in it")
     rows = []
     budget = budget or Budget(wall_cap, clock, started)
     not_run = []
@@ -596,15 +702,17 @@ def gate(base_rules, head_rules, waivers_base, waivers_head, sizes=SIZES, added_
         keep = 1 if light else KEEP_UNITS
         tripped_any = False
         for k in which:
+            head_dec = head_keys.get(rid) if head_keys.get(rid, (None,))[0] == k else None
+            base_dec = base_keys.get(rid) if base_keys.get(rid, (None,))[0] == k else None
             try:
-                head_rx = compile_all([head_src[k]])
-                base_rx = (compile_all([base_src[k]]) if (not is_new and k < len(base_src)
-                                                          and base_src[k] != head_src[k]) else None)
+                head_rx = [entry_search(head_src[k], head_dec)]
+                base_rx = ([entry_search(base_src[k], base_dec)] if (not is_new and k < len(base_src)
+                                                                      and (base_src[k] != head_src[k] or base_dec != head_dec)) else None)
             except re.error as e:
                 failures.append(f"{rid} r{k}: does not compile ({e.msg})")
                 continue
             capped = []
-            units = pick_units([head_src[k]], keep, budget, capped)
+            units = pick_units([head_src[k]], keep, budget, capped, **({} if head_dec is None else {"declared": head_dec}))
             if capped:                      # a head run that reached the run cap is a verdict of its own
                 tripped_any = True
                 capped_verdict = "WAIVED" if rid in waivers else "FAIL"
@@ -715,11 +823,12 @@ def main(argv=None):
     try:
         if args.all:
             sources = {p: open(os.path.join(args.repo, p), encoding="utf-8").read() for p, _ in TABLES}
-            head_rules = rules_from_sources(sources, budget)
+            head_keys = {}
+            head_rules = rules_from_sources(sources, budget, keys=head_keys)
             wpath = os.path.join(args.repo, WAIVERS)
             waivers = read_waivers(open(wpath).read() if os.path.exists(wpath) else None)
             rows, failures, notes = gate({}, head_rules, waivers, waivers, wall_cap=args.wall_cap,
-                                         budget=budget, probe_added_fully=True)
+                                         budget=budget, probe_added_fully=True, head_keys=head_keys)
             print(report(rows, failures, notes, args.show_units))
             return 1 if failures else 0
         if not args.base and not args.head:
@@ -737,12 +846,14 @@ def main(argv=None):
         w_head = read_waivers(head_waiver_text)
         w_fork = read_waivers(base_waiver_text)
         w_tip = read_waivers(tip_waiver_text)
-        base_rules = rules_from_sources(base_src, budget)
-        head_rules = rules_from_sources(head_src, budget)
+        base_keys, head_keys = {}, {}
+        base_rules = rules_from_sources(base_src, budget, keys=base_keys)
+        head_rules = rules_from_sources(head_src, budget, keys=head_keys)
         waiver_problems = waiver_conflict(base_rules, head_rules, base_waiver_text, head_waiver_text)
         rows, failures, notes = gate(base_rules, head_rules, effective_waivers(w_tip, w_fork, w_head), w_head,
                                      wall_cap=args.wall_cap, budget=budget,
-                                     removed_waivers=removed_waiver_ids(w_fork, w_head))
+                                     removed_waivers=removed_waiver_ids(w_fork, w_head),
+                                     head_keys=head_keys, base_keys=base_keys)
         notes.append(f"compared with the merge-base {fork[:12]}")
         failures = waiver_problems + failures
     except (GateError, ValueError, OSError) as e:
