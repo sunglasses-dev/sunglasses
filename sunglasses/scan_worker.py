@@ -27,6 +27,7 @@ answer is a fault; a traceback is never shown to the reader.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
 import select
@@ -145,10 +146,11 @@ def _plain(result):
         "bytes_scanned": result.bytes_scanned, "extraction_complete": result.extraction_complete,
         "extraction_warnings": result.extraction_warnings,
         "extraction_sources": result.extraction_sources,
+        "time_limit_ended": result.time_limit_ended,
     }
 
 
-def _answer(engine, request):
+def _answer(engine, request, limit=None):
     try:
         op = request["op"]
         if op == "member":
@@ -157,7 +159,9 @@ def _answer(engine, request):
             target = request["path"]
         else:
             return {"ok": False, "error": "fault"}
-        return {"ok": True, "result": _plain(engine.scan_file(target))}
+        scope = engine.time_limit_scope(limit) if limit is not None else contextlib.nullcontext()
+        with scope:
+            return {"ok": True, "result": _plain(engine.scan_file(target))}
     except NonRegularFile as exc:
         return {"ok": False, "error": "unreadable", "cls": "NonRegularFile",
                 "message": str(exc), "path": str(exc.path), "kind": str(exc.kind)}
@@ -171,8 +175,12 @@ def _answer(engine, request):
         return {"ok": False, "error": "fault"}
 
 
-def serve(engine, stdin, stdout, *, ready=True):
-    """Answer requests until stdin closes. Returns the process exit code."""
+def serve(engine, stdin, stdout, *, ready=True, limit=None):
+    """Answer requests until stdin closes. Returns the process exit code.
+
+    `limit` is a `TimeLimit` (the rule limit only: the parent's file deadline is the outer belt)
+    or None. A child that cannot take the timer answers a fault for the file, never a verdict
+    from a scan that ran with no limit."""
     if ready:
         _put(stdout, {"ready": True})
     while True:
@@ -182,7 +190,7 @@ def serve(engine, stdin, stdout, *, ready=True):
             return 0
         except (ValueError, struct.error):
             return 1
-        reply = _answer(engine, request)
+        reply = _answer(engine, request, limit)
         try:
             _put(stdout, reply)
         except (TypeError, ValueError):
@@ -207,7 +215,16 @@ def main():
         except Exception:
             pass
         return 1
-    return serve(engine, sys.stdin.buffer, channel)
+    limit = None
+    # The parent's --rule-time-limit, as the one extra argument of the child's command line.
+    raw = sys.argv[1] if len(sys.argv) > 1 else None
+    if raw:
+        try:
+            from ._time_limit import TimeLimit
+            limit = TimeLimit(float(raw), None)
+        except (ValueError, TypeError):
+            limit = None
+    return serve(engine, sys.stdin.buffer, channel, limit=limit)
 
 
 # ----------------------------------------------------------------- parent
@@ -294,7 +311,7 @@ _PLAIN_TYPES = (
     ("event_id", str), ("decision", str), ("findings", list), ("raw_input", str),
     ("normalized_input", str), ("channel", str), ("latency_ms", (int, float)),
     ("truncated", bool), ("bytes_scanned", int), ("extraction_complete", bool),
-    ("extraction_warnings", list), ("extraction_sources", list),
+    ("extraction_warnings", list), ("extraction_sources", list), ("time_limit_ended", list),
 )
 
 
@@ -332,6 +349,8 @@ def _well_formed(plain):
             and all(_finding_well_formed(f) for f in plain["findings"])
             and all(isinstance(w, str) for w in plain["extraction_warnings"])
             and all(isinstance(label, str) for label in plain["extraction_sources"])
+            and all(isinstance(e, dict) and isinstance(e.get("rule_id"), str) and isinstance(e.get("reason"), str)
+                    for e in plain["time_limit_ended"])
             and plain["bytes_scanned"] >= 0)
 
 
@@ -345,6 +364,7 @@ def _rebuild(plain):
     result.extraction_complete = plain["extraction_complete"]
     result.extraction_warnings = plain["extraction_warnings"]
     result.extraction_sources = plain["extraction_sources"]
+    result.time_limit_ended = plain["time_limit_ended"]
     return result
 
 
@@ -361,8 +381,9 @@ class ScanWorker:
     """
 
     def __init__(self, deadline_s, *, argv=None, startup_s=None, grace_ms=GRACE_MS,
-                 answer_limit=ANSWER_LIMIT):
+                 answer_limit=ANSWER_LIMIT, rule_time_limit_s=None):
         self.deadline_s = float(deadline_s)
+        self.rule_time_limit_s = rule_time_limit_s
         self.argv = argv or default_argv()
         self.startup_s = STARTUP_S if startup_s is None else startup_s
         self.grace_ms = grace_ms
@@ -377,6 +398,12 @@ class ScanWorker:
 
     # -- lifecycle
 
+    def _child_argv(self):
+        """The child's command line; the rule time limit, when one is asked for, is its one argument."""
+        if self.rule_time_limit_s:
+            return [*self.argv, repr(float(self.rule_time_limit_s))]
+        return list(self.argv)
+
     def start(self):
         """Begin loading the engine now, so the load overlaps the caller's own work.
 
@@ -388,7 +415,7 @@ class ScanWorker:
             if self._child is None and not self._broken and not self._aborted:
                 try:
                     self._child = subprocess.Popen(
-                        self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        self._child_argv(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL, bufsize=0, start_new_session=True,
                         env=child_env.scan_child_env())
                 except (OSError, ValueError, subprocess.SubprocessError) as exc:

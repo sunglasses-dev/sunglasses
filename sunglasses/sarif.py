@@ -20,6 +20,7 @@ import json
 from typing import Iterable, Optional
 
 from . import __version__, taxonomy
+from ._time_limit import LIMIT_ID
 
 _SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
 _SARIF_VERSION = "2.1.0"
@@ -161,18 +162,27 @@ def _taxonomies(categories) -> list:
     return components
 
 
+# The one rule entry for the time-limit finding says what is true of both causes, a rule that ran out of
+# time and the whole scan that did: its `reason` field is a machine word and is never a sentence here.
+_TIME_LIMIT_SHORT = "A rule or the scan did not finish within its time limit"
+_TIME_LIMIT_FULL = ("A rule, or the scan as a whole, did not finish within its time limit. "
+                    "The input is not fully checked.")
+
+
 def _build_rule(finding: dict) -> dict:
     """Build a SARIF rule (reportingDescriptor) from a finding."""
     severity = finding.get("severity", "medium")
     tax = taxonomy.for_category(finding.get("category", "unknown"))
+    limit_end = finding["id"] == LIMIT_ID
     return {
         "id": finding["id"],
         "name": finding.get("name", finding["id"]),
         "shortDescription": {
-            "text": finding.get("name", finding["id"]),
+            "text": _TIME_LIMIT_SHORT if limit_end else finding.get("name", finding["id"]),
         },
         "fullDescription": {
-            "text": finding.get("reason") or finding.get("description") or finding.get("name", finding["id"]),
+            "text": _TIME_LIMIT_FULL if limit_end else (
+                finding.get("reason") or finding.get("description") or finding.get("name", finding["id"])),
         },
         "helpUri": _help_uri(finding),
         "properties": {
@@ -197,14 +207,19 @@ def _build_result(finding: dict, artifact_uri: str, artifact_index: int) -> dict
     """Build a SARIF result from a single finding."""
     severity = finding.get("severity", "medium")
     matched = finding.get("matched_text", "")
+    if finding["id"] == LIMIT_ID:
+        # the sentence that names the rule or the scan, never the machine word in `reason`
+        message = finding.get("description") or finding.get("name", finding["id"])
+    else:
+        message = (finding.get("reason")
+                   or finding.get("description")
+                   or f"{finding.get('name', finding['id'])} detected"
+                   + (f": \"{matched}\"" if matched else ""))
     return {
         "ruleId": finding["id"],
         "level": _SEVERITY_TO_LEVEL.get(severity, "warning"),
         "message": {
-            "text": finding.get("reason")
-            or finding.get("description")
-            or f"{finding.get('name', finding['id'])} detected"
-            + (f": \"{matched}\"" if matched else ""),
+            "text": message,
         },
         "locations": [
             {

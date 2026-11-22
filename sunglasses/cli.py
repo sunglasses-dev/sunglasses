@@ -28,6 +28,7 @@ import time
 
 from . import __version__
 from . import baseline as _baseline
+from . import _time_limit
 from . import child_env
 from .engine import SunglassesEngine
 from .extractors import archive_listing
@@ -119,7 +120,10 @@ def print_result(result, verbose=False):
         folded_total = sum(len(f.get("also_matched") or []) for f in reported)
         extra = (f" {DIM}({folded_total} overlapping pattern(s) folded){RESET}"
                  if folded_total else "")
-        print(f"  {BOLD}{len(reported)} threat(s) found:{RESET}{extra}\n")
+        _shown = _time_limit.threats_only(reported)
+        _unfinished = _time_limit.ended_counts(list(getattr(result, "time_limit_ended", None) or []))
+        _tail = f", {_unfinished}" if _unfinished else ""
+        print(f"  {BOLD}{len(_shown)} threat(s) found{_tail}:{RESET}{extra}\n")
 
         for i, f in enumerate(reported, 1):
             fc = severity_colors.get(f["severity"], YELLOW)
@@ -635,6 +639,20 @@ def _check_file_deadline(args):
     return float(value)
 
 
+def _check_rule_time_limit(args):
+    """`--rule-time-limit` is a number of CPU seconds, 0 or more; refuse before scanning.
+
+    Returns the limit in seconds, 0 meaning off. Not given means the default."""
+    value = getattr(args, "rule_time_limit", None)
+    if value is None:
+        return _time_limit.DEFAULT_RULE_S
+    if not (value >= 0 and value != float("inf")):
+        _usage_error(args, f"--rule-time-limit must be a number of seconds, 0 or more, got {value:g}.",
+                     "Nothing was scanned. Use 0 to switch the limit off, or leave "
+                     "--rule-time-limit out for the default.")
+    return float(value)
+
+
 DEFAULT_JOBS = 1
 MAX_JOBS = 64
 
@@ -708,9 +726,27 @@ def _file_scanner(args, engine, tree=False):
     # No child exists yet: the worker starts it on first use, or the caller starts it with
     # `_begin` once it is inside the block that closes the worker. Nothing is spawned in the
     # gap between this return and that block, so a signal there leaves nothing running.
+    rule_s = getattr(args, "_rule_s", 0.0) or None
+    degraded = False
+    if rule_s:
+        # The child starts with the signal state this process has (a blocked or ignored timer signal reaches it
+        # as it is), so the question is asked here, before the limit is handed over: a host that cannot give the
+        # limit gets the scan without it and the line that says so, as it does on the text door.
+        reason = _time_limit.unavailable_reason()
+        if reason is not None:
+            degraded = True
+            rule_s = None
+            if hasattr(engine, "_degrade"):
+                engine._degrade(reason)
+    if hasattr(engine, "mode_line") and not degraded:
+        engine.mode_line = f"time limit: {rule_s:g} CPU seconds for each rule" if rule_s else "time limit: off"
     if jobs > 1:
-        return _ScanPool(seconds, jobs)
-    return scan_worker.ScanWorker(seconds)
+        pool = _ScanPool(seconds, jobs)
+        pool.rule_time_limit_s = rule_s
+        return pool
+    worker = scan_worker.ScanWorker(seconds)
+    worker.rule_time_limit_s = rule_s
+    return worker
 
 
 def _begin(scanner, engine):
@@ -788,6 +824,7 @@ class _ScanPool:
 
     def __init__(self, deadline_s, jobs):
         self.deadline_s = deadline_s
+        self.rule_time_limit_s = None        # set by the caller that was given --rule-time-limit
         self.jobs = jobs
         self.limit = 2 * jobs
         self._queue = queue.Queue()
@@ -806,6 +843,7 @@ class _ScanPool:
     def _spawn(self):
         from . import scan_worker
         worker = scan_worker.ScanWorker(self.deadline_s)
+        worker.rule_time_limit_s = self.rule_time_limit_s
         self._workers.append(worker)
         worker.start()
         thread = threading.Thread(target=self._run, args=(worker,), daemon=True)
@@ -1071,6 +1109,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     files_with_threats = 0
     files_incomplete = 0
     partially_read = []          # (path, reason) for members read only in part
+    time_limit_list = []         # (path, reason) for files where a rule reached its time limit
+    printed_threat_files = 0     # the printed counts leave out a time-limit finding; the JSON fields keep it
+    printed_threats = 0
     total_threats = 0
     all_findings = []
     # sha256 of the bytes each file was judged on, only when --fail-on / --baseline are in use.
@@ -1121,6 +1162,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     def settle():
         """Wait for the oldest file handed out, then count it."""
         nonlocal files_scanned, files_with_threats, files_incomplete, total_threats
+        nonlocal printed_threat_files, printed_threats
         rel_path, task = pending.popleft()
         # Repo files go through the SAME extraction path as `--file`. Reading them
         # as raw text here meant a real compressed PDF named `.txt` was scanned as
@@ -1162,17 +1204,24 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             # (which `not is_clean` now would) inflates "files with threats" with
             # zero findings behind it — but it must not leave the scan looking
             # complete either.
-            files_incomplete += 1
-            # As a COUNT and nothing else, the
-            # report said "Files not fully read: 1" and never which file or why —
-            # while the walker's own skips were listed by name right beside it.
-            # A count is not a name: a reader cannot act on "one of these is
-            # partly unread". The reasons already exist on the result; nothing
-            # was collecting them.
-            reason = "; ".join(scan_result.extraction_warnings) or (
-                "truncated at the scan cap" if scan_result.truncated
-                else "part of this file was not read")
-            partially_read.append((rel_path, reason))
+            _unread, _ended = _time_limit.coverage_causes(scan_result)
+            _own = {_time_limit.time_limit_warning(e) for e in _ended}
+            if _ended:
+                # A rule that reached its time limit is its own count and its own line: the
+                # "Files not fully read" counts only files with a part not read.
+                time_limit_list.append((rel_path, "; ".join(_time_limit.time_limit_warning(e) for e in _ended)))
+            if _unread or not _ended:
+                files_incomplete += 1
+                # As a COUNT and nothing else, the
+                # report said "Files not fully read: 1" and never which file or why —
+                # while the walker's own skips were listed by name right beside it.
+                # A count is not a name: a reader cannot act on "one of these is
+                # partly unread". The reasons already exist on the result; nothing
+                # was collecting them.
+                reason = "; ".join(w for w in scan_result.extraction_warnings if w not in _own) or (
+                    "truncated at the scan cap" if scan_result.truncated
+                    else "part of this file was not read")
+                partially_read.append((rel_path, reason))
 
         if scan_result.threat_found:
             files_with_threats += 1
@@ -1183,6 +1232,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             # release exists to remove, in the counters rather than the verdict.
             reported = scan_result.reported_findings()
             total_threats += len(reported)
+            _real = _time_limit.threats_only(reported)
+            printed_threats += len(_real)
+            printed_threat_files += 1 if _real else 0
 
             for finding in reported:
                 cat = finding.get("category", "unknown")
@@ -1338,6 +1390,10 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     # JSON could previously see the COUNT of partly-read members and never learn
     # which they were.
     summary["partially_read"] = [{"file": f, "reason": r} for f, r in partially_read]
+    # Files where a rule reached its time limit: their own count and list, beside the keys
+    # above, which count what their names say.
+    summary["time_limit_files"] = len(time_limit_list)
+    summary["time_limit_list"] = [{"file": f, "reason": r} for f, r in time_limit_list]
     # Zero files inspected can never be CLEAN: an empty or wholly-skipped clone
     # is not a repo we cleared.
     nothing_inspected = files_scanned == 0
@@ -1358,7 +1414,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     n_dependency = len(_named) - n_tool_cache
     summary["excluded_dependency_folders"] = n_dependency
     summary["excluded_tool_cache_folders"] = n_tool_cache
-    incomplete = bool(files_incomplete or unread_skips or folder_gaps or nothing_inspected)
+    incomplete = bool(files_incomplete or time_limit_list or unread_skips or folder_gaps or nothing_inspected)
     repo_exit = (EXIT_THREAT if total_threats else
                  EXIT_INCOMPLETE if incomplete else EXIT_CLEAN)
     policy = None
@@ -1405,7 +1461,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             "extraction_complete": not incomplete,
             "warnings": ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in folder_gaps]
-                         + [f"{path}: {reason}" for path, reason in partially_read]),
+                         + [f"{path}: {reason}" for path, reason in partially_read]
+                         + [f"{path}: {reason}" for path, reason in time_limit_list]),
             "findings": summary.get("findings") or [],
             # The findings live per file, so the normalizer sees an empty list and would
             # answer "none" beside a block. Hand it the worst severity this scan counted.
@@ -1435,7 +1492,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                                             "justification": "listed in the baseline"}]
         not_inspected = ([f"{path}: {reason}" for path, reason in unread_skips]
                          + [f"{path}: {reason}" for path, reason in folder_gaps]
-                         + [f"{path}: {reason}" for path, reason in partially_read])
+                         + [f"{path}: {reason}" for path, reason in partially_read]
+                         + [f"{path}: {reason}" for path, reason in time_limit_list])
         not_inspected += [
             f"{r.source}: not fully inspected"
             for r in repo_results if not getattr(r, "inspection_complete", True)
@@ -1466,20 +1524,30 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
     print(f"  {DIM}{'─' * 50}{RESET}")
     print(f"  {'Repo' if kind == 'repo' else 'Directory'}:{' ' * (13 if kind == 'repo' else 8)}{CYAN}{_printable(repo_name)}{RESET} ({_printable(repo_url)})")
     print(f"  Files scanned:   {BOLD}{files_scanned}{RESET}")
-    print(f"  Files w/ threats: {BOLD}{files_with_threats}{RESET}")
-    if files_incomplete or unread_skips or folder_gaps:
+    print(f"  Files w/ threats: {BOLD}{printed_threat_files}{RESET}")
+    if files_incomplete or time_limit_list or unread_skips or folder_gaps:
         # The banner introduces the list, so it is printed before it: a header
         # that promises a list of what went unread has to arrive before the list,
         # not after the named skips (the `banner_without_named_scope` assertion
         # holds this).
-        _print_coverage_banner("part of this repo was not read" if kind == "repo"
-                               else "part of this directory was not read")
+        _causes = [_time_limit.coverage_causes(r) for r in repo_results if not r.inspection_complete]
+        _print_coverage_banner(_time_limit.incomplete_detail(
+            "part of this repo was not read" if kind == "repo" else "part of this directory was not read",
+            bool(unread_skips or folder_gaps or any(u for u, _ in _causes)),
+            [e for _, ended in _causes for e in ended]))
+        _print_time_limit_hint([e for _, ended in _causes for e in ended])
     if files_incomplete:
         print(f"  {YELLOW}Files not fully read: {BOLD}{files_incomplete}{RESET}")
         for name, reason in partially_read[:10]:
             print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
         if len(partially_read) > 10:
             print(f"    {DIM}... and {len(partially_read) - 10} more{RESET}")
+    if time_limit_list:
+        print(f"  {YELLOW}Files with a rule that did not finish within its time limit: {BOLD}{len(time_limit_list)}{RESET}")
+        for name, reason in time_limit_list[:10]:
+            print(f"    {YELLOW}!{RESET} {DIM}{_printable(name)}: {_printable(reason)}{RESET}")
+        if len(time_limit_list) > 10:
+            print(f"    {DIM}... and {len(time_limit_list) - 10} more{RESET}")
     if folder_gaps:
         print(f"  {YELLOW}Folders NOT inspected (output/cache holding files): {BOLD}{len(folder_gaps)}{RESET}")
         for name, _reason in folder_gaps[:10]:
@@ -1502,7 +1570,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
           f"{BOLD}{len(folder_gaps)}{RESET} folders  "
           f"{DIM}(+ {n_dependency} dependency/VCS, {n_tool_cache} tool-cache folders named, "
           f"not entered){RESET}")
-    print(f"  Total threats:   {BOLD}{total_threats}{RESET}")
+    print(f"  Total threats:   {BOLD}{printed_threats}{RESET}")
     print(f"  Decision:        {BOLD}{str(summary['decision']).upper()}{RESET}")
     if policy:
         print(f"  Known (baseline): {BOLD}{policy['known_count']}{RESET}   "
@@ -1562,7 +1630,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             print(f"  {DIM}No files were inspected at all, so this is not a "
                   f"result about the repo's contents.{RESET}\n")
         else:
-            print(f"  {DIM}{files_incomplete + len(walker_skips)} file(s) were not "
+            print(f"  {DIM}{files_incomplete + len(time_limit_list) + len(walker_skips)} file(s) were not "
                   f"read in full, so this is not a clean bill of health for the "
                   f"repo.{RESET}\n")
     else:
@@ -1830,6 +1898,13 @@ def _print_coverage_banner(detail, stream=None):
     print(f"\n  {YELLOW}{BOLD}INCOMPLETE SCAN{RESET} {DIM}— {detail}{RESET}", file=out)
 
 
+def _print_time_limit_hint(ended, stream=None):
+    """One line under the banner, only when a rule reached its limit: the option that changes it.
+    A scan-wide end is not changed by this option, so it gets no line."""
+    if _time_limit.rule_limit_ended(ended):
+        print(f"  {DIM}To give each rule more time: --rule-time-limit SECONDS{RESET}", file=stream or sys.stdout)
+
+
 def _print_extraction_warnings(result, stream=None):
     """Announce anything we could not read. Never let it be inferred from silence."""
     warnings = list(getattr(result, "extraction_warnings", None) or [])
@@ -1850,7 +1925,9 @@ def _print_extraction_warnings(result, stream=None):
     if not warnings:
         return
     out = stream or sys.stdout
-    _print_coverage_banner("part of this file was not read", stream=out)
+    unread, ended = _time_limit.coverage_causes(result)
+    _print_coverage_banner(_time_limit.incomplete_detail("part of this file was not read", unread, ended), stream=out)
+    _print_time_limit_hint(ended, stream=out)
     for w in warnings:
         print(f"  {YELLOW}!{RESET} {w}", file=out)
     if result.is_clean:
@@ -1899,9 +1976,14 @@ def _print_report_line(result):
 
     A block can be a wrong block, so it points at the public form. A pass or an incomplete
     result can hide a miss, so it points at the private report, because a text that got past
-    the scan should not be posted in public.
+    the scan should not be posted in public. A result with a time-limit finding (a rule that did
+    not finish, or the whole scan) is a text that must not be posted in public either: the line
+    that would ask for the public form is not printed, and the private route stands in its place.
     """
-    if result.threat_found:
+    if getattr(result, "time_limit_ended", None) or any(
+            f.get("id") == _time_limit.LIMIT_ID for f in (getattr(result, "findings", None) or [])):
+        print(f"  {DIM}A rule did not finish on text you trust? Report it in private at {_REPORT_PRIVATE_URL}{RESET}\n")
+    elif result.threat_found:
         print(f"  {DIM}Blocked something harmless? Report it at {_REPORT_WRONG_BLOCK_URL}{RESET}\n")
     else:
         print(f"  {DIM}Got past the scan? Report it in private at {_REPORT_PRIVATE_URL}{RESET}\n")
@@ -1946,6 +2028,9 @@ def _emit_scan_result(args, result, source):
     # the same scan.
     print(f"\n  {BOLD}SUNGLASSES v{__version__}{RESET} — scanning {source} ({result.channel} channel)")
     print(f"  {DIM}{'─' * 50}{RESET}")
+    mode_line = getattr(getattr(args, "_engine_holder", None), "mode_line", "")
+    if mode_line:
+        print(f"  {DIM}{mode_line}{RESET}")
     print_result(result, verbose=args.verbose)
     _print_single_policy(args, result)
     _print_extraction_warnings(result)
@@ -1975,6 +2060,31 @@ class _LazyEngine:
 
     def __init__(self):
         self._built = None
+        self.rule_s = 0.0                 # CPU seconds one rule may use in one scan; 0 = no limit
+        self.scan_s = None                   # CPU seconds for one text scan; None = no limit
+        self.mode_line = ""                  # what the limit did, for the one line the human output prints
+        self._off_said = False
+
+    def _budget(self, with_scan_limit):
+        if not self.rule_s:
+            self.mode_line = "time limit: off"
+            return None
+        reason = _time_limit.unavailable_reason()
+        if reason is not None:
+            return self._degrade(reason)
+        scan_s = self.scan_s if with_scan_limit else None
+        self.mode_line = (f"time limit: {self.rule_s:g} CPU seconds for each rule"
+                          + (f", {scan_s:g} CPU seconds for the scan" if scan_s else ""))
+        return _time_limit.TimeLimit(self.rule_s, scan_s)
+
+    def _degrade(self, reason):
+        """The scan runs with no limit and says so: this entry point may degrade with a say."""
+        self.mode_line = f"time limit: off ({reason})"
+        if not self._off_said:
+            self._off_said = True
+            print(f"  note: the rule time limit is off for this scan ({reason}); "
+                  "a rule that never finishes is not stopped.", file=sys.stderr)
+        return None
 
     def _engine(self):
         if self._built is None:
@@ -1985,10 +2095,27 @@ class _LazyEngine:
         return self._built
 
     def scan(self, text, channel="message"):
-        return self._engine().scan(text, channel=channel)
+        engine = self._engine()
+        budget = self._budget(True)
+        if budget is None:
+            return engine.scan(text, channel=channel)
+        try:
+            return engine.scan(text, channel=channel, time_limit=budget)
+        except _time_limit.TimeLimitUnavailable as exc:
+            self._degrade(str(exc))
+            return engine.scan(text, channel=channel)
 
     def scan_file(self, filepath):
-        return self._engine().scan_file(filepath)
+        engine = self._engine()
+        budget = self._budget(False)      # a file: the rule limit only, the file deadline is its outer belt
+        if budget is None:
+            return engine.scan_file(filepath)
+        try:
+            with engine.time_limit_scope(budget):
+                return engine.scan_file(filepath)
+        except _time_limit.TimeLimitUnavailable as exc:
+            self._degrade(str(exc))
+            return engine.scan_file(filepath)
 
 
 def cmd_scan(args):
@@ -2056,7 +2183,13 @@ def _deliver_report(args, token):
 
 
 def _run_scan(args):
+    # The limit is checked first: a bad value is a usage error before anything is read or cloned.
+    rule_s = _check_rule_time_limit(args)
+    args._rule_s = rule_s
     engine = _LazyEngine()
+    # Plain attributes, so the constructor takes no new argument (a test may stand another class in).
+    engine.rule_s, engine.scan_s = rule_s, _time_limit.DEFAULT_SCAN_S
+    args._engine_holder = engine
 
     # `-o json` is documented as an output format and was silently printing human
     # text (audit case `output_json_alias`): the flag parsed, the format did not
@@ -3959,6 +4092,12 @@ def main():
                                   "in SECONDS is reported as not fully read (exit 3) and the scan "
                                   "moves on, never called clean. 0 = no deadline "
                                   "(default: 120). Refused with --deep on an audio or video file")
+    scan_parser.add_argument("--rule-time-limit", dest="rule_time_limit", type=float, metavar="SECONDS",
+                             help="A time limit in CPU seconds for each rule in one scan. A rule that "
+                                  "reaches it ends with the finding 'Rule did not finish within its "
+                                  "time limit', at that rule's own severity, and the scan answers as "
+                                  "not finished; the other rules still run. 0 = no limit (default: "
+                                  "60). With --file, --dir or --repo it applies to each file")
     scan_parser.add_argument("--jobs", dest="jobs", metavar="N",
                              help="With --dir or --repo: read up to N files at once, 1 to 64 "
                                   "(default: 1, one file at a time). If the tree is unchanged and every "

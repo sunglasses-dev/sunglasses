@@ -24,6 +24,7 @@ if _pkg_dir not in sys.path:
     sys.path.append(_pkg_dir)   # at the END: the package is already imported, and this must never go ahead of the standard library
 
 from sunglasses import __version__
+from sunglasses import _time_limit
 from sunglasses.engine import SunglassesEngine
 from sunglasses.scanner import SunglassesScanner
 from sunglasses.extractors.dispatch import UnreadableFile
@@ -209,6 +210,35 @@ def _engine():
     return _ENGINE
 
 
+def _coverage_detail(result):
+    """The cause of an incomplete scan, in the same words the command line uses."""
+    unread, ended = _time_limit.coverage_causes(result)
+    return _time_limit.incomplete_detail("part of the input was not read", unread, ended)
+
+
+def _time_limit_lines(result):
+    """One warning line per rule (or scan) that ended at its time limit: the command line's own text."""
+    return "".join(f"\n  ! {_time_limit.time_limit_warning(e)}"
+                   for e in (getattr(result, "time_limit_ended", None) or []))
+
+
+def _call_time_limit():
+    """The time limit a tool call scans under, and why there is none.
+
+    Returns (TimeLimit, None), or (None, reason) when this process cannot own the CPU timer (the
+    server's handlers run on its main thread, so that is a platform or host-program answer). The
+    server may scan with no limit but must say so: the note is the first line of the tool's text."""
+    reason = _time_limit.unavailable_reason()
+    if reason is not None:
+        return None, reason
+    return _time_limit.TimeLimit(_time_limit.DEFAULT_RULE_S, _time_limit.DEFAULT_SCAN_S), None
+
+
+def _off_note(why):
+    return (f"Note: the rule time limit is off for this scan ({why}); "
+            f"a rule that never finishes is not stopped.\n\n") if why else ""
+
+
 def _tool_scan_text(arguments):
     """Execute scan_text tool."""
     channel = arguments.get("channel", "message")
@@ -233,8 +263,14 @@ def _tool_scan_text(arguments):
         }
 
     engine = _engine()
+    budget, why = _call_time_limit()
     try:
-        result = engine.scan(text, channel=channel)
+        try:
+            result = (engine.scan(text, channel=channel, time_limit=budget) if budget is not None
+                      else engine.scan(text, channel=channel))
+        except _time_limit.TimeLimitUnavailable as exc:
+            why = str(exc)
+            result = engine.scan(text, channel=channel)
     except ValueError as e:
         # Unknown channel fails CLOSED: an explicit error, never a clean PASS.
         return {
@@ -256,12 +292,14 @@ def _tool_scan_text(arguments):
                 summary = f"PASS — No threats detected ({result.latency_ms}ms)"
         else:
             summary = (f"INCOMPLETE SCAN — no findings in the inspected scope "
-                       f"({result.latency_ms}ms); part of the input was not read. "
+                       f"({result.latency_ms}ms); {_coverage_detail(result)}. "
                        f"This is NOT a clean result.")
     else:
+        _unfinished = _time_limit.ended_counts(list(getattr(result, "time_limit_ended", None) or []))
         summary = (
-            f"{result.decision.upper()} — {len(result.findings)} threat(s) found, "
-            f"severity: {result.severity} ({result.latency_ms}ms)"
+            f"{result.decision.upper()} — {len(_time_limit.threats_only(result.findings))} threat(s) found"
+            + (f", {_unfinished}" if _unfinished else "")
+            + f", severity: {result.severity} ({result.latency_ms}ms)"
         )
         for i, f in enumerate(result.findings, 1):
             summary += f"\n  {i}. [{f['severity'].upper()}] {f['name']}"
@@ -272,14 +310,19 @@ def _tool_scan_text(arguments):
             # the FIRST LINE. This surface announced only "BLOCK — 5 threats" on
             # a truncated input, so the part that was never read vanished behind
             # the part that was. Same defect the CLI human threat screen had.
-            summary = ("INCOMPLETE SCAN — part of the input was not read, AND "
-                       "threats were found in the part that was.\n" + summary)
+            if not _time_limit.threats_only(result.findings):
+                summary = f"INCOMPLETE SCAN — {_coverage_detail(result)}.\n" + summary
+            else:
+                summary = (f"INCOMPLETE SCAN — {_coverage_detail(result)}, AND threats were found "
+                           + ("in what was checked" if getattr(result, "time_limit_ended", None)
+                              else "in the part that was") + ".\n" + summary)
 
     # Both branches now open with the same "INCOMPLETE SCAN" prefix that
     # `scan_file` uses. An agent keying on the first line should not have to
     # learn two vocabularies for one fact.
 
-    output = f"{summary}\n\n{json.dumps(result_dict, indent=2)}"
+    summary += _time_limit_lines(result)
+    output = f"{_off_note(why)}{summary}\n\n{json.dumps(result_dict, indent=2)}"
 
     return {
         "content": [{"type": "text", "text": output}],
@@ -305,8 +348,14 @@ def _tool_scan_file(arguments):
         }
 
     scanner = SunglassesScanner()
+    budget, why = _call_time_limit()
     try:
-        result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+        try:
+            with scanner.engine.time_limit_scope(budget):
+                result = scanner.scan_auto(file_path, allow_deep=allow_deep)
+        except _time_limit.TimeLimitUnavailable as exc:
+            why = str(exc)
+            result = scanner.scan_auto(file_path, allow_deep=allow_deep)
     except UnreadableFile as exc:
         # An operational failure must surface as an error, not as a scan result.
         # Returning a "0 threats" document here would be the same lie the
@@ -340,13 +389,23 @@ def _tool_scan_file(arguments):
     # is the caller we are actually protecting.
     if isinstance(result, dict) and result.get("inspection_complete") is False:
         warnings = result.get("warnings") or []
-        reason = warnings[0] if warnings else "content was not fully inspected"
-        notice = (f"INCOMPLETE SCAN — {reason} This is NOT a clean result; "
-                  f"do not treat {file_path} as inspected.\n\n")
+        ended = list(result.get("time_limit_ended") or [])
+        if ended:
+            own = {_time_limit.time_limit_warning(e) for e in ended}
+            others = [w for w in warnings if w not in own]
+            reason = _time_limit.incomplete_detail(others[0] if others else "content was not fully inspected",
+                                                    bool(others), ended)
+            notice = (f"INCOMPLETE SCAN — {reason}. This is NOT a clean result; "
+                      f"do not treat {file_path} as inspected.\n"
+                      + "".join(f"  ! {_time_limit.time_limit_warning(e)}\n" for e in ended) + "\n")
+        else:
+            reason = warnings[0] if warnings else "content was not fully inspected"
+            notice = (f"INCOMPLETE SCAN — {reason} This is NOT a clean result; "
+                      f"do not treat {file_path} as inspected.\n\n")
     else:
         notice = ""
 
-    output = notice + json.dumps(result, indent=2, default=str)
+    output = _off_note(why) + notice + json.dumps(result, indent=2, default=str)
     return {
         "content": [{"type": "text", "text": output}],
         "isError": False,
