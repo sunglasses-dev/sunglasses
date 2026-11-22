@@ -30,7 +30,7 @@
     "f['\\\"]UPDATE\\s",
     "f['\\\"]DELETE\\s",
     "(?:execute|cursor\\.execute)\\s*\\(\\s*f['\\\"]",
-    "\\.format\\s*\\(.*\\)\\s*#.*(?:sql|query|select|where)"
+    "\\.format\\s*\\((?:(?=(.*\\)))\\1\\s*#.*(?:sql|query|select|where)|(?=(.*?\\)[^\\S\\n]*#))\\2.*(?:sql|query|select|where))"
   ],
   "examples": {
     "malicious": [],

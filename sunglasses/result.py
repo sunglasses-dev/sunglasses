@@ -349,7 +349,9 @@ def aggregate(children, *, source: Optional[str] = None,
     threat_found = False
     scanned_bytes = 0
 
+    kept = []
     for label, text, result in children:
+        kept.append((label, text, result))
         # Sum what the engine READ: a source longer than the engine's cap would
         # otherwise be published as though all of it had been inspected -- a number
         # about what we handed the engine, printed as a statement about what the
@@ -390,6 +392,11 @@ def aggregate(children, *, source: Optional[str] = None,
     merged_extra["results"] = per_source
     # Kept for callers that predate the canonical name.
     merged_extra["threats"] = list(findings)
+    # The rules that reached their time limit in ANY child. `normalize()` copies none of an engine result's
+    # extra fields, so the fold has to name them: a document that says "not inspected" for this reason must
+    # also say which rules.
+    from . import _time_limit
+    merged_extra.update(_time_limit.ended_extra(merged_extra, *[result for _label, _text, result in kept]))
 
     return normalize(
         {

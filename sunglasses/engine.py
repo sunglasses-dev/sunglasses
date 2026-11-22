@@ -13,6 +13,7 @@ Usage:
 import bisect
 import codecs
 import collections
+import contextlib
 import copy
 import functools
 import html
@@ -24,6 +25,8 @@ import types
 import unicodedata
 
 from . import _prefilter
+from . import _time_limit
+from ._time_limit import TimeLimit, TimeLimitUnavailable  # noqa: F401  (the library's opt-in time limit)
 from ._rule_gates import GATES as _RULE_GATES
 from . import _reader_forms as _READER_FORMS
 import time
@@ -102,6 +105,9 @@ class ScanResult:
         self.extraction_complete = True
         self.extraction_warnings = []
         self.extraction_sources = []
+        # Set only by a scan that ran under a time limit and had a rule or the scan end at it: one
+        # {rule_id, reason, limit_s} per end. Empty, and absent from to_dict(), on every other scan.
+        self.time_limit_ended = []
 
     @property
     def threat_found(self) -> bool:
@@ -169,6 +175,10 @@ class ScanResult:
         groups, order = {}, []
         for finding in self.findings:
             span = finding.get("matched_text", "")
+            if finding.get("id") == "GLS-TIME-LIMIT":
+                # An unfinished rule has no span: each one stands alone, so none is folded into
+                # another and the rule it names stays visible.
+                span = ("GLS-TIME-LIMIT", finding.get("rule_id"), finding.get("reason"))
             if span not in groups:
                 groups[span] = []
                 order.append(span)
@@ -221,6 +231,7 @@ class ScanResult:
                 for f in self.reported_findings()
             ],
             "latency_ms": self.latency_ms,
+            **({"time_limit_ended": [dict(e) for e in self.time_limit_ended]} if self.time_limit_ended else {}),
         }
 
     def summary(self) -> str:
@@ -229,8 +240,9 @@ class ScanResult:
         if not self.threat_found:
             # No findings, but we did not read all of it. Saying PASS here is the
             # bug; saying THREAT here would be a lie in the other direction.
-            return (f"[SUNGLASSES] INCOMPLETE ({self.latency_ms}ms) — "
-                    f"no findings in the inspected scope; part of the input was not read")
+            unread, ended = _time_limit.coverage_causes(self)
+            return (f"[SUNGLASSES] INCOMPLETE ({self.latency_ms}ms) — no findings in the inspected scope; "
+                    + _time_limit.incomplete_detail("part of the input was not read", unread, ended))
         return (
             f"[SUNGLASSES] {self.decision.upper()} ({self.latency_ms}ms) — "
             f"{len(self.findings)} finding(s), severity: {self.severity}"
@@ -1425,6 +1437,13 @@ class _Walk:
 _SCAN_LOCAL = threading.local()
 
 
+def _take_rule_key():
+    """The rule id the caller named for the next time-limited call, read once and cleared."""
+    key = getattr(_SCAN_LOCAL, "rule_key", None)
+    _SCAN_LOCAL.rule_key = None
+    return key
+
+
 class _ViewEnds:
     """Where each view of a normalized text ends, found once.
 
@@ -1750,7 +1769,7 @@ class _ReadBudget:
                     self.paid.append(self.paid[-1] + min(end + reach, self.size) - begin + 1)
         elif mode == "leadin":
             self.hit = span + _prefilter.max_read_extent(twin, text, {}) + 1
-        elif mode in ("plain", "anchored"):
+        elif mode in ("plain", "anchored", "memo"):
             self.starts, self.miss = _prefilter.start_positions(rx, text)
 
     def _cost(self, lo: int, hi: int) -> int:
@@ -2277,6 +2296,9 @@ class SunglassesEngine:
         # (rule id, regex entry index) -> why anchored mode was refused. Read by
         # the tests, so a refusal is visible rather than a silent downgrade.
         self._anchor_refusals = {}
+        # (rule id, regex entry index) -> (finder of the starts that end their gap line when they fail,
+        # finder of the starts that never do or None). Filled for a rule that declares `start_memo`.
+        self._start_memo_spec = {}
         self._keyword_to_patterns = {}  # keyword -> list of pattern dicts
         self._regex_patterns = []       # patterns with regex instead of keywords
         self._floor_cache = {}          # rule id -> its guard floor copy, built the first time it is needed
@@ -2386,6 +2408,20 @@ class SunglassesEngine:
                         # on which rule was declared last.
                         self._anchor_spec[(pattern["id"], index)] = (terms, max(span, 1))
                         compiled.append(("anchored", rx, (pattern["id"], index)))
+                    elif self._start_memo_entry(pattern, index, r):
+                        # Sixth mode, for a rule that declares `start_memo` for this entry. The
+                        # compiled regex stays the one the rule wrote; the two finders only say
+                        # where an attempt may begin (see _match_memo).
+                        memo_part = pattern["start_memo"]
+                        try:
+                            finder = re.compile(memo_part["memo"], re.IGNORECASE)
+                            plain = (re.compile(memo_part["plain"], re.IGNORECASE)
+                                     if memo_part.get("plain") else None)
+                        except re.error:
+                            compiled.append(("plain", rx, None))
+                        else:
+                            self._start_memo_spec[(pattern["id"], index)] = (finder, plain)
+                            compiled.append(("memo", rx, (pattern["id"], index)))
                     elif r in _LEADIN_SOURCES:
                         # Fifth mode, for the exact sources in _LEADIN_SOURCES
                         # and no other regex. See _match_leadin. The compiled
@@ -2610,6 +2646,21 @@ class SunglassesEngine:
 
     def _eval_regex(self, mode: str, rx, guards, text: str, start: int = 0, memo=None,
                     tripped=None, key=None):
+        """`_eval_regex_body` inside the rule's time window when the scan runs under a time limit.
+
+        With no limit (every call but the two entry points that ask for one) this is one thread-local
+        read and the call itself."""
+        run = getattr(_SCAN_LOCAL, "time_limit", None)
+        if run is None:
+            return self._eval_regex_body(mode, rx, guards, text, start, memo, tripped, key)
+        window = key if key is not None else _take_rule_key()
+        if window is None:
+            run.admit()
+            return self._eval_regex_body(mode, rx, guards, text, start, memo, tripped, key)
+        return run.call(window, lambda: self._eval_regex_body(mode, rx, guards, text, start, memo, tripped, key), None)
+
+    def _eval_regex_body(self, mode: str, rx, guards, text: str, start: int = 0, memo=None,
+                         tripped=None, key=None):
         """Evaluate one compiled pattern regex against `text` per its mode
         (see the compile step in __init__). Returns a re.Match or None.
 
@@ -2641,7 +2692,71 @@ class SunglassesEngine:
             return self._match_anchored(rx, guards, text, start, memo)
         if mode == "leadin":
             return self._match_leadin(rx, guards, text, start)
+        if mode == "memo":
+            return self._match_memo(rx, guards, text, start, memo)
         return rx.search(text, start)
+
+    @staticmethod
+    def _start_memo_entry(pattern, index: int, source: str) -> bool:
+        """True when `pattern` declares `start_memo` for regex entry `index` and the declared start parts are
+        in that entry's source. The declaration is `{"memo": <start source>, "plain": <start source or None>,
+        "entry": <index, default 0>}`; a declaration whose parts are not in the entry is not used, so the
+        entry keeps its plain search."""
+        declared = pattern.get("start_memo")
+        if not isinstance(declared, dict) or declared.get("entry", 0) != index:
+            return False
+        parts = [declared.get("memo"), declared.get("plain")]
+        return bool(parts[0]) and all(part is None or (isinstance(part, str) and part in source) for part in parts)
+
+    def _match_memo(self, rx, key, text: str, start: int = 0, memo=None):
+        """The match `rx.search(text, start)` returns, found by attempting `rx` only at the starts the rule
+        declared and not at a start whose gap line already failed.
+
+        A rule opts in only when a later start of its memo part cannot succeed where an earlier one on the
+        same gap line failed (the later start reads a subset of what the earlier one read). A failed memo
+        start therefore ends its gap line: a later memo start whose own end is on that line is not tried.
+        The END of the start decides, not its place, because the start can take blank space across a line
+        break (`\\s*`) and its gap is the line where it ends. A start that is not a memo start (`plain`) is
+        always tried and never ends a line. A success ends nothing: the caller asks for the next occurrence
+        from one character after the start and gets the same answer the plain search gives.
+
+        `memo` is the caller's per-text dict (one walk over one text), so what failed is known to the
+        later steps of the walk and to no other text. Without it the state lives for this call only."""
+        finder, plain = self._start_memo_spec[key]
+        if memo is None:
+            memo = {}
+        dead = memo.get(key, -1)             # the newline (or text end) that ends the line of the last failed start
+        length = len(text)
+        at_memo = at_plain = start
+        next_memo = next_plain = None
+        while True:
+            if next_memo is None and at_memo is not None:
+                found = finder.search(text, at_memo)
+                while found is not None and found.end() <= dead:
+                    found = finder.search(text, found.start() + 1)
+                if found is None:
+                    at_memo = None
+                else:
+                    next_memo = found
+            if plain is not None and next_plain is None and at_plain is not None:
+                found = plain.search(text, at_plain)
+                if found is None:
+                    at_plain = None
+                else:
+                    next_plain = found
+            if next_memo is None and next_plain is None:
+                return None
+            use_memo = next_plain is None or (next_memo is not None and next_memo.start() <= next_plain.start())
+            chosen = next_memo if use_memo else next_plain
+            hit = rx.match(text, chosen.start())
+            if hit is not None:
+                return hit
+            if use_memo:
+                newline = text.find("\n", chosen.end())
+                dead = memo[key] = length if newline == -1 else newline
+                at_memo, next_memo = chosen.start() + 1, None
+            else:
+                at_plain, next_plain = chosen.start() + 1, None
 
     LEADIN_OLD = _LEADIN_OLD
     LEADIN_FAST = _LEADIN_FAST
@@ -3330,6 +3445,18 @@ class SunglassesEngine:
 
     def _resolve_cover(self, mode, rx, guards, text, first, source=None, align=None,
                        framed=False, negation=True):
+        """`_resolve_cover_body` inside the rule's time window when the scan runs under a time limit.
+        A walk the limit ends returns the occurrence it was given, uncovered (the strict side).
+        The rule is named by the caller through `_SCAN_LOCAL.rule_key`, so the call takes no new argument."""
+        run = getattr(_SCAN_LOCAL, "time_limit", None)
+        window = None if run is None else _take_rule_key()
+        if window is None:
+            return self._resolve_cover_body(mode, rx, guards, text, first, source, align, framed, negation)
+        return run.call(window, lambda: self._resolve_cover_body(
+            mode, rx, guards, text, first, source, align, framed, negation), (first, None))
+
+    def _resolve_cover_body(self, mode, rx, guards, text, first, source=None, align=None,
+                            framed=False, negation=True):
         """Pick the occurrence a regex rule is judged on. Returns (match, how).
 
         An occurrence is covered when a negation covers it (`negation`; False for a
@@ -4609,7 +4736,7 @@ class SunglassesEngine:
                        for f in out]
         return out
 
-    def scan(self, text: str, channel: str = "message") -> ScanResult:
+    def scan(self, text: str, channel: str = "message", time_limit: Optional[TimeLimit] = None) -> ScanResult:
         """
         Scan text for attack patterns.
 
@@ -4624,6 +4751,15 @@ class SunglassesEngine:
                 pattern set. A prompt injection is still a prompt injection
                 whichever channel carries it.
 
+            time_limit: a `TimeLimit` (CPU seconds per rule, and the CPU seconds after which the scan starts no further rule expression)
+                or None. With None, the default, nothing is
+                armed and no signal state is touched. With a time limit, a rule that uses up
+                its seconds ends alone: the scan goes on with the other rules, and the
+                result carries a GLS-TIME-LIMIT finding at that rule's own severity (so
+                the decision is never below an unfinished rule's), `time_limit_ended`, a
+                warning, and `extraction_complete` False. A scan that shares an open
+                `time_limit_scope` uses that scope's time limit and this argument is ignored.
+
         Returns:
             ScanResult with decision, findings, and timing info.
 
@@ -4631,7 +4767,96 @@ class SunglassesEngine:
             ValueError: if channel is not a known channel. Unknown channels
                 fail CLOSED (error) instead of silently scanning against
                 nothing and returning a clean allow.
+            TimeLimitUnavailable: a `time_limit` was given and this process cannot
+                own the CPU timer (not the main thread, no timer on this platform, or the
+                host program uses it). The scan did not run.
         """
+        if time_limit is None and getattr(_SCAN_LOCAL, "time_limit", None) is None:
+            return self._scan_text(text, channel)
+        with self.time_limit_scope(time_limit) as run:
+            run.begin_call()
+            try:
+                return self._time_limit_report(run, self._scan_text(text, channel))
+            finally:
+                run.end_call()
+
+    @contextlib.contextmanager
+    def time_limit_scope(self, time_limit: Optional[TimeLimit] = None):
+        """Hold ONE time limit across several `scan` calls (a file's pieces, an archive's members).
+
+        Every call inside shares the time limit: a rule's seconds add up over all of them, and the scan
+        total counts from the first. Inside an open scope this yields that scope's run and installs
+        nothing. With no time limit and no open scope it yields None and does nothing. An engine that
+        scans inside a scope another engine opened shares it, each rule at its own severity (the
+        stricter one where both carry the id)."""
+        outer = getattr(_SCAN_LOCAL, "time_limit", None)
+        if outer is not None:
+            outer.add_severities(self, self._rule_severities())
+            yield outer
+            return
+        if time_limit is None:
+            yield None
+            return
+        run = _time_limit._Run(time_limit, self._rule_severities())
+        run.engines[id(self)] = self
+        with _time_limit.installed(run):
+            _SCAN_LOCAL.time_limit = run
+            try:
+                yield run
+            finally:
+                _SCAN_LOCAL.time_limit = None
+
+    def _rule_severities(self):
+        """Each rule id of this engine with its severity."""
+        return {pid: p.get("severity", "high") for pid, p in self._pattern_by_id.items()}
+
+    def _time_limit_report(self, run, result: ScanResult) -> ScanResult:
+        """The scan's result with this call's time-limit ends written in (see `scan`).
+
+        Added after every lowering and cover step and before nothing else: a finding at the ended
+        rule's own severity, so the decision is the worse of what was found and what the unfinished
+        rule would have said, and nothing in the engine lowers or removes it."""
+        run.admit()     # a scan call that answers inside an open window answers only while that window's limit is unused
+        ends, cut = run.call_ended, run.call_scan_cut
+        if not ends and cut is None:
+            return result
+        out = copy.copy(result)
+        out.findings = list(result.findings)
+        out.time_limit_ended = []
+        out.extraction_warnings = list(result.extraction_warnings)
+        limit = run.limit
+
+        def add(rid, severity, reason, limit):
+            out.findings.append({
+                "id": "GLS-TIME-LIMIT",
+                "name": _time_limit.finding_name(reason),
+                "category": "scan_time_limit",
+                "severity": severity,
+                "channel": [],
+                "description": (f"Rule {rid} used up its time limit on this input, so part of the input was not "
+                                "checked by that rule. Treat the result as not finished." if reason == "rule_limit"
+                                else f"The scan used up its time limit at rule {rid}; the rules after it did not run. "
+                                     "Treat the result as not finished."),
+                "matched_text": "",
+                "rule_id": rid,
+                "reason": reason,
+                "not_finished": True,
+            })
+            out.time_limit_ended.append({"rule_id": rid, "reason": reason, "limit_s": limit})
+
+        for rid, reason in ends.items():
+            add(rid, run.severity_of.get(rid, "high"), reason, limit.rule_s)
+            out.extraction_warnings.append(_time_limit.time_limit_warning({"rule_id": rid, "reason": reason}))
+        if cut is not None:
+            add(cut[0], cut[1], "scan_limit", limit.scan_s)
+            out.extraction_warnings.append(_time_limit.time_limit_warning({"rule_id": cut[0], "reason": "scan_limit"}))
+        decisions = [out.decision] + [self.SEVERITY_TO_DECISION.get(f["severity"], "quarantine") for f in out.findings]
+        out.decision = max(decisions, key=lambda d: self._DECISION_RANK.get(d, 3))
+        out.extraction_complete = False
+        return out
+
+    def _scan_text(self, text: str, channel: str) -> ScanResult:
+        """`scan` without the time limit: the raw scan, then the UTF-7 view's."""
         result = self._scan_in_context(text, channel)
         # UTF-7 runs are read by a model that is asked to decode them and by no step of the
         # pipeline, so the text is scanned a second time with each readable run decoded.
@@ -5048,6 +5273,7 @@ class SunglassesEngine:
                         source = None
                         if raw_frame is not None:
                             source = (text, *raw_frame)
+                        _SCAN_LOCAL.rule_key = pattern["id"]
                         match, how = self._resolve_cover(
                             mode, rx, guards, subject, match, source,
                             None if subject is text else align, framed, negation)
@@ -5133,6 +5359,7 @@ class SunglassesEngine:
                         if negation or framed:
                             if norm_source is None:
                                 norm_source = (view_text, *view_frame)
+                            _SCAN_LOCAL.rule_key = pid
                             match, how = self._resolve_cover(
                                 mode, rx, guards, view_norm, match, norm_source, view_align,
                                 framed, negation)
@@ -5162,6 +5389,7 @@ class SunglassesEngine:
                     floor = self._floor_entry(pid)
                     if floor is not None and not any(f.get("severity") in ("critical", "high") for f in findings):
                         for mode, rx, guards in floor[1]:
+                            _SCAN_LOCAL.rule_key = pid
                             match = self._eval_regex(mode, rx, guards, view_norm)
                             if match:
                                 floor_hit = {**floor[0], "matched_text": match.group(0)[:50]}

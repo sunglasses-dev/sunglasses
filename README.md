@@ -424,6 +424,8 @@ scan, and errors). `0` is a claim, so it is reserved for scans that earned it.
 Precedence is `1 > 3 > 2 > 0`. A threat we did find outranks the part we could
 not read, and both outrank a usage complaint.
 
+A rule that did not finish within its time limit is reported as a finding at that rule's severity, and the scan exits `1`. With `--fail-on` above that severity, or with a baseline that covers the finding, that finding no longer gives `1`. The scan then exits `3`, or `1` when another finding still gives it.
+
 The distinction between `0` and `3` is the whole point. "I read the file and it
 is clean" and "I could not open it and therefore saw nothing" must never be the
 same signal to a CI job. In JSON output the same split is explicit as
