@@ -40,7 +40,6 @@
   "GLS-PCF-459": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-PFX-001": "2026-10-25 base-slow at 460b983, superlinear growth, bounded later via BACKLOG_SLOW_RULES",
   "GLS-PFX-247": "2026-10-25 base-slow at 460b983, superlinear growth, bounded later via BACKLOG_SLOW_RULES",
-  "GLS-PI-015": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-RMP-002": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-RP-278": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",
   "GLS-RP-457": "2026-10-25 base-slow at 460b983, run cap at two or more sizes, bounded later via BACKLOG_SLOW_RULES",

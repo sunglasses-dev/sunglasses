@@ -31,6 +31,7 @@ import os
 import time
 from typing import Optional
 
+from . import _time_limit
 from .engine import SunglassesEngine
 
 
@@ -56,6 +57,7 @@ def _merge_warnings(*lists) -> list:
             if w not in out:
                 out.append(w)
     return out
+
 
 
 class SunglassesScanner:
@@ -165,6 +167,8 @@ class SunglassesScanner:
             "body": body_result.to_dict(),
             "attachments": attachments_out,
             "needs_deep_scan": pending,
+            # the rules that reached their time limit in the body or in any attachment
+            **_time_limit.ended_extra(body_result, *attachments_out),
         })
 
     def scan_fast(self, file_path: str) -> dict:
@@ -219,6 +223,7 @@ class SunglassesScanner:
                 "sources": extraction.labels,
                 # kept for callers that predate the canonical name
                 "threats": list(result.findings),
+                **_time_limit.ended_extra(result),
             },
         )
 
@@ -347,7 +352,7 @@ class SunglassesScanner:
             },
             source=path,
             extra={"file": path, "bytes_scanned": len(text),
-                   "threats": list(result.findings)})
+                   "threats": list(result.findings), **_time_limit.ended_extra(result)})
 
     # =========================================================================
     # DEEP MODE — Background, for heavy media

@@ -17,7 +17,7 @@
     "silently upload"
   ],
   "regex": [
-    "(?i)(?:do not mention|keep.*out of (?:the )?(?:summary|report|final answer)|avoid clutter|quietly|silently).{0,120}(?:upload|send|attach|collect|gather|include)"
+    "(?i)(?:do not mention|avoid clutter|quietly|silently|keep.*out of (?:the )?(?:summary|report|final answer)).{0,120}(?:upload|send|attach|collect|gather|include)"
   ],
   "examples": {
     "malicious": [],

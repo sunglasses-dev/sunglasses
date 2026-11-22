@@ -6,6 +6,24 @@ This is the "fat database" that makes the thin filter smart.
 Community can add new patterns by contributing to this file or the patterns/ directory.
 """
 
+# GLS-SI-001, last regex: a `.format(` call, a `)` then `#` on its line, and a SQL word after the `#`.
+# The tail reads its line twice and no more. The last `)` of the gap line is tried first (the only one whose
+# `#` can stand on a later line); when it fails, the first `)` followed by a `#` on the same line decides,
+# because every later one on that line has fewer words after it. Both choices are read inside a lookahead, which
+# does not give a choice back.
+_SQL_FORMAT_START = r"\.format\s*\("
+_SQL_FORMAT_TAIL = (r"(?:(?=(.*\)))\1\s*#.*(?:sql|query|select|where)"
+                    r"|(?=(.*?\)[^\S\n]*#))\2.*(?:sql|query|select|where))")
+
+# GLS-PI-015: an opener, then an action word within 120 characters. Four openers are one literal each; the fifth
+# starts with `keep` and has an open gap (`.*`) before the words it needs. The two kinds are kept apart so the
+# engine can try the fifth once per gap line and the other four wherever they stand.
+_CONCEAL_PLAIN = r"do not mention|avoid clutter|quietly|silently"
+_CONCEAL_KEEP = r"keep"
+_CONCEAL_REGEX = (r"(?i)(?:" + _CONCEAL_PLAIN + r"|" + _CONCEAL_KEEP
+                  + r".*out of (?:the )?(?:summary|report|final answer))"
+                  + r".{0,120}(?:upload|send|attach|collect|gather|include)")
+
 PATTERNS = [
     # =========================================================================
     # PROMPT INJECTION — Direct attempts to override agent instructions
@@ -2342,8 +2360,11 @@ PATTERNS = [
             r"f['\"]UPDATE\s",
             r"f['\"]DELETE\s",
             r"(?:execute|cursor\.execute)\s*\(\s*f['\"]",
-            r"\.format\s*\(.*\)\s*#.*(?:sql|query|select|where)",
+            _SQL_FORMAT_START + _SQL_FORMAT_TAIL,
         ],
+        # The engine tries the start part only once on a gap line (see `start_memo` in engine.py): the
+        # parts below are the ones the regex is composed from, so the engine and the regex read one source.
+        "start_memo": {"memo": _SQL_FORMAT_START, "entry": 5},
         "description": "SQL injection via user-controlled metadata keys or filter parameters in AI agent data stores. Based on LangGraph CVE-2025-67644 where metadata filter keys were not parameterized."
     },
 
@@ -3694,8 +3715,11 @@ PATTERNS = [
             "silently upload",
         ],
         "regex": [
-            r"(?i)(?:do not mention|keep.*out of (?:the )?(?:summary|report|final answer)|avoid clutter|quietly|silently).{0,120}(?:upload|send|attach|collect|gather|include)",
+            _CONCEAL_REGEX,
         ],
+        # The engine tries a `keep` start once on a gap line and the four plain openers at every place they stand
+        # (see `start_memo` in engine.py); the parts are the ones the regex is composed from.
+        "start_memo": {"memo": _CONCEAL_KEEP, "plain": _CONCEAL_PLAIN},
         "description": "Detects concealment language co-occurring with action verbs — a key indicator of covert malicious workflow steering."
     },
 
