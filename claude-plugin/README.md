@@ -1,6 +1,6 @@
 # Sunglasses for Claude
 
-Sunglasses is a local input firewall for AI agents. This plugin connects Claude to the Sunglasses MCP server, which scans text and files for prompt injection, credential leaks and data exfiltration before an agent reads them.
+Sunglasses is a local input firewall for AI agents. This plugin connects Claude to the Sunglasses MCP server, which scans the text and files you or Claude pass to it for prompt injection, credential leaks and data exfiltration.
 
 ## Before you install
 
