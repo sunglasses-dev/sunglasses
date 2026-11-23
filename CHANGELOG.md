@@ -5,6 +5,40 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.27] — 2026-11-22
+
+### Security
+
+- Scan time. In our measures on generated texts of growing length, the SQL filter query rule and the concealment action rule each read a text in time that grows in step with its length. On release 0.6.26 a text written for that purpose can hold a scan far longer than its length explains. Upgrade to this release.
+
+- Scan time limit. The command line and the MCP server give every rule a time limit in CPU seconds for one scan. A rule that reaches it ends with the finding Rule did not finish within its time limit, at that rule's own severity, and the scan answers as not finished. A text scan on the command line and every scan through the MCP server also carry a limit for the scan as a whole. Once a scan has used it, a rule that is running is stopped and no further rule expression starts. Such a scan ends with the finding Scan did not finish within its time limit, at the highest severity among the rules that did not finish.
+
+### Added
+
+- The option `--rule-time-limit SECONDS` sets the limit per rule in CPU seconds on the command line. 0 switches the limit off. With `--file`, `--dir` or `--repo` the limit applies to each file.
+
+- The Python call scan() takes the limit when the caller passes one as time_limit. TimeLimit is imported from sunglasses.engine, and TimeLimit() carries the default limits. time_limit_scope() holds one limit across the scan() calls made inside it on the same thread.
+
+- The JSON of a text scan and of a file scan lists the rules that reached their limit under time_limit_ended. A directory or repo scan counts the files with a rule that did not finish within its time limit on their own summary line, and its JSON lists them under time_limit_list.
+
+- After a text scan or a file scan that ends at a time limit the command line prints, in the human output, the address of the private report form and not the public one.
+
+### Changed
+
+- A scan through the command line or the MCP server can stop a text that release 0.6.26 keeps scanning without an answer.
+
+### Known limits
+
+- Scan time limit. The Python call uses a time limit only when the caller gives one, as time_limit to scan() or through time_limit_scope(). The agent hook and the proxy do not use it. The agent hook, the proxy and the file scan of the command line keep their own deadlines. The MCP server uses the default limit.
+
+- Scan time limit. The limit uses the CPU timer of the process on its main thread. On Windows, and inside a host program that uses that timer or blocks its signal, the command line and the MCP server scan without the limit and say so. A Python call that passes a limit there raises TimeLimitUnavailable and does not scan.
+
+- Scan time limit. A limit stops a rule expression after the limit is reached, and it does not stop the other work of a scan. A scan that reaches a limit takes longer than that limit.
+
+- Scan time limit. A scan of honest text can reach a limit too. A rule that needs more CPU time than its limit on that text does not finish, and the scan is answered as not finished. On the command line the option `--rule-time-limit` raises the limit per rule, and 0 switches the limits off.
+
+- Scan time. Other rules can read a text in time that grows faster than its length. On the command line and through the MCP server such a rule ends at its time limit with the finding Rule did not finish within its time limit. A Python call whose caller gives no time limit scans without one. Set your own time limit around a scan of text you do not trust.
+
 ## [0.6.26] — 2026-11-21
 
 ### Security
