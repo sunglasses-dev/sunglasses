@@ -1,6 +1,6 @@
 {
   "name": "sunglasses",
-  "description": "Local input firewall for AI agents. Scans text and files before an agent reads them. Needs pip install sunglasses first, on Python 3.9 or newer.",
+  "description": "Local input firewall for AI agents. Adds scan tools Claude can call on text and files. Needs pip install sunglasses first, on Python 3.9 or newer.",
   "author": {
     "name": "sunglasses-dev",
     "url": "https://github.com/sunglasses-dev"
