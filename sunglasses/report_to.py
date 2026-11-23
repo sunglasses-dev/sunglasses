@@ -55,6 +55,7 @@ import urllib.parse
 import urllib.request
 
 from . import __version__
+from .door_mask import secret_strings, shown_match
 
 ENVELOPE_SCHEMA = "sg-report/1"
 TOKEN_ENV = "SUNGLASSES_REPORT_TOKEN"
@@ -107,17 +108,19 @@ def _plain_value(value):
     return value is None or isinstance(value, (str, int, float, bool))
 
 
-def _project_finding(finding, include_text):
+def _project_finding(finding, include_text, secrets=()):
     out = {key: finding[key] for key in _FINDING_FIELDS
            if key in finding and _plain_value(finding[key])}
     text = finding.get("matched_text")
     if isinstance(text, str):
-        out["matched_text"] = text if include_text else _digest(text)
+        # A report file leaves the machine: the words go in only when asked for, and a secret goes in as the mask.
+        out["matched_text"] = shown_match(finding, text, False, secrets) if include_text else _digest(text)
     return out
 
 
 def _project_findings(findings, include_text):
-    return [_project_finding(f, include_text) for f in findings or [] if isinstance(f, dict)]
+    secrets = secret_strings(findings)
+    return [_project_finding(f, include_text, secrets) for f in findings or [] if isinstance(f, dict)]
 
 
 def project_scan(doc, include_text=False):

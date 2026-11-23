@@ -24,6 +24,7 @@ if _pkg_dir not in sys.path:
     sys.path.append(_pkg_dir)   # at the END: the package is already imported, and this must never go ahead of the standard library
 
 from sunglasses import __version__
+from sunglasses.door_mask import mask_document, secret_strings, shown_match
 from sunglasses import _time_limit
 from sunglasses.engine import SunglassesEngine
 from sunglasses.scanner import SunglassesScanner
@@ -277,7 +278,10 @@ def _tool_scan_text(arguments):
             "content": [{"type": "text", "text": f"Error: {e}"}],
             "isError": True,
         }
-    result_dict = result.to_dict()
+    # The JSON this door hands a model is the same result with a marker in place of a found secret: the server
+    # has no option to print the full match, because nothing at the other end of this door is a person reading
+    # their own terminal (see door_mask).
+    result_dict = mask_document(result.to_dict())
 
     # Build a human-readable summary + JSON
     # threat_found, not is_clean: a truncated-but-findingless scan must not render
@@ -301,10 +305,12 @@ def _tool_scan_text(arguments):
             + (f", {_unfinished}" if _unfinished else "")
             + f", severity: {result.severity} ({result.latency_ms}ms)"
         )
+        secrets = secret_strings(result.findings)
         for i, f in enumerate(result.findings, 1):
             summary += f"\n  {i}. [{f['severity'].upper()}] {f['name']}"
             if f.get("matched_text"):
-                summary += f' — matched: "{f["matched_text"]}"'
+                # This result is read by a model and written to its logs: a secret leaves as its marker only.
+                summary += f' — matched: "{shown_match(f, f["matched_text"], False, secrets)}"'
         if not result.inspection_complete:
             # A finding does not cancel a coverage failure, and the agent reads
             # the FIRST LINE. This surface announced only "BLOCK — 5 threats" on
@@ -405,7 +411,8 @@ def _tool_scan_file(arguments):
     else:
         notice = ""
 
-    output = _off_note(why) + notice + json.dumps(result, indent=2, default=str)
+    # The same door rule as scan_text: a found secret leaves this server as its marker, never as the key.
+    output = _off_note(why) + notice + json.dumps(mask_document(result), indent=2, default=str)
     return {
         "content": [{"type": "text", "text": output}],
         "isError": False,
