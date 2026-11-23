@@ -45,3 +45,11 @@ def test_the_hidden_text_rule_reads_web_content_and_files_and_not_a_plain_messag
     hidden = [c for c in CASES if "GLS-HI-002" in c["expect"]["web_content"]]
     assert hidden
     assert all("GLS-HI-002" in c["expect"]["file"] and "GLS-HI-002" not in c["expect"]["message"] for c in hidden)
+
+
+def test_agent_input_reads_the_message_rules_and_its_own_in_every_case(engine):
+    for case in CASES:
+        message, own = set(case["expect"]["message"]), set(case["expect"]["agent_input"])
+        assert message <= own, case["id"]
+        found = {f["id"] for f in engine.scan(case["text"], channel="agent_input").findings} & RULES
+        assert found == own, case["id"]

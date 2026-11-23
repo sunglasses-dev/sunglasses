@@ -690,7 +690,7 @@ for the source (`--report-source NAME`; by default the directory or repository n
 field of the scan's `--json` result (a rule's name, its explanation, the other rules that matched,
 framework mappings, warning text) is left out, and a field the scan
 result gains later is not sent until it is added to that list. `--report-include-text` sends the
-matched text itself instead of its hash. `line` is the line where the matched text first appears in
+matched text itself instead of its hash; for a found secret it sends the marker. `line` is the line where the matched text first appears in
 the file as read, or `null` when it cannot be located (a scan of text, a format that is extracted
 before it is scanned, a file too large to read again); the file is read again after the scan, so a
 file that changed in between can give a stale line. `--report-include-receipts` adds the newest

@@ -61,9 +61,9 @@ SANCTIONED_SUBSETS = [
     # changes that decision; the other channels never redact it.
     {"web_content", "agent_input", "tool_output"},
     # The structural validator's own reach: the four channels it declares, plus
-    # `code` (the alias of `file`). The three channels it does not read are asserted
-    # clear on their own, from the complementary list above.
-    {"message", "file", "web_content", "tool_output", "code"},
+    # `code` (the alias of `file`) and `agent_input` (read with the message rules). The
+    # channels it does not read are asserted clear on their own, from the complementary list.
+    {"message", "file", "web_content", "tool_output", "code", "agent_input"},
     # The settings validator's reach: the channels that carry a settings file (`code` is the
     # alias of `file`). Every other channel is asserted clear in the same test, from the full list.
     {"file", "tool_output", "code"},
@@ -71,8 +71,9 @@ SANCTIONED_SUBSETS = [
 
 # Sets sanctioned for ONE test file only, and only while that file still carries the tests that
 # make the omission safe. A global entry would let any other file omit these channels unseen.
-# GLS-SD-010 reads exactly message, file and code. test_sd010_export_prefix.py walks those three
-# for the export form, and asserts on its own that every channel the rule does not list stays clear.
+# GLS-SD-010 declares exactly message, file and code (prompt and agent_input are read with the message
+# rules). test_sd010_export_prefix.py walks those three for the export form, and asserts on its own
+# that every other channel stays clear.
 # The other channels are out BY DESIGN, not because a test was red: the rule is line anchored, and
 # that anchor cannot match inside a JSON string, which is how a tool result or an API answer
 # carries a line of text. That direction is a documented open gap (CHANGELOG 0.5.x, "GLS-SD-010's

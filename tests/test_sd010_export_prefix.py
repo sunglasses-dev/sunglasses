@@ -41,6 +41,11 @@ def test_an_export_line_is_read_on_each_channel_of_the_rule(engine, channel):
     assert found(engine, f"export API_KEY={VALUE}", channel)
 
 
+def test_an_export_line_is_read_on_agent_input_with_the_message_rules(engine):
+    assert found(engine, f"export API_KEY={VALUE}", "agent_input")
+    assert found(engine, f"API_KEY={VALUE}", "agent_input")
+
+
 @pytest.mark.parametrize("text", [
     f"export\tAPI_KEY={VALUE}",
     f"export   API_KEY={VALUE}",
@@ -70,7 +75,7 @@ def test_a_line_with_other_text_in_front_is_read_as_it_was_before(engine, text):
 LIVE = {"message", "file", "api_response", "web_content", "log_memory", "tool_output", "agent_input", "code", "prompt"}
 
 
-@pytest.mark.parametrize("channel", sorted(LIVE - {"message", "file", "code"} - {"prompt"}))   # prompt is the alias of message
+@pytest.mark.parametrize("channel", sorted(LIVE - {"message", "file", "code"} - {"prompt", "agent_input"}))   # prompt and agent_input are read as a message
 def test_a_channel_the_rule_does_not_list_stays_clear(engine, channel):
     assert not found(engine, f"export API_KEY={VALUE}", channel)
     assert not found(engine, f"API_KEY={VALUE}", channel)

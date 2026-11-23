@@ -21,19 +21,22 @@ except ImportError:
 # This key can only send emails FROM our verified domain
 RESEND_API_KEY = ""  # Set after domain verification on resend.com
 
-CONFIG_PATH = Path.home() / ".sunglasses" / "config.json"
+def _config_path() -> Path:
+    """The mail config file, inside `$SUNGLASSES_HOME` (or `~/.sunglasses`) like every other local file."""
+    from .firewall import sunglasses_home
+    return Path(sunglasses_home()) / "config.json"
 
 
 def _load_config() -> dict:
-    if CONFIG_PATH.exists():
-        with open(CONFIG_PATH) as f:
+    if _config_path().exists():
+        with open(_config_path()) as f:
             return json.load(f)
     return {}
 
 
 def _save_config(config: dict):
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
+    _config_path().parent.mkdir(parents=True, exist_ok=True)
+    with open(_config_path(), "w") as f:
         json.dump(config, f, indent=2)
 
 
