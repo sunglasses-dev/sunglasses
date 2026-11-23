@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional, Type
 
+from ..door_mask import mask_document
 from ..scanner import SunglassesScanner
 
 
@@ -94,7 +95,8 @@ def _build_tool_class():
             output = result.to_dict()
             output["is_clean"] = result.is_clean
             output["summary"] = result.summary()
-            return json.dumps(output, indent=2)
+            # The result is read by a model: a secret shows as a mask (see door_mask).
+            return json.dumps(mask_document(output), indent=2)
 
         async def _arun(self, text: str, channel: str = "message", **kwargs) -> str:
             """Async version — delegates to sync. Scanning is CPU-bound; scan cost grows with input length,

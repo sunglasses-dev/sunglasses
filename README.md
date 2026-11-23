@@ -399,6 +399,27 @@ sunglasses demo
 sunglasses info
 ```
 
+### A found secret shows a marker, not the key
+
+When a finding IS a credential, the scanner does not print it back at you. A marker stands in its place at
+every door where a match leaves the program as text (the terminal, `--json`, a SARIF file, a report sent
+with `--report-to`, the MCP server, the LangChain and CrewAI tools), and it reads like this.
+
+```
+[CRITICAL] AWS access key ID
+  File: conf/deploy.env
+  Match: "AKIA… [20 characters, GLS-SD-003, a3059ab8]"
+```
+
+That is the first four characters, the length, the rule id and a short digest of the whole key, beside the
+place the door already names. It is enough to find the key and to tell two findings apart. The words
+of a finding that is not a credential lose the characters of a key found in the same scan.
+
+At your own terminal, `sunglasses scan --show-secrets ...` prints the full match in the text and JSON output.
+A SARIF file and the MCP server never carry it, with or without that option, because both are written to be
+read somewhere else. The Python API is unchanged. `result.findings[i]["matched_text"]` is the full match,
+because a program that scanned the text already holds it.
+
 ### Framework references on every finding
 
 Each finding in `--json` output carries a `taxonomy` object listing where its category sits in the

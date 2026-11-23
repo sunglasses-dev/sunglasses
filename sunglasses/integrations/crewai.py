@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from ..door_mask import mask_document
 from ..scanner import SunglassesScanner
 
 # Module-level scanner instance (shared, thread-safe for reads)
@@ -61,7 +62,8 @@ def _scan_text(text: str, channel: str = "message") -> str:
     output = result.to_dict()
     output["is_clean"] = result.is_clean
     output["summary"] = result.summary()
-    return json.dumps(output, indent=2)
+    # The result is read by a model: a secret shows as a mask (see door_mask).
+    return json.dumps(mask_document(output), indent=2)
 
 
 def _try_crewai_tool():

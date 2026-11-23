@@ -36,6 +36,7 @@ from .extractors.dispatch import COMPILED_SUFFIXES, UnreadableFile, next_step
 from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .result import verdict_word
+from .door_mask import mask_document, secret_strings, shown_match
 from .sarif import to_sarif
 from .taxonomy import for_category
 from .receipts._shown import printable as _shown_message
@@ -78,7 +79,7 @@ def _apply_color_policy():
         GREEN = RED = YELLOW = CYAN = BOLD = DIM = RESET = ""
 
 
-def print_result(result, verbose=False):
+def print_result(result, verbose=False, show_secrets=False):
     """Pretty-print a scan result."""
     if result.is_clean:
         print(f"\n  {GREEN}{BOLD}PASS{RESET} {DIM}({result.latency_ms}ms){RESET}")
@@ -132,7 +133,9 @@ def print_result(result, verbose=False):
             if f.get("location"):
                 print(f"     {DIM}Found in: {_printable_match(f['location'])}{RESET}")
             if f.get("matched_text"):
-                print(f"     {DIM}Matched: \"{_printable_match(f['matched_text'])}\"{RESET}")
+                # A secret shows its marker here, and the words of a neighbouring finding lose any piece of it.
+                shown = shown_match(f, f["matched_text"], show_secrets, secret_strings(result.findings))
+                print(f"     {DIM}Matched: \"{_printable_match(shown)}\"{RESET}")
             if f.get("also_matched"):
                 # Named, not hidden: the reader can still see everything that
                 # fired on this span.
@@ -144,7 +147,7 @@ def print_result(result, verbose=False):
 
     if verbose:
         print(f"  {DIM}--- Raw JSON ---{RESET}")
-        print(f"  {json.dumps(result.to_dict(), indent=2)}")
+        print(f"  {json.dumps(mask_document(result.to_dict(), show_secrets), indent=2)}")
         print()
 
 
@@ -1249,7 +1252,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                         "name": finding["name"],
                         "severity": finding["severity"],
                         "category": finding.get("category", "unknown"),
-                        "matched_text": finding.get("matched_text", ""),
+                        "matched_text": shown_match(finding, finding.get("matched_text", ""),
+                                                    getattr(args, "show_secrets", False),
+                                                    secret_strings(scan_result.findings)),
                         "taxonomy": for_category(finding.get("category", "unknown")),
                     },
                 })
@@ -1264,7 +1269,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                         "name": f["name"],
                         "severity": f["severity"],
                         "category": f.get("category", "unknown"),
-                        "matched_text": f.get("matched_text", ""),
+                        "matched_text": shown_match(f, f.get("matched_text", ""),
+                                                    getattr(args, "show_secrets", False),
+                                                    secret_strings(scan_result.findings)),
                         "taxonomy": for_category(f.get("category", "unknown")),
                     }
                     for f in scan_result.findings
@@ -1611,6 +1618,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
             print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}{marker}")
             print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
             if f.get("matched_text"):
+                # The entries of all_findings were built at the door above: matched_text already carries the marker.
                 print(f"      {DIM}Match: \"{_printable_match(f['matched_text'])}\"{RESET}")
             if len(shown) >= 20:
                 remaining = len(all_findings) - 20
@@ -2019,7 +2027,7 @@ def _emit_scan_result(args, result, source):
         output["decision"] = verdict_word(result.decision, result.threat_found, result.inspection_complete)
         output["source"] = source
         _annotate_single_policy(args, output)
-        print(json.dumps(output))
+        print(json.dumps(mask_document(output, getattr(args, "show_secrets", False))))
         _print_extraction_warnings(result, stream=sys.stderr)
         sys.exit(_single_exit_code(args, result))
 
@@ -2031,7 +2039,7 @@ def _emit_scan_result(args, result, source):
     mode_line = getattr(getattr(args, "_engine_holder", None), "mode_line", "")
     if mode_line:
         print(f"  {DIM}{mode_line}{RESET}")
-    print_result(result, verbose=args.verbose)
+    print_result(result, verbose=args.verbose, show_secrets=getattr(args, "show_secrets", False))
     _print_single_policy(args, result)
     _print_extraction_warnings(result)
     _print_report_line(result)
@@ -2294,7 +2302,7 @@ def _run_scan(args):
                     output["decision"] = verdict_word(
                         result.decision, result.threat_found, result.inspection_complete)
                     output["source"] = filepath
-                    print(json.dumps(output))
+                    print(json.dumps(mask_document(output, getattr(args, "show_secrets", False))))
                     _print_extraction_warnings(result, stream=sys.stderr)
                     sys.exit(_scan_exit_code(result))
 
@@ -2375,7 +2383,7 @@ def _run_scan(args):
 
                     if args.json or args.output == "json":
                         _annotate_deep_findings(result_dict)
-                        print(json.dumps(result_dict))
+                        print(json.dumps(mask_document(result_dict, getattr(args, "show_secrets", False))))
                         sys.exit(exit_code)
 
                     if exit_code == EXIT_CLEAN:
@@ -2392,7 +2400,7 @@ def _run_scan(args):
                     else:
                         print(f"\n  {RED}{BOLD}THREATS FOUND{RESET} {DIM}({elapsed:.1f}s){RESET}")
                         for t in threats:
-                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {_printable_match(str(t.get('matched_text', '')))}")
+                            print(f"  {RED}• {t.get('name', 'Unknown')}{RESET}: {_printable_match(str(shown_match(t, t.get('matched_text', ''), getattr(args, 'show_secrets', False), secret_strings(threats))))}")
                         # A finding does not cancel a coverage failure. The human
                         # threat screen used to drop the warnings entirely, so a
                         # partially transcribed file with one finding read as a
@@ -4129,6 +4137,10 @@ def main():
                              help="Enable deep scan for audio/video files")
     scan_parser.add_argument("--verbose", "-v", action="store_true")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    scan_parser.add_argument(
+        "--show-secrets", dest="show_secrets", action="store_true",
+        help="Print the full match of a secret finding in the text and JSON output (default: a marker with the "
+             "first 4 characters, the length, the rule id and a short digest). SARIF output never carries it.")
     scan_parser.add_argument(
         "--output", "-o",
         choices=["human", "json", "sarif"],

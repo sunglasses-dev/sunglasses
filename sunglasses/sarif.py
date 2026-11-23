@@ -21,6 +21,7 @@ from typing import Iterable, Optional
 
 from . import __version__, taxonomy
 from ._time_limit import LIMIT_ID
+from .door_mask import secret_strings, shown_match
 
 _SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
 _SARIF_VERSION = "2.1.0"
@@ -203,10 +204,12 @@ def _build_rule(finding: dict) -> dict:
     }
 
 
-def _build_result(finding: dict, artifact_uri: str, artifact_index: int) -> dict:
+def _build_result(finding: dict, artifact_uri: str, artifact_index: int, secrets: tuple = ()) -> dict:
     """Build a SARIF result from a single finding."""
     severity = finding.get("severity", "medium")
-    matched = finding.get("matched_text", "")
+    # A secret is never written in full into a SARIF file (an upload to code scanning keeps the value after the
+    # code is cleaned): the marker, with no option to turn it off.
+    matched = shown_match(finding, finding.get("matched_text", ""), False, secrets)
     if finding["id"] == LIMIT_ID:
         # the sentence that names the rule or the scan, never the machine word in `reason`
         message = finding.get("description") or finding.get("name", finding["id"])
@@ -310,8 +313,9 @@ def to_sarif(
     # Build results array.
     sarif_results = []
     for r in results:
+        secrets = secret_strings(r.findings)
         for f in r.findings:
-            res = _build_result(f, artifact_uri=artifact_uri, artifact_index=0)
+            res = _build_result(f, artifact_uri=artifact_uri, artifact_index=0, secrets=secrets)
             # Read through getattr with defaults, not bare attribute access.
             # `to_sarif` touches these three ONLY inside this loop, which is why
             # every empty-results test passed while a deep scan with one finding
