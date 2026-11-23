@@ -5,6 +5,20 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.28] — 2026-11-24
+
+### Changed
+
+- The `agent_input` channel reads the `message` rules as well as the rules that declare `agent_input`, the way `prompt` reads them. On 0.6.27 a text scanned with `agent_input` is read by the rules that declare that channel only. Text fetched from a page or read from a file is scanned on `web_content` or `file`.
+
+- A finding of a secret class shows a marker at every door that prints or writes a match. The marker is the first four characters of the text it matched, its length, its rule id and a short digest. The doors are the command line in text and JSON, a SARIF file, the MCP result, the LangChain and CrewAI tools, and a report asked to carry the text. `--show-secrets` gives the full match back at the command line, in text and JSON. A SARIF file and the MCP result carry the marker with or without it. The library result is unchanged. 0.6.27 prints the full match at these doors.
+
+- The daily report's log and the mail settings file sit inside SUNGLASSES_HOME when it is set.
+
+### Fixed
+
+- The daily report lists a scan that found no pattern and did not finish, or did not read its whole input, as not fully inspected, with its own count. 0.6.27 counts a scan that ends on its time limit as an attack blocked, lists an input cut at the size limit in the attack log, and counts a file it could not extract in full, with no pattern found, as a clean pass.
+
 ## [0.6.27] — 2026-11-22
 
 ### Security
