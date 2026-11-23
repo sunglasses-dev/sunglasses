@@ -1128,7 +1128,7 @@ def test_main_hands_one_budget_to_the_reader_and_the_gate(tmp_path, monkeypatch,
     seen = {"read": [], "gate": []}
     real_read = g.rules_from_sources
     monkeypatch.setattr(g, "rules_from_sources",
-                        lambda src, budget=None: (seen["read"].append(budget), real_read(src, budget))[1])
+                        lambda src, budget=None, keys=None: (seen["read"].append(budget), real_read(src, budget, keys=keys))[1])
     monkeypatch.setattr(g, "gate", lambda *a, **k: (seen["gate"].append(k.get("budget")), ([], [], []))[1])
     before = time.monotonic()
     args = ["--repo", str(repo), "--wall-cap", "100"]
