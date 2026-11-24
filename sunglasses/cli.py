@@ -1269,9 +1269,9 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                         "name": f["name"],
                         "severity": f["severity"],
                         "category": f.get("category", "unknown"),
-                        "matched_text": shown_match(f, f.get("matched_text", ""),
-                                                    getattr(args, "show_secrets", False),
-                                                    secret_strings(scan_result.findings)),
+                        # The full match stays in the result: each output masks it ONCE, at its own door (the JSON
+                        # print below, the report projection). A mask here would be masked again there.
+                        "matched_text": f.get("matched_text", ""),
                         "taxonomy": for_category(f.get("category", "unknown")),
                     }
                     for f in scan_result.findings
@@ -1523,7 +1523,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
         sys.exit(repo_exit)
 
     if args.json or args.output == "json":
-        print(json.dumps(summary, indent=2))
+        print(json.dumps(mask_document(summary, getattr(args, "show_secrets", False)), indent=2))
         sys.exit(repo_exit)
 
     # Human-readable output

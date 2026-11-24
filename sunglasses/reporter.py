@@ -18,17 +18,49 @@ Usage:
 
 import json
 import os
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 from .engine import SunglassesEngine
+from . import _time_limit
+from .result import verdict_word
+
+# The ways a scan ends without having read the whole input. All are read from the result's own
+# fields (completeness, truncation, the rules that reached their time limit), never guessed from
+# a finding's category.
+END_TIME_LIMIT = "time_limit"
+END_NOT_READ_WHOLE = "not_read_whole"
+END_BOTH = "time_limit_and_not_read_whole"
+_END_WORDS = {
+    END_TIME_LIMIT: "stopped at the time limit",
+    END_NOT_READ_WHOLE: "not read whole",
+    END_BOTH: "stopped at the time limit and not read whole",
+}
+# What a log line that carries no finding ids (as 0.6.27 writes it) calls a time-limit finding.
+_LIMIT_NAMES = frozenset(_time_limit.finding_name(r) for r in ("scan_limit", "rule_limit"))
+
+
+def _sunglasses_home() -> Path:
+    from .firewall import sunglasses_home
+    return Path(sunglasses_home())
+
+
+def _end_of(result) -> Optional[str]:
+    """None when the whole input was read, else which way the scan stopped short."""
+    if result.inspection_complete:
+        return None
+    unread, ended = _time_limit.coverage_causes(result)
+    if ended and unread:
+        return END_BOTH
+    return END_TIME_LIMIT if ended else END_NOT_READ_WHOLE
 
 
 def _log_dir() -> Path:
     """Get or create the local log directory."""
-    d = Path.home() / ".sunglasses" / "logs"
+    d = _sunglasses_home() / "logs"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -40,12 +72,43 @@ def _log_file(date: Optional[str] = None) -> Path:
     return _log_dir() / f"scans-{date}.jsonl"
 
 
+
 class ProtectedEngine(SunglassesEngine):
     """Drop-in replacement for SunglassesEngine that logs every scan locally."""
 
+    # Per thread, the engines whose scan_file is running here: that engine's inner scan() must not write a
+    # row, because the file's own result is not final until the extractors' completeness is merged into it.
+    # Another engine on the same thread, and every other thread, still log their own scans.
+    _in_file_scan = threading.local()
+
+    def _holding_back(self) -> bool:
+        return bool(getattr(self._in_file_scan, "engines", {}).get(id(self), False))
+
     def scan(self, text: str, channel: str = "message") -> "ScanResult":
         result = super().scan(text, channel=channel)
+        if not self._holding_back():
+            self._log(result, channel)
+        return result
 
+    def scan_file(self, filepath: str) -> "ScanResult":
+        """Scan a file and log the FINAL result once: after the extraction's completeness is merged in."""
+        engines = getattr(self._in_file_scan, "engines", None)
+        if engines is None:
+            engines = {}
+            self._in_file_scan.engines = engines
+        before = engines.get(id(self), False)
+        engines[id(self)] = True
+        try:
+            result = super().scan_file(filepath)
+        finally:
+            if before:
+                engines[id(self)] = True
+            else:
+                engines.pop(id(self), None)
+        self._log(result, "file")
+        return result
+
+    def _log(self, result, channel: str) -> None:
         # Log to local file — never sent anywhere
         entry = {
             "ts": datetime.now().isoformat(),
@@ -58,6 +121,13 @@ class ProtectedEngine(SunglassesEngine):
             "findings_count": len(result.findings),
             "categories": [f["category"] for f in result.findings],
             "finding_names": [f["name"] for f in result.findings],
+            "finding_ids": [f.get("id") for f in result.findings],
+            # Whether the whole input was read, and if not which way the scan stopped short: the
+            # result's own fields, so the report never has to guess from a decision or a category.
+            "inspection_complete": bool(result.inspection_complete),
+            "truncated": bool(result.truncated),
+            "extraction_complete": bool(result.extraction_complete),
+            "end": _end_of(result),
         }
         # NO raw input logged — privacy first
         try:
@@ -66,7 +136,75 @@ class ProtectedEngine(SunglassesEngine):
         except Exception:
             pass  # never crash the scan because of logging
 
-        return result
+
+KIND_ATTACK = "attack"
+KIND_CLEAN = "clean"
+KIND_NOT_INSPECTED = "not_inspected"
+
+
+def _pattern_indices(e: dict) -> list:
+    """Which of the row's findings are something the text said. A time-limit finding says only that
+    checking did not finish: it is found by its id, or, on a log line that carries no finding ids,
+    by the name the time limit gives it."""
+    ids = e.get("finding_ids")
+    names = e.get("finding_names")
+    if isinstance(ids, list):
+        return [i for i, x in enumerate(ids) if x != _time_limit.LIMIT_ID]
+    if isinstance(names, list):
+        return [i for i, n in enumerate(names) if n not in _LIMIT_NAMES]
+    return list(range(int(e.get("findings_count") or 0)))
+
+
+def _limit_finding(e: dict) -> bool:
+    """Whether the row holds a time-limit finding."""
+    ids, names = e.get("finding_ids"), e.get("finding_names")
+    if isinstance(ids, list):
+        return _time_limit.LIMIT_ID in ids
+    return isinstance(names, list) and any(n in _LIMIT_NAMES for n in names)
+
+
+def _pattern_names(e: dict) -> list:
+    names = e.get("finding_names") or []
+    return [names[i] for i in _pattern_indices(e) if i < len(names)]
+
+
+def _row_kind(e: dict) -> str:
+    """Which of the three kinds a log row is: a pattern finding, a whole read with none, or neither.
+
+    A finding is a pattern finding: the row's own count of them. A row with none that was read
+    whole and allowed is clean. A row with none that is anything else was not fully inspected,
+    whatever word the decision carries: the engine's decision is about the bytes it read.
+    Lines without the completeness fields are read the same way: no finding and
+    not clean is a scan that did not finish.
+    """
+    if _pattern_indices(e):
+        return KIND_ATTACK
+    if _limit_finding(e):
+        return KIND_NOT_INSPECTED          # checking did not finish: never read as a clean pass
+    complete = e.get("inspection_complete")
+    if complete is None:
+        complete = bool(e.get("is_clean"))
+    if complete and e.get("decision") == "allow":
+        return KIND_CLEAN
+    return KIND_NOT_INSPECTED
+
+
+# The word each decision carries in the report. A decision this table does not know prints as itself.
+_HTML_LABEL = {"block": "NEUTRALIZED", "quarantine": "QUARANTINED", "allow_redacted": "REDACTED"}
+
+
+def _label(e: dict, html: bool = False) -> str:
+    """The row's label, made from its decision and nothing else."""
+    decision = str(e.get("decision", "unknown"))
+    if _row_kind(e) == KIND_NOT_INSPECTED:
+        complete = e.get("inspection_complete")
+        word = verdict_word(decision, False, bool(complete) if complete is not None else False)
+        return word.replace("_", " ").upper()
+    return (_HTML_LABEL.get(decision, decision.upper()) if html else decision.upper())
+
+
+def _end_text(e: dict) -> str:
+    return _END_WORDS.get(e.get("end"), "stop point not recorded")
 
 
 def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
@@ -103,29 +241,34 @@ def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
         return f"No scan data for {date}."
 
     # Calculate stats
+    kinds = [_row_kind(e) for e in entries]
+    attacks = [e for e, k in zip(entries, kinds) if k == KIND_ATTACK]
+    not_inspected = [e for e, k in zip(entries, kinds) if k == KIND_NOT_INSPECTED]
     total = len(entries)
-    blocked = sum(1 for e in entries if e["decision"] == "block")
-    quarantined = sum(1 for e in entries if e["decision"] == "quarantine")
-    clean = sum(1 for e in entries if e["is_clean"])
-    redacted = sum(1 for e in entries if e["decision"] == "allow_redacted")
+    blocked = sum(1 for e in attacks if e["decision"] == "block")
+    quarantined = sum(1 for e in attacks if e["decision"] == "quarantine")
+    clean = sum(1 for k in kinds if k == KIND_CLEAN)
+    redacted = sum(1 for e in attacks if e["decision"] == "allow_redacted")
 
-    # Category breakdown
+    # Category breakdown: rows with a pattern finding only
     all_categories = []
-    for e in entries:
-        all_categories.extend(e.get("categories", []))
+    for e in attacks:
+        cats = e.get("categories") or []
+        all_categories.extend(cats[i] for i in _pattern_indices(e) if i < len(cats))
     category_counts = {}
     for c in all_categories:
         category_counts[c] = category_counts.get(c, 0) + 1
 
     # Average latency
-    avg_latency = sum(e["latency_ms"] for e in entries) / total
+    avg_latency = sum(e.get("latency_ms", 0) for e in entries) / total
 
-    # Threat timeline
-    threats = [e for e in entries if not e["is_clean"]]
+    # Threat timeline: rows with a pattern finding; a scan that did not finish is listed apart
+    threats = attacks
 
     if as_html:
         return _generate_html_report(date, total, blocked, quarantined, clean,
-                                      redacted, category_counts, avg_latency, threats)
+                                      redacted, category_counts, avg_latency, threats,
+                                      not_inspected)
 
     # Terminal report
     lines = []
@@ -139,6 +282,8 @@ def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
     lines.append(f"  Attacks blocked:    {blocked}")
     lines.append(f"  Quarantined:        {quarantined}")
     lines.append(f"  Clean passes:       {clean}")
+    if not_inspected:
+        lines.append(f"  Not fully inspected: {len(not_inspected)}")
     if redacted:
         lines.append(f"  Redacted & passed:  {redacted}")
     lines.append(f"  Avg scan time:      {avg_latency:.2f}ms")
@@ -155,10 +300,19 @@ def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
         lines.append("  Attack log:")
         for t in threats[-10:]:  # last 10 threats
             ts = t["ts"].split("T")[1][:8]
-            names = ", ".join(t.get("finding_names", ["unknown"]))
-            lines.append(f"    [{ts}] {t['decision'].upper():>10s} — {names}")
+            names = ", ".join(_pattern_names(t) or ["unknown"])
+            lines.append(f"    [{ts}] {_label(t):>10s} — {names}")
         if len(threats) > 10:
             lines.append(f"    ... and {len(threats) - 10} more")
+        lines.append("")
+
+    if not_inspected:
+        lines.append("  Not fully inspected (nothing was concluded about these):")
+        for t in not_inspected[-10:]:
+            ts = t["ts"].split("T")[1][:8]
+            lines.append(f"    [{ts}] {_label(t):>14s} — {_end_text(t)}")
+        if len(not_inspected) > 10:
+            lines.append(f"    ... and {len(not_inspected) - 10} more")
         lines.append("")
 
     lines.append(f"  Without SUNGLASSES: {blocked + quarantined} attack(s)")
@@ -172,27 +326,38 @@ def generate_report(date: Optional[str] = None, as_html: bool = False) -> str:
 
 
 def _generate_html_report(date, total, blocked, quarantined, clean,
-                           redacted, category_counts, avg_latency, threats):
+                           redacted, category_counts, avg_latency, threats, not_inspected=()):
     """Generate a cybersecurity-themed HTML report."""
-    # Protection score (percentage of scans that were clean)
-    protection_score = round((clean / total) * 100) if total > 0 else 100
+    # Protection score: of the scans that were read whole, the share that were clean. A scan that did
+    # not finish is neither clean nor a threat, so it is not in the score; with none read whole there is none.
+    read_whole = total - len(not_inspected)
+    protection_score = round((clean / read_whole) * 100) if read_whole > 0 else None
     threat_count = blocked + quarantined
-    score_color = "#00ff88" if protection_score >= 90 else "#ffcc00" if protection_score >= 70 else "#ff4444"
+    score_shown = f"{protection_score}%" if protection_score is not None else "n/a"
+    score_for_color = protection_score if protection_score is not None else 0
+    score_color = ("#00ff88" if score_for_color >= 90 else "#ffcc00" if score_for_color >= 70 else "#ff4444") \
+        if protection_score is not None else "#889"
 
     # Threat log rows
     threat_rows = ""
     for t in threats[-20:]:
         ts = t["ts"].split("T")[1][:8]
-        names = ", ".join(t.get("finding_names", ["unknown"]))
+        names = ", ".join(_pattern_names(t) or ["unknown"])
         sev = t.get("severity", "high")
-        if t["decision"] == "block":
-            status_html = '<span class="badge badge-red">NEUTRALIZED</span>'
-        else:
-            status_html = '<span class="badge badge-yellow">QUARANTINED</span>'
+        status_html = f'<span class="badge badge-{"red" if t["decision"] == "block" else "yellow"}">{_label(t, html=True)}</span>'
         sev_html = f'<span class="badge badge-{"red" if sev in ("critical","high") else "yellow"}">{sev.upper()}</span>'
         threat_rows += f'''<div class="threat-row">
           <div class="threat-time">{ts}</div>
           <div class="threat-info"><div class="threat-name">{names}</div><div class="threat-meta">{status_html} {sev_html}</div></div>
+        </div>\n'''
+
+    # Scans that did not finish: their own section, never among the threats
+    ni_rows = ""
+    for t in not_inspected[-20:]:
+        ts = t["ts"].split("T")[1][:8]
+        ni_rows += f'''<div class="threat-row ni-row">
+          <div class="threat-time">{ts}</div>
+          <div class="threat-info"><div class="threat-name">{_end_text(t)}</div><div class="threat-meta"><span class="badge badge-grey">{_label(t, html=True)}</span></div></div>
         </div>\n'''
 
     # Category bars
@@ -239,7 +404,7 @@ def _generate_html_report(date, total, blocked, quarantined, clean,
   .score-ring svg {{ transform:rotate(-90deg); }}
   .score-ring .bg {{ fill:none; stroke:#111; stroke-width:8; }}
   .score-ring .fg {{ fill:none; stroke:{score_color}; stroke-width:8; stroke-linecap:round;
-    stroke-dasharray:{protection_score * 4.4} 440; transition:stroke-dasharray 1s; }}
+    stroke-dasharray:{(protection_score or 0) * 4.4} 440; transition:stroke-dasharray 1s; }}
   .score-num {{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
     font-size:42px; font-weight:800; color:{score_color}; font-family:-apple-system,sans-serif; }}
   .score-label {{ font-size:12px; color:#556; letter-spacing:2px; text-transform:uppercase; }}
@@ -278,6 +443,7 @@ def _generate_html_report(date, total, blocked, quarantined, clean,
     border-radius:3px; font-weight:700; text-transform:uppercase; }}
   .badge-red {{ background:rgba(255,68,68,0.15); color:#f66; border:1px solid rgba(255,68,68,0.3); }}
   .badge-yellow {{ background:rgba(255,200,0,0.1); color:#fc0; border:1px solid rgba(255,200,0,0.2); }}
+  .badge-grey {{ background:rgba(150,160,180,0.1); color:#9aa; border:1px solid rgba(150,160,180,0.25); }}
   .badge-green {{ background:rgba(0,255,100,0.1); color:#0f2; border:1px solid rgba(0,255,100,0.2); }}
 
   /* Speed */
@@ -321,7 +487,7 @@ def _generate_html_report(date, total, blocked, quarantined, clean,
         <circle class="bg" cx="80" cy="80" r="70"/>
         <circle class="fg" cx="80" cy="80" r="70"/>
       </svg>
-      <div class="score-num">{protection_score}%</div>
+      <div class="score-num">{score_shown}</div>
     </div>
     <div class="score-label">Protection Score</div>
   </div>
@@ -341,6 +507,8 @@ def _generate_html_report(date, total, blocked, quarantined, clean,
   {"<div class='section-head'>Threat Categories Detected</div>" + cat_rows if cat_rows else ""}
 
   {"<div class='section-head'>Incident Log</div>" + threat_rows if threat_rows else ""}
+
+  {"<div class='section-head'>Not Fully Inspected: " + str(len(not_inspected)) + " (nothing was concluded about these)</div>" + ni_rows if ni_rows else ""}
 
   <div class="impact">
     <div class="impact-num">{threat_count}</div>

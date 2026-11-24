@@ -1869,6 +1869,7 @@ class SunglassesEngine:
     # inherited scope.
     CHANNEL_ALIASES = {
         "prompt": "message",        # a prompt is a message-borne instruction
+        "agent_input": "message",   # text handed to an agent as input is a message-borne instruction
         "conversation": "message",
         "email": "message",         # an email body is a message
         "log": "log_memory",
