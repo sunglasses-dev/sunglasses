@@ -61,10 +61,11 @@ def test_framed_negated_and_live_hits_mixed_in_any_order(order):
 @pytest.mark.parametrize("order", ["fn", "nf", "fnfn"])
 def test_framed_and_negated_hits_together_stay_covered(order):
     parts = {"f": FRAMED, "n": NEGATED}
+    # The negated sentence has a subject in front of the forbidding word, so it is not the closed form and
+    # the hit in it is live: the text keeps the rule's own severity.
     decision, found = _scan(_rule(r"(?i)zorbit now"), "".join(parts[c] for c in order))
-    assert decision == "allow_redacted"
-    assert found["severity"] == "review"
-    assert found.get("defensive_context") or found.get("negation_context")
+    assert decision in BLOCKING
+    assert _is_live(found)
 
 
 def test_a_live_hit_in_the_second_alternative_of_the_rule_is_read():

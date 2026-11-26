@@ -67,6 +67,10 @@ SANCTIONED_SUBSETS = [
     # The settings validator's reach: the channels that carry a settings file (`code` is the
     # alias of `file`). Every other channel is asserted clear in the same test, from the full list.
     {"file", "tool_output", "code"},
+    # The lower-severity field tests walk the three page-text channels beside the channels the field does not
+    # name; the two halves are asserted apart so a channel the field names cannot hide one it does not.
+    {"file", "web_content", "code"},
+    {"message", "file", "tool_output"},
 ]
 
 # Sets sanctioned for ONE test file only, and only while that file still carries the tests that
@@ -81,6 +85,13 @@ SANCTIONED_SUBSETS = [
 # embedded content rule that closes it is a separate card, so these channels are not this rule's job.
 # file name -> (channel set, test functions that must exist in that same file)
 FILE_SCOPED_SUBSETS = {
+    # GLS-STRUCT-007 declares web_content and file. test_send_target_validator.py walks those two for the reader on
+    # its own rows, and walks the six channels the validator does not declare to assert that it stays silent there.
+    "test_send_target_validator.py": (
+        {"message", "tool_output", "prompt", "agent_input", "api_response", "log_memory"},
+        {"test_a_look_alike_send_target_is_reported_on_a_declared_channel",
+         "test_each_class_of_the_reader_on_both_declared_channels"},
+    ),
     # GLS-IP-009 declares the four channels that carry content an agent reads. The person's own channels
     # (message, prompt) are out of scope on purpose, so that a person's order to their own assistant is not
     # touched. test_reader_directed_orders.py walks the four for the rule, asserts on its own that every
@@ -89,6 +100,40 @@ FILE_SCOPED_SUBSETS = {
         {"web_content", "file", "api_response", "tool_output"},
         {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
          "test_the_rule_declares_only_the_channels_that_carry_content_the_agent_reads"},
+    ),
+    # GLS-IP-010 declares the same four channels as GLS-IP-009, for the same reason, and test_hypothetical_probe.py
+    # walks the four for the rule, asserts on its own that every other channel stays clear, and asserts that the
+    # rule declares exactly those four.
+    "test_hypothetical_probe.py": (
+        {"web_content", "file", "api_response", "tool_output"},
+        {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
+         "test_the_rule_declares_only_the_channels_that_carry_content_the_agent_reads"},
+    ),
+    # GLS-GHSA-PI-202 declares message, file, web_content and tool_output. test_a_notice_that_lists_what_not_to_send.py
+    # walks those four, asserts on its own that every other channel stays clear of the rule, and asserts that the rule
+    # declares exactly those four.
+    "test_a_notice_that_lists_what_not_to_send.py": (
+        {"message", "file", "web_content", "tool_output"},
+        {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
+         "test_the_rule_declares_only_the_channels_the_tests_walk"},
+    ),
+    "test_forbidding_lines_in_ordinary_layouts.py": (
+        {"message", "file", "web_content", "tool_output"},
+        {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
+         "test_the_rule_declares_only_the_channels_the_tests_walk"},
+    ),
+    # The two orders the hidden-text matrix leaves open are read on a page, a file and a tool result only.
+    # The test file asserts on its own that the order is not read on the channels it leaves out.
+    "test_two_orders_the_hidden_text_matrix_leaves_open_are_read_in_plain_text.py": (
+        {"web_content", "file", "tool_output"},
+        {"test_the_order_is_not_read_on_the_other_channels"},
+    ),
+    # GLS-EX-001 declares message, file and web_content. The notice test walks those three, asserts on its own that every
+    # other channel stays clear of the rule, and asserts that the rule declares exactly those three.
+    "test_a_notice_that_names_a_keyword_rules_own_phrase.py": (
+        {"message", "file", "web_content"},
+        {"test_every_channel_the_rule_does_not_declare_stays_clear_of_it",
+         "test_the_rule_declares_only_the_channels_the_tests_walk"},
     ),
     "test_sd010_export_prefix.py": (
         {"message", "file", "code"},

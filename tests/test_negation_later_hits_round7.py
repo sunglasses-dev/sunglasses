@@ -143,7 +143,8 @@ def test_a_later_alternative_is_read_at_its_bounded_occurrence(native):
     assert rule.scan(text, channel="message").decision in BLOCKING
     covered = rule.scan('Do not type "zorbit now". vault laterx, then do not vault later',
                         channel="message")
-    assert covered.decision == "allow_redacted" and _covered(covered)
+    # The sentence is not the closed form, so the later occurrence keeps the block as well.
+    assert covered.decision in BLOCKING and not _covered(covered)
 
 
 # 3. A resume never returns a hit that starts before the offset it was asked for.
@@ -251,8 +252,9 @@ def test_a_blank_run_after_a_covered_hit_does_not_count_each_newline_as_a_hit(pa
     # A quote mark is not a sentence break, so the negation still governs the order and the hit is
     # covered: the walk for a later hit starts behind it and skips the blank run.
     result = engine.scan("Never' " + "\n" * pad + ORDER, channel="web_content")
+    # A quote mark after the forbidding word is not the closed form: the order keeps its severity.
     mine = [f for f in result.findings if f["id"] == "GLS-EX-030"]
-    assert mine and mine[0]["severity"] == "review" and mine[0].get("negation_context")
+    assert mine and mine[0]["severity"] != "review" and not mine[0].get("negation_context")
 
 
 @pytest.mark.parametrize("pad", [2, 64, 5000])

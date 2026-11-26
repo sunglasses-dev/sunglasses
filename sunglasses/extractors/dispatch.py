@@ -520,6 +520,43 @@ def _opaque_result(path: str, label: str) -> ExtractionResult:
     return ExtractionResult(sources, [warning], complete=False)
 
 
+def _bytes_that_read_as_text(path):
+    """The file's text when every byte decodes as UTF-8 and none is NUL, else None.
+
+    A file signature is two or four bytes at the start. A note that begins with the two
+    letters of an executable header, or with the word FORM, starts with one. A binary has bytes that are not text (every real
+    executable, archive and media container carries NUL bytes and sequences that do not
+    decode), so a file whose bytes ALL decode as text is read as text whatever its first
+    bytes say, and an order on its second line is scanned. The format note stays as a note (the answer stays incomplete).
+    """
+    try:
+        if isinstance(path, Member):
+            raw = bytes(path)
+        else:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+    except OSError as exc:
+        raise UnreadableFile(path, exc) from exc
+    if not raw or b"\x00" in raw:
+        return None
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _with_the_text_behind_a_signature(path, result):
+    """Add the file's text to a "not inspected" answer when every byte of the file reads as text.
+
+    The format note stays a note about what the first bytes say, and the
+    answer stays incomplete; the text is ALSO scanned, so an order in it is found.
+    """
+    text = _bytes_that_read_as_text(path)
+    if text is None:
+        return result
+    return ExtractionResult(list(result.sources) + [("file", text)], result.warnings, complete=False)
+
+
 def extract_file_sources(path: str) -> ExtractionResult:
     """Route a file to the right extractor. Text and unknown types read as text.
 
@@ -559,14 +596,14 @@ def _extract_file_sources(path: str) -> ExtractionResult:
     if kind == "image":
         return _extract_image(path)
     if kind == "opaque":
-        return _opaque_result(path, label)
+        return _with_the_text_behind_a_signature(path, _opaque_result(path, label))
     if kind == "media":
-        return ExtractionResult(
+        return _with_the_text_behind_a_signature(path, ExtractionResult(
             [],
             [f"{label} not transcribed — deep scan not requested. Nothing in "
              f"{display_name(path)} was inspected. Re-run with --deep."],
             complete=False,
-        )
+        ))
 
     # Text, source code, config, and anything unrecognised: read it as text. Correct
     # for these, and complete — UNLESS the bytes did not all decode, in which case

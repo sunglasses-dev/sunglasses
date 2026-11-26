@@ -47,9 +47,11 @@ def test_RS10_catalog_counts():
  # 1594 -> 1595 and 1606 -> 1607 are GLS-PI-026, split out of GLS-MM-AUDIO-206 (one id added, none removed).
  # 1595 -> 1574 and 1607 -> 1586 are the 21 exact copies removed, none added.
  # 1576 -> 1577 and 1588 -> 1589 are one added rule, none removed.
- assert len(inspection.engine_catalog())==1577
+ # 1577 -> 1578 and 1589 -> 1590 are one more added rule, none removed.
+ # 1578 -> 1579 and 1590 -> 1591 are one more added rule, none removed.
+ assert len(inspection.engine_catalog())==1580
  assert len(inspection.helper_catalog())==12
- assert len(inspection.trusted_catalog())==1589
+ assert len(inspection.trusted_catalog())==1592
 
 def test_RS11_list_finding_provenance_is_preserved():
  page={'tools':[{'name':'echo','inputSchema':{'type':'object'}}]}

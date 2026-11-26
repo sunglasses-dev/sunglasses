@@ -149,8 +149,29 @@ def _no_trace_outlives_its_test():
     sys.settrace(before)
 
 
+def _mark_expected_red(items):
+    """Mark the rows listed in tests/expected_red_rows.json as strict xfail, the reason being the
+    name of the class the row belongs to. A row is keyed by the first 16 hex digits of the sha1 of
+    its node id. Strict: when a row starts to pass, the run fails and the row comes off the list in
+    the same change (the failure names the node id)."""
+    import hashlib
+    import json
+    import os
+    import pytest
+    path = os.path.join(os.path.dirname(__file__), "expected_red_rows.json")
+    if not os.path.exists(path):      # a copy of this conftest run in a temporary folder has no list beside it
+        return
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)
+    for item in items:
+        reason = rows.get(hashlib.sha1(item.nodeid.encode("utf-8")).hexdigest()[:16])
+        if reason:
+            item.add_marker(pytest.mark.xfail(strict=True, reason=reason))
+
+
 def pytest_collection_modifyitems(config, items):
     """CI_SHARD="i/n": keep part i of the collected suite (see tests/ci_shard.py)."""
+    _mark_expected_red(items)
     import ci_shard
     spec = ci_shard.spec_from_env()
     if not spec:

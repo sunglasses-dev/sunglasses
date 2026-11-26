@@ -38,7 +38,7 @@ import pytest
 from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
 from sunglasses import validators as validators_module
-from sunglasses.validators import (EnvironmentDumpedByPython, HookFetchAndRun, RegistryRedirectInShell,
+from sunglasses.validators import (EnvironmentDumpedByPython, HookFetchAndRun, LookAlikeSendTarget, RegistryRedirectInShell,
                                    SettingsWithoutPrompts, VALIDATORS)
 
 RULE = "GLS-STRUCT-001"
@@ -644,7 +644,7 @@ def test_the_layer_can_be_switched_off_and_changes_nothing_else():
 
 def test_the_layer_is_counted_apart_from_the_patterns():
     info = SunglassesEngine().info()
-    assert info["validators"] == len(VALIDATORS) == 4
+    assert info["validators"] == len(VALIDATORS) == 5
     assert SunglassesEngine(validators=False).info()["validators"] == 0
     bare = SunglassesEngine(validators=False).info()
     for key in ("patterns_with_matcher", "listed_patterns"):
@@ -1094,5 +1094,5 @@ def test_deep_nesting_does_not_raise(validator):
 
 def test_the_module_lists_exactly_the_validators_the_engine_runs():
     assert [type(v) for v in VALIDATORS] == [
-        HookFetchAndRun, SettingsWithoutPrompts, EnvironmentDumpedByPython, RegistryRedirectInShell]
+        HookFetchAndRun, SettingsWithoutPrompts, EnvironmentDumpedByPython, RegistryRedirectInShell, LookAlikeSendTarget]
     assert validators_module.VALIDATORS is VALIDATORS

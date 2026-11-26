@@ -60,4 +60,5 @@ def test_control_governing_negation_still_downgrades(engine):
     # A quote mark is not a sentence break, so the negation still governs the order.
     result = engine.scan("Never' " + EX030, channel="tool_output")
     mine = [f for f in result.findings if f["id"] == "GLS-EX-030"]
-    assert mine and all(f.get("negation_context") for f in mine)
+    # A quote mark after the forbidding word is not the closed form: the order keeps its severity.
+    assert mine and not any(f.get("negation_context") for f in mine)

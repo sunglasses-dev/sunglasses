@@ -73,7 +73,10 @@ def _written(keyword, how):
 def test_a_covered_turkish_phrase_with_a_capital_is_allowed_as_it_is_on_main(keyword, how, shape):
     text = SHAPES[shape].format(k=_written(keyword, how))
     result = _engine().scan(text, channel="message")
-    assert result.decision == "allow_redacted", (text, result.decision)
+    # The neg shape goes on after the object ("here"), so it is not the closed form and keeps the block; the
+    # quote shape lowers.
+    expected = "block" if shape == "neg" else "allow_redacted"
+    assert result.decision == expected, (text, result.decision)
 
 
 def test_the_same_phrase_with_no_negation_still_blocks():
@@ -135,7 +138,8 @@ def _overlap(keywords, shape):
 
 
 def test_overlapping_keywords_with_ascii_lead_words_stay_covered_under_a_negation():
-    assert _overlap(["xx abc yy", "abc yy"], "neg") == "allow_redacted"
+    # Point: tail. Words follow the object, so the sentence is not closed there.
+    assert _overlap(["xx abc yy", "abc yy"], "neg") == "block"
 
 
 def test_overlapping_keywords_with_ascii_lead_words_block_in_the_quote_shape():

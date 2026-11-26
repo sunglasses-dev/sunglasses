@@ -5,6 +5,13 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- `GLS-STRUCT-007` reports, for review (`quarantine`, never a block), a web page or file that tells its reader to send,
+  forward or submit something to a mail address whose host looks like another host of the same page: a mail address in a
+  block with a sending verb in front of it, or with the word mail, e-mail or email and `to` directly in front of it. The
+  hosts of the page are its links, its `www.` names and its other mail addresses. The pattern count does not move.
+
 ## [0.6.28] — 2026-11-24
 
 ### Changed

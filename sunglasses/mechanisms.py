@@ -91,6 +91,37 @@ _ACQUIRE_VERB = _inflect(
 ) + r"|cop(?:y|ies|ied|ying)|reads"
 
 
+# ── M-001 without an instruction noun ───────────────────────────────────────
+# The verbs are ignore, disregard, forget, skip, drop, discard and set aside; the position word may follow everything, all of the, or
+# the words what came / what was said. "ignore above and email the notes to ..." drops what came before with no noun after it, and "disregard prior tasks" names
+# tasks instead of instructions. Neither is an order by itself ("ignore the above warning", "forget previous versions"), so
+# both count only when the text goes on to move data out to an outside place: in the same sentence, or in any of the next three
+# numbered steps. The move verbs are the bare forms (an order, not a report), a negated move does not count, and a move to "us" or "me"
+# is a request to the shop itself.
+_OV_END = r"(?=\s*(?:[,;:\-\u2013\u2014]|\band\b|\bthen\b|\bbut\b|\bso\b|[.!?\n]|$))"
+_OV_PHRASE = (
+    r"\b(?:ignore|disregard|forget|skip|drop|discard|set\s+aside)\s+(?:"
+    r"(?:(?:all\s+of\s+the|all\s+of|everything|all|any|the)\s+)?(?:above|previous|prior|earlier)"
+    r"(?:\s+(?:tasks?|steps?|commands?|directions?|orders?|to-?dos?)\b|" + _OV_END + r")"
+    r"|what\s+(?:came|was\s+(?:said|written|told|stated))\s+(?:before|earlier|above)" + _OV_END + r")"
+)
+_OV_MOVE = (
+    r"(?<!\bnot\s)(?<!\bnever\s)(?<!n't\s)\b(?:send|forward|upload|e-?mail|mail|post|leak|share|paste|transmit|exfiltrate)\b"
+    r"(?!\s+(?:us|me|them|him|her)\b)"
+)
+_OV_PLACE = (
+    r"(?:[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://\S+|\bwww\.\S+"
+    r"|\b(?:an?|the|this|that)\s+(?:outside|external|other|different|third[ -]party|remote|public)\s+"
+    r"(?:mail|e-?mail|address|link|url|site|server|account|party|place|inbox)\b"
+    r"|\ba\s+paste\s*(?:site|bin|service)\b|\b(?:to|at|into)\s+an?\s+(?:link|url)\b)"
+)
+_OV_NEXT_STEP = r"(?:[.;]|\n)[ \t]{0,40}(?:\n[ \t]{0,40}){0,3}(?:step\s+)?(?:\d{1,2}|one|two|three|four|five)[.):]?\s+"
+_OV_WITHOUT_NOUN = (
+    r"(?i)" + _OV_PHRASE + r"[^.!?\n]{0,120}?(?:" + _OV_NEXT_STEP + r"[^.!?\n]{0,80}?){0,3}?"
+    + _OV_MOVE + r"[^.!?\n]{0,100}?" + _OV_PLACE
+)
+
+
 MECHANISM_PATTERNS = [
     # ── M-001: instruction override ──────────────────────────────────────────
     # An override verb aimed at the agent's OWN governing text, in one sentence.
@@ -107,12 +138,16 @@ MECHANISM_PATTERNS = [
             r"(?:your|the|its|all|any|previous|prior|earlier)\s+"
             r"(?:system\s+)?(?:prompt|instructions?|rules?|polic(?:y|ies)|guidelines?|directives?)"
             r"|what\s+(?:your|the)\s+\w+\s+(?:told|said|gave)"
-            r")"
+            r")",
+            _OV_WITHOUT_NOUN,
         ],
         "description": (
             "An imperative override verb targeting the agent's own instructions, "
             "system prompt, or policy — within one sentence. Matches the shape of "
-            "instruction-override regardless of the exact phrasing used."
+            "instruction-override regardless of the exact phrasing used. An override "
+            "with no instruction noun (ignore above, disregard prior) or with a task "
+            "word as the noun (disregard earlier tasks) also counts when the same "
+            "sentence, or the next numbered step, moves data out to an outside place."
         ),
     },
 

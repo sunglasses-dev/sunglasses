@@ -19,7 +19,6 @@
     "<admin>",
     "this is an important message from me",
     "this is a message from the user",
-    "important message from",
     "before you can solve the task",
     "before you solve the task",
     "before you continue",
@@ -27,7 +26,9 @@
     "please do this first",
     "before the original task"
   ],
-  "regex": [],
+  "regex": [
+    "(?i)(?:<information>|<important>|<instructions>|<system>|<admin>|this is an important message from me(?![^\\W_])|this is a message from the user(?![^\\W_])|before you can solve the task(?![^\\W_])|before you solve the task(?![^\\W_])|before you continue(?![^\\W_])|please do the following first(?![^\\W_])|please do this first(?![^\\W_])|before the original task(?![^\\W_])|important\\s+message\\s+from(?:(?![^\\W_])(?![ \\t\\r\\n]{1,3}(?!(?:i|we|me|us|my|our|mine|ours|myself|ourselves)\\b)[^\\W\\d_])|[ \\t\\r\\n]{1,3}(?:[^.!?\\n<>]|\\.(?=[^\\s.!?])|(?<=\\bdr)\\.|(?<=\\bmr)\\.|(?<=\\bmrs)\\.|(?<=\\bms)\\.|(?<=\\bprof)\\.|(?<=\\bjr)\\.|(?<=\\bsr)\\.){1,60}?\\bto\\s+you\\b))"
+  ],
   "examples": {
     "malicious": [],
     "benign": []
