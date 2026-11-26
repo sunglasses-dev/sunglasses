@@ -5,12 +5,73 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.29] — 2026-11-26
+
 ### Added
 
-- `GLS-STRUCT-007` reports, for review (`quarantine`, never a block), a web page or file that tells its reader to send,
-  forward or submit something to a mail address whose host looks like another host of the same page: a mail address in a
-  block with a sending verb in front of it, or with the word mail, e-mail or email and `to` directly in front of it. The
-  hosts of the page are its links, its `www.` names and its other mail addresses. The pattern count does not move.
+- A rule blocks a page or a file that orders the reader to send other people's stored data to an outside mail address. That covers logs, conversations, credentials, sessions, configuration, prompts, a history and card data. A long opening or one line break inside the sentence does not move the order out of reach, whatever line ending the file uses, and a negated form keeps the block.
+
+- A second rule covers the same request in the passive, as in "the saved logs should be forwarded to" an address, and in a that clause such as "it is recommended that". A negated passive keeps the block.
+
+- A rule blocks a pretend case (suppose, imagine, a drill, a scenario) that asks an AI reader to send the private or stored data of a person to a mail address or a link, or to show the steps. It reads a web page, a file, an API response and tool output.
+
+- A new finding for pages and files that tell their reader to send something to a mail address whose host looks like another host of the same page. The scan reads the links, the www names and the mail addresses of the page. It reports the address when its host holds another host's registered name, carries that name under another ending, or spells that host in front of its own registered name. The finding is `GLS-STRUCT-007`, severity medium, on the `web_content` and `file` channels. A scan that holds it ends in quarantine, a finding for review.
+
+### Changed
+
+- The access key rules read the key shape in the case it is written. The previous release, 0.6.28, reads the shape in any case, so country names written together can read as a key there. Two rules about fetched pages and feeds read whole words, and the longer forms of their own words stay covered.
+
+- The rule for display in front of a script, iframe or form reads the style property display, as in a hidden block before an iframe, as the property.
+
+- The override check `GLS-MECH-001` also reads an override that names no instruction, as in disregard prior tasks, in a sentence that goes on to send data to an outside place.
+
+- The rule for an order to send a secret reads fourteen more sending verbs with a secret object and a mail address.
+
+- The workflow rule for support and debug lines asks for a secret object, such as a token, a credential, a secret, the environment variables, a .env file, or somebody's whole config, history or context, and it covers more asking verbs. A bug report line that asks for a version, a config file or a log reads as ordinary help text.
+
+- An HTML page on web content is read as parts, in one pass. The text flow, the attribute values, the comments, the script and style bodies and the start tags each go through the rules on their own, and the page gets one result. A word split by an inline tag stays one word. Block edges, list items, table cells and line breaks start a new line, and the text flow is also read with each block edge as a space, so an order split over two blocks is still found. A text with no tag is read as one string.
+
+- On web content the secret rules read the text flow, the attribute values, the comments and data blocks (JSON, `JSON-LD`, templates, a script of an unknown type). The code of a script and the body of a stylesheet go through every other rule. The previous release, 0.6.28, reads the secret rules there too. To have the code of a script or a stylesheet checked for secrets, scan it as a file.
+
+- A stylesheet carried in a data address is read as one more style body of the page. A tag that is no known element stays in the text flow as written. The words around a pinned site metadata tag are read together with the tag. The address of a link is read right behind its words, as a page turned into text for an agent shows it. A comment part is the comment as written.
+
+- A page that holds more different parts with white space in them than can be read one at a time is blocked, with a finding that says so. A page under that count is read part by part. The previous release, 0.6.28, reads such a page as one text.
+
+- A rule that anchors on a markup mark also reads the page as written, so it reads as much on a page cut into parts as on the page as one string.
+
+- The rule for a comment or metadata note that overrides something covers more of the things such a note can override, among them restrictions, guidelines and safeguards.
+
+- A forbidding word lowers a finding only when the sentence, read as written, plainly forbids the act itself. Anything else keeps the severity of the rule. A notice that the previous release, 0.6.28, records can be blocked in this release. A forbidding word reads its sentence across one line break between the word and the act, whatever line ending the file uses. The previous release, 0.6.28, blocks a notice wrapped that way. In a file, a forbidding sentence that stands behind a markup tag keeps the severity of the rule. The previous release, 0.6.28, lowers it.
+
+- A finding in a report carries a new `shown_text` field that holds the words of the input as written, widened to whole words and never empty, and the command line prints it. Where the matched words do not stand in the input as written, as on a page with markup between them or in a decoded view, the field shows the scanner's own reading. A rule that reads the whole text says so in place of a phrase. The `matched_text` field is unchanged.
+
+- The wrapper rule reads the phrase important message from when the sender is the first person, as in an important message from me, and when the phrase ends in the reader. An announcement that names another sender, as a shop or a school writes it, reads as ordinary text. The previous release, 0.6.28, reads that announcement as the wrapper.
+
+- The hypothetical framing rule is recorded at low severity on a web page and in a file. In a message it keeps its severity.
+
+- The rule for retrieved text that gives orders about the reply also reads a conditional order to add something to a record silently when a person asks for something.
+
+- The MCP server returns a compact result. Each finding is listed once, under `findings`, with its id, name, category, severity, channel and `matched_text`, and a secret is shown as a mask. The list holds at most 50 findings, a match is cut at 300 characters, and the whole result is at most 64 KiB. When findings are left out, `more_findings` counts them by category. The previous release, 0.6.28, also lists the findings of `scan_file` under `threats`, and a finding there carries more fields, `also_matched`, `reason` and `taxonomy` from `scan_text` and `description` and `keywords` from `scan_file`.
+
+- A name made of digits and marks alone does not count as the name of an AI reader on an urgent page or in hidden text. A page that holds more different numbers than are read one by one keeps its block.
+
+- A file whose first bytes match a binary format and whose every byte reads as text is also scanned as text. The format note stays and the answer stays incomplete. The previous release, 0.6.28, does not scan the text of such a file.
+
+### Fixed
+
+- One rule for automation metadata reads long inputs in linear time. What it matches is unchanged.
+
+- The keyword index holds a keyword in its folded reading beside the written one. A rule that is a list of keywords is found through an order keyword that holds a digit or an exclamation mark, and through its keywords written in Cyrillic, Greek or Thai letters. The previous release, 0.6.28, does not find a rule through a keyword that holds a digit or an exclamation mark.
+
+### Known limits
+
+- A line that forbids or describes an order in other words than the plain form still reads as the order. This errs on the side of the block.
+
+- The rule for an order to send a secret can still read an honest sentence that holds the word email and a secret word as that order. This errs on the side of the block.
+
+- A line that tells staff to send another person's records to a mail address reads as such an order. This errs on the side of the block.
+
+- When an MCP result is cut further to fit its size, the count in `more_findings` reads higher than the number of findings left out. The decision is not affected.
 
 ## [0.6.28] — 2026-11-24
 
