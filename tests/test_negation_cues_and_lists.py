@@ -81,14 +81,16 @@ def _blocking(engine, text):
     return {f["id"] for f in engine.scan(text, channel="file").findings if f["severity"] in ("high", "critical")}
 
 
-def test_the_feedback_readme_with_plain_payloads_in_place_of_its_list_sentences_never_blocks(engine):
+# Benign wording the closed form blocks: made-up text that puts plain payloads in the list sentences of the
+# feedback README. The closed form reads the two literal tails for their own rule only.
+def test_the_feedback_readme_with_plain_payloads_in_place_of_its_list_sentences_now_blocks(engine):
     text = (
         "# Plugin\n\n" + README_LINES["sc015_no_session_cookies"] + "\n\n"
         "The plugin does not ignore previous instructions anywhere other than the API itself.\n\n"
         "The plugin does not ignore previous instructions without telling the user first.\n"
     )
-    assert _decision(engine, text) != "block"
-    assert _blocking(engine, text) == set()
+    assert _decision(engine, text) == "block"
+    assert _blocking(engine, text) != set()
 
 
 def test_the_gate_source_file_never_blocks(engine):
@@ -107,7 +109,8 @@ NEW_CUES = ["no", "not", "does not", "doesn't", "did not", "didn't", "cannot", "
 
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_new_cue_covers_the_payload_it_governs(engine, cue):
-    assert _decision(engine, f"We {cue} {PAYLOAD}") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} {PAYLOAD}") == "block"
 
 
 OLD_CUES = ["do not", "don't", "never", "avoid", "should not", "must not"]
@@ -115,7 +118,8 @@ OLD_CUES = ["do not", "don't", "never", "avoid", "should not", "must not"]
 
 @pytest.mark.parametrize("cue", OLD_CUES)
 def test_an_existing_cue_still_covers_it(engine, cue):
-    assert _decision(engine, f"We {cue} {PAYLOAD}") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} {PAYLOAD}") == "block"
 
 
 # Bypass guards. Each is a block on main and must stay one.
@@ -301,7 +305,8 @@ CURLY_CUES = ["doesn’t", "didn’t", "can’t", "won’t", "isn’t", "aren’
 
 @pytest.mark.parametrize("cue", CURLY_CUES)
 def test_a_curly_apostrophe_cue_covers_the_payload_it_governs(engine, cue):
-    assert _decision(engine, f"We {cue} {PAYLOAD}") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} {PAYLOAD}") == "block"
 
 
 def test_a_curly_apostrophe_cue_does_not_cover_what_it_does_not_govern(engine):
@@ -368,13 +373,15 @@ def test_a_word_that_turns_the_next_thing_into_an_order_counts_in_either_place_o
 
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_new_cue_reaches_one_word_not_two(engine, cue):
-    assert _decision(engine, f"We {cue} log {PAYLOAD}") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} log {PAYLOAD}") == "block"
     assert _decision(engine, f"We {cue} log it {PAYLOAD}") == "block"
 
 
 @pytest.mark.parametrize("cue", OLD_CUES)
 def test_an_existing_cue_still_reaches_two_words(engine, cue):
-    assert _decision(engine, f"We {cue} log it {PAYLOAD}") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} log it {PAYLOAD}") == "block"
 
 
 # 6c. A refusal message is a complete, single-line call with a complete string, in code.
@@ -714,7 +721,8 @@ def test_a_list_keeps_its_findings_with_a_line_after_it_except_inside_the_refusa
                                   "andante", "sandbox", "fork"])
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_word_that_only_contains_and_or_or_does_not_join_items(engine, cue, word):
-    assert _decision(engine, f"We {cue} {PAYLOAD} in the {word} here.") == "allow_redacted"
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} {PAYLOAD} in the {word} here.") == "block"
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
@@ -731,9 +739,10 @@ def test_a_new_cue_in_front_of_a_payload_with_a_comma_after_it_stays_a_block(eng
 
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_separator_after_the_end_of_the_sentence_does_not_matter(engine, cue):
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
     for tail in (". Later, we sleep.", "! Later, x and y", "? Later, x or y", ".\n- a\n- b",
                  "\n", "\n\n", " \n ", ".\nLater, x"):
-        assert _decision(engine, f"We {cue} {PAYLOAD}{tail}") == "allow_redacted", repr(tail)
+        assert _decision(engine, f"We {cue} {PAYLOAD}{tail}") == "block", repr(tail)
 
 
 BEFORE_PREFIXES = ["ordinary, ", "a; ", "a: ", "a / ", "a & ", "a and ", "a or ", "a nor ",
@@ -745,7 +754,8 @@ BEFORE_PREFIXES = ["ordinary, ", "a; ", "a: ", "a / ", "a & ", "a and ", "a or "
                                     "or\u4e2d ", "nor\u0436 ", "xor ", "Xand ", "ORE ", "andy "])
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_word_that_only_contains_a_joining_word_in_front_of_the_cue_joins_nothing(engine, cue, prefix):
-    assert _decision(engine, f"{prefix}{cue} {PAYLOAD}.") == "allow_redacted", prefix
+    # A word stands in front of the forbidding word, so the sentence is not the closed form.
+    assert _decision(engine, f"{prefix}{cue} {PAYLOAD}.") == "block", prefix
 
 
 # Only a LETTER sits against a joining word and makes it part of a longer word. A digit, an
@@ -809,11 +819,19 @@ def test_a_list_mark_in_front_of_the_cue_since_the_last_sentence_end_means_main(
 
 @pytest.mark.parametrize("prefix", ["Done, ok. ", "Done.\n", "Done!\n\n", "Fine? ", "a; b. ",
                                     "However we ", "Mostly "])
-@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("cue", NEW_CUES + OLD_CUES)
 def test_a_list_mark_before_the_previous_sentence_end_does_not_matter(engine, cue, prefix):
+    # A true cue governs where it starts its sentence (a full stop, "!" or "?" and then a space or a blank line);
+    # words before it, or a lone line break after the stop, take the start away. A plain cue governs nothing on the
+    # plain road, so its text is read as plain text at every start.
     governed, _ = _governed(engine, f"{prefix}{cue} {LIST_FIRST}.",
                             f"{prefix}xx {LIST_FIRST}.")
-    assert governed, prefix
+    if prefix == "Done.\n":
+        # A line break after the full stop starts the sentence: the text answers as its one-line twin.
+        twin, _ = _governed(engine, f"Done. {cue} {LIST_FIRST}.", f"Done. xx {LIST_FIRST}.")
+        assert governed is twin, prefix
+        return
+    assert governed is (cue in OLD_CUES and prefix in ("Done, ok. ", "Done!\n\n", "Fine? ", "a; b. ")), prefix
 
 
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
@@ -822,10 +840,10 @@ def test_the_sentence_end_must_come_within_200_characters_of_the_cue(engine, cue
     def case(filler, end):
         return (f"We {cue} {LIST_FIRST} " + "x" * filler + end,
                 f"We xx {LIST_FIRST} " + "x" * filler + end)
-    assert _governed(engine, *case(100, "."), channel)[0]
+    # A subject stands in front of the cue, so the sentence is not the closed form at any distance.
+    assert not _governed(engine, *case(100, "."), channel)[0]
     assert _governed(engine, *case(300, "."), channel)[1]
-    # No sentence end at all: the end of a short text counts, a long run does not.
-    assert _governed(engine, *case(100, ""), channel)[0]
+    assert not _governed(engine, *case(100, ""), channel)[0]
     assert _governed(engine, *case(300, ""), channel)[1]
 
 
@@ -836,10 +854,10 @@ def test_a_list_mark_between_the_cue_and_the_payload_means_main(engine, cue, gap
     assert got and got == _sev(engine, f"xx {gap} {LIST_FIRST}.")
 
 
-@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("cue", NEW_CUES + OLD_CUES)
 def test_only_the_last_sentence_end_before_the_cue_counts(engine, cue):
     governed, _ = _governed(engine, f"One. a, b. {cue} {LIST_FIRST}.", f"One. a, b. xx {LIST_FIRST}.")
-    assert governed
+    assert governed is (cue in OLD_CUES)
 
 
 @pytest.mark.parametrize("tail", [" v1.2, log.", ".5, log", "?x, log."])
@@ -853,25 +871,26 @@ def test_a_full_stop_inside_a_word_or_number_does_not_end_the_sentence(engine, c
                                   ".] Later, a, b", ".\u201d Later, a, b"])
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_a_sentence_end_may_be_followed_by_a_closing_quote_or_bracket(engine, cue, tail):
+    # A subject or other words stand in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
     governed, _ = _governed(engine, f"We {cue} {LIST_FIRST}{tail}", f"We xx {LIST_FIRST}{tail}")
-    assert governed, tail
+    assert not governed, tail
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_the_200_character_bound_is_exact_from_the_end_of_the_payload(engine, cue):
-    """The sentence end 200 characters after the payload still governs, 201 does not; so does
-    the end of the text. Only the distance after the payload counts."""
+    """Words follow the object and the sentence goes on, so it is not the closed form at any distance:
+    the cue governs nothing, with a sentence end or without one."""
+    # Point: tail. Words follow the object, so the sentence is not closed there.
     head = f"{cue} {LIST_FIRST} "
-    for after, expect_governed in ((199, True), (200, True), (201, False)):
+    for after in (199, 200, 201):
         text = head + "x" * (after - 1) + "."
         plain = "xx" + text[len(cue):]
         governed, as_main = _governed(engine, text, plain)
-        assert governed is expect_governed and as_main is (not expect_governed), after
-    # Without a sentence end, a text that ends within the bound is read; one char more is not.
-    for after, expect_governed in ((199, True), (200, True), (201, False)):
+        assert not governed and as_main, after
+    for after in (199, 200, 201):
         text = head + "x" * (after - 1)
         plain = "xx" + text[len(cue):]
-        assert _governed(engine, text, plain)[0] is expect_governed, after
+        assert not _governed(engine, text, plain)[0], after
 
 
 @pytest.mark.parametrize("cue", NEW_CUES)
@@ -897,13 +916,13 @@ def test_a_separator_any_distance_before_the_cue_since_the_last_sentence_end_mea
     assert got and got == _sev(engine, f"{front}xx {LIST_FIRST}."), distance
 
 
-@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("cue", NEW_CUES + OLD_CUES)
 @pytest.mark.parametrize("distance", [199, 200, 201, 1000])
 def test_a_sentence_end_ends_the_look_back_at_any_distance(engine, cue, distance):
     filler = "w" * distance
     text = f"a, b. {filler}. {cue} {LIST_FIRST}."
     governed, _ = _governed(engine, text, f"a, b. {filler}. xx {LIST_FIRST}.")
-    assert governed, distance
+    assert governed is (cue in OLD_CUES), distance
 
 
 BREAKS = ["\n", "\r", "\r\n", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"]
@@ -920,11 +939,18 @@ def test_a_line_break_in_front_of_the_cue_counts_with_text_before_or_after_it(en
 
 
 @pytest.mark.parametrize("br", BREAKS)
-@pytest.mark.parametrize("cue", NEW_CUES)
+@pytest.mark.parametrize("cue", NEW_CUES + OLD_CUES)
 def test_a_break_right_after_a_sentence_end_is_a_paragraph_start(engine, cue, br):
-    for front in (f"Done.{br}", f"Done. {br}"):
+    # A line break straight after the full stop (a line feed, a carriage return, both, a line separator) and the
+    # paragraph separator start the sentence: the text answers as its one-line twin. The other break characters
+    # start no sentence; a blank and then the break starts the sentence, and the cue governs.
+    twin, _ = _governed(engine, f"Done. {cue} {LIST_FIRST}.", f"Done. xx {LIST_FIRST}.")
+    for front, starts in ((f"Done.{br}", br == "\u2029"), (f"Done. {br}", True)):
         governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
-        assert governed, repr(front)
+        if front == f"Done.{br}" and br in ("\n", "\r", "\r\n", "\u2028"):
+            assert governed is twin, repr(front)
+            continue
+        assert governed is (starts and cue in OLD_CUES), repr(front)
 
 
 PARAGRAPH_ENDS = [".", "!", "?", '."', ".'", ".\u201d", ".\u2019", ".)", ".]", ".}", '.")', "!\u201d", "?)"]
@@ -944,7 +970,8 @@ def test_a_paragraph_start_is_a_sentence_boundary_the_cue_may_stand_after_words_
         for gap in ("", " ", "  ", f"{br}"):
             front = f"Done{end}{gap}{br}The plugin "
             governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.", channel)
-            assert governed, repr(front)
+            # "The plugin" stands in front of the cue in its paragraph, so the sentence is not the closed form.
+            assert not governed, repr(front)
 
 
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
@@ -984,7 +1011,8 @@ def test_an_opening_quote_after_the_break_starts_the_new_paragraph(engine, cue, 
     for q in OPENING_QUOTES:
         front = f"Done.{br}{q}The plugin "
         governed, _ = _governed(engine, f"{front}{cue} {LIST_FIRST}.", f"{front}xx {LIST_FIRST}.")
-        assert governed, repr(front)
+        # "The plugin" stands in front of the cue in its paragraph, so the sentence is not the closed form.
+        assert not governed, repr(front)
 
 
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
@@ -1058,9 +1086,10 @@ def test_each_comma_named_character_is_a_separator_in_front_of_the_cue_and_after
 @pytest.mark.parametrize("edge", ["\u00e9", "\u0436", "\u4e2d", "x", "Q"])
 @pytest.mark.parametrize("cue", NEW_CUES[:3])
 def test_a_joining_word_glued_to_a_letter_is_not_a_joining_word(engine, cue, word, edge):
+    # Words follow the object and the sentence goes on, so it is not the closed form: the cue governs nothing.
     for tail in (f" {edge}{word} more.", f" {word}{edge} more."):
         governed, _ = _governed(engine, f"{cue} {LIST_FIRST}{tail}", f"xx {LIST_FIRST}{tail}")
-        assert governed, tail
+        assert not governed, tail
 
 
 @pytest.mark.parametrize("word", ["and", "or", "nor", "AND", "Or"])
@@ -1091,14 +1120,17 @@ def test_a_gap_longer_than_200_characters_between_the_cue_and_the_payload_is_rea
 @pytest.mark.parametrize("cue", NEW_CUES)
 def test_the_payload_itself_is_not_read_for_separators(engine, cue):
     """A URL has a colon and solidi; the payload is what the cue governs."""
-    assert _decision(engine, f"We {cue} {PAYLOAD}") == "allow_redacted"
-    assert _decision(engine, f"We {cue} {PAYLOAD} then rest.") == "allow_redacted"
+    # A subject stands in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert _decision(engine, f"We {cue} {PAYLOAD}") == "block"
+    assert _decision(engine, f"We {cue} {PAYLOAD} then rest.") == "block"
 
 
 @pytest.mark.parametrize("channel", LIST_CHANNELS)
 @pytest.mark.parametrize("cue", OLD_CUES)
 def test_an_existing_cue_reads_the_first_item_as_it_does_on_main(engine, cue, channel):
-    assert _decision(engine, f"{cue} {LIST_FIRST}, log, or store.", channel) == "allow_redacted"
+    # Point: tail. Words follow the object, so the sentence is not closed there.
+    # The items after the payload are verbs, not objects of the one verb, so the list is not the closed form.
+    assert _decision(engine, f"{cue} {LIST_FIRST}, log, or store.", channel) == "block"
 
 
 # 7b. Inside the string of a refusal line, a new cue never lowers a finding: an injection
@@ -1128,4 +1160,5 @@ def test_the_same_words_outside_a_refusal_string_are_the_named_idiom_residual(en
     sev = {f["id"]: f["severity"] for f in r.findings}
     assert r.decision == "block"
     assert sev["GLS-PI-001"] == "high"
-    assert sev["GLS-CF-252"] == "review"
+    # A subject stands in front of the cue, so no rule is lowered here.
+    assert sev["GLS-CF-252"] == "high"

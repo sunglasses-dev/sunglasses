@@ -142,6 +142,7 @@ def _plain(result):
         # the `view` mark stays on the engine's own results and never goes over the wire
         "findings": [{k: v for k, v in f.items() if k != "view"} if "view" in f else f for f in result.findings],
         "raw_input": result.raw_input, "normalized_input": result.normalized_input,
+        "page_text": result.page_text,
         "channel": result.channel, "latency_ms": result.latency_ms, "truncated": result.truncated,
         "bytes_scanned": result.bytes_scanned, "extraction_complete": result.extraction_complete,
         "extraction_warnings": result.extraction_warnings,
@@ -309,7 +310,7 @@ def _raised(reply):
 # read as "complete" and a result with no findings as clean.
 _PLAIN_TYPES = (
     ("event_id", str), ("decision", str), ("findings", list), ("raw_input", str),
-    ("normalized_input", str), ("channel", str), ("latency_ms", (int, float)),
+    ("page_text", str), ("normalized_input", str), ("channel", str), ("latency_ms", (int, float)),
     ("truncated", bool), ("bytes_scanned", int), ("extraction_complete", bool),
     ("extraction_warnings", list), ("extraction_sources", list), ("time_limit_ended", list),
 )
@@ -359,6 +360,7 @@ def _rebuild(plain):
     result = ScanResult(plain["decision"], plain["findings"], plain["raw_input"],
                         plain["normalized_input"], plain["channel"], plain["latency_ms"])
     result.event_id = plain["event_id"]
+    result.page_text = plain["page_text"]
     result.truncated = plain["truncated"]
     result.bytes_scanned = plain["bytes_scanned"]
     result.extraction_complete = plain["extraction_complete"]

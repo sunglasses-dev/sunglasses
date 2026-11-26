@@ -173,8 +173,9 @@ def test_a_prohibition_in_front_still_covers_the_phrase():
     variant, _ = _twin_pair("I am not a developer at{}Anthropic.", ZWSP)
     result = ENGINE.scan(variant, channel="message")
     held = [f for f in result.findings if f["id"] == "GLS-PI-021"]
-    assert held and held[0].get("negation_context")
-    assert result.decision != "block"
+    # A subject stands in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    assert held and not held[0].get("negation_context")
+    assert result.decision == "block"
 
 
 def test_a_later_occurrence_that_nothing_covers_blocks():

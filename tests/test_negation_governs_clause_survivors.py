@@ -33,11 +33,9 @@ def engine():
     return SunglassesEngine()
 
 
-REASON = "bare gap words read like real prose, a lexical rule cannot tell them apart"
-
 @pytest.mark.parametrize(
     "name",
-    [pytest.param(n, marks=pytest.mark.xfail(strict=True, reason=REASON)) for n in SURVIVORS],
+    list(SURVIVORS),
     ids=list(SURVIVORS),
 )
 def test_survivor_still_downgraded(engine, name):

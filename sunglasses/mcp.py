@@ -98,9 +98,9 @@ def handle_tools_list(params):
                     "other AI agent security threats. Returns findings, a severity, a decision "
                     "(allow, block, quarantine or allow_redacted) and inspection_complete. "
                     "The decision is reported to the caller and is not enforced. This tool "
-                    "blocks nothing and returns the matched text of each finding in full, "
-                    "allow_redacted included. isError false means the scan ran, not that "
-                    "the input is clean. "
+                    "blocks nothing and returns the matched words of each finding; a secret "
+                    "shows its first 4 characters, its length and its rule id. "
+                    "isError false means the scan ran, not that the input is clean. "
                     "Read is_clean and inspection_complete in the result."
                 ),
                 "inputSchema": {
@@ -240,6 +240,106 @@ def _off_note(why):
             f"a rule that never finishes is not stopped.\n\n") if why else ""
 
 
+# ── what a result carries ───────────────────────────────────────────────────
+#
+# A tool result is read by a model and written to its logs, so it is built for that
+# reader. Per finding it carries the rule id, the name, the category, the severity,
+# the channel the input came in on and the words that matched -- never the rule's own
+# keyword list or regex list, and each finding once. A finding of a secret class shows
+# its marker (see door_mask); the full secret does not leave the process through this door.
+# At most MAX_FINDINGS findings are listed, then one entry counts the rest by category,
+# and the whole result is at most MAX_RESULT_BYTES.
+MAX_FINDINGS = 50
+MAX_RESULT_BYTES = 64 * 1024
+MAX_SHOWN_CHARS = 300
+
+
+def _shown_words(finding):
+    """The words listed for a finding. A document handed to this function has been through mask_document at
+    the door, so the words are already a marker for a secret; here they are only cut to a readable length."""
+    matched = finding.get("matched_text")
+    if not isinstance(matched, str) or not matched:
+        return None
+    if len(matched) > MAX_SHOWN_CHARS:
+        return matched[:MAX_SHOWN_CHARS] + "\u2026"
+    return matched
+
+
+def _compact_findings(findings, channel):
+    """Each finding once, as id, name, category, severity, channel, shown words; capped.
+
+    Returns (listed, rest) where rest is None or {"count": n, "by_category": {...}}.
+    """
+    listed, seen, rest = [], set(), {}
+    for f in findings or []:
+        if not isinstance(f, dict):
+            continue
+        shown = _shown_words(f)
+        key = (f.get("id"), shown)
+        if key in seen:
+            continue
+        seen.add(key)
+        if len(listed) >= MAX_FINDINGS:
+            category = str(f.get("category"))
+            rest[category] = rest.get(category, 0) + 1
+            continue
+        entry = {"id": f.get("id"), "name": f.get("name"),
+                 "category": f.get("category"), "severity": f.get("severity"),
+                 "channel": channel}
+        if shown is not None:
+            entry["matched_text"] = shown
+        listed.append(entry)
+    if not rest:
+        return listed, None
+    return listed, {"count": sum(rest.values()), "by_category": rest}
+
+
+def _door_document(doc):
+    """The result a caller gets: the scan document without the rule objects, findings compacted."""
+    out = {k: v for k, v in doc.items() if k not in ("threats", "findings")}
+    channel = doc.get("channel")
+    # scan_file's document lists every finding twice, under `threats` and `findings`.
+    source = doc.get("findings") if doc.get("findings") is not None else doc.get("threats")
+    listed, rest = _compact_findings(source, channel)
+    out["findings"] = listed
+    if rest:
+        out["more_findings"] = rest
+    return out
+
+
+def _fit(doc, header=""):
+    """Render the document, shrinking it until header + JSON are at most MAX_RESULT_BYTES."""
+    def render():
+        return header + json.dumps(doc, indent=2, default=str)
+    text = render()
+    if len(text.encode("utf-8")) <= MAX_RESULT_BYTES:
+        return text
+    doc = dict(doc)
+    for key in ("warnings", "extraction_warnings"):
+        if isinstance(doc.get(key), list) and len(doc[key]) > 5:
+            doc[key] = doc[key][:5] + [f"\u2026 {len(doc[key]) - 5} more not shown"]
+    findings = list(doc.get("findings") or [])
+    dropped = {}
+    while findings:
+        text = render()
+        if len(text.encode("utf-8")) <= MAX_RESULT_BYTES:
+            break
+        f = findings.pop()
+        category = str(f.get("category"))
+        dropped[category] = dropped.get(category, 0) + 1
+        doc["findings"] = findings
+        more = dict((doc.get("more_findings") or {}).get("by_category", {}))
+        for c, n in dropped.items():
+            more[c] = more.get(c, 0) + n
+        doc["more_findings"] = {"count": sum(more.values()), "by_category": more}
+    text = render()
+    if len(text.encode("utf-8")) > MAX_RESULT_BYTES:
+        doc = {k: doc[k] for k in ("decision", "severity", "channel", "threat_found", "inspection_complete",
+                                   "is_clean", "truncated", "bytes_scanned", "more_findings") if k in doc}
+        text = render()
+    return text
+
+
 def _tool_scan_text(arguments):
     """Execute scan_text tool."""
     channel = arguments.get("channel", "message")
@@ -306,11 +406,14 @@ def _tool_scan_text(arguments):
             + f", severity: {result.severity} ({result.latency_ms}ms)"
         )
         secrets = secret_strings(result.findings)
-        for i, f in enumerate(result.findings, 1):
+        for i, f in enumerate(result.findings[:MAX_FINDINGS], 1):
             summary += f"\n  {i}. [{f['severity'].upper()}] {f['name']}"
             if f.get("matched_text"):
                 # This result is read by a model and written to its logs: a secret leaves as its marker only.
-                summary += f' — matched: "{shown_match(f, f["matched_text"], False, secrets)}"'
+                shown = shown_match(f, f["matched_text"], False, secrets)
+                summary += f' — matched: "{shown[:MAX_SHOWN_CHARS]}"'
+        if len(result.findings) > MAX_FINDINGS:
+            summary += f"\n  … {len(result.findings) - MAX_FINDINGS} more findings, counted by category below"
         if not result.inspection_complete:
             # A finding does not cancel a coverage failure, and the agent reads
             # the FIRST LINE. This surface announced only "BLOCK — 5 threats" on
@@ -328,7 +431,7 @@ def _tool_scan_text(arguments):
     # learn two vocabularies for one fact.
 
     summary += _time_limit_lines(result)
-    output = f"{_off_note(why)}{summary}\n\n{json.dumps(result_dict, indent=2)}"
+    output = _fit(_door_document(result_dict), header=f"{_off_note(why)}{summary}\n\n")
 
     return {
         "content": [{"type": "text", "text": output}],
@@ -336,10 +439,28 @@ def _tool_scan_text(arguments):
     }
 
 
+def _one_line(text):
+    """A name in a notice must not start a line of its own: line breaks become spaces."""
+    return " ".join(str(text).splitlines())
+
+
 def _tool_scan_file(arguments):
     """Execute scan_file tool."""
     file_path = arguments.get("file_path", "")
     allow_deep = arguments.get("allow_deep", False)
+
+    # The tool's own schema says string and boolean; a string "false" is truthy and must not
+    # open the deep branch.
+    if not isinstance(file_path, str):
+        return {
+            "content": [{"type": "text", "text": "Error: 'file_path' parameter must be a string."}],
+            "isError": True,
+        }
+    if not isinstance(allow_deep, bool):
+        return {
+            "content": [{"type": "text", "text": "Error: 'allow_deep' parameter must be true or false."}],
+            "isError": True,
+        }
 
     if not file_path:
         return {
@@ -349,7 +470,7 @@ def _tool_scan_file(arguments):
 
     if not os.path.exists(file_path):
         return {
-            "content": [{"type": "text", "text": f"Error: File not found: {file_path}"}],
+            "content": [{"type": "text", "text": f"Error: File not found: {json.dumps(file_path)}"}],
             "isError": True,
         }
 
@@ -367,7 +488,7 @@ def _tool_scan_file(arguments):
         # Returning a "0 threats" document here would be the same lie the
         # exit-code repair removes from the CLI.
         return {
-            "content": [{"type": "text", "text": f"Error: {exc} — NOT inspected. Nothing was scanned."}],
+            "content": [{"type": "text", "text": f"Error: {_one_line(exc)} — NOT inspected. Nothing was scanned."}],
             "isError": True,
         }
 
@@ -399,20 +520,22 @@ def _tool_scan_file(arguments):
         if ended:
             own = {_time_limit.time_limit_warning(e) for e in ended}
             others = [w for w in warnings if w not in own]
-            reason = _time_limit.incomplete_detail(others[0] if others else "content was not fully inspected",
+            reason = _time_limit.incomplete_detail(_one_line(others[0]) if others else "content was not fully inspected",
                                                     bool(others), ended)
             notice = (f"INCOMPLETE SCAN — {reason}. This is NOT a clean result; "
-                      f"do not treat {file_path} as inspected.\n"
+                      f"do not treat {json.dumps(file_path)} as inspected.\n"
                       + "".join(f"  ! {_time_limit.time_limit_warning(e)}\n" for e in ended) + "\n")
         else:
-            reason = warnings[0] if warnings else "content was not fully inspected"
+            reason = _one_line(warnings[0]) if warnings else "content was not fully inspected"
             notice = (f"INCOMPLETE SCAN — {reason} This is NOT a clean result; "
-                      f"do not treat {file_path} as inspected.\n\n")
+                      f"do not treat {json.dumps(file_path)} as inspected.\n\n")
     else:
         notice = ""
 
     # The same door rule as scan_text: a found secret leaves this server as its marker, never as the key.
-    output = _off_note(why) + notice + json.dumps(mask_document(result), indent=2, default=str)
+    door = mask_document(result)
+    output = _fit(_door_document(door), header=_off_note(why) + notice) if isinstance(door, dict) \
+        else _off_note(why) + notice + json.dumps(door, indent=2, default=str)
     return {
         "content": [{"type": "text", "text": output}],
         "isError": False,
@@ -434,8 +557,14 @@ def _tool_scanner_info(arguments):
 # MCP stdio transport — JSON-RPC 2.0 over stdin/stdout
 # =========================================================================
 
+def handle_ping(params):
+    """ping: the protocol asks for an empty result."""
+    return {}
+
+
 HANDLERS = {
     "initialize": handle_initialize,
+    "ping": handle_ping,
     "tools/list": handle_tools_list,
     "tools/call": handle_tools_call,
 }
@@ -446,6 +575,15 @@ NOTIFICATION_METHODS = {"notifications/initialized", "notifications/cancelled"}
 
 _EOF = object()
 
+# One request is one line. The longest honest one is a scan_text call whose text is the 1 MB scan
+# limit with every character escaped (six bytes each), so the cap is 8 MiB; a line past it is
+# discarded in chunks (never held in memory) and answered with one error.
+MAX_FRAME_BYTES = 8 * 1024 * 1024
+
+
+class _FrameTooLarge(Exception):
+    pass
+
 
 def read_message():
     """Read the next JSON value from stdin (newline-delimited JSON).
@@ -455,9 +593,15 @@ def read_message():
     invalid one), so neither of them ends the server.
     """
     while True:
-        line = sys.stdin.readline()
+        line = sys.stdin.readline(MAX_FRAME_BYTES + 1)
         if not line:
             return _EOF
+        if len(line) > MAX_FRAME_BYTES and not line.endswith("\n"):
+            while True:
+                rest = sys.stdin.readline(1024 * 1024)
+                if not rest or rest.endswith("\n"):
+                    break
+            raise _FrameTooLarge()
         line = line.strip()
         if line:
             return json.loads(line)
@@ -534,6 +678,11 @@ def main(argv=None):
         except json.JSONDecodeError as e:
             sys.stderr.write(f"[sunglasses-mcp] JSON decode error: {e}\n")
             sys.stderr.flush()
+            # JSON-RPC 2.0 section 5.1: a frame that is not JSON is a Parse error, answered
+            # once with id null (the id cannot be read).
+            write_message(_make_error(None, -32700, "Parse error"))
+        except _FrameTooLarge:
+            write_message(_make_error(None, -32600, f"Invalid Request: a message is at most {MAX_FRAME_BYTES} bytes"))
         except KeyboardInterrupt:
             break
         except Exception as e:

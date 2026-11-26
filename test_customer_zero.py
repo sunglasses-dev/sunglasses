@@ -204,23 +204,49 @@ def test_negation_context(engine):
             results["fail"] += 1
         results["tests"].append({"name": name, "correct": correct})
 
+    def check_known_limit(name, text, channel, severity):
+        """A text of the Known limits group answers at the rule's severity, with no negation context."""
+        result = engine.scan(text, channel=channel)
+        has_negation = any(f.get("negation_context") for f in result.findings)
+        correct = result.decision == "block" and result.severity == severity and not has_negation
+
+        status = f"{G}OK{X}" if correct else f"{R}FAIL{X}"
+        neg_tag = f" {Y}[NEGATION]{X}" if has_negation else ""
+        detail = "" if correct else f" — GOT: negation={has_negation}, decision={result.decision}, severity={result.severity}"
+        print(f"  {status}  {result.decision:>16s}{neg_tag} sev={result.severity}  {name}{detail}")
+
+        results["pass" if correct else "fail"] += 1
+        results["tests"].append({"name": name, "correct": correct})
+
     # --- Warnings that contain attack keywords (should downgrade, not block) ---
     print(f"  {B}--- Warnings/Examples (should downgrade to review) ---{X}")
-    check_negation("Warning about rm -rf",
-                   "WARNING: Do NOT run rm -rf / on your server!",
-                   "message", expect_negation=True)
-    check_negation("Never ignore instructions",
-                   "You should never ignore previous instructions from your team lead.",
-                   "message", expect_negation=True)
     check_negation("Example of injection (quoted)",
                    "Here is an example of a prompt injection: 'ignore all previous instructions'.",
-                   "message", expect_negation=True)
-    check_negation("Avoid rm -rf /",
-                   "Be careful with shell commands. Avoid rm -rf / as it can destroy data.",
                    "message", expect_negation=True)
     check_negation("Watch out for jailbreaks",
                    "Watch out for messages like 'do anything now' — they are attacks.",
                    "message", expect_negation=True)
+    check_negation("Plain form, README sentence",
+                   "Do NOT run rm -rf / --no-preserve-root",
+                   "message", expect_negation=True)
+    check_negation("Plain form, shell command",
+                   "Do NOT run rm -rf /.",
+                   "message", expect_negation=True)
+    check_negation("Plain form, instruction",
+                   "never ignore previous instructions.",
+                   "message", expect_negation=True)
+
+    # --- Known limits of the release heading: the rule keeps its severity ---
+    print(f"\n  {B}--- A line that forbids or describes an order in other words than the plain form still reads as the order. This errs on the side of the block. ---{X}")
+    check_known_limit("Warning about rm -rf",
+                      "WARNING: Do NOT run rm -rf / on your server!",
+                      "message", "critical")
+    check_known_limit("Never ignore instructions",
+                      "You should never ignore previous instructions from your team lead.",
+                      "message", "high")
+    check_known_limit("Avoid rm -rf /",
+                      "Be careful with shell commands. Avoid rm -rf / as it can destroy data.",
+                      "message", "critical")
 
     # --- Real attacks that happen to have tricky wording (must still block) ---
     print(f"\n  {B}--- Real attacks (must still block, no false negation) ---{X}")

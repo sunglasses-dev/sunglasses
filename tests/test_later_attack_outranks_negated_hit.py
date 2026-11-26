@@ -1052,10 +1052,12 @@ def test_overlapping_matches_that_each_reach_the_end_of_the_text_cost_a_bounded_
 
 
 def test_a_few_overlapping_negated_matches_stay_downgraded():
+    # Point: governs. The forbidding word governs the verb; a word of its own stands between it and the order, so it governs nothing here.
     text = "Never " + "note never " * 6 + "zorbit now"
     decision, found, steps = _walk(_overlap_rule(), text)
-    assert decision == "allow_redacted"
-    assert found["severity"] == "review" and found["negation_context"] is True
+    # More words stand between the forbidding word and the object than the closed form allows: it keeps the block.
+    assert decision == "block"
+    assert found["severity"] != "review" and not found.get("negation_context")
 
 
 @pytest.mark.parametrize("copies", [100, 2000])
@@ -1071,7 +1073,8 @@ def test_a_wide_gap_rule_over_dense_negated_repeats_stays_inside_the_budget():
     rule = _rule("TEST-WIDE-001", r"(?i)zorbit.{0,300}now")
     text = "Never zorbit now, " * 3000
     decision, found, steps = _walk(rule, text)
-    assert found["severity"] == "review" and found["negation_context"] is True
+    # A comma follows the object and the sentence goes on: not the closed form.
+    assert found["severity"] != "review" and not found.get("negation_context")
 
 
 def test_a_kept_span_follows_the_text_it_is_asked_about():

@@ -318,7 +318,8 @@ def test_the_reported_offset_is_a_document_offset_not_a_window_offset(anchored):
     so the rule must downgrade to `review`. The first 50 characters of the
     document, where a slice relative offset points, are deliberately clean.
     """
-    lead = "clean introduction. " + ("filler " * 3000)
+    # The forbidding word starts its sentence (a full stop and a space before it), the closed form the downgrade reads.
+    lead = "clean introduction. " + ("filler " * 3000).rstrip() + ". "
     doc = lead + "do not " + PAYLOAD
     finding = _finding(anchored, doc)
     assert finding is not None

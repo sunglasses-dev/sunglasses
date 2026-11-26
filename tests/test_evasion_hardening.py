@@ -42,7 +42,11 @@ def test_framing_label_does_not_downgrade_live_payload(payload):
 def test_true_negation_still_downgrades():
     # The anti-FP behavior we must PRESERVE: genuine advice that negates the
     # payload should still be spared a hard block.
+    # The sentence goes on after the object (a dash and more words), so it is not the closed form. The
+    # closed form itself, the sentence that ends after the object, is the one that is spared.
     r = engine.scan("Never ignore your previous instructions — that is the rule.", "message")
+    assert r.decision == "block"
+    r = engine.scan("Never ignore your previous instructions.", "message")
     assert r.decision != "block", (
         "true-negation advice should still be spared a hard block "
         "(don't over-correct into a false positive)"

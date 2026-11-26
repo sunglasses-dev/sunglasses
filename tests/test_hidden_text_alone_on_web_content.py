@@ -91,10 +91,11 @@ def test_hidden_element_with_no_closing_tag_blocks_when_unreadable(engine):
     assert result.decision == "block"
 
 
-def test_hiding_style_outside_a_start_tag_keeps_its_block(engine):
+def test_hiding_style_outside_a_start_tag_is_recorded_and_blocks_only_through_the_ask(engine):
     body = "<style>.promo{display:none}</style>"
     result = engine.scan(page(body), channel="web_content")
-    assert result.decision == "block"
+    assert result.decision not in BLOCKED
+    assert severity(result, HI) == "review"
 
 
 def test_every_hidden_element_is_read_not_only_the_first(engine):
@@ -186,7 +187,7 @@ KEEP_THE_BLOCK = {
     "end_tag_in_script_text": '<div style="display:none"><script>var a = "</div>";</script>%s</div>' % ASK,
     "tag_end_sign_in_a_quoted_value": '<div title="a>b" style="display:none">%s</div>' % ASK,
     "an_open_sign_in_an_earlier_value": '<div title="<i" style="display:none">menu</i> %s</div>' % ASK,
-    "unterminated_quote": '<div style="display:none" title="abc>menu</div>',
+    "unterminated_quote": '<div style="display:none" title="abc>menu</div> %s' % ASK,
     "comment_never_ends": '<div style="display:none"><!-- menu</div>',
 }
 
@@ -203,6 +204,7 @@ STAYS_RECORDED = {
     "end_tag_in_a_quoted_value": '<div style="display:none"><a title="</div>">Home</a></div>',
     "tag_end_sign_in_a_quoted_value": '<div title="a>b" style="display:none"><ul><li>Home</li></ul></div>',
     "script_text_with_an_end_tag": '<div style="display:none"><script>var a = "</div>";</script></div>',
+    "unterminated_quote": '<div style="display:none" title="abc>menu</div>',
 }
 
 

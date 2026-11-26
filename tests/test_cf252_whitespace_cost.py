@@ -161,7 +161,7 @@ NEGATION_ROWS = [
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
-@pytest.mark.parametrize("text", NEGATION_ROWS)
+@pytest.mark.parametrize("text", NEGATION_ROWS, ids=["never", "do_not", "quoted_label"])
 def test_negated_status_is_not_blocked(engine, text, channel):
     result = engine.scan(text, channel=channel)
     assert result.decision not in BLOCKING, f"{text[:40]!r} on {channel}: {result.decision}"

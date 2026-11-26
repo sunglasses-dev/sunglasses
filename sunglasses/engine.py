@@ -47,11 +47,14 @@ from .mechanisms import MECHANISM_PATTERNS
 from .validators import VALIDATORS
 from .patterns import PATTERNS
 from .utf7 import utf7_view
+from .page_parts import MARKS_SINK, cut_page, pack_parts
+from .shown_text import READ_CAP, shown_text
 from .preprocessor import (CONTROL_CHARS, ENRICH_MAX_LEN, HOMOGLYPHS, HTML_FALLBACK, INVISIBLE_CHARS, LEET, VIEW_SEP,
                            decode_html_entities, decode_hex_escapes, decode_rot13, decode_shadow_ascii,
                            decode_letter_references, decode_url_encoding, normalize_unicode,
                            normalize_before_leetspeak, normalize_with_length, replace_homoglyphs, replace_lookalikes,
-                           space_ignorable_between_words, keyword_view_between_words, strip_ignorable, strip_invisible,
+                           space_ignorable_between_words, keyword_view_between_words,
+                           paragraph_offsets_in_keyword_view, strip_ignorable, strip_invisible,
                            BLANKS, IGNORABLE_CHARS, PUNCT_LOOKALIKES, WORD_CHAR, decoded_at,
                            decoded_before)
 
@@ -95,6 +98,9 @@ class ScanResult:
         self.decision = decision          # allow | block | quarantine | allow_redacted
         self.findings = findings           # list of matched patterns
         self.raw_input = raw_input[:200]   # truncated for logging
+        # The page a report quotes from (see shown_text.py): kept only for a result with findings, and only
+        # as far as shown_text reads it.
+        self.page_text = raw_input[:READ_CAP] if findings else ""
         self.normalized_input = normalized_input[:200]
         self.channel = channel
         self.latency_ms = round(latency_ms, 2)
@@ -223,6 +229,7 @@ class ScanResult:
                     "severity": f["severity"],
                     "category": f["category"],
                     "matched_text": f.get("matched_text", ""),
+                    "shown_text": self.shown_text_of(f),
                     "reason": f.get("description", ""),
                     "also_matched": f.get("also_matched", []),
                     "taxonomy": taxonomy.for_category(f["category"]),
@@ -233,6 +240,10 @@ class ScanResult:
             "latency_ms": self.latency_ms,
             **({"time_limit_ended": [dict(e) for e in self.time_limit_ended]} if self.time_limit_ended else {}),
         }
+
+    def shown_text_of(self, finding: dict) -> str:
+        """What a report quotes for one finding: the words of the page (see shown_text.py)."""
+        return shown_text(self.page_text, finding.get("matched_text", ""))
 
     def summary(self) -> str:
         if self.is_clean:
@@ -674,6 +685,55 @@ def _guard_floor_twin(pattern):
     return twin
 
 
+def _without_classes(rx):
+    """`rx` with every character class replaced by the word (CLASS), so an arrow or a compare sign inside a class is no mark."""
+    out, i = [], 0
+    while i < len(rx):
+        c = rx[i]
+        if c == "\\":
+            out.append(rx[i:i + 2])
+            i += 2
+        elif c == "[":
+            j = i + 1
+            if j < len(rx) and rx[j] == "^":
+                j += 1
+            if j < len(rx) and rx[j] == "]":
+                j += 1
+            while j < len(rx) and rx[j] != "]":
+                j += 2 if rx[j] == "\\" else 1
+            out.append("(CLASS)")
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _holds_markup_mark(source):
+    """True when a rule regex reads a markup mark: a comment opener or closer, a tag sign, an attribute sign
+    (an equals sign and a quote) or an entity. A page cut into parts has to keep each such mark for the rule."""
+    rx = re.sub(r"\(\?<[=!]|\(\?P<\w+>|\(\?P=\w+\)|\(\?>", "(", source)
+    rx = _without_classes(rx).replace("\\<", "<").replace("\\>", ">").replace("\\-", "-").replace("\\!", "!")
+    rest = rx.replace("<!--", "").replace("-->", "")
+    return ("<!-" in rx or "-->" in rx or "<" in rest or ">" in rest
+            or bool(re.search(r"(?<!\?)=(\\s[*+]?)?(\(CLASS\)|[\"'])", rx))
+            or "&#" in rx or "&lt" in rx or "&gt" in rx or "&amp" in rx)
+
+
+def _mark_rule_ids_of(patterns):
+    """The ids of the web_content rules whose regexes read a markup mark."""
+    found = set()
+    for rule in patterns:
+        if "web_content" not in rule.get("channel", ()):
+            continue
+        sources = rule.get("regex") or []
+        if isinstance(sources, str):
+            sources = [sources]
+        if any(_holds_markup_mark(source) for source in sources):
+            found.add(rule["id"])
+    return frozenset(found)
+
+
 class _LazyRegex:
     """A rule regex that is compiled on first use instead of at engine start.
 
@@ -917,7 +977,7 @@ class _Walk:
 
     __slots__ = ("raw", "low", "view", "held", "limit", "i", "j", "dead", "changed", "cuts", "active", "cursor",
                  "leftover", "vcursor", "guards", "gcursor", "guarded", "stops", "scursor", "record", "soft", "hard",
-                 "mark_i", "mark_j", "run")
+                 "mark_i", "mark_j", "run", "brk")
 
     def __init__(self, raw: str, low: str, view: str, record=None):
         self.raw = raw
@@ -935,6 +995,7 @@ class _Walk:
         self.cuts = []     # view indexes where raw characters were deleted before it
         self.soft = set()  # view indexes with a cut that only collapses a run of plain spaces
         self.hard = set()  # view indexes with any other cut; one of these ends the tolerance there
+        self.brk = {}      # view index -> 1: the space is a raw CR; 2: a raw LF straight after that CR was deleted there; 0: any other whitespace deleted there
         self.mark_i = [0]  # view index where an identical run starts ...
         self.mark_j = [0]  # ... and the raw index it starts at
         self.run = None     # the last ignorable run looked at (see _run_sides)
@@ -1276,9 +1337,13 @@ class _Walk:
             if c.isspace():
                 if view[i] == " ":
                     self.changed.append(i)
+                    if c == "\r":
+                        self.brk[i] = 1
                     self.i = i + 1
                 else:
                     self.cuts.append(i)
+                    self.brk[i] = 2 if (c == "\n" and j > 0 and raw[j - 1] == "\r" and self.brk.get(i - 1) == 1
+                                       and i not in self.brk) else 0
                     if i > 0 and view[i - 1] == " " and self._plain_run(j):
                         self.soft.add(i)
                     else:
@@ -1410,22 +1475,37 @@ class _Walk:
         k = bisect.bisect_right(self.mark_i, pos) - 1
         return self.mark_j[k] + (pos - self.mark_i[k])
 
-    def holds(self, lo: int, hi: int, spaced=None) -> bool:
+    def holds(self, lo: int, hi: int, spaced=None, breaks=None) -> bool:
         """True if view[lo:hi] reads as the same characters in the raw input. ``spaced`` is a
         function of the index of a space the view kept: when it says yes for a space whose
         run of plain spaces collapsed to it, the collapse is not counted as an edit. Every
-        other change in the range still is, whatever comes after the collapsed run."""
+        other change in the range still is, whatever comes after the collapsed run.
+        ``breaks`` is (cue_start, cue_end, upto): a CR or a CRLF in the raw input, which the
+        view holds as one space, is the line break an LF is, so it is no edit in front of the
+        cue and in the gap after it (view indexes below ``upto``, none inside the cue), and at
+        most one such break stands in the gap."""
         if lo < 0 or lo >= hi or hi > self.limit:
             return False
         self.advance(hi)
         if self.i < hi:
             return False
+        in_gap = 0
         k = bisect.bisect_left(self.changed, lo)
-        if k < len(self.changed) and self.changed[k] < hi:
+        while k < len(self.changed) and self.changed[k] < hi:
+            at = self.changed[k]
+            if breaks is None or at >= breaks[2] or breaks[0] <= at < breaks[1] or self.brk.get(at) != 1:
+                return False
+            in_gap += at >= breaks[1]
+            k += 1
+        if in_gap > 1:
             return False
         k = bisect.bisect_right(self.cuts, lo)
         while k < len(self.cuts) and self.cuts[k] < hi:
             at = self.cuts[k]
+            if (breaks is not None and at <= breaks[2] and self.brk.get(at) == 2
+                    and self.cuts[k - 1:k].count(at) + self.cuts[k + 1:k + 2].count(at) == 0):
+                k += 1
+                continue
             if spaced is None or at not in self.soft or at in self.hard or not spaced(at - 1):
                 return False
             k += 1
@@ -1548,13 +1628,13 @@ class _RawAlign(_ViewEnds):
             cached = self._moved[id(view)] = (view, spans)
         return any(lo <= pos < hi for lo, hi in cached[1])
 
-    def holds(self, view: str, lo: int, hi: int, spaced=None) -> bool:
+    def holds(self, view: str, lo: int, hi: int, spaced=None, breaks=None) -> bool:
         walk = self._walks.get(id(view))
         if walk is None or walk.view is not view:
             if self._low is None:
                 self._low = _ascii_lower(self._raw)
             walk = self._walks[id(view)] = _Walk(self._raw, self._low, view, self._record)
-        return walk.holds(lo, hi, spaced)
+        return walk.holds(lo, hi, spaced, breaks)
 
     def origin(self, view: str, pos: int):
         """Raw index of view[pos] (see _Walk.origin), or None."""
@@ -1819,6 +1899,25 @@ class _HiddenReadLimit(Exception):
     """A page spent everything it may on reading its hidden elements (see _hidden_style_carries_ask)."""
 
 
+
+def _folded_reading(keyword: str) -> str:
+    """The keyword as the scan reads text: the first view of the normalizer, lower case."""
+    return normalize_with_length(keyword)[0].split(VIEW_SEP)[0].strip().lower()
+
+
+def _is_look_alike_spelling(keyword: str, folded: str) -> bool:
+    """A keyword that is a look-alike SPELLING of a plain phrase: a letter of a script other than Latin in the key,
+    and a folded reading whose letters are all ASCII. Computed from the key, never listed.
+
+    Such a key is a rule about the spelling. Its folded reading is the plain phrase, so indexing it would turn the rule
+    into a rule about the plain phrase (the look-alike text itself is still read through the fold by the plain-phrase
+    rules)."""
+    if not any(c.isalpha() and "LATIN" not in unicodedata.name(c, "") for c in keyword):
+        return False
+    letters = [c for c in folded if c.isalpha()]
+    return bool(letters) and all(c.isascii() for c in letters)
+
+
 class SunglassesEngine:
     """The SUNGLASSES scanner engine."""
 
@@ -1867,6 +1966,29 @@ class SunglassesEngine:
     # (e.g. the email-only ones) still fire. Canonical channels are
     # untouched, so the FP-hardened file/message corpora govern the
     # inherited scope.
+    # The shortest folded reading that is indexed (the keyword index does not carry a key this short on its own).
+    FOLD_KEY_MIN = 4
+
+    # Keywords that read differently after the fold and are NOT indexed under that reading, each by rule id and the
+    # keyword as written. Each names something ordinary text carries, with no ask in the key itself:
+    #   GLS-HI-002: a style value.
+    #   GLS-MSE-237 and GLS-EE-001: a call or a request that decodes a base64 string.
+    #   GLS-CI-001: a permission command, and an eval of a decoded string.
+    #   GLS-HI-001: a comment that opens with a label or a build marker.
+    #   GLS-CMD-GHSA-024, GLS-SSRF-GHSA-026, GLS-CMD-GHSA-029: an advisory id.
+    # A key of these rules that is itself an order is indexed.
+    # A rule joins this list only with a line here; tests/test_keyword_fold_index.py holds the list to its keys.
+    FOLD_ONLY_KEYS_LEFT_OUT = frozenset({
+        ("GLS-HI-002", "font-size:0"), ("GLS-HI-002", "font-size: 0"),
+        ("GLS-HI-002", "opacity:0"), ("GLS-HI-002", "opacity: 0"),
+        ("GLS-MSE-237", "decode base64 blob"), ("GLS-MSE-237", "decode base64"), ("GLS-MSE-237", "base64 blob"),
+        ("GLS-EE-001", "decode this base64"), ("GLS-EE-001", "base64.decode("),
+        ("GLS-CI-001", "chmod 777"), ("GLS-CI-001", "eval(base64"),
+        ("GLS-HI-001", "<!-- system:"), ("GLS-HI-001", "<!-- instruction:"), ("GLS-HI-001", "<!-- prompt:"),
+        ("GLS-HI-001", "<!-- override"), ("GLS-HI-001", "<!-- inject"),
+        ("GLS-CMD-GHSA-024", "ghsa-2763-cj5r-c79m"), ("GLS-SSRF-GHSA-026", "ghsa-4ggg-h7ph-26qr"), ("GLS-CMD-GHSA-029", "ghsa-jpcj-7wfg-mqxv"),
+    })
+
     CHANNEL_ALIASES = {
         "prompt": "message",        # a prompt is a message-borne instruction
         "agent_input": "message",   # text handed to an agent as input is a message-borne instruction
@@ -2130,6 +2252,9 @@ class SunglassesEngine:
     # longer run of words means the item goes on or another clause starts.
     NEGATION_LIST_TRAIL_WORDS = 8
     NEGATION_LIST_FINAL_WORDS = 5  # the last item of a closed list (the match), blank-separated
+    # A negated list lowers its last item only when EVERY item in front of it is, whole, one of these (case folded, nothing else
+    # in the item). Each entry has a counted honest text; a new entry needs one.
+    _NEGATION_LIST_ITEMS = frozenset(("log", "store", "read", "copy", "change provider", "model"))
     _LIST_TRAIL_STARTS = frozenset((
         "to", "anywhere", "anyone", "anybody", "elsewhere", "without", "outside", "beyond",
         "except", "other", "for", "from", "with", "in", "on", "at", "by", "into", "about",
@@ -2267,6 +2392,9 @@ class SunglassesEngine:
         self._validators = tuple(VALIDATORS) if validators else ()
         if extra_patterns:
             self._patterns = self._patterns + extra_patterns
+        # The rules that read a markup mark (computed, so a rule added later joins the list): a page read as
+        # parts is also read as written for these, see _scan_page_parts.
+        self._mark_rule_ids = _mark_rule_ids_of(self._patterns)
 
         # Fail-closed channel vocabulary (0.4.3). An unknown channel used to
         # filter out EVERY pattern and return a clean ALLOW — silent false
@@ -2274,6 +2402,11 @@ class SunglassesEngine:
         # loaded pattern declares, so a typo can never scan against nothing.
         self.valid_channels = frozenset(self.DOCUMENTED_CHANNELS).union(
             ch for p in self._patterns for ch in p.get("channel", []))
+
+        # A rule may carry `channel_severity`: a lower severity on named channels (its own severity stays what the rule says on every other
+        # channel). It only lowers; a field that names an unknown channel, a severity that does not rank below the rule's own, or any other
+        # shape is refused here, at load, so no rule can ship that a reader would have to guess about.
+        self._channel_severity = self._read_channel_severity(self._patterns)
 
         # Build pattern index
         # (rule id, regex entry index) -> (anchor terms, span). NOT id(rx),
@@ -2309,6 +2442,8 @@ class SunglassesEngine:
         # caller supplied compiles now, so a bad one is dropped here as it always was.
         shipped = {id(p) for p in PATTERNS}.union(id(p) for p in MECHANISM_PATTERNS)
 
+        written_keys = {kw.lower() for p in self._patterns for kw in p.get("keywords", [])}
+        folded_only = set()  # keys indexed ONLY through the folded reading: not part of the published keyword count
         for pattern in self._patterns:
             compile_rx = _LazyRegex if id(pattern) in shipped else re.compile
             for kw in pattern.get("keywords", []):
@@ -2318,6 +2453,20 @@ class SunglassesEngine:
                 if kw_lower not in self._keyword_to_patterns:
                     self._keyword_to_patterns[kw_lower] = []
                 self._keyword_to_patterns[kw_lower].append(pattern)
+                # The scan reads text through the normalizer (look-alike letters, digits written for letters). A
+                # keyword that reads differently after the same fold is indexed in its folded reading BESIDE the written
+                # one; the written one is left alone.
+                # A folded reading that is a generic word, or shorter than FOLD_KEY_MIN, is not indexed; neither is the
+                # folded reading of a look-alike spelling of a plain phrase (see _is_look_alike_spelling).
+                folded = _folded_reading(kw_lower)
+                if (folded != kw_lower and len(folded) >= self.FOLD_KEY_MIN and folded not in self.KEYWORD_DENYLIST
+                        and (pattern.get("id"), kw_lower) not in self.FOLD_ONLY_KEYS_LEFT_OUT
+                        and not _is_look_alike_spelling(kw_lower, folded)):
+                    hits = self._keyword_to_patterns.setdefault(folded, [])
+                    if pattern not in hits:
+                        hits.append(pattern)
+                        if folded not in written_keys:
+                            folded_only.add(folded)
 
             if "regex" in pattern:
                 compiled = []
@@ -2455,6 +2604,11 @@ class SunglassesEngine:
         # Patterns with NO regex keep keyword-verdict behavior (their keywords
         # are their whole definition, e.g. multi-word attack phrases).
         self._regex_bearing_ids = {p["id"] for p, _ in self._regex_patterns}
+        # Rules whose every regex is read one window at a time (see _match_windowed): their finding on a long page
+        # depends on the distance in the text they are given.
+        self._windowed_only_ids = frozenset(
+            p["id"] for p, rxs in self._regex_patterns
+            if rxs and all(mode in ("guarded", "windowed", "windowed_edges") for mode, _rx, _g in rxs))
         # Step-3 prefilter: the literals each regex cannot match without. Built
         # once at load (sub-second for 1,578 regexes), consulted per scan.
         self._regex_requirement = {
@@ -2469,6 +2623,10 @@ class SunglassesEngine:
                            if pid in self._regex_bearing_ids}
         self._compiled_by_id = {p["id"]: rxs for p, rxs in self._regex_patterns}
         self._pattern_by_id = {p["id"]: p for p, _rxs in self._regex_patterns}
+        # The rule each compiled regex belongs to, for the two rules that read a literal tail (see
+        # _CF_LITERAL_TAILS). The cover check finds its rule here from the regex it is handed.
+        self._literal_tail_rule = {id(rx): pid for pid in self._CF_LITERAL_TAILS
+                                   for _mode, rx, _guards in self._compiled_by_id.get(pid, ())}
 
         # Build Aho-Corasick automaton if available (10x faster)
         self._automaton = None
@@ -2492,7 +2650,7 @@ class SunglassesEngine:
         with_matcher.update(id(p) for hits in self._keyword_to_patterns.values() for p in hits)
         self._matcher_count = sum(1 for p in carriers if id(p) in with_matcher)
         self._mechanism_count = len(self._mechanisms)
-        self._keyword_count = len(self._keyword_to_patterns)
+        self._keyword_count = len(self._keyword_to_patterns) - len(folded_only)
         # `info()["keywords"]` and the README's keyword total are two different
         # measurements, not a stale number: this index is the pre-screen automaton,
         # which deliberately omits the generic keywords excluded above (they matched
@@ -2507,6 +2665,10 @@ class SunglassesEngine:
                 declared_entries += 1
         self._keywords_declared = len(declared)
         self._keyword_entries = declared_entries
+        # The trigger table (what a scan reads to skip the rules a text cannot reach) is built here, so a scan adds
+        # no attribute to the engine; _trigger_table builds it again only for a rule list that has changed.
+        self._trigger_index = None
+        self._trigger_table()
 
     @staticmethod
     def _is_anchored(raw: str) -> bool:
@@ -3120,11 +3282,413 @@ class SunglassesEngine:
         else. Quotes stay out: a quote the match opens on is the quoted-example shape,
         which _quoted_gap_holds reads."""
         at = text[match_start:match_start + 1]
+        # The character the match starts with, for _negation_governs (it is called right after, on the same thread).
+        _SCAN_LOCAL.match_first = at
         return at if at in self._LEADIN_BREAKS else ""
+
+    # A forbidding word lowers a finding only in a closed form: it opens its sentence, it stands
+    # right before the verb, the sentence holds no place the data could go to, the rest of the sentence
+    # after the match holds only words of a closed list, the end of the sentence is seen, and no second
+    # negating word stands in it. Anything else keeps the severity of the rule. A list read by
+    # _negation_reach keeps its own bounds and gets the place, the end and the second negating word on
+    # top. The shape is read in the raw input: in a view the whole sentence must be the same characters.
+    _CF_WINDOW = 400
+    _CF_REACH = 1500
+    _CF_MAX_WORDS = 30
+    _CF_OPENERS = frozenset((
+        "", "please", "you", "you must", "you should", "agents", "the agent", "the assistant", "always"))
+    _CF_GAP_WORDS = frozenset(("ever", "please"))
+    # A verb may stand between the negation and the match for these rules only (keyword rules whose
+    # match is the command alone), by rule id, with this closed list. Never a verb that turns or
+    # delays the sentence, never two verbs.
+    _CF_GAP_VERBS = {"GLS-CI-001": frozenset(("run", "execute"))}
+    # Two literal tails, each bound to ONE rule id: the last words of the sentence, whole, in the raw input
+    # (single spaces, nothing after them). Their own negating word does not count as a second one.
+    _CF_LITERAL_TAILS = {
+        "GLS-GHSA-PI-202": "anywhere other than the api itself",
+        "GLS-MECH-002": "without telling the user first",
+    }
+    # A literal flag that stands right after the match belongs to the command: one space, one flag.
+    _CF_FLAGS_AFTER = ("--no-preserve-root",)
+    # A label in front of the sentence: the label, a colon, one space, at a seen start, once.
+    _CF_FRONT_LABELS = ("safety guidance",)
+    _CF_TAIL_WORDS = frozenset((
+        "the", "a", "an", "any", "your", "my", "our", "their", "its", "this", "that", "these", "those",
+        "and", "or", "of"))
+    _CF_NOUNS_RX = re.compile(
+        r"\b(?:api keys?|access tokens?|tokens?|secrets?|credentials?|passwords?|one-time passwords?|"
+        r"payment card details|payment details|account credentials|login information|"
+        r"government identification)\b")
+    _CF_START_RX = re.compile(
+        r"(?:[.!?][\"'‘’“”)\]]*[ \t]+|[\n\u2028][ \t\r]*[\n\u2028]\s*(?:(?:[-*•+]|\d{1,3}[.)])[ \t]+|>[ \t]*)?|\u2029\s*|"
+        r"(?:^|\n)[ \t]*(?:[-*•+]|\d{1,3}[.)])[ \t]+|(?:^|\n)[ \t]*(?:>[ \t]*)+)")
+    # The list road asks nothing of the front of the sentence; it keeps the start after a line separator that
+    # follows a full stop (the raw input is asked about the sentence from there).
+    _CF_START_LIST_RX = re.compile(
+        r"(?:[.!?][\"'‘’“”)\]]*[ \t]+|[.!?][\"'‘’“”)\]]*\u2028+|[\n\u2028][ \t\r]*[\n\u2028]\s*|\u2029\s*|"
+        r"(?:^|\n)[ \t]*(?:[-*•+]|\d{1,3}[.)])[ \t]+)")
+    _CF_END_RX = re.compile(r"(?:[.!?](?=[ \t\r\n\u2028\u2029]|\Z)|[\n\u2028][ \t\r]*[\n\u2028]|\u2029|\Z)")
+    _CF_PARTIAL_RX = re.compile(r"\b(?:half|part|parts|some|only|just)\b")
+    _CF_NEGATING_RX = re.compile(
+        r"(?<![\w'’])(?:not|never|no|without|neither|nor|unless|except|but|cannot|other than)(?![\w'’])"
+        r"|n['’]t(?![\w])")
+    # A mail address, URL, host, IP address or handle anywhere in the sentence, the match included.
+    _CF_PLACE_RX = re.compile(
+        r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"
+        r"|(?<![\w@])@\w{2,}"
+        r"|\b[a-z][a-z0-9+.-]*://"
+        r"|\bwww\."
+        r"|\b\d{1,3}(?:\.\d{1,3}){3}\b"
+        r"|\b[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b", re.IGNORECASE)
+    # A file path counts only outside the match: inside it the path is the rule's own payload.
+    _CF_PATH_RX = re.compile(
+        r"(?<![\w/])(?:~|\.{1,2})?/[\w.~-]"
+        r"|\b[a-z]:[\\/]", re.IGNORECASE)
+    # A flag token of a command: a hyphen, then at most three hyphen-joined pieces of letters or digits.
+    _CF_FLAG_RX = re.compile(r"(?<![\w-])-{1,2}[a-z0-9]+(?:-[a-z0-9]+){0,2}(?![\w-])", re.IGNORECASE)
+    # The three place phrases the tail may hold, and no sibling.
+    _CF_PARTY_RX = re.compile(r"\b(?:from\s+(?:the\s+)?user|to\s+users|to\s+any\s+external\s+url)\b")
+
+    # The NOTICE form: the rule that reads a move word beside a secret word (GLS-GHSA-PI-202) also meets the most
+    # common security sentences of the web ("We will never send your password by email.", "Do not send your card
+    # number by email or chat.", "Never send your password to anyone, not even to <mail address>."). A plain
+    # sentence that forbids sending, sharing, mailing or posting a secret is a notice in every
+    # layout. The closed form above holds for every other rule; for this one the front may be a
+    # first-person promise or an intro of the closed list below, and the tail may hold more secret nouns, ways to
+    # send (by email, by chat, in a public issue) and an audience (to anyone who contacts you), still words of a
+    # closed list only: a verb, a place, a second negating word or any word not listed keeps the severity.
+    _CF_NOTICE_IDS = frozenset(("GLS-GHSA-PI-202",))
+    # A keyword rule whose own phrase is a move word and a secret noun (GLS-EX-001) reads the same notice form: the forbidding
+    # word, then the closed lists of ways and audiences.
+    _CF_NOTICE_KEYWORD_IDS = frozenset(("GLS-EX-001",))
+    _CF_NOTICE_INTROS = (
+        "for your security", "for your safety", "for your protection", "for security", "to stay safe",
+        "remember", "important", "reminder", "note", "tip", "warning", "security notice", "security tip")
+    _CF_NOTICE_OPENERS = frozenset(("we will", "we", "we do", "we'll", "we\u2019ll", "you will", "i will", "i"))
+    _CF_NOTICE_TAIL_WORDS = frozenset((
+        "by", "via", "over", "in", "on", "through", "email", "e-mail", "emails", "mail", "chat", "chats", "text",
+        "texts", "message", "messages", "sms", "phone", "public", "publicly", "issue", "issues", "forum", "forums",
+        "comment", "comments", "social", "media", "to", "anyone", "anybody", "everyone", "others", "other",
+        "people", "someone", "somebody", "stranger", "strangers", "who", "contacts", "contact", "you", "us",
+        "them", "it", "including", "staff", "support", "even", "with", "else", "ticket", "tickets", "board",
+        "boards", "post", "posts", "pages", "page", "website", "websites", "site", "sites", "group", "groups",
+        # the rest of a secret noun the match stopped inside ("secret" + "key")
+        "key", "keys", "code", "codes", "number", "numbers", "details", "phrase", "phrases", "word", "words",
+        "answer", "answers", "token", "tokens"))
+    # Between the verb and the secret noun of the match, when the sentence ends on a bare address: a determiner of
+    # this closed list, no other word.
+    _CF_NOTICE_DETERMINERS = frozenset((
+        "the", "a", "any", "your", "my", "our", "their", "his", "her", "its", "these", "those", "all"))
+    _CF_NOTICE_NOUNS_RX = re.compile(
+        r"\b(?:one-time (?:codes?|passcodes?|pins?)|(?:verification|security|confirmation|login|sign-in|2fa|"
+        r"authentication) codes?|passcodes?|passphrases?|pins?|card numbers?|card details|bank details|"
+        r"login details|sign-in details|seed phrases?|recovery phrases?|private keys?|secret keys?|"
+        r"api[ _-]?keys?|keys|cvv|security answers?|account (?:numbers?|details)|"
+        r"account credentials|credentials)\b")
+    # The list form of a notice: the move word, then at least three items split by commas, exactly one "or" or
+    # "and" and it opens the last item, the sentence ends right behind that item. An item is at most five words and
+    # ends on a noun of this closed list (a short form in brackets behind the noun belongs to the item); the words in
+    # front of the noun are free except the closed list that keeps the severity.
+    _CF_NOTICE_LIST_NOUNS = frozenset((
+        "password", "passwords", "passcode", "passcodes", "passphrase", "passphrases", "credential", "credentials",
+        "information", "detail", "details", "identification", "token", "tokens", "number", "numbers", "code", "codes",
+        "data", "key", "keys", "secret", "secrets", "pin", "pins", "phrase", "phrases", "answer", "answers", "cvv"))
+    _CF_NOTICE_LIST_BLOCKERS = frozenset((
+        "to", "at", "on", "in", "into", "onto", "via", "by", "from", "with", "without", "unless", "except", "until",
+        "if", "when", "once", "after", "before", "while", "but", "then", "now", "here", "there", "yet", "only", "just",
+        "not", "no", "never", "them", "it", "us", "me"))
+    _CF_NOTICE_LIST_SHORT_RX = re.compile(r"\s*\(\s*[A-Za-z0-9][A-Za-z0-9 ./-]{0,11}\s*\)\s*\Z")
+    _CF_NOTICE_LIST_WORD_RX = re.compile(r"[a-z0-9'\u2019-]+")
+
+    @classmethod
+    def _notice_list(cls, listing: str) -> bool:
+        """True when `listing` (the move word and what follows to the end of the sentence, the mark left out) is a
+        closed list of secrets as described above."""
+        pieces = _ascii_lower(listing).split(",")
+        first = pieces[0].split(None, 1)
+        if len(pieces) < 3 or len(first) != 2:
+            return False
+        pieces[0] = first[1]
+        joiner = 0
+        for n, piece in enumerate(pieces):
+            piece = cls._CF_NOTICE_LIST_SHORT_RX.sub("", piece).strip()
+            words = cls._CF_NOTICE_LIST_WORD_RX.findall(piece)
+            if " ".join(words) != " ".join(piece.split()):
+                return False
+            joiners = sum(1 for w in words if w in ("or", "and"))
+            if joiners:
+                if n != len(pieces) - 1 or joiners != 1 or words[0] not in ("or", "and"):
+                    return False
+                joiner += 1
+                words = words[1:]
+            if not words or len(words) > 5 or words[-1] not in cls._CF_NOTICE_LIST_NOUNS:
+                return False
+            if any(w in cls._CF_NOTICE_LIST_BLOCKERS for w in words[:-1]):
+                return False
+        return joiner == 1
+
+    # The last words of a notice sentence, cut off before the tail is read: an audience that names a mail address
+    # ("not even to <address>", "to <address>"), and the restatement of the promise after a semicolon. Each must
+    # reach the end of the sentence; the cut is blanked in the place check and the negating-word check.
+    _CF_NOTICE_CUTS = (
+        re.compile(r"(?:, not even )?\bto [\w.+-]+@[\w-]+(?:\.[\w-]+)+\Z", re.IGNORECASE),
+        re.compile(r"[;,] we (?:will )?never (?:ask for|ask you for|request|require|need) (?:them|it|this)\Z", re.IGNORECASE),
+    )
+
+    _CF_DANGLING = frozenset((
+        "to", "that", "says", "say", "said", "should", "must", "would", "could", "can", "will", "shall", "may",
+        "might", "if", "when", "because", "and", "or", "but", "so", "then", "the", "a", "an", "of", "is", "are",
+        "was", "were", "be", "not", "by", "for", "in", "on", "at", "as", "with", "than", "whether", "who", "which",
+        "what", "how", "you", "your", "we", "they", "it", "this", "do", "does", "did", "never", "no", "also"))
+    _CF_LINE_BREAK_RX = re.compile(r"(?:\r\n?|[\n\u2028])[ \t\r]*")
+    _CF_SENTENCE_MARK_END_RX = re.compile(r"[.!?][\"'‘’“”)\]]*\Z")
+    _CF_UNDERLINE_RX = re.compile(r"[=\-_*~]{3,}\Z")
+    _CF_TITLE_WORD_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’&/-]*\Z")
+
+    @classmethod
+    def _complete_line(cls, line: str, whole: bool) -> bool:
+        """True when a line (before a line break) is a complete unit: it ends with a sentence mark, it is a
+        markdown heading, an underline of a heading, or (only when the whole line is seen) a short title of up
+        to five plain words that does not end on a word that wants an object."""
+        line = line.strip(" \t\r")
+        if not line:
+            return True
+        if cls._CF_SENTENCE_MARK_END_RX.search(line) or cls._CF_UNDERLINE_RX.match(line):
+            return True
+        if not whole:
+            return False
+        if line.startswith("#"):
+            return True
+        words = line.split()
+        if len(words) > 5 or not all(cls._CF_TITLE_WORD_RX.match(w) for w in words):
+            return False
+        if words[-1].lower() in cls._CF_DANGLING or cls._CF_NEGATING_RX.search(line.lower()):
+            return False
+        return True
+
+    @classmethod
+    def _line_break_start(cls, pre: str, window_at_start: bool) -> Optional[int]:
+        """The last offset in ``pre`` (the text before a forbidding word) that follows a line break after a
+        complete line, or None. A line cut by the start of the window counts only if it ends with a sentence mark."""
+        best = None
+        for m in cls._CF_LINE_BREAK_RX.finditer(pre):
+            at = m.start()
+            lo = max(pre.rfind("\n", 0, at), pre.rfind("\r", 0, at), pre.rfind("\u2028", 0, at)) + 1
+            if cls._complete_line(pre[lo:at], whole=lo > 0 or window_at_start):
+                best = m.end()
+        return best
+
+    @classmethod
+    def _notice_front(cls, front: str) -> bool:
+        """The front of a notice sentence (the words before the forbidding word, lowercase, single-spaced): one
+        intro of the closed list, then nothing or one opener of the closed form or a first-person promise."""
+        f = " ".join(front.replace(",", " ").replace(":", " ").split())
+        for intro in cls._CF_NOTICE_INTROS:
+            if f == intro or f.startswith(intro + " "):
+                f = f[len(intro):].strip()
+                break
+        return f in cls._CF_OPENERS or f in cls._CF_NOTICE_OPENERS
+
+    def _closed_form(self, text: str, road: str, cue_start: int, cue_end: int, gap: str,
+                     match_start: int, match_end: Optional[int], list_end: Optional[int],
+                     align=None, rule_id: Optional[str] = None, tail_id: Optional[str] = None) -> bool:
+        """True when the forbidding word at text[cue_start:cue_end] may lower the match (see
+        the note above). Every doubt answers False, the side of the block."""
+        gap = self._one_line_gap(gap, text[match_start:match_start + 1])
+        flat_of = getattr(_SCAN_LOCAL, "flat_of", None)
+        if flat_of and road == "plain" and text in flat_of:
+            # The flat form of a page's text flow: read it in the line form, which has the same characters at the
+            # same places with a line break where the page has a block edge (a block starts a sentence).
+            text = flat_of[text]
+        if align is not None and road == "plain" and match_end is not None:
+            # A view that is not the raw input (a separator the normalizer deleted or turned into a line
+            # break reads as nothing or as ONE break there): when the cue, the span between and the match are the
+            # same characters in the raw input, the sentence is read in the raw input itself.
+            raw = align.raw
+            flat_of = getattr(_SCAN_LOCAL, "flat_of", None)
+            if flat_of:
+                raw = flat_of.get(raw, raw)
+            paragraphs = getattr(align, "paragraphs", None)
+            if paragraphs:
+                # In the view that draws a break as one newline, a paragraph separator reads as one.
+                raw = "".join("\u2029" if i in paragraphs else ch for i, ch in enumerate(raw))
+            at = [align.origin(text, i) for i in (cue_start, cue_end - 1, match_start, match_end - 1)]
+            if None not in at and raw is not text and len(raw) >= max(a for a in at if a is not None) + 1:
+                r_cs, r_ce, r_ms, r_me = at[0], at[1] + 1, at[2], at[3] + 1
+                if (r_cs < r_ce <= r_ms < r_me
+                        and _ascii_lower(raw[r_cs:r_ce]) == _ascii_lower(text[cue_start:cue_end])
+                        and _ascii_lower(raw[r_ms:r_me]) == _ascii_lower(text[match_start:match_end])
+                        and _ascii_lower(raw[r_ce:r_ms]) == _ascii_lower(text[cue_end:match_start])):
+                    return self._closed_form(raw, road, r_cs, r_ce, raw[r_ce:r_ms], r_ms, r_me, None, None,
+                                             rule_id, tail_id)
+        view_lo = text.rfind(" " + VIEW_SEP + " ", 0, cue_start)
+        view_lo = 0 if view_lo == -1 else view_lo + len(VIEW_SEP) + 2
+        view_hi = text.find(" " + VIEW_SEP + " ", cue_end)
+        view_hi = len(text) if view_hi == -1 else view_hi
+        lo = max(view_lo, cue_start - self._CF_WINDOW)
+        pre = text[lo:cue_start]
+        # FRONT: the start of the sentence is seen, and only one opener of the closed list stands before the word.
+        start = None
+        for m in (self._CF_START_LIST_RX if road == "list" else self._CF_START_RX).finditer(pre):
+            start = m.end()
+        if road == "plain":
+            # A sentence also starts after ONE line break when the line before it is complete: it ends with a
+            # sentence mark, it is a heading (a # line, an underlined line, a short title) or a block of a page.
+            # A line that runs on (a colon, a comma, a word that wants an object) does not end the sentence: the
+            # text before the break is then the front of the one-line twin.
+            line_start = self._line_break_start(pre, lo == view_lo)
+            if line_start is not None and (start is None or line_start > start):
+                start = line_start
+        front_seen = start is not None or lo == view_lo
+        if start is None:
+            if lo != view_lo and road == "plain":
+                return False
+            start = 0
+        raw_front = _ascii_lower(pre[start:])
+        for label in self._CF_FRONT_LABELS:
+            if raw_front.startswith(label + ": "):
+                raw_front = raw_front[len(label) + 2:]
+                break
+        front = " ".join(raw_front.split())
+        notice = road == "plain" and (tail_id in self._CF_NOTICE_IDS or rule_id in self._CF_NOTICE_KEYWORD_IDS)
+        if road == "plain" and front not in self._CF_OPENERS and not (notice and self._notice_front(front)):
+            return False
+        sent_lo = lo + start
+        # GOVERNS: the word stands right before the verb, at most one word of the closed list between.
+        if road == "plain":
+            words = re.findall(r"[a-z0-9'’-]+", _ascii_lower(gap))
+            verbs = self._CF_GAP_VERBS.get(rule_id or "", ())
+            if words and words[-1] in verbs:
+                # An optional word between, then ONE verb of the rule's closed list, in plain single-spaced
+                # words on one line: a comma, a colon, a quote or a line break in that span = no lowering.
+                if len(words) > 2 or (len(words) == 2 and words[0] not in self._CF_GAP_WORDS) \
+                        or not re.fullmatch(r" ?[a-z]+(?: [a-z]+)? ?", _ascii_lower(gap)):
+                    return False
+            elif len(words) > 1 or (words and words[0] not in self._CF_GAP_WORDS):
+                return False
+        # TAIL start and END of the sentence.
+        tail_from = list_end if road == "list" else match_end
+        if tail_from is None or tail_from < cue_end:
+            return False
+        # A match that stops inside a word ("password" of "passwords") is read to the end of that word.
+        while 0 < tail_from < len(text) and text[tail_from - 1].isalnum() and text[tail_from].isalnum():
+            tail_from += 1
+        if road == "plain" and match_end is not None:
+            match_end = tail_from
+            # ONE listed literal flag, one space after the match, counts as part of the match.
+            for flag in self._CF_FLAGS_AFTER:
+                if text[tail_from:tail_from + 1 + len(flag)].lower() == " " + flag and not (
+                        tail_from + 1 + len(flag) < len(text)
+                        and (text[tail_from + 1 + len(flag)].isalnum() or text[tail_from + 1 + len(flag)] in "-_")):
+                    match_end = tail_from = tail_from + 1 + len(flag)
+                    break
+        stop = min(view_hi, tail_from + self._CF_REACH)
+        end_at = None
+        terminator = ""
+        for m in self._CF_END_RX.finditer(text, tail_from, stop):
+            end_at, terminator = m.start(), m.group(0)
+            break
+        if end_at is None:
+            return False
+        if terminator == "?" or (stop == tail_from + self._CF_REACH and end_at >= stop):
+            return False
+        if terminator == "" and end_at != view_hi:
+            return False
+        tail = text[tail_from:end_at]
+        sentence = text[sent_lo:end_at]
+        # A literal tail of this rule closes the sentence: it is cut off the part read for words.
+        literal = self._CF_LITERAL_TAILS.get(tail_id or "")
+        lit_at = None
+        if literal and end_at - len(literal) - 1 >= cue_end and text[end_at - len(literal) - 1] == " " \
+                and _ascii_lower(text[end_at - len(literal):end_at]) == literal:
+            lit_at = end_at - len(literal)
+            # The tail takes the same front as every closed form (a seen start; nothing, or one opener; the
+            # subject of the README sentence itself) and nothing after it on its line: no second sentence.
+            after = text[end_at + (1 if terminator[:1] in ".!?" else 0):]
+            rest_of_line = re.split(r"[\n\u2028\u2029]", after, 1)[0]
+            if not front_seen or (front not in self._CF_OPENERS and front != "the plugin") \
+                    or rest_of_line.strip(" \t\r"):
+                lit_at = None
+        if len(re.findall(r"\S+", text[cue_end:end_at])) > self._CF_MAX_WORDS:
+            return False
+        # The notice form cuts its last words (an audience that names a mail address, the restated promise) off
+        # the tail; they are blanked below in the place check and in the negating-word check.
+        cut_at = None
+        bare_address = False
+        if notice:
+            for i, rx in enumerate(self._CF_NOTICE_CUTS):
+                cm = rx.search(text, tail_from, end_at)
+                if cm is not None and cm.end() == end_at:
+                    cut_at = cm.start() if cut_at is None else min(cut_at, cm.start())
+                    bare_address = bare_address or (i == 0 and not cm.group(0).startswith(","))
+            if cut_at is not None:
+                tail = text[tail_from:max(cut_at, tail_from)]
+            if bare_address:
+                # The bare "to <address>" at the end holds only when nothing but a determiner stands between the
+                # move word and the secret noun.
+                inner = _ascii_lower(text[match_start:match_end if match_end is not None else tail_from]).split(None, 1)
+                inner = self._CF_NOUNS_RX.sub(" ", self._CF_NOTICE_NOUNS_RX.sub(" ", inner[1] if len(inner) == 2 else ""))
+                if any(tok not in self._CF_NOTICE_DETERMINERS for tok in re.findall(r"[a-z0-9'’-]+", inner)):
+                    return False
+        # No place the data could go to, anywhere in the sentence.
+        if self._CF_PLACE_RX.search(sentence if cut_at is None else sentence[:max(cut_at - sent_lo, 0)]):
+            return False
+        m_lo = max(match_start, sent_lo)
+        m_hi = min(match_end if match_end is not None else tail_from, end_at)
+        outside = sentence[:max(m_lo - sent_lo, 0)] + " " * max(m_hi - m_lo, 0) + sentence[max(m_hi - sent_lo, 0):]
+        if self._CF_PATH_RX.search(outside):
+            return False
+        # ONE negating word: a second one anywhere in the sentence keeps the severity.
+        blanked = text[sent_lo:cue_start] + " " * (cue_end - cue_start) + text[cue_end:end_at]
+        if lit_at is not None:
+            blanked = blanked[:lit_at - sent_lo] + " " * (end_at - lit_at)
+        if cut_at is not None:
+            blanked = blanked[:max(cut_at - sent_lo, 0)] + " " * (end_at - max(cut_at, sent_lo))
+        if match_end is not None:
+            for fm in self._CF_FLAG_RX.finditer(text, max(match_start, sent_lo), min(match_end, end_at)):
+                a, b = fm.start() - sent_lo, fm.end() - sent_lo
+                blanked = blanked[:a] + " " * (b - a) + blanked[b:]
+        if self._CF_NEGATING_RX.search(_ascii_lower(blanked)):
+            return False
+        # TAIL (plain road only): the rest of the sentence after the match holds only closed words.
+        if road == "plain":
+            if match_end is None:
+                return False
+            # A word that cuts the object down to a part, inside the match, is no closed form either.
+            if self._CF_PARTIAL_RX.search(_ascii_lower(text[match_start:match_end])):
+                return False
+            own = set()
+            for tok in re.findall(r"[a-z0-9'’-]+", _ascii_lower(text[match_start:match_end])):
+                # A flag of the match is not repeated in the tail: a second flag is an option, not a word.
+                if not self._CF_FLAG_RX.fullmatch(tok):
+                    own.update((tok,) if "-" not in tok else tok.split("-"))
+            if lit_at is not None:
+                tail = text[tail_from:max(lit_at, tail_from)]
+            rest = _ascii_lower(tail)
+            allowed = self._CF_TAIL_WORDS
+            if notice and cut_at is None and lit_at is None and "," in text[match_start:end_at] \
+                    and self._notice_list(text[match_start:end_at]):
+                rest = ""
+            elif notice:
+                rest = self._CF_NOTICE_NOUNS_RX.sub(" ", rest)
+                allowed = allowed | self._CF_NOTICE_TAIL_WORDS
+            rest = self._CF_PARTY_RX.sub(" ", self._CF_NOUNS_RX.sub(" ", rest))
+            for token in re.findall(r"[a-z0-9'’-]+|[^\sa-z0-9'’-]", rest):
+                if token == "," or token in allowed or token in own:
+                    continue
+                return False
+        elif tail.strip():
+            return False
+        # The raw input says the same: the whole sentence is the same characters in it.
+        if align is not None and not align.holds(text, sent_lo, max(end_at, sent_lo + 1), None,
+                                                  (cue_start, cue_end, match_start)):
+            return False
+        return True
 
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
                         refusal_ok: bool = False, raw_frame: bool = False, view_copy: bool = False,
-                        only_list: bool = False) -> bool:
+                        only_list: bool = False, rule_id: Optional[str] = None,
+                        tail_id: Optional[str] = None) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -3179,6 +3743,7 @@ class SunglassesEngine:
                     continue
             gap_end = hit_end
             list_end = None
+            road = "plain"
             leadin = self._leadin_break(text, match_start)
             if shape == "list" or not self._negation_governs(gap + leadin, gap_words):
                 if tail is None:
@@ -3196,18 +3761,30 @@ class SunglassesEngine:
                     # must say the same there too, and say that the list ends where it does.
                     list_end = match_start + reach
                     gap_end = max(hit_end, list_end)
+                    road = "list"
                     if view_end is not None:
                         gap_end = min(gap_end, view_end)
                 elif shape == "list" or not self._quoted_gap_holds(gap, text, match_start, match_end, align):
                     continue
+                else:
+                    road = "quoted"
+            # On the plain road only a true negation lowers a hit. A plain negation lowers on the list
+            # road (above) and nowhere else; a copy of the text read at its place with a rule id
+            # (_negated_here) reaches this check too.
+            if road == "plain" and plain:
+                continue
             if align is None or align.holds(
                     text, max(0, window_start + m.start() - 1), gap_end,
-                    self._spaced_inside(text, window_start + m.end(), match_start)):
+                    self._spaced_inside(text, window_start + m.end(), match_start),
+                    (window_start + m.start(), window_start + m.end(), match_start)):
                 # The single place a cue lowers a hit. A list lowers it only if the RAW input
                 # says the list ends where it was read to end (_list_confirmed): nothing the view
                 # shows after the last word is looked at again here.
                 if (not only_list) if list_end is None else self._list_confirmed(align, text, list_end):
-                    return True
+                    if road == "quoted" or self._closed_form(
+                            text, road, window_start + m.start(), window_start + m.end(), gap,
+                            match_start, match_end, list_end, align, rule_id, tail_id):
+                        return True
         for phrase in () if only_list else self.FRAMING_LABELS:
             pos = before_text.rfind(phrase)
             if pos == -1:
@@ -3336,7 +3913,24 @@ class SunglassesEngine:
         if match_end is not None and match_end - 1 > match_start:
             last = align.origin(view, match_end - 1)
             end = last + 1 if last is not None and last - start == match_end - 1 - match_start else start + 1
-        return cls._sentence_shape(raw, cue, raw[cue + cue_len:start].lower(), end)
+        return cls._sentence_shape(raw, cue, cls._one_line_gap(raw[cue + cue_len:start], raw[start:start + 1]).lower(), end)
+
+    _ONE_BREAK_GAP_RX = re.compile(r"[ \t]*[\n\u2028][ \t\r]*")
+    _OTHER_BREAK_RX = re.compile(r"[\x0b\x0c\x1c\x1d\x1e\x85\u2029]")
+
+    @classmethod
+    def _one_line_gap(cls, gap: str, nxt: str = "") -> str:
+        """The gap between a forbidding word and the match, with ONE line break read as the space it is in the
+        one-line twin of the text (the word ends its line, the order starts the next). CRLF and a lone CR are the
+        line break LF is. Any other break, or a second one, is left as it is; so is a break before a capital
+        letter (``nxt`` is the first character of the match): the next line starts a new sentence."""
+        if nxt[:1].isupper() or getattr(_SCAN_LOCAL, "in_parts", False):
+            # (a page: a line break there is the edge of a block, which starts a sentence)
+            return gap
+        flat = gap.replace("\r\n", "\n").replace("\r", "\n")
+        if flat.count("\n") + flat.count("\u2028") != 1 or cls._OTHER_BREAK_RX.search(flat):
+            return gap
+        return cls._ONE_BREAK_GAP_RX.sub(" ", flat, 1)
 
     @classmethod
     def _sentence_shape(cls, text: str, cue_start: int, gap: str, match_end: int,
@@ -3398,7 +3992,8 @@ class SunglassesEngine:
         input can hold a list mark or a line break the view lost, and it can say the sentence is
         not clean where the view says it is."""
         shape = self._sentence_shape(
-            text, cue_start, gap, match_end if match_end is not None else match_start, view)
+            text, cue_start, self._one_line_gap(gap, text[match_start:match_start + 1]),
+            match_end if match_end is not None else match_start, view)
         if shape != "other" and align is not None:
             raw_shape = self._raw_sentence_shape(text, cue_start, cue_len, match_start, match_end, align)
             if raw_shape == "other" or shape == "plain":
@@ -3491,9 +4086,13 @@ class SunglassesEngine:
         from. The end of the match is handed on, so a quote that is to cover the
         whole match is checked against it; in the raw frame the end is known only
         when the last character of the match is also placed in the raw text."""
+        tail_id = getattr(self, "_literal_tail_rule", {}).get(id(rx))
+
         def negated_at(match):
             position = match.start()
-            if self._negated_here(text, position, align, match.end()):
+            if self._markup_stands_before(text, position, match.end()):
+                return False
+            if self._negated_here(text, position, align, match.end(), tail_id=tail_id):
                 return True
             if source is not None:
                 raw, origin, copied = source
@@ -3503,7 +4102,7 @@ class SunglassesEngine:
                     stop = None
                     if last is not None and last - at == match.end() - 1 - position:
                         stop = last + 1
-                    return self._check_negation(raw, at, None, stop, raw_frame=True)
+                    return self._check_negation(raw, at, None, stop, raw_frame=True, tail_id=tail_id)
                 return copied(position, match.end())
             return False
 
@@ -3649,7 +4248,8 @@ class SunglassesEngine:
         return None
 
     def _live_occurrence(self, normalized: str, keyword: str, begin: int, align=None,
-                         refusal_ok: bool = False, decoded_strict: bool = False):
+                         refusal_ok: bool = False, decoded_strict: bool = False,
+                         rule_id: Optional[str] = None):
         """Offset of the first word-bounded occurrence of `keyword` at or after
         `begin` that is not negated, or None. `align` is the walk of the views
         against the raw input (see _check_negation). `decoded_strict`: see _negated_here."""
@@ -3657,13 +4257,65 @@ class SunglassesEngine:
         while at != -1:
             if self._word_bounded(normalized, at, keyword) and \
                     not self._negated_here(normalized, at, align, at + len(keyword), refusal_ok,
-                                           decoded_strict):
+                                           decoded_strict, rule_id):
                 return at
             at = normalized.find(keyword, at + 1)
         return None
 
+    _MARKUP_SENTENCE_START_RX = re.compile(r"[.!?][\"'\u2018\u2019\u201c\u201d)\]]*[ \t]+|[\n\u2028\u2029]")
+
+    @staticmethod
+    def _lowered_marks(marks):
+        lowered = marks.get(None)
+        if lowered is None:
+            lowered = {key.lower(): value for key, value in marks.items() if key is not None and len(key.lower()) == len(key)}
+            marks[None] = lowered
+        return lowered
+
+    def _markup_stands_before(self, text: str, pos: int, end: Optional[int]) -> bool:
+        """True when, in the text flow of a page, markup of any kind (a tag, a comment, a processing instruction)
+        stands between the start of the sentence the match is in and the last character of the match. A word
+        the reader may not see lowers nothing: the page is read as written to lower a match, one text node and
+        nothing else between the forbidding word and the match. Everywhere but a page, and in any text that is
+        not the text flow of the page as cut, this is False."""
+        marks = getattr(_SCAN_LOCAL, "page_marks", None)
+        if not marks:
+            return False
+        # The rules read the views of a text joined with a separator: the plain view comes first. The marks
+        # are looked up by the view the match is in (the text flow as cut, or the same in lower case).
+        cached = getattr(_SCAN_LOCAL, "view_bounds", None)
+        if cached is None or cached[0] is not text:
+            sep, starts = " " + VIEW_SEP + " ", [0]
+            at = text.find(sep)
+            while at != -1:
+                starts.append(at + len(sep))
+                at = text.find(sep, at + len(sep))
+            cached = _SCAN_LOCAL.view_bounds = (text, starts)
+        starts = cached[1]
+        k = bisect.bisect_right(starts, pos) - 1
+        base = starts[k]
+        top = starts[k + 1] - len(VIEW_SEP) - 2 if k + 1 < len(starts) else len(text)
+        view = text[base:top]
+        found = marks.get(view)
+        if found is None:
+            found = self._lowered_marks(marks).get(view)
+        if found is None:
+            return False
+        low = max(base, pos - self.NEGATION_WINDOW)
+        front = low
+        # The flat form draws a block edge as a space: a sentence starts at a block edge, so it is read in the
+        # line form (the same characters at the same places).
+        lined = found.lined_lower if len(found.lined_lower) == len(view) else view
+        for m in self._MARKUP_SENTENCE_START_RX.finditer(lined, low - base, pos - base):
+            front = base + m.end()
+        stop = end if end is not None else pos
+        offsets = found.offsets()
+        i = bisect.bisect_right(offsets, front - base)
+        return i < len(offsets) and offsets[i] + base < stop
+
     def _negated_here(self, view: str, pos: int, align, end: int, refusal_ok: bool = False,
-                      decoded_strict: bool = False) -> bool:
+                      decoded_strict: bool = False, rule_id: Optional[str] = None,
+                      tail_id: Optional[str] = None) -> bool:
         """Whether the hit at view[pos:end] is negated. A hit in a view behind the plain
         one that does not keep the offsets never is.
 
@@ -3674,23 +4326,28 @@ class SunglassesEngine:
         the shape-confusion copy is the plain text again and is judged as it always was."""
         if align is not None and align.moved(view, pos):
             return False
+        if self._markup_stands_before(view, pos, end):
+            return False
         if refusal_ok and self._refusal_in_shape_copy(view, pos, end, align):
             return True
         aligned = self._align_at(view, pos, align)
         if align is None or aligned is not None:
-            return self._check_negation(view, pos, aligned, end, refusal_ok)
+            return self._check_negation(view, pos, aligned, end, refusal_ok, rule_id=rule_id, tail_id=tail_id)
         if decoded_strict and not self._in_shape_copy(view, pos, align):
-            return self._check_negation(view, pos, align, end, refusal_ok)
+            return self._check_negation(view, pos, align, end, refusal_ok, rule_id=rule_id, tail_id=tail_id)
         # A hit in a later view (ROT13, reversed...) is judged in its own text, as a plain
         # sentence: no list is read there, because the raw input cannot say where it ends. The
         # copy of the plain text with some `l` written as `i` is the plain text, so its hit is also
         # asked at the place it is a copy of, where the raw input can speak, and only for a list
         # (a plain sentence is read in the copy as on main).
-        if self._check_negation(view, pos, None, end, refusal_ok, view_copy=True):
+        if self._check_negation(view, pos, None, end, refusal_ok, view_copy=True, rule_id=rule_id,
+                                tail_id=tail_id):
             return True
         place = self._shape_place(view, pos, end, align)
+        # The copy is the plain text: when the plain text at its place is negated, so is the copy.
         return place is not None and self._check_negation(
-            view, place, align, place + end - pos, refusal_ok, only_list=True)
+            view, place, align, place + end - pos, refusal_ok, only_list=rule_id is None, rule_id=rule_id,
+            tail_id=tail_id)
 
     @staticmethod
     def _shape_copy_start(view: str, align):
@@ -3937,6 +4594,7 @@ class SunglassesEngine:
         _Walk.BLANK_RUN spaces between two words of the gap counts as one space.
         Anything else in the gap means it does not govern."""
         gap = self._GAP_SPACES_RX.sub(" ", gap)
+        gap = self._one_line_gap(gap, getattr(_SCAN_LOCAL, "match_first", ""))
         if not self._NEGATION_GAP_RX.fullmatch(gap):
             return False
         words = gap.split()
@@ -4100,12 +4758,21 @@ class SunglassesEngine:
                 return None
             final_words = last[0] + 1  # the item after the conjunction, and the conjunction
             body = gap[1:-2]
+            if item not in self._NEGATION_LIST_ITEMS:
+                return None
         else:
             body = None
             for conj in (", and ", ", or "):
                 if gap.endswith(conj):
                     body = gap[1:-len(conj)]
                     break
+            if body is None:
+                # A list of three or more items may leave out the comma before its conjunction
+                # ("log, store or transmit"); two items with no comma at all are not a list.
+                for conj in (" and ", " or "):
+                    if gap.endswith(conj) and "," in gap[1:-len(conj)]:
+                        body = gap[1:-len(conj)]
+                        break
             if body is None:
                 return None
             # The last item is the match. It is read whole, on one line, and it ends the list.
@@ -4128,6 +4795,8 @@ class SunglassesEngine:
         if commas > self.NEGATION_LIST_COMMAS:
             return None
         for item in body.split(", "):
+            if item not in self._NEGATION_LIST_ITEMS:
+                return None
             item_words = item.split(" ")
             if len(item_words) > self.NEGATION_LIST_ITEM_WORDS or not all(
                     self._LIST_WORD_RX.fullmatch(w) for w in item_words):
@@ -4243,6 +4912,7 @@ class SunglassesEngine:
     _ASCII_FOLD = {c: c + 32 for c in range(65, 91)}
     _URGENCY_RULE_ID = "GLS-SEM-UI-217"
     _HIDDEN_MAX_HITS = 200
+    _SMALL_FRACTION = re.compile(r"\.\d*[1-9]")
     _HIDDEN_REGION_CAP = 20000
     _HIDDEN_TEXT_MIN = 40
     _HIDDEN_TEXT_MAX = 400
@@ -4469,6 +5139,49 @@ class SunglassesEngine:
             seen.add(name)
             found.append((name, next((g for g in attr.groups()[1:] if g is not None), None)))
 
+    _SPRITE_TAGS = frozenset((
+        "svg", "symbol", "path", "g", "defs", "use", "circle", "rect", "line", "polyline", "polygon", "ellipse",
+        "lineargradient", "radialgradient", "stop", "clippath"))
+
+    def _hidden_svg_sprite(self, text: str, tokens, place: int, budget: list):
+        """For a hidden svg ROOT whose whole subtree is drawing elements with only white space
+        between the tags: the attribute text of the subtree, to be read for an ask like any hidden element. None when
+        the subtree is anything else (text, a comment, another element, no end tag in reach)."""
+        kind, name, start, end = tokens[place]
+        tags = [text[start:end]]
+        if not text[start:end].endswith("/>"):
+            depth = 1
+            last = end
+            closed = False
+            for k in range(place + 1, len(tokens)):
+                later = tokens[k]
+                if later[2] - end > self._HIDDEN_REGION_CAP:
+                    return None
+                budget[0] -= 1
+                if budget[0] < 0:
+                    raise _HiddenReadLimit()
+                if later[0] == "other" or later[1] not in self._SPRITE_TAGS or text[last:later[2]].strip():
+                    return None
+                last = later[3]
+                if later[0] == "start":
+                    tags.append(text[later[2]:later[3]])
+                    if not text[later[2]:later[3]].endswith("/>"):
+                        depth += 1
+                else:
+                    depth -= 1
+                    if depth == 0:
+                        closed = True
+                        break
+            if not closed:
+                return None
+        values = [decode_html_entities(value) for tag in tags for attr_name, value in self._hidden_attrs(tag)
+                  if attr_name != "style" and value]
+        attrs = " ".join(values)
+        said = normalize_before_leetspeak(" ".join(tags) + " " + attrs)
+        if self._has_hidden_mail(said) or self._HIDDEN_ORDER.search(said):
+            return True
+        return attrs
+
     def _hidden_hit_carries_ask(self, text: str, tokens, foreign, place: int, budget: list):
         """True when the hiding style on the start tag `place` must keep its block: its element
         holds an ask, or it cannot be read. Otherwise the text of the element, for the reader
@@ -4478,6 +5191,10 @@ class SunglassesEngine:
         if name in self._HIDDEN_BLOCK_TAGS:
             return True                      # by the parsing rules the attributes land on the page itself
         start_tag = text[start:end]
+        if name == "svg" and not foreign[place] and "<" not in start_tag[1:]:
+            sprite = self._hidden_svg_sprite(text, tokens, place, budget)
+            if sprite is not None:
+                return sprite                # an svg of drawing elements and no text
         if "<" in start_tag[1:] or name in self._HIDDEN_FOREIGN_TAGS or foreign[place]:
             return True                      # a tag that swallowed another, or foreign content
         budget[1] -= len(start_tag)
@@ -4600,7 +5317,80 @@ class SunglassesEngine:
             at = text.find(keyword, at + 1)
         return found
 
+    _NON_LETTER_RUN = re.compile(r"(?:(?![^\W\d_])[\s\S])+")
+    _RUN_ATOM = re.compile(r"[^\W_]*\d[^\s<>\"'{}()\[\]=]*|[^\s<>\"'{}()\[\]=]*\d[^\s<>\"'{}()\[\]=]*")
+    _DIGIT_RUN_CAP = 20000
+    _DIGIT_RUN_CALLS = 8000
+    _DIGIT_RUN_CHARS = 400000
+    _DIGIT_RUN_WINDOW = 4
+
+    def _digit_name_spans(self, text: str) -> list:
+        """The spans of `text` that are made of digits and marks alone and that the list reads as a name on their own, as (start, end).
+        A run is everything between two letters, with the blanks, marks, quotes and tag signs that stand in it. A run with fewer than two
+        digits cannot read as a name and is not asked. Every other run is asked first as it stands and then from its first digit to its
+        last; a span with no letter after its encodings are read that the list reads alone is the span of that run. The runs left are then
+        asked by windows of up to _DIGIT_RUN_WINDOW digit-words (words split at blanks, quotes, tag signs and brackets), longest first, with
+        the same test. A span is asked once whatever number of runs holds it, so the cost follows the number of different spans and not of
+        runs; at most _DIGIT_RUN_CALLS different spans, and _DIGIT_RUN_CHARS characters of them, are asked for one text, and past that the span stays, so the block stays."""
+        asked, chars = {}, [0]
+
+        def free(a, b):
+            piece = text[a:b]
+            if piece not in asked:
+                if len(asked) >= self._DIGIT_RUN_CALLS or chars[0] >= self._DIGIT_RUN_CHARS:
+                    return False
+                chars[0] += len(piece)
+                asked[piece] = (not any(ch.isalpha() for ch in normalize_before_leetspeak(piece))) and self._reads_reader(piece)
+            return asked[piece]
+
+        spans, left = [], []
+        for run in self._NON_LETTER_RUN.finditer(text):
+            if len(spans) + len(left) >= self._DIGIT_RUN_CAP:
+                break
+            lo, hi = run.span()
+            digits = [i for i in range(lo, hi) if text[i].isdigit()]
+            if len(digits) < 2:
+                continue
+            first, last = digits[0], digits[-1] + 1
+            if free(lo, hi):
+                spans.append((lo, hi))
+            elif (first, last) != (lo, hi) and free(first, last):
+                spans.append((first, last))
+            else:
+                left.append((lo, hi))
+        for lo, hi in left:
+            atoms = [m.span() for m in self._RUN_ATOM.finditer(text, lo, hi) if any(ch.isdigit() for ch in m.group(0))]
+            i = 0
+            while i < len(atoms):
+                took = False
+                for j in range(min(len(atoms), i + self._DIGIT_RUN_WINDOW), i, -1):
+                    if sum(ch.isdigit() for ch in text[atoms[i][0]:atoms[j - 1][1]]) >= 2 and free(atoms[i][0], atoms[j - 1][1]):
+                        spans.append((atoms[i][0], atoms[j - 1][1]))
+                        i, took = j, True
+                        break
+                if not took:
+                    i += 1
+        return sorted(spans)
+
     def _names_ai_reader(self, text: str, subjects=None) -> bool:
+        """True when `text` names an AI reader, as _reads_reader asks it, and the name is not made of digits and marks alone: a span between
+        two letters with a digit and no letter in the text after its character references and other encodings are read (a count, a time, a
+        rating, a size, a path, a placeholder) that the list reads as a name only on a view that reads digits as letters does not count,
+        whatever mark or blank joins it to the words beside it. The test is the hit, not the glue. The text with those spans taken out is
+        asked again, and the answer stays when it still names a reader. A text with no such span answers as _reads_reader does."""
+        if not self._reads_reader(text, subjects):
+            return False
+        spans = self._digit_name_spans(text)
+        if not spans:
+            return True
+        pieces, at = [], 0
+        for a, b in spans:
+            pieces.append(text[at:a])
+            at = b
+        pieces.append(text[at:])
+        return self._reads_reader(" ".join(pieces))
+
+    def _reads_reader(self, text: str, subjects=None) -> bool:
         """True when `text` names an AI reader, by the list of reader names or by the gate of GLS-IP-009. It never makes a block. The urgency
         switch also keeps the block on the gate answer from the scan's own walk (reader_gate_seen); the hiding switch does not read it.
 
@@ -4674,12 +5464,44 @@ class SunglassesEngine:
                     value = decode_html_entities(value).translate(self._ASCII_FOLD)
                     counts = [len(self._bounded_hits(value, k)) for k in keywords]
                     if any(counts):
-                        places.append(place)
+                        # a zero followed by a dot and a nonzero digit (0.9, 0.05rem) is not a zero.
+                        # The hit is accounted (it counts as located) but it does not put the element in `places`.
+                        real = [sum(1 for h in self._bounded_hits(value, k)
+                                    if not (k[-1] == "0" and self._SMALL_FRACTION.match(value, h + len(k))))
+                                for k in keywords]
+                        if any(real):
+                            places.append(place)
                         for k, n in zip(keywords, counts):
                             located[k] += n
             else:
                 at += 1
             at = folded.find("style", at)
+        # a hit inside style, script or noscript text or a comment hides nothing the page names:
+        # accounted, not placed. Only tokens the tokenizer made as "other" with those names (or a comment).
+        for i, (kind, name, begin, end) in enumerate(tokens):
+            if kind != "other":
+                continue
+            raw_body = (name in ("style", "script", "noscript") and i and tokens[i - 1][0] == "start"
+                        and tokens[i - 1][1] == name and tokens[i - 1][3] == begin)
+            # the body of a script, style or noscript element only; a tag of that name that never ends is read by the end-of-page rule below.
+            if raw_body or (name == "" and text.startswith("<!--", begin)):
+                for k in keywords:
+                    located[k] += len(self._bounded_hits(folded[begin:end], k))
+        # a start tag whose quote never closes before the end of the page is an EOF-in-tag: a parser drops
+        # it, no element hides anything. Its hits are accounted, not placed; the text it swallowed is still read for an ask
+        # (mail, an order, a name for an AI reader): one found keeps the block.
+        for i, (kind, name, begin, end) in enumerate(tokens):
+            if kind != "other" or end != len(text) or not text.startswith("<", begin) or name in ("", "cdata"):
+                continue
+            if i and tokens[i - 1][0] == "start" and tokens[i - 1][1] == name and tokens[i - 1][3] == begin:
+                continue                     # raw text that follows a start tag, not a tag that never ends
+            for k in keywords:
+                located[k] += len(self._bounded_hits(folded[begin:end], k))
+            swallowed = text[begin:end]
+            said = normalize_before_leetspeak(swallowed)
+            if (self._has_hidden_mail(said) or self._HIDDEN_ORDER.search(said)
+                    or self._names_ai_reader(swallowed) or self._names_ai_reader(said)):
+                return True
         for k in keywords:
             if located[k] < max(len(self._bounded_hits(v, k)) for v in views):
                 return True                  # fewer found as written than the rule saw on any view
@@ -4773,11 +5595,11 @@ class SunglassesEngine:
                 host program uses it). The scan did not run.
         """
         if time_limit is None and getattr(_SCAN_LOCAL, "time_limit", None) is None:
-            return self._scan_text(text, channel)
+            return self._scan_whole(text, channel)
         with self.time_limit_scope(time_limit) as run:
             run.begin_call()
             try:
-                return self._time_limit_report(run, self._scan_text(text, channel))
+                return self._time_limit_report(run, self._scan_whole(text, channel))
             finally:
                 run.end_call()
 
@@ -4856,9 +5678,64 @@ class SunglassesEngine:
         out.extraction_complete = False
         return out
 
-    def _scan_text(self, text: str, channel: str) -> ScanResult:
-        """`scan` without the time limit: the raw scan, then the UTF-7 view's."""
-        result = self._scan_in_context(text, channel)
+    def _scan_whole(self, text: str, channel: str) -> ScanResult:
+        """One text as `scan` reads it, before the time limit's report: an HTML page on web content is read as parts
+        (see `_scan_page_parts`), any other text whole. The parts walk runs inside the call's time limit scope."""
+        if self.CHANNEL_ALIASES.get(channel, channel) == "web_content" and channel in self.valid_channels:
+            paged = self._scan_page_parts(text, channel)
+            if paged is not None:
+                return self._lowered_on_channel(paged, channel)
+        return self._lowered_on_channel(self._scan_text(text, channel), channel)
+
+    def _read_channel_severity(self, patterns) -> dict:
+        """rule id -> {canonical channel: severity} for every rule that carries `channel_severity`. Raises ValueError on a field that is not
+        a mapping of known channels to a severity that ranks below the rule's own."""
+        held = {}
+        for pattern in patterns:
+            if "channel_severity" not in pattern:
+                continue
+            rule, field = pattern.get("id"), pattern["channel_severity"]
+            own = self.SEVERITY_ORDER.get(pattern.get("severity"), 0)
+            if not isinstance(field, dict) or not field:
+                raise ValueError(f"{rule}: channel_severity must be a mapping of channel to severity")
+            canonical = {}
+            for channel, severity in field.items():
+                if channel not in self.valid_channels:
+                    raise ValueError(f"{rule}: channel_severity names an unknown channel {channel!r}")
+                if self.SEVERITY_ORDER.get(severity, 0) <= 0 or self.SEVERITY_ORDER[severity] >= own:
+                    raise ValueError(f"{rule}: channel_severity {severity!r} on {channel!r} does not rank below the rule's own severity")
+                canonical[self.CHANNEL_ALIASES.get(channel, channel)] = severity
+            held[rule] = canonical
+        return held
+
+    def _lowered_on_channel(self, result: ScanResult, channel: str) -> ScanResult:
+        """The one place a rule's `channel_severity` takes effect: every finding of such a rule on its named channel carries the lower severity
+        (the rule's own severity stays in `original_severity`) and the decision is taken from the worst severity left. A result with
+        no such finding comes back as it is."""
+        if not self._channel_severity:
+            return result
+        canonical = self.CHANNEL_ALIASES.get(channel, channel)
+        lowered = False
+        findings = []
+        for finding in result.findings:
+            lower = self._channel_severity.get(finding.get("id"), {}).get(canonical)
+            if lower is not None and self.SEVERITY_ORDER.get(finding["severity"], 0) > self.SEVERITY_ORDER[lower]:
+                finding = {**finding, "severity": lower, "original_severity": finding.get("original_severity", finding["severity"])}
+                lowered = True
+            findings.append(finding)
+        if not lowered:
+            return result
+        result.findings = findings
+        worst = max(findings, key=lambda f: self.SEVERITY_ORDER.get(f["severity"], 0))["severity"]
+        result.decision = self.SEVERITY_TO_DECISION.get(worst, "quarantine")
+        return result
+
+    def _scan_text(self, text: str, channel: str, only=None) -> ScanResult:
+        """`scan` without the time limit and as one text: the raw scan, then the UTF-7 view's. `only` is a set of rule ids: the
+        scan then reads those rules and no other.
+        `only` is passed down only when it is set, so a caller that replaces one of these steps with two or three arguments keeps working.
+        """
+        result = self._scan_in_context(text, channel) if only is None else self._scan_in_context(text, channel, only)
         # UTF-7 runs are read by a model that is asked to decode them and by no step of the
         # pipeline, so the text is scanned a second time with each readable run decoded.
         # The raw scan above is kept whole and the second one only adds to it, so a text that
@@ -4873,23 +5750,202 @@ class SunglassesEngine:
             view = None                      # plain ASCII with no way to write a plus
         if view is None:
             return result
-        return self._with_view_result(result, view, channel)
+        return self._with_view_result(result, view, channel) if only is None else self._with_view_result(result, view, channel, only)
 
-    def _scan_in_context(self, text: str, channel: str) -> ScanResult:
+    # Key shapes and encoded strings are what code is made of, so the rules of these two classes do not
+    # read the body of a JavaScript script or a stylesheet. A script that holds data (json, ld+json, a
+    # template) is page content and is read by every rule. The rules aimed at a reader read code too.
+    _CODE_PART_KINDS = frozenset(("script", "style", "sheet"))
+    _CODE_PART_SKIPPED_CLASSES = frozenset(("secret_detection", "encoding_evasion"))
+
+    def _page_parts_over(self, text: str, channel: str, start: float) -> ScanResult:
+        """The result for a page with more different parts that hold white space than it can be read in
+        bounded time: it keeps the block, with a finding that says why."""
+        finding = {
+            "id": "GLS-CF-PAGE-PARTS",
+            "name": "Page holds more parts than can be read part by part",
+            "category": "context_flooding",
+            "severity": "high",
+            "channel": ["web_content"],
+            "keywords": [],
+            "description": "The page holds more different parts with text in them (attribute values, comments, "
+                           "script and style bodies) than it can be read in bounded time, one part at a time, "
+                           "so it is not passed.",
+            "matched_text": "",
+        }
+        result = ScanResult(
+            decision=self.SEVERITY_TO_DECISION.get("high", "block"),
+            findings=[finding],
+            raw_input=text,
+            normalized_input="",
+            channel=channel,
+            latency_ms=(time.perf_counter() - start) * 1000,
+        )
+        result.bytes_scanned = len(text)
+        return result
+
+    def _scan_page_parts(self, text: str, channel: str):
+        """A web_content page that holds markup, read as parts (see sunglasses/page_parts.py):
+        each part goes through the rules on its own, and the page gets one result. None when the
+        text holds no tag (it is read as one string).
+
+        The page is cut at the scan limit, like a single text. The findings of every part stand;
+        one rule that fires in several parts is reported once, at its highest severity. The hiding
+        style and the urgency rule are read once, on the whole page and every part's findings."""
+        start = time.perf_counter()
+        limit = self.max_scan_bytes
+        truncated = bool(limit) and len(text) > limit
+        page = text[:limit] if truncated else text
+        marks = {}
+        MARKS_SINK.marks = marks
+        try:
+            parts = cut_page(page, None)
+        finally:
+            MARKS_SINK.marks = None
+        if parts is None:
+            return None
+        previous = getattr(_SCAN_LOCAL, "in_parts", False)
+        previous_marks = getattr(_SCAN_LOCAL, "page_marks", None)
+        previous_flat = getattr(_SCAN_LOCAL, "flat_of", None)
+        _SCAN_LOCAL.in_parts = True
+        _SCAN_LOCAL.page_marks = marks
+        try:
+            parts, over = pack_parts(parts)
+            if over:
+                return self._page_parts_over(text, channel, start)
+            uniq = list({part for _, part in parts})
+            _SCAN_LOCAL.page_rules = self._page_rules(uniq)
+            _SCAN_LOCAL.page_keywords = None if self._automaton else self._page_keywords(uniq)
+            # The flat form of the text flow is the line form with each break drawn as one space: the same
+            # characters at the same places. A closed form read in the flat form reads the sentence start in the
+            # line form (a block of the page starts a sentence), see _closed_form.
+            line_forms = [part for kind, part in parts if kind == "text"]
+            flat_of = {}
+            for kind, part in parts:
+                if kind == "textflat":
+                    for lined in line_forms:
+                        if len(lined) == len(part) and lined.replace("\n", " ") == part:
+                            flat_of[part] = lined
+                            break
+            _SCAN_LOCAL.flat_of = flat_of
+            scanned = {}
+            results = []
+            for _, part in parts:
+                if part not in scanned:
+                    scanned[part] = self._scan_text(part, channel)
+                results.append(scanned[part])
+        finally:
+            _SCAN_LOCAL.in_parts = previous
+            _SCAN_LOCAL.page_rules = None
+            _SCAN_LOCAL.page_keywords = None
+            _SCAN_LOCAL.page_marks = previous_marks
+            _SCAN_LOCAL.flat_of = previous_flat
+        merged = {}
+        for (kind, _), result in zip(parts, results):
+            for finding in result.findings:
+                if kind in self._CODE_PART_KINDS and finding["category"] in self._CODE_PART_SKIPPED_CLASSES:
+                    continue
+                held = merged.get(finding["id"])
+                if held is None or (self.SEVERITY_ORDER.get(finding["severity"], 0)
+                                    > self.SEVERITY_ORDER.get(held["severity"], 0)):
+                    merged[finding["id"]] = finding
+        # A rule that reads one window of the text for its signals (the window is COOCCUR_WINDOW characters) measures
+        # that window in the text it is given. The text flow of a page has dropped the layout (a run of spaces, an
+        # indent), so two signals a page apart in the file can stand inside one window of the flow. On a long page such a
+        # rule counts only when the page as written holds its signals in one window too.
+        if self._windowed_only_ids and any(kind == "text" and len(part) > self.COOCCUR_WINDOW for kind, part in parts):
+            asked = {fid for fid in merged if fid in self._windowed_only_ids}
+            if asked:
+                held_raw = {f["id"] for f in self._scan_text(page, channel, asked).findings}
+                for fid in asked - held_raw:
+                    del merged[fid]
+        # A rule that reads a markup mark also reads the page as written, and a finding there counts: the cut can
+        # keep a mark apart from the words the rule reads with it, and the parts view must read at least as much as
+        # the page as written for these rules. A rule off the list keeps its reading inside the part.
+        if self._mark_rule_ids:
+            raw = self._scan_text(page, channel, self._mark_rule_ids)
+            # Two findings of a rule on the list stand or fall with another rule: a mechanism rule is dropped beside a
+            # carrier of its class, and a rule's floor copy is not walked once a critical or high finding stands. The
+            # list alone cannot say, so a page that holds one is read by every rule.
+            if any(f["id"].startswith("GLS-MECH-") or f.get("defensive_context") for f in raw.findings):
+                raw = self._scan_text(page, channel)
+            for finding in raw.findings:
+                if finding["id"] not in self._mark_rule_ids:
+                    continue
+                held = merged.get(finding["id"])
+                if held is None or (self.SEVERITY_ORDER.get(finding["severity"], 0)
+                                    > self.SEVERITY_ORDER.get(held["severity"], 0)):
+                    merged[finding["id"]] = finding
+        # A validator that reads the page as written (it carries its own reading of markup) is run once on the capped
+        # page and never on a part. A failure is reported as a validator failure is on any text: a warning, and the
+        # inspection is not complete.
+        page_failures = []
+        page_channels = {channel, self.CHANNEL_ALIASES.get(channel, channel)}
+        for validator in self._validators:
+            if not getattr(validator, "reads_the_page_as_written", False):
+                continue
+            if not page_channels.intersection(validator.channel):
+                continue
+            try:
+                if validator.pregate(page):
+                    for finding in validator.run(page):
+                        held = merged.get(finding["id"])
+                        if held is None or (self.SEVERITY_ORDER.get(finding["severity"], 0)
+                                            > self.SEVERITY_ORDER.get(held["severity"], 0)):
+                            merged[finding["id"]] = finding
+            except Exception as exc:
+                page_failures.append(
+                    f"validator {validator.id} failed ({type(exc).__name__}); its check was skipped")
+        findings = list(merged.values())
+        views = [r.hidden_views for r in results if getattr(r, "hidden_views", None) is not None]
+        # A stylesheet decoded from a data address is accounted for as a style body that follows the page, so a
+        # hiding style in it is a hiding style the reader can place (and records) and not one it cannot find.
+        decoded = "".join("\n<style>%s</style>" % body.replace("<", " ") for kind, body in parts if kind == "sheet")
+        hidden_notes = []
+        findings = self._record_hidden_style_alone(findings, page + decoded, VIEW_SEP.join(views), hidden_notes)
+        if not findings:
+            decision = "allow"
+        else:
+            worst = max(findings, key=lambda f: self.SEVERITY_ORDER.get(f["severity"], 0))["severity"]
+            decision = self.SEVERITY_TO_DECISION.get(worst, "quarantine")
+        flow = next((r for (kind, _), r in zip(parts, results) if kind == "text"), None)
+        result = ScanResult(
+            decision=decision,
+            findings=findings,
+            raw_input=text,
+            normalized_input=flow.normalized_input if flow is not None else "",
+            channel=channel,
+            latency_ms=(time.perf_counter() - start) * 1000,
+        )
+        result.truncated = truncated or any(r.truncated for r in results)
+        result.bytes_scanned = len(page)
+        warnings = []
+        for r in results:
+            for warning in r.extraction_warnings:
+                if warning not in warnings:
+                    warnings.append(warning)
+        for note in hidden_notes + page_failures:
+            if note not in warnings:
+                warnings.append(note)
+        result.extraction_warnings = warnings
+        result.extraction_complete = all(r.extraction_complete for r in results) and not hidden_notes and not page_failures
+        return result
+
+    def _scan_in_context(self, text: str, channel: str, only=None) -> ScanResult:
         """`_scan` with the per-scan thread state set up and put back (one scan, one state)."""
         previous = getattr(_SCAN_LOCAL, "ends", None)
         previous_channel = getattr(_SCAN_LOCAL, "channel", None)
         _SCAN_LOCAL.ends = _ViewEnds()
         _SCAN_LOCAL.channel = channel
         try:
-            return self._scan(text, channel)
+            return self._scan(text, channel) if only is None else self._scan(text, channel, only)
         finally:
             _SCAN_LOCAL.ends = previous
             _SCAN_LOCAL.channel = previous_channel
 
     _DECISION_RANK = {"allow": 0, "allow_redacted": 1, "quarantine": 2, "block": 3}
 
-    def _with_view_result(self, raw: ScanResult, view: str, channel: str) -> ScanResult:
+    def _with_view_result(self, raw: ScanResult, view: str, channel: str, only=None) -> ScanResult:
         """The raw result with the UTF-7 view's scan merged in. Never lowers it.
 
         decision is the worse of the two, every raw finding stays, a view finding is added
@@ -4899,7 +5955,7 @@ class SunglassesEngine:
         incomplete (extraction_complete False, with a warning). The raw object is copied, not edited.
         """
         try:
-            extra = self._scan_in_context(view, channel)
+            extra = self._scan_in_context(view, channel) if only is None else self._scan_in_context(view, channel, only)
         except Exception:
             # The raw result stands. A view that could not be scanned is a part not inspected,
             # so the result says so instead of passing as a complete clean one.
@@ -4929,8 +5985,90 @@ class SunglassesEngine:
             merged.extraction_complete = False
         return merged
 
-    def _scan(self, text: str, channel: str) -> ScanResult:
-        """The scan itself (see scan)."""
+    def _candidate_rules(self, present):
+        """The (pattern, regexes) entries of self._regex_patterns, in the same order, that can have a
+        regex whose trigger literal (the shortest literal clause of its requirement) is in `present`, plus every entry
+        with no literal trigger (an empty requirement, or a clause that needs a character class): those are always visited."""
+        page = getattr(_SCAN_LOCAL, "page_rules", None)
+        if page is not None:
+            return page                       # the page's own shortlist (see _page_rules)
+        rules = self._regex_patterns
+        if present.literals is None:
+            return rules
+        index = self._trigger_table()
+        _, always, by_literal = index
+        chosen = set(always)
+        for lit in present.literals:
+            hit = by_literal.get(lit)
+            if hit:
+                chosen |= hit
+        return [rules[i] for i in sorted(chosen)]
+
+    def _page_rules(self, part_texts):
+        """ONE shortlist for a page read as parts. A rule none of whose regexes has its trigger literal in
+        any part cannot match any part (a literal a part holds is in the parts joined by a NUL), so no part visits it. The
+        union is a superset of every part's own shortlist; every part still runs the full can_skip test on what it visits."""
+        rules = self._regex_patterns
+        _, always, by_literal = self._trigger_table()
+        joined = "\x00".join(_prefilter.fold(x) for x in part_texts)
+        present = self._literal_index.present(joined)
+        chosen = set(always)
+        if present.literals is not None:
+            for lit in present.literals:
+                hit = by_literal.get(lit)
+                if hit:
+                    chosen |= hit
+        else:
+            for lit, hit in by_literal.items():
+                if lit in joined:
+                    chosen |= hit
+        return [rules[i] for i in sorted(chosen)]
+
+    def _page_keywords(self, part_texts):
+        """The keywords (of self._keyword_to_patterns) that the normalized text of at least one part holds,
+        found in ONE pass over the parts joined by a NUL. A keyword a part's normalized text holds is in the joined text, so
+        this is a superset of every part's own list; each part still runs _first_bounded on what it visits."""
+        limit = self.max_scan_bytes
+        joined = "\x00".join(normalize_with_length(x[:limit] if limit else x, [])[0] for x in part_texts)
+        return [k for k in self._keyword_to_patterns if k in joined]
+
+    def _trigger_table(self):
+        rules = self._regex_patterns
+        index = getattr(self, "_trigger_index", None)
+        if index is None or index[0] != len(rules):
+            always = set()
+            by_literal = {}
+            for i, (pattern, regexes) in enumerate(rules):
+                for mode, rx, guards in regexes:
+                    need = self._regex_requirement.get(id(rx))
+                    if need is None:
+                        need = self._floor_requirement.get(id(rx), ())
+                    best = None
+                    for clause in need:
+                        if isinstance(clause, _prefilter.Clause):
+                            if clause.classes or not clause.literals:
+                                continue
+                            lits = clause.literals
+                        elif isinstance(clause, _prefilter.ClassClause):
+                            continue
+                        else:
+                            lits = clause
+                        if lits and (best is None or len(lits) < len(best)):
+                            best = lits
+                    if best is None:
+                        always.add(i)
+                        break
+                    for lit in best:
+                        by_literal.setdefault(lit, set()).add(i)
+                if pattern.get("match_on") == "normalized":
+                    always.add(i)
+            index = (len(rules), frozenset(always), by_literal)
+            self._trigger_index = index
+        return index
+
+    def _scan(self, text: str, channel: str, only=None) -> ScanResult:
+        """The scan itself (see scan). With `only` (a set of rule ids) a rule outside it is left out of the scan, and
+        so are the validators and the hiding style step, which are no rule of the list."""
         if channel not in self.valid_channels:
             raise ValueError(
                 f"Unknown channel '{channel}'. Valid channels: "
@@ -4970,9 +6108,16 @@ class SunglassesEngine:
         # taken in one canonical order (start, end, keyword) whichever answered, so
         # a scan reports the same findings, order and excerpts with or without
         # the optional extension.
-        def keyword_pass(normalized, align, negated_kw, view_candidates):
+        def keyword_pass(normalized, align, negated_kw, view_candidates, main=False):
             first_hits = {}
-            if self._automaton:
+            page_words = getattr(_SCAN_LOCAL, "page_keywords", None) if main else None
+            if page_words is not None and not self._automaton:
+                # on a page read as parts, only a keyword some part's normalized text holds is looked for
+                for keyword in page_words:
+                    first = self._first_bounded(normalized, keyword)
+                    if first is not None:
+                        first_hits[keyword] = first
+            elif self._automaton:
                 for end_idx, keyword in self._automaton.iter(normalized):
                     if keyword in first_hits:
                         continue
@@ -4991,11 +6136,13 @@ class SunglassesEngine:
                 for pattern in patterns:
                     if match_channels.isdisjoint(pattern.get("channel", ())):
                         continue
+                    if only is not None and pattern["id"] not in only:
+                        continue
                     held = negated_kw.get(pattern["id"])
                     if held is not None:
                         live = self._live_occurrence(normalized, keyword, 0, align,
                                                      pattern["id"] in self._REFUSAL_STRING_RULES,
-                                                     decoded_strict=True)
+                                                     decoded_strict=True, rule_id=pattern["id"])
                         if live is not None:
                             self._restore_live(held, self._excerpt(normalized, live, live + len(keyword)))
                             del negated_kw[pattern["id"]]
@@ -5012,19 +6159,21 @@ class SunglassesEngine:
                         "matched_text": self._excerpt(normalized, idx, idx + len(keyword)),
                     }
                     refusal_ok = pattern["id"] in self._REFUSAL_STRING_RULES
-                    if not pattern.get("negation_immune") and self._check_negation(
-                            normalized, idx, align, idx + len(keyword), refusal_ok):
+                    if not pattern.get("negation_immune") and not self._markup_stands_before(
+                            normalized, idx, idx + len(keyword)) and self._check_negation(
+                            normalized, idx, align, idx + len(keyword), refusal_ok, rule_id=pattern["id"]):
                         finding["severity"] = "review"
                         finding["negation_context"] = True
                         finding["original_severity"] = pattern["severity"]
-                        live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok)
+                        live = self._live_occurrence(normalized, keyword, idx + 1, align, refusal_ok,
+                                                     rule_id=pattern["id"])
                         if live is not None:
                             self._restore_live(finding, self._excerpt(normalized, live, live + len(keyword)))
                         else:
                             negated_kw[pattern["id"]] = finding
                     findings.append(finding)
 
-        keyword_pass(normalized, align, negated_kw, candidates)
+        keyword_pass(normalized, align, negated_kw, candidates, True)
         # The keyword lane's one view deletes an invisible character, so a phrase whose
         # space is an invisible character reads as joined words ("atAnthropic") and no
         # keyword stands in it. The regex lane already reads such a run as a space (the
@@ -5054,6 +6203,7 @@ class SunglassesEngine:
                 spaced_record = []
                 spaced_normalized, spaced_length = normalize_with_length(keyword_view, spaced_record)
                 spaced_align = _RawAlign(keyword_view, spaced_record)
+                spaced_align.paragraphs = paragraph_offsets_in_keyword_view(decoded, self._LINE_BREAK_CHARS)
                 keyword_pass(spaced_normalized, spaced_align, negated_kw, spaced_candidates)
 
         # Step 3: Regex patterns (for things like API keys)
@@ -5199,8 +6349,17 @@ class SunglassesEngine:
         reader_gate_seen = False
         floor_found = {}   # rule id -> the floor copy's finding; step 3.5 may replace it with the rule's own
         floor_held = set()  # rule ids whose held (covered) finding came from the floor copy, not from the rule
-        for pattern, regexes in itertools.chain(self._regex_patterns, self._floor_walk(floor_due, findings)):
+        # a text with no extra view (no shadow, no folded view) is read by every rule as the raw text alone,
+        # so a rule none of whose regexes has its trigger literal in the text cannot match and is not visited. The full
+        # can_skip test below still runs on every rule that is visited; the rules keep the order of the list.
+        if shadow is None and shadow_folded is None and not folded_subjects:
+            walked = self._candidate_rules(prefilter_present)
+        else:
+            walked = self._regex_patterns
+        for pattern, regexes in itertools.chain(walked, self._floor_walk(floor_due, findings)):
             if match_channels.isdisjoint(pattern.get("channel", ())):
+                continue
+            if only is not None and pattern["id"] not in only:
                 continue
             if pattern["id"] in seen_ids:
                 continue
@@ -5449,9 +6608,12 @@ class SunglassesEngine:
         # A validator that raises must not take the scan down with it: the findings already
         # made stand, and the result says the inspection is not complete.
         validator_failures = []
-        for validator in self._validators:
+        in_parts = getattr(_SCAN_LOCAL, "in_parts", False)
+        for validator in (self._validators if only is None else ()):
             if not match_channels.intersection(validator.channel):
                 continue
+            if in_parts and getattr(validator, "reads_the_page_as_written", False):
+                continue                                   # read once on the page as written, see _scan_page_parts
             try:
                 if validator.pregate(text):
                     findings.extend(validator.run(text))
@@ -5460,10 +6622,17 @@ class SunglassesEngine:
                     f"validator {validator.id} failed ({type(exc).__name__}); its check was skipped")
 
         # Step 3d: a hiding style that stands alone, and the urgency rule, on web content.
-        if findings and self.CHANNEL_ALIASES.get(channel, channel) == "web_content":
-            findings = self._record_hidden_style_alone(findings, text, normalized, validator_failures,
-                reader_gate_seen or any(f['id'] == self._READER_RULE_ID for f in findings),
-                (text, shadow, shadow_folded, *(sub[0] for sub in folded_subjects), normalized))
+        hidden_views = None
+        if only is None and findings and self.CHANNEL_ALIASES.get(channel, channel) == "web_content":
+            if getattr(_SCAN_LOCAL, "in_parts", False):
+                # One part of a page: the page reads the hiding style and the urgency rule once, on
+                # every finding of every part.
+                if any(f["id"] == self._HIDDEN_RULE_ID for f in findings):
+                    hidden_views = normalized
+            else:
+                findings = self._record_hidden_style_alone(findings, text, normalized, validator_failures,
+                    reader_gate_seen or any(f['id'] == self._READER_RULE_ID for f in findings),
+                    (text, shadow, shadow_folded, *(sub[0] for sub in folded_subjects), normalized))
 
         # Step 4: Determine decision based on worst finding severity
         if not findings:
@@ -5487,6 +6656,8 @@ class SunglassesEngine:
         )
         result.truncated = truncated
         result.bytes_scanned = len(text)
+        if hidden_views is not None:
+            result.hidden_views = hidden_views      # only a part of a page carries one
         if validator_failures:
             result.extraction_complete = False
             result.extraction_warnings = list(validator_failures)

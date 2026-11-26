@@ -1,0 +1,15 @@
+{
+  "id": "GLS-STRUCT-007",
+  "name": "Page sends its reader to a mail address that looks like another host of the page",
+  "version": "1.0",
+  "kind": "structural-validator",
+  "category": "exfiltration",
+  "severity": "medium",
+  "channel": [
+    "web_content",
+    "file"
+  ],
+  "description": "A page or file in this text tells its reader to send, forward or submit something to a mail address whose host looks like another host of the same page (a link, a www. name or another mail address of the page): it holds that host's registered name, it is that name under another ending that the page does not link, or it spells that host in front of its own registered name. The address reads as the page's own, so this is a finding for review.",
+  "contributed_by": "Sunglasses Team",
+  "source": "validators.py:GLS-STRUCT-007"
+}

@@ -77,10 +77,27 @@ NEWLINE_ATOM = r"(?:\\n|\\r|\[[^\]]*\\n[^\]]*\])"
 # One optional token: a class, one (escaped) character, or a group (with at most
 # one level of groups inside it), followed by `?`.
 OPTIONAL_TOKEN = r"(?:\[[^\]]*\]\?|\\?.\?|\(\?:(?:[^()]|\([^()]*\))*\)\?)"
+# Shape (a) also holds when the atom sits in a group that closes right before the whitespace: a
+# closing paren after it, an alternative after it inside the group, or an alternative before it
+# (`(?:^|[.\n])\s*`, `(?:\n|;)\s*`, `(?:;|\n)\s*`). A class in an alternative may hold parens.
+GROUP_ALT = r"(?:\[[^\]]*\]|[^()\[\]])*"
+NEWLINE_THEN_WS = re.compile("|".join((
+    NEWLINE_ATOM + UNBOUNDED_WS,
+    NEWLINE_ATOM + r"\)+" + UNBOUNDED_WS,
+    NEWLINE_ATOM + r"\|" + GROUP_ALT + r"\)+" + UNBOUNDED_WS,
+    r"\|" + NEWLINE_ATOM + r"\)+" + UNBOUNDED_WS,
+    GROUP_ALT + r"\|" + NEWLINE_ATOM + r"\)+" + UNBOUNDED_WS,
+)))
+# Under a multiline flag `^` starts every line, so a line start then unbounded whitespace is the
+# same walk as a newline atom then unbounded whitespace.
+LINE_START_THEN_WS = re.compile(
+    r"(?s)^(?=\(\?[a-z]*m).*?(?:\^" + UNBOUNDED_WS + r"|\^\|" + GROUP_ALT + r"\)+" + UNBOUNDED_WS
+    + r"|\|\^\)+" + UNBOUNDED_WS + ")")
 SHAPES = (
-    ("newline atom then unbounded whitespace", re.compile(NEWLINE_ATOM + UNBOUNDED_WS)),
+    ("newline atom then unbounded whitespace", NEWLINE_THEN_WS),
     ("two unbounded whitespace quantifiers",
      re.compile(UNBOUNDED_WS + OPTIONAL_TOKEN + "?" + UNBOUNDED_WS)),
+    ("line start then unbounded whitespace under a multiline flag", LINE_START_THEN_WS),
 )
 
 PROBE_LEN = 16_000
@@ -163,7 +180,6 @@ KNOWN_SLOW = {
 # the input. The growth test does not apply to them. Not strict: a faster machine may bring
 # one inside the cap, and that says nothing about the entry.
 KNOWN_SLOW_HEAVY = {
-    ("GLS-CICD-004", 0): "guarded predicate with a large per-byte constant; 9 probes over (guarded)",
 }
 
 # Entries whose shape (b) sits only in the positive core of a guarded predicate,
@@ -194,6 +210,11 @@ BOUNDED_SHAPE = {
     ("GLS-AB-009", 0): r"auth\w*\s*[\"']?\s*: in the windowed core; 0.5 ms",
     ("GLS-DKS-002", 0): r"score\s*[:=]?\s*10 in the windowed core; 1 ms",
     ("GLS-MR-032", 0): r"referenced\s*[_-]?\s*(?:dataset and allowed\s*[_-]?\s*datasets in the windowed core; 0.6 ms",
+    # A newline inside a group or a class, and a line start under a multiline flag, count as a newline atom. The newline then a run sits in the positive
+    # core of a guarded predicate, which the engine matches per co-occurrence window; the growth
+    # probes show no growth on the engine's run.
+    ("GLS-DFP-040", 0): r"(?:^|\n)\s*annotations:\s*\n in the guarded core, matched per 1,200 character window; no growth on the engine's run",
+    ("GLS-DFP-055", 0): r"(?:^|[\n\r])\s*\[(?:Unit|Service|Timer|Socket|Install)\] in the guarded core, matched per 1,200 character window; no growth on the engine's run",
 }
 
 
@@ -234,7 +255,7 @@ def test_regex_entry_has_no_quadratic_whitespace_shape(rule_id, index, source):
     hits = []
     for name, shape in SHAPES:
         m = shape.search(subject)
-        if m and shape is SHAPES[1][1] and (rule_id, index) in BOUNDED_SHAPE:
+        if m and (rule_id, index) in BOUNDED_SHAPE:
             unbounded = _bounded_subjects(rule_id, index)
             assert unbounded is not None, (
                 f"{rule_id} #{index} is in BOUNDED_SHAPE but the engine no longer runs it "
@@ -248,11 +269,51 @@ def test_regex_entry_has_no_quadratic_whitespace_shape(rule_id, index, source):
     assert not hits, f"{rule_id} #{index}: quadratic whitespace shape:\n" + "\n".join(hits)
 
 
+def _static_flagged(source):
+    return any(shape.search(source) for name, shape in SHAPES if shape is not SHAPES[1][1])
+
+
+# Sources written out as strings, so the check is tested without any engine or stack head.
+# The first is a persona-order rule whose line-start delimiter group closes right before the
+# unbounded whitespace: 0.32, 1.28, 5.08 and 20.4 s on 2,000, 4,000, 8,000 and 16,000 newlines.
+STATIC_FLAGGED = {
+    "group_closes_before_ws": (
+        '(?im)(?:(?:^|[.!?:;\\n>\\"\'\\u201c\\u2018(\\[*\\u2022-])\\s*(?:(?:please|now)\\s+){0,2}'
+        '|,\\s*(?:(?:please|now)\\s+){1,2})(?:act as an?)\\b'),
+    "line_start_or_newline": r"(?:^|\n)\s*run\b",
+    "newline_in_a_group": r"(\n)\s+run\b",
+    "class_in_a_group": r"(?:[.\n])\s*run\b",
+    "newline_then_alternative": r"(?:\n|;)\s*run\b",
+    "alternative_then_newline": r"(?:;|\n)\s*run\b",
+    "class_with_parens_then_alternative": r"(?:[(\n]|;)\s*run\b",
+    "line_start_under_multiline": r"(?im)(?:^|[.!?])\s*run\b",
+    "line_start_alone_under_multiline": r"(?m)^\s*run\b",
+    "line_start_then_alternative_under_multiline": r"(?m)(?:^|;)\s*run\b",
+}
+STATIC_CLEAN = {
+    "horizontal_space_after_the_delimiter": r"(?im)(?:^|[.!?:;\n])[^\S\n]*run\b",
+    "newline_in_a_group_then_literal": r"(?:\n)run\b",
+    "line_start_without_a_multiline_flag": r"(?i)(?:^|[.!?])\s*run\b",
+    "a_run_of_blanks_after_a_word": r"run\s*(?:now|please)\b",
+    "alternatives_outside_the_group": r"(?:\n)|\s*run\b",
+}
+
+
+@pytest.mark.parametrize("name", sorted(STATIC_FLAGGED))
+def test_the_static_check_flags_the_quadratic_source(name):
+    assert _static_flagged(STATIC_FLAGGED[name]), name
+
+
+@pytest.mark.parametrize("name", sorted(STATIC_CLEAN))
+def test_the_static_check_leaves_the_linear_source_alone(name):
+    assert not _static_flagged(STATIC_CLEAN[name]), name
+
+
 @pytest.mark.parametrize("key", sorted(BOUNDED_SHAPE), ids=lambda k: f"{k[0]}-{k[1]}")
 def test_each_bounded_entry_still_carries_the_shape(key):
     # Fixing one without removing it from BOUNDED_SHAPE fails here, so the list stays true.
     source = next(p["regex"][key[1]] for p in ENGINE._patterns if p["id"] == key[0])
-    assert SHAPES[1][1].search(source), f"{key} no longer carries shape (b); remove it"
+    assert any(shape.search(source) for _name, shape in SHAPES), f"{key} no longer carries a shape; remove it"
 
 
 def test_the_known_lists_name_only_entries_that_exist():
