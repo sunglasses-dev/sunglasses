@@ -18,7 +18,7 @@
     "ghp_[a-zA-Z0-9]{36}",
     "glpat-[a-zA-Z0-9\\-]{20}",
     "xoxb-[0-9]{10,}-[a-zA-Z0-9]+",
-    "AKIA[0-9A-Z]{16}"
+    "(?-i:AKIA[0-9A-Z]{16})"
   ],
   "examples": {
     "malicious": [],

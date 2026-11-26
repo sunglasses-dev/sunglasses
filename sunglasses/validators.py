@@ -156,6 +156,8 @@ import threading
 import urllib.parse
 import warnings
 
+from . import _send_target
+
 __all__ = ["HookFetchAndRun", "SettingsWithoutPrompts", "VALIDATORS", "classify_command"]
 
 # ----------------------------------------------------------------------------- JSON side
@@ -4024,5 +4026,42 @@ class RegistryRedirectInShell:
         return []
 
 
+class LookAlikeSendTarget:
+    """GLS-STRUCT-007: a page tells its reader to send something to an address whose host is dressed as another host of the page."""
+
+    id = "GLS-STRUCT-007"
+    name = "Page sends its reader to a mail address that looks like another host of the page"
+    # This validator carries its own reading of markup (blocks, tags, comments, attribute values, written forms), so on a page
+    # the engine reads as parts it is given the page as written, once, and never a part.
+    reads_the_page_as_written = True
+    category = "exfiltration"
+    severity = "medium"
+    channel = ["web_content", "file"]
+    description = ("A page or file in this text tells its reader to send, forward or submit something to a mail address whose host looks "
+                   "like another host of the same page (a link, a www. name or another mail address of the page): it holds that host's "
+                   "registered name, it is that name under another ending that the page does not link, or it spells that host in front "
+                   "of its own registered name. The address reads as the page's own, so this is a finding for review.")
+
+    def pregate(self, text):
+        return _send_target.may_read(text)
+
+    def run(self, text):
+        findings = []
+        for evidence in _send_target.read(text):
+            findings.append({
+                "id": self.id,
+                "name": self.name,
+                "category": self.category,
+                "severity": self.severity,
+                "channel": list(self.channel),
+                "description": self.description,
+                "matched_text": evidence["address"],
+                "structural": True,
+                "evidence": {key: value for key, value in evidence.items() if key != "address"},
+            })
+            break                                   # one finding per text
+        return findings
+
+
 VALIDATORS = (HookFetchAndRun(), SettingsWithoutPrompts(), EnvironmentDumpedByPython(),
-              RegistryRedirectInShell())
+              RegistryRedirectInShell(), LookAlikeSendTarget())

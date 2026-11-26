@@ -22,7 +22,7 @@
     "comment supersede policy"
   ],
   "regex": [
-    "(?is)(?:<!--|/\\*|//|#\\s*metadata:|metadata\\s*:|x-instruction\\s*:|annotation\\s*:|comment[_ -]?block\\s*[:=]).{0,140}\\b(?:ignore|bypass|override|disregard|supersede|forget)\\b.{0,140}\\b(?:previous|system|safety|policy|guardrail(?:s)?|instruction(?:s)?)\\b"
+    "(?is)(?:<!--|/\\*|//|#\\s*metadata:|metadata\\s*:|x-instruction\\s*:|annotation\\s*:|comment[_ -]?block\\s*[:=]).{0,140}\\b(?:ignore|bypass|override|disregard|supersede|forget)\\b.{0,140}\\b(?:previous|system|safety|policy|guardrail(?:s)?|instruction(?:s)?|earlier|restrictions?|guidelines?|directives?|protocols?|safeguards?|constraints?)\\b"
   ],
   "examples": {
     "malicious": [],

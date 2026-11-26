@@ -27,10 +27,23 @@ import run_alone  # noqa: E402
 # worktree list (run_alone.py: `git rev-parse --git-common-dir`, `git worktree list --porcelain`), so
 # without one they fail for the environment, not for the code. They SKIP with that reason instead of
 # failing. In a real checkout or worktree .git exists, nothing skips, and they run in full.
+def _is_a_registered_worktree():
+    """True when ROOT is a checkout git itself lists (`git worktree list`). A COPY of a worktree folder keeps the
+    original's `.git` pointer file: git then answers for the original and ROOT is not in its list, so a pytest started
+    with cwd=ROOT is in no worktree the scan knows. The rows below need a real checkout, the same question they assert."""
+    if not (ROOT / ".git").exists():
+        return False
+    try:
+        return ROOT in run_alone.worktree_roots(ROOT)
+    except Exception:
+        return False
+
+
 needs_git = pytest.mark.skipif(
-    not (ROOT / ".git").exists(),
-    reason="needs a .git checkout: this row asks git for the shared git directory or the worktree "
-           "list, and a `git archive` of the tree carries no .git")
+    not _is_a_registered_worktree(),
+    reason="needs a real git checkout: this row asks git for the shared git directory or the worktree "
+           "list and for ROOT to be in it. A `git archive` of the tree carries no .git, and a copied "
+           "worktree folder carries another worktree's .git pointer")
 
 
 def test_a_live_pid_is_reported_alive():

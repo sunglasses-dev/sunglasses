@@ -433,17 +433,16 @@ This is the same family as the long-token entry above and carries the same
 consequence: the firewall hook has a fixed timeout, and before v0.6.10 a timed-out hook did not block the call (a default install now blocks on timeout on Claude Code 2.1.295 and later; see the long-token entry above).
 We have not published timings, for the same reason as before.
 
-Status after 0.6.8: four of the five are repaired. `GLS-AW-001` was repaired in
-0.6.8. `GLS-SC-018`, `GLS-CF-251` and `GLS-AW-713` are repaired in the release
+Status after 0.6.26: all five are repaired. `GLS-AW-001` was repaired in
+0.6.8. `GLS-SC-018`, `GLS-CF-251` and `GLS-AW-713` were repaired in the release
 after 0.6.8: each now gives a run of whitespace around its optional token to one
-quantifier, so its cost grows in step with the input. `GLS-CICD-004` is still
-open. The input cap bounds the length of a scan, not its cost, and it is not a fix
-for it. The timed check is the gate that finds the rest of this family, and each
-open entry is listed in it as an expected failure, so repairing one without
-removing it from the list fails the suite.
-
-`tests/test_known_gaps_are_listed.py` asserts that the open entry stays in this
-file until it is repaired.
+quantifier, so its cost grows in step with the input. `GLS-CICD-004` is repaired
+in 0.6.26 the same way: a line start there takes the blank space of one line, so
+a long run of newlines costs time in step with its length. The input cap bounds
+the length of a scan, not its cost, and it is not a fix for it. The timed check
+is the gate that finds the rest of this family, and each open entry is listed in
+it as an expected failure, so repairing one without removing it from the list
+fails the suite.
 
 ## Open limit as of 0.6.7 (2026-10-08) — look-alike letters outside the fold table still pass as ordinary letters
 

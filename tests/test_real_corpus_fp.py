@@ -85,6 +85,63 @@ def test_famous_readme_does_not_block(engine, path):
     assert not regressed, f"{name} gained NEW false-positive patterns: {sorted(regressed)}"
 
 
+# The same famous files read as a page and as a message. Every file that does not answer "allow" there is recorded with
+# its answer; every other file answers "allow". Each recorded answer is the answer the file gets, pandas
+# on web_content included, which answers allow_redacted. A file may answer lower only by
+# editing its row here, so the list can only shrink; it may never answer higher.
+# KNOWN_WRONG_PAGE_BLOCKS: axios and redis on web_content answer block, and both blocks are
+# known wrong ones. The cause is the page switch of the AI reader; the switch is not narrowed here. The two rows are listed so
+# that the cause is on record and an answer below block is a row to edit.
+KNOWN_WRONG_PAGE_BLOCKS = {
+    "axios__axios.md": "the page switch of the AI reader",
+    "redis__redis.md": "the page switch of the AI reader",
+}
+RELEASE_ANSWERS = {
+    ('AgriciDaniel__claude-seo.AGENTS.md', 'message'): ('block', ('GLS-TS-257',)),
+    ('AgriciDaniel__claude-seo.CLAUDE.md', 'message'): ('block', ('GLS-MCP-053',)),
+    ('AgriciDaniel__claude-seo.md', 'message'): ('block', ('GLS-RP-337',)),
+    ('AgriciDaniel__claude-seo.md', 'web_content'): ('block', ('GLS-SC-014', 'GLS-TS-251')),
+    ('axios__axios.md', 'message'): ('block', ('GLS-SEM-UI-217',)),
+    ('axios__axios.md', 'web_content'): ('block', ('GLS-SEM-UI-217',)),
+    ('browser-use__browser-use.md', 'message'): ('block', ('GLS-MCP-053',)),
+    ('gitleaks__gitleaks.md', 'message'): ('block', ('GLS-TS-257',)),
+    ('modelcontextprotocol__servers.md', 'message'): ('block', ('GLS-MCP-053',)),
+    ('openai__openai-python.md', 'message'): ('block', ('GLS-TS-257',)),
+    ('openai__openai-python.md', 'web_content'): ('block', ('GLS-DFP-074',)),
+    ('pandas-dev__pandas.md', 'message'): ('block', ('GLS-SEM-UI-217',)),
+    ('pandas-dev__pandas.md', 'web_content'): ('allow_redacted', ('GLS-SEM-UI-217',)),
+    ('prettier__prettier.md', 'message'): ('block', ('GLS-TS-257',)),
+    ('redis__redis.md', 'message'): ('block', ('GLS-SEM-UI-217',)),
+    ('redis__redis.md', 'web_content'): ('block', ('GLS-SEM-UI-217',)),
+    ('run-llama__llama_index.md', 'message'): ('quarantine', ('GLS-EP-001',)),
+    ('sunglasses-dev__sunglasses.md', 'message'): ('block', ('GLS-APD-252', 'GLS-CAI-584', 'GLS-CF-252', 'GLS-EX-001', 'GLS-GHSA-PI-202', 'GLS-PI-001', 'GLS-PI-007', 'GLS-PSR-582', 'GLS-RP-315', 'GLS-TOP-309', 'GLS-TP-003', 'GLS-TS-257')),
+    ('sunglasses-dev__sunglasses.md', 'web_content'): ('block', ('GLS-APD-252', 'GLS-APIP-010', 'GLS-CF-252', 'GLS-EX-001', 'GLS-GHSA-PI-202', 'GLS-PI-001', 'GLS-PI-007', 'GLS-PI-018', 'GLS-PSR-582')),
+    ('trufflesecurity__trufflehog.md', 'message'): ('block', ('GLS-SD-001', 'GLS-SD-003', 'GLS-TOP-309')),
+    ('trufflesecurity__trufflehog.md', 'web_content'): ('block', ('GLS-CICD-006', 'GLS-SD-003')),
+}
+
+
+@pytest.mark.parametrize("channel", ("web_content", "message"))
+@pytest.mark.parametrize(
+    "path", _real_world_files(), ids=[os.path.basename(p) for p in _real_world_files()]
+)
+def test_famous_readme_answers_as_recorded_on_the_page_and_message_channels(engine, path, channel):
+    name = os.path.basename(path)
+    content = open(path, errors="ignore").read()
+    result = engine.scan(content, channel=channel)
+    expected = RELEASE_ANSWERS.get((name, channel), ("allow", ()))[0]
+    assert result.decision == expected, (
+        f"{name} on {channel}: decision={result.decision}, the recorded answer is {expected}; "
+        f"findings: {sorted({f['id'] for f in result.findings})[:12]}"
+    )
+
+
+def test_the_known_wrong_page_blocks_are_recorded_as_the_release_answers_them():
+    for name, cause in KNOWN_WRONG_PAGE_BLOCKS.items():
+        assert RELEASE_ANSWERS[(name, "web_content")][0] == "block", name
+        assert cause, name
+
+
 def test_plain_english_sentence_is_clean(engine):
     """A neutral sentence with zero attack content must not produce any finding."""
     result = engine.scan(

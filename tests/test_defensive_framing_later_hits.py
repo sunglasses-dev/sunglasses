@@ -45,7 +45,8 @@ def _framed_description(payload):
 
 CASES = {
     "plain_control": (COVERT, True),
-    "negation_covered_only": (NEGATED, False),
+    # A subject stands in front of the forbidding word, so the sentence is not the closed form: it keeps the block.
+    "negation_covered_only": (NEGATED, True),
     "quoted_negation_covered_only": (_quoted("never " + COVERT), False),
     "framed_only": (_quoted(COVERT), False),
     "covered_then_live": (_quoted("never " + COVERT) + "\n\n" + COVERT, True),
@@ -55,7 +56,7 @@ CASES = {
     "negated_then_live": (NEGATED + "\n\n" + COVERT, True),
     "framed_then_framed": (_quoted(COVERT) + ' and also detects "' + COVERT + '"', False),
     "covered_then_framed": (_quoted("never " + COVERT) + ' and also detects "' + COVERT + '"', False),
-    "negated_then_framed": (NEGATED + "\n\n" + _framed_description(COVERT), False),
+    "negated_then_framed": (NEGATED + "\n\n" + _framed_description(COVERT), True),
 }
 # A closed quote that holds two examples blocks where main allows_redacted: the second
 # example is judged on its own, and the first example sits between it and the framing word

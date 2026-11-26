@@ -33,10 +33,22 @@ _run_is_the_whole_tree = _root_conftest._run_is_the_whole_tree
 # `git worktree list` (run_alone.worktree_roots), so with no .git it names nothing and this row fails
 # for the environment. It SKIPS with that reason; in a real checkout or worktree it runs in full.
 # The skip is decided before the fixture, so no foreign pytest is spawned for a row that will not run.
+def _is_a_registered_worktree():
+    """True when ROOT is a checkout git itself lists (`git worktree list`). A copy of a worktree folder keeps the
+    original's `.git` pointer file, so ROOT is not in the list the detector reads and it cannot see a pytest run there."""
+    if not (ROOT / ".git").exists():
+        return False
+    try:
+        return ROOT in worktree_roots(ROOT)
+    except Exception:
+        return False
+
+
 needs_git = pytest.mark.skipif(
-    not (ROOT / ".git").exists(),
-    reason="needs a .git checkout: the detector finds foreign pytests through `git worktree list`, "
-           "and a `git archive` of the tree carries no .git")
+    not _is_a_registered_worktree(),
+    reason="needs a real git checkout: the detector finds foreign pytests through `git worktree list`, "
+           "and a `git archive` of the tree carries no .git while a copied worktree folder carries "
+           "another worktree's .git pointer")
 
 
 class _Config:

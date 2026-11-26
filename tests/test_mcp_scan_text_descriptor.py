@@ -6,7 +6,7 @@ decision (allow/block/quarantine)". The engine has a fourth decision,
 `allow_redacted`, and every result says whether inspection was complete. The
 description said neither. It also said nothing about what the decision DOES,
 which is nothing: the tool reports it to the caller, blocks nothing, redacts
-nothing, and quotes the text each finding matched. A cold reader took
+nothing, and shows the words each finding matched (a secret as a mask). A cold reader took
 `isError: false` for "the input is clean".
 
 THE TEXT IS PINNED WORD FOR WORD, and that is deliberate. The proxy approves a
@@ -35,9 +35,9 @@ EXPECTED = (
     "other AI agent security threats. Returns findings, a severity, a decision "
     "(allow, block, quarantine or allow_redacted) and inspection_complete. "
     "The decision is reported to the caller and is not enforced. This tool "
-    "blocks nothing and returns the matched text of each finding in full, "
-    "allow_redacted included. isError false means the scan ran, not that the "
-    "input is clean. "
+    "blocks nothing and returns the matched words of each finding; a secret "
+    "shows its first 4 characters, its length and its rule id. "
+    "isError false means the scan ran, not that the input is clean. "
     "Read is_clean and inspection_complete in the result."
 )
 
@@ -80,7 +80,7 @@ def test_it_says_the_decision_is_reported_and_not_enforced():
     text = _scan_text_descriptor()
     assert "reported to the caller and is not enforced" in text
     assert "This tool blocks nothing" in text
-    assert "matched text of each finding in full, allow_redacted included" in text
+    assert "matched words of each finding; a secret shows its first 4 characters, its length and its rule id" in text
     assert "isError false means the scan ran, not that the input is clean" in text
 
 

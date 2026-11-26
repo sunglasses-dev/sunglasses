@@ -36,7 +36,7 @@ from .extractors.dispatch import COMPILED_SUFFIXES, UnreadableFile, next_step
 from .extractors.member import Member
 from .reporter import ProtectedEngine, generate_report
 from .result import verdict_word
-from .door_mask import mask_document, secret_strings, shown_match
+from .door_mask import is_secret_finding, mask_document, secret_strings, shown_match
 from .sarif import to_sarif
 from .taxonomy import for_category
 from .receipts._shown import printable as _shown_message
@@ -132,10 +132,9 @@ def print_result(result, verbose=False, show_secrets=False):
             print(f"     {DIM}ID: {f['id']} | Category: {f['category']}{RESET}")
             if f.get("location"):
                 print(f"     {DIM}Found in: {_printable_match(f['location'])}{RESET}")
-            if f.get("matched_text"):
-                # A secret shows its marker here, and the words of a neighbouring finding lose any piece of it.
-                shown = shown_match(f, f["matched_text"], show_secrets, secret_strings(result.findings))
-                print(f"     {DIM}Matched: \"{_printable_match(shown)}\"{RESET}")
+            # A secret shows its marker here; any other finding shows the words of the page, and the words of a
+            # neighbouring finding lose any piece of a secret.
+            print(f"     {DIM}Matched: \"{_printable_match(_door_words(result, f, show_secrets, secret_strings(result.findings)))}\"{RESET}")
             if f.get("also_matched"):
                 # Named, not hidden: the reader can still see everything that
                 # fired on this span.
@@ -915,6 +914,13 @@ def _printable(name):
     return shown_name(name)
 
 
+def _door_words(result, finding, show_secrets, secrets):
+    """The words a door prints for one finding: the marker for a secret (made from the full match, as at every door),
+    for any other finding the words of the page, cut where they overlap a secret of the same scan."""
+    words = finding.get("matched_text", "") if is_secret_finding(finding) else result.shown_text_of(finding)
+    return shown_match(finding, words, show_secrets, secrets)
+
+
 def _printable_match(text):
     """A quoted match is file content: escape controls, and the backslash that spells them.
 
@@ -1255,6 +1261,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                         "matched_text": shown_match(finding, finding.get("matched_text", ""),
                                                     getattr(args, "show_secrets", False),
                                                     secret_strings(scan_result.findings)),
+                        "shown_text": _door_words(scan_result, finding, getattr(args, "show_secrets", False),
+                                                  secret_strings(scan_result.findings)),
                         "taxonomy": for_category(finding.get("category", "unknown")),
                     },
                 })
@@ -1272,6 +1280,7 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                         # The full match stays in the result: each output masks it ONCE, at its own door (the JSON
                         # print below, the report projection). A mask here would be masked again there.
                         "matched_text": f.get("matched_text", ""),
+                        "shown_text": scan_result.shown_text_of(f),
                         "taxonomy": for_category(f.get("category", "unknown")),
                     }
                     for f in scan_result.findings
@@ -1617,9 +1626,8 @@ def _scan_tree_inner(args, engine, tmp_dir, source, kind, root_fd, announce=None
                 marker = f" {DIM}(below --fail-on){RESET}"
             print(f"    {sev_color}[{f['severity'].upper()}]{RESET} {f['name']}{marker}")
             print(f"      {DIM}File: {_printable(item['file'])}{RESET}")
-            if f.get("matched_text"):
-                # The entries of all_findings were built at the door above: matched_text already carries the marker.
-                print(f"      {DIM}Match: \"{_printable_match(f['matched_text'])}\"{RESET}")
+            # The entries of all_findings were built at the door above: both texts already carry the marker.
+            print(f"      {DIM}Match: \"{_printable_match(f.get('shown_text') or f.get('matched_text', ''))}\"{RESET}")
             if len(shown) >= 20:
                 remaining = len(all_findings) - 20
                 if remaining > 0:

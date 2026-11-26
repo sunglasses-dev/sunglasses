@@ -17,7 +17,7 @@
     "secret exposure"
   ],
   "regex": [
-    "AKIA[0-9A-Z]{16}"
+    "(?-i:AKIA[0-9A-Z]{16})"
   ],
   "examples": {
     "malicious": [],

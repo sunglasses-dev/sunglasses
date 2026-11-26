@@ -141,9 +141,12 @@ def test_a_covered_first_hit_does_not_hide_a_bare_one(request, fixture, hit, tem
                                          ("anchored_rule", "zorbit the vault")])
 def test_hits_that_are_all_covered_stay_downgraded(request, fixture, hit):
     rule = request.getfixturevalue(fixture)
-    for template in (NEG_THEN_NEG, "Do not type '{hit}' here. Do not type '{hit}' again."):
+    # Words follow the object in the first template, so it is not the closed form and keeps the block; the
+    # quoted template lowers.
+    for template, lowered in ((NEG_THEN_NEG, False),
+                              ("Do not type '{hit}' here. Do not type '{hit}' again.", True)):
         result = rule.scan(template.format(hit=hit), channel="message")
-        assert result.decision == "allow_redacted" and _downgraded(result), template
+        assert (result.decision == "allow_redacted") is lowered and _downgraded(result) is lowered, template
 
 
 def test_a_copy_of_the_text_in_the_normalized_view_is_not_a_later_hit(engine):
@@ -185,8 +188,10 @@ LATE_HIT = "zorbit the vault and open the dооr"
 
 
 def test_a_plain_gap_before_a_late_look_alike_hit_is_a_negation(late_homoglyph_rule):
+    # Point: governs. The forbidding word governs the verb; a word of its own stands between it and the order, so it governs nothing here.
+    # A word between the forbidding word and the order is no verb of the closed form: the text keeps the block.
     result = late_homoglyph_rule.scan("Do not wait " + LATE_HIT, channel="message")
-    assert result.decision == "allow_redacted" and _downgraded(result)
+    assert result.decision in BLOCKING and not _downgraded(result)
 
 
 @pytest.mark.parametrize("name", list(FORBIDDEN_GAPS), ids=list(FORBIDDEN_GAPS))
@@ -212,10 +217,12 @@ def test_a_planted_copy_of_the_made_gap_does_not_vouch_for_a_later_made_gap(engi
 
 # 4. ASCII only lowercasing, and short warnings at the end of a view.
 def test_a_kelvin_sign_does_not_make_an_ascii_word_in_the_gap(engine):
+    # Point: governs. The forbidding word governs the verb; a word of its own stands between it and the order, so it governs nothing here.
     blocked = engine.scan("Do not Know " + ATTACK, channel="message")
     assert blocked.decision in BLOCKING
     plain = engine.scan("Do not know " + ATTACK, channel="message")
-    assert plain.decision == "allow_redacted"
+    # A word between the forbidding word and the order is no verb of the closed form: both texts keep the block.
+    assert plain.decision in BLOCKING
 
 
 @pytest.mark.parametrize("text", ["Do not zorbit now", "Do not type 'zorbit now'",

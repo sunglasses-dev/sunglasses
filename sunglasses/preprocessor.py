@@ -433,6 +433,20 @@ def keyword_view_between_words(text: str, line_breaks):
     return spaced if count else None
 
 
+def paragraph_offsets_in_keyword_view(text: str, line_breaks):
+    """Where, in the view `keyword_view_between_words` makes of `text`, a line break stands for a run
+    that held a paragraph separator (U+2029): the view draws every break as one newline, and a
+    paragraph separator is a paragraph break, not one line break. A frozenset of offsets."""
+    breaks = frozenset(line_breaks)
+    found, shift = [], 0
+    for match in _IGNORABLE_BETWEEN_WORDS.finditer(text):
+        run = match.group()
+        if any(c in breaks for c in run) and "\u2029" in run:
+            found.append(match.start() - shift)
+        shift += len(run) - 1
+    return frozenset(found)
+
+
 def replace_lookalikes(text: str) -> str:
     """Homoglyph letters, punctuation look-alikes and blanks to their ASCII
     character; one code point to one code point."""
