@@ -317,7 +317,7 @@ SUNGLASSES is a free, open source input inspection layer. It does not sit invisi
 - **The Claude Code firewall hook**, inspects tool calls before they run and can block them. It is best effort under load. The hook has a 10-second timeout, since v0.6.6 its optional pattern lane stops itself at 7 seconds and answers ask, and a default install (v0.6.10 and later) sets `onFailure: "block"` so a hook that times out or cannot start refuses the call on Claude Code 2.1.295 and later (`init --fail-open` opts out; see `KNOWN_VERSION_GAPS.md`).
 - **The MCP server**, exposes scanning to an agent as a tool it can call.
 
-It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note.
+It flags; it does not silently strip. Content it cannot inspect (an archive, an image whose OCR is unavailable, a file over the size cap) is reported as **not inspected**, never as clean. Inside opened files, coverage is per format; see the PDF note. A file whose first bytes match a binary format and whose every byte reads as text is also scanned as text. The format note stays and the answer stays incomplete.
 
 **What it scans.**
 - **Text.** Emails, messages, files, APIs, web content, logs
@@ -419,6 +419,8 @@ At your own terminal, `sunglasses scan --show-secrets ...` prints the full match
 A SARIF file and the MCP server never carry it, with or without that option, because both are written to be
 read somewhere else. The Python API is unchanged. `result.findings[i]["matched_text"]` is the full match,
 because a program that scanned the text already holds it.
+
+A finding in a report also carries `shown_text`. It holds the words of the input as written, widened to whole words, and the command line prints it. Where the matched words do not stand in the input as written, as on a page with markup between them or in a decoded view, it shows the scanner's own reading. For a secret finding it shows the mask, and the full words with `--show-secrets`. `matched_text` is unchanged.
 
 ### Framework references on every finding
 
@@ -763,6 +765,8 @@ print(result.latency_ms)   # milliseconds; grows with input length
 The simplest start is `sunglasses-mcp`, the script `pip install sunglasses` puts next to your Python. A desktop client may not use the same PATH as your terminal, so set `command` to the absolute path of that script. In a virtual environment that is `/absolute/path/to/.venv/bin/sunglasses-mcp`, with `args` set to `[]`. The root `mcp.json` is the fallback: it sets `command` to `python3` and `args` to a short start-up line that runs the same server without putting the current folder on Python's import path. Set `command` to the absolute path of the Python that has Sunglasses installed and keep `args` as it is. Starting the server with `python -m sunglasses.mcp` in a folder you do not trust puts that folder first on the import path, so use the script or the start-up line there. CI runs on Linux. Windows is not supported. Proxy, doctor, receipts, install, uninstall and init refuse to run there, and scan is untested.
 
 To check the connection, confirm that your client lists `scan_text`, `scan_file` and `scanner_info`. Call `scanner_info` with `{}`. Then call `scan_text` with `{"text": "The team lunch is at noon on Friday."}`. The answer has `isError` false. Its result reads `"decision": "allow"`, `"inspection_complete": true` and `"is_clean": true`. `scan_file` takes an absolute path on the machine that runs the server.
+
+A `scan_text` or `scan_file` answer lists each finding once, under `findings`, with its id, name, category, severity, channel and `matched_text`. A secret is shown as a mask. The list holds at most 50 findings, a match is cut at 300 characters, and the whole result is at most 64 KiB. When findings are left out, `more_findings` counts them by category. When a result is cut further to fit its size, that count reads higher than the number of findings left out.
 
 The MCP server returns its decision to the caller and stops nothing itself. A decision of `block`, `quarantine` or `allow_redacted` is an answer to your client. The tool does not hold back or redact anything downstream. `isError` false means the call completed. It does not mean the input is clean, so read `is_clean` and `inspection_complete` as well.
 
