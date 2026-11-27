@@ -1048,11 +1048,24 @@ def test_the_layer_costs_a_bounded_multiple_of_the_scan_without_it(family):
     assert costs_a_bounded_multiple(with_layer, without), (family, with_layer, without)
 
 
+def growth_readings(run, family):
+    """The two readings the row judges and one in between, so a red leg shows where the time went."""
+    t_small, t_large = growth_seconds(run, family)
+    t_middle = best_of(lambda: run(families(1 << 18)[family]), 2)
+    return t_small, t_middle, t_large
+
+
 @pytest.mark.parametrize("family", sorted(families(1000)))
-def test_the_validator_alone_grows_linearly_with_the_input(validator, family):
-    t_small, t_large = growth_seconds(validator.run, family)
+def test_the_validator_alone_grows_linearly_with_the_input(validator, family, capsys):
+    t_small, t_middle, t_large = growth_readings(validator.run, family)
+    # every run prints its readings, passed or failed, so the log of a red leg and the log of a green one can be set side by side
+    with capsys.disabled():
+        print(
+            "growth readings %s: 64K %.4f s, 256K %.4f s, 1M %.4f s, 1M over 64K %.1f, host factor %.2f"
+            % (family, t_small, t_middle, t_large, t_large / t_small, _host_factor.host_factor())
+        )
     # 16x the input; allow 3x slack for noise, never the 256x a quadratic walk would take
-    assert grows_linearly(t_small, t_large), (family, t_small, t_large)
+    assert grows_linearly(t_small, t_large), (family, t_small, t_middle, t_large)
 
 
 class FakeClock:
