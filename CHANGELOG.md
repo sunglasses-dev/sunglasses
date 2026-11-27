@@ -5,6 +5,22 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
+## [0.6.30] — 2026-11-27
+
+### Security
+
+- 0.6.29 lowers a finding to a notice, and lets the text pass, in some sentences that do not forbid the act. This release reads those sentences as 0.6.28 does and blocks the text where 0.6.28 blocks it. A text that 0.6.29 passes with a notice can be blocked in this release. Upgrade from 0.6.29.
+
+### Changed
+
+- Timed test rows take their limit from the speed of the machine that runs them. Seventeen test files read it through one helper (four in 0.6.29), a short scan is judged on the best of up to three shots, and a first shot over its limit is printed at the end of the run. A controls file with a fake clock, outside that count, checks that a row turns red just over its limit and stays green just under it. Tests only.
+
+- The README says what `shown_text` holds, what an MCP result lists (each finding once, up to 50 findings, 300 characters a match, 64 KiB in all, with `more_findings` counting the rest), that a file whose bytes match a binary format but all read as text is scanned as text, and where a finding at severity `review` sits against the `--fail-on` levels. Documentation only.
+
+### Known limits
+
+- A forbidding word can lower a finding in a sentence that does not forbid the act. The 0.6.29 notes say it lowers a finding only when the sentence plainly forbids the act, and that says more than the scanner does. A lowered finding stays in the result at severity `review` and the decision is `allow_redacted`. On the command line a scan with no other finding exits `1` at the default and with `--fail-on any`, and `0` with `low`, with every level above it and with `none`. A caller that must not miss one reads the findings list, not the decision or a fail level alone.
+
 ## [0.6.29] — 2026-11-26
 
 ### Added
