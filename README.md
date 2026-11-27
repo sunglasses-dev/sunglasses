@@ -616,6 +616,7 @@ These four options change when a scan fails CI. They do not remove a finding fro
 
 - `--fail-on LEVEL` takes `any` (the default, so every finding exits `1`), `low`, `medium`, `high`, `critical`
   or `none` (report only, so exit `1` never comes from a finding, **critical ones included**).
+  A finding at severity `review` sits below `low`. It exits `1` at the default and with `any`, and `0` with `low` and every level above. A finding the scanner lowers, such as a match in a sentence that forbids the act, is listed at `review`.
 - `--write-baseline FILE` lists the findings of this scan, then judges the scan against that list.
 - `--baseline FILE` makes findings the file lists **known**, so they do not fail the scan.
 - `--accept-critical GLS-XX-000` lets the baseline cover critical findings of that

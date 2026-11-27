@@ -183,6 +183,24 @@ def test_review_ranks_below_low():
     assert bl.fails(["critical"], "none") is False
 
 
+@pytest.mark.parametrize("level", ["default", *LEVELS])
+def test_a_review_finding_exits_one_only_at_the_default_and_any(capsys, monkeypatch, tmp_path, level):
+    # the README's own negated example, read by the real rules (the stub rules do not lower a match in a directory)
+    monkeypatch.setattr(cli, "SunglassesEngine", SunglassesEngine)
+    text = "Do NOT run rm -rf / --no-preserve-root"
+    root = tree(tmp_path, {"a.md": text})
+    path = tmp_path / "x.md"
+    path.write_text(text, encoding="utf-8")
+    want = 1 if level in ("default", "any") else 0
+    given = [] if level == "default" else ["--fail-on", level]
+    code, out, _ = run(capsys, monkeypatch, "--dir", root, *given, "-o", "json")
+    assert code == want, level
+    d = doc(out)
+    assert [f["severity"] for r in d["file_results"] for f in r["findings"]] == ["review"]
+    assert run(capsys, monkeypatch, "--file", str(path), *given)[0] == want
+    assert run(capsys, monkeypatch, "--text", text, *given)[0] == want
+
+
 def test_unknown_level_is_a_usage_error(capsys, monkeypatch, tmp_path):
     root = tree(tmp_path, {"a.md": "x"})
     assert run(capsys, monkeypatch, "--dir", root, "--fail-on", "severe")[0] == 2
