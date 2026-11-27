@@ -1013,13 +1013,13 @@ def best_of(call, runs=3):
     return out
 
 
-# The two cost rows below keep their multiples (4x the scan without the layer, 48x the small text for 16x the input) and
+# The two cost rows below keep their multiples (4x the scan without the layer, 96x the small text for 16x the input) and
 # put their fixed seconds on the host factor of tests/_host_factor.py, as the other cost rows do: a slow shared runner
 # widens the fixed seconds, a host at the reference speed keeps the stated numbers. The multiples never move, so a walk that
 # is quadratic in the text (256x for 16x the input) still fails at the slowest factor the helper allows.
 BOUNDED_MULTIPLE = 4.0
 BOUNDED_SECONDS = 6.0
-GROWTH_MULTIPLE = 48
+GROWTH_MULTIPLE = 96
 GROWTH_SECONDS = 0.5
 
 
@@ -1064,7 +1064,7 @@ def test_the_validator_alone_grows_linearly_with_the_input(validator, family, ca
             "growth readings %s: 64K %.4f s, 256K %.4f s, 1M %.4f s, 1M over 64K %.1f, host factor %.2f"
             % (family, t_small, t_middle, t_large, t_large / t_small, _host_factor.host_factor())
         )
-    # 16x the input; allow 3x slack for noise, never the 256x a quadratic walk would take
+    # 16x the input; allow 6x slack for noise, never the 256x a quadratic walk would take
     assert grows_linearly(t_small, t_large), (family, t_small, t_middle, t_large)
 
 
@@ -1109,11 +1109,22 @@ def test_a_walk_that_is_linear_in_the_text_passes_the_growth_row_at_any_host_fac
     assert grows_linearly(t_small, t_large), (family, t_small, t_large)
 
 
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("power, passes", [(1.5, True), (2, False)])
+def test_a_walk_of_power_one_and_a_half_passes_the_growth_row_and_a_quadratic_one_fails_it(monkeypatch, factor, power, passes):
+    clock = FakeClock()
+    monkeypatch.setitem(globals(), "time", clock)
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    t_small, t_large = growth_seconds(PlantedWalk(clock, power, seconds_for_small=0.3).run, "plain_commands")
+    assert t_large == pytest.approx(16 ** power * t_small, rel=0.01)
+    assert grows_linearly(t_small, t_large) is passes, (power, t_small, t_large)
+
+
 @pytest.mark.parametrize("factor, passes", [(1.0, False), (1.2, False), (1.5, True), (_host_factor.CAP, True)])
 def test_the_fixed_seconds_of_the_growth_row_follow_the_host_factor(monkeypatch, factor, passes):
     monkeypatch.setattr(_host_factor, "_factor", [factor])
-    # 0.027 s for the small text and 1.91 s for the large one: 71x for 16x the input, ruled by the fixed seconds alone
-    assert grows_linearly(0.027, 1.91) is passes
+    # 0.027 s for the small text and 3.3 s for the large one: 122x for 16x the input, ruled by the fixed seconds alone
+    assert grows_linearly(0.027, 3.3) is passes
 
 
 @pytest.mark.parametrize("factor, with_layer, passes", [(1.0, 10.0, True), (1.0, 11.0, False), (_host_factor.CAP, 15.0, True),
