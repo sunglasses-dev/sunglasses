@@ -198,5 +198,16 @@ def pytest_terminal_summary(terminalreporter):
         line = _host_factor.report_line()
         if line:
             terminalreporter.write_line(line)
+        for first in _host_factor.first_over_lines():
+            terminalreporter.write_line(first)
+    except Exception:
+        return
+
+
+# The id of the row that is running, for the line a cost row prints when its first shot was over its limit.
+def pytest_runtest_setup(item):
+    try:
+        import _host_factor
+        _host_factor.ROW[:] = [item.nodeid]
     except Exception:
         return

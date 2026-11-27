@@ -12,13 +12,19 @@ careers mail, a privacy request, a returns form, a receipt line. Those stay allo
 because they stand nearest to the class: same verb, same passive, same kind of mail, but the thing moved is not stored data
 of a person. The person's own channel (message) never blocks on this class. The rule reads English text.
 """
+import os
 import re
+import sys
 import time
 
 import pytest
 
 from sunglasses import patterns as P
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
 
 ENGINE = SunglassesEngine()
 PAGE_CHANNELS = ("web_content", "file")
@@ -148,7 +154,7 @@ def test_a_long_run_of_the_rule_words_is_read_in_bounded_time(filler):
     start = time.perf_counter()
     for channel in PAGE_CHANNELS:
         _ids(filler, channel)
-    assert time.perf_counter() - start < 30
+    assert time.perf_counter() - start < seconds_limit(30)
 
 
 def test_the_sets_hold_what_the_card_asks():

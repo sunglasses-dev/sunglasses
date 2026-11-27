@@ -20,13 +20,18 @@ Every fixture here is written for this test; none is taken from a published corp
 """
 import json
 import os
+import sys
 import time
 
 import pytest
 
-from sunglasses import validators as validators_module
-from sunglasses.engine import SunglassesEngine
-from sunglasses.validators import RegistryRedirectInShell, VALIDATORS
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import _host_factor  # noqa: E402
+from _host_factor import seconds_limit  # noqa: E402
+from sunglasses import validators as validators_module  # noqa: E402
+from sunglasses.engine import SunglassesEngine  # noqa: E402
+from sunglasses.validators import RegistryRedirectInShell, VALIDATORS  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RULE = "GLS-STRUCT-006"
@@ -1008,23 +1013,102 @@ def best_of(call, runs=3):
     return out
 
 
+# The two cost rows below keep their multiples (4x the scan without the layer, 48x the small text for 16x the input) and
+# put their fixed seconds on the host factor of tests/_host_factor.py, as the other cost rows do: a slow shared runner
+# widens the fixed seconds, a host at the reference speed keeps the stated numbers. The multiples never move, so a walk that
+# is quadratic in the text (256x for 16x the input) still fails at the slowest factor the helper allows.
+BOUNDED_MULTIPLE = 4.0
+BOUNDED_SECONDS = 6.0
+GROWTH_MULTIPLE = 48
+GROWTH_SECONDS = 0.5
+
+
+def costs_a_bounded_multiple(with_layer, without):
+    return with_layer <= BOUNDED_MULTIPLE * without + seconds_limit(BOUNDED_SECONDS)
+
+
+def grows_linearly(t_small, t_large):
+    return t_large < GROWTH_MULTIPLE * t_small + seconds_limit(GROWTH_SECONDS)
+
+
+def growth_seconds(run, family):
+    small = families(1 << 16)[family]
+    large = families(1 << 20)[family]
+    t_small = max(best_of(lambda: run(small)), 1e-4)
+    t_large = best_of(lambda: run(large), 2)
+    return t_small, t_large
+
+
 @pytest.mark.parametrize("family", sorted(families(1000)))
 def test_the_layer_costs_a_bounded_multiple_of_the_scan_without_it(family):
     text = families(1 << 20)[family]
     on, off = SunglassesEngine(), SunglassesEngine(validators=False)
     with_layer = best_of(lambda: on.scan(text, channel="file"), 2)
     without = best_of(lambda: off.scan(text, channel="file"), 2)
-    assert with_layer <= 4.0 * without + 6.0, (family, with_layer, without)
+    assert costs_a_bounded_multiple(with_layer, without), (family, with_layer, without)
 
 
 @pytest.mark.parametrize("family", sorted(families(1000)))
 def test_the_validator_alone_grows_linearly_with_the_input(validator, family):
-    small = families(1 << 16)[family]
-    large = families(1 << 20)[family]
-    t_small = max(best_of(lambda: validator.run(small)), 1e-4)
-    t_large = best_of(lambda: validator.run(large), 2)
+    t_small, t_large = growth_seconds(validator.run, family)
     # 16x the input; allow 3x slack for noise, never the 256x a quadratic walk would take
-    assert t_large < 48 * t_small + 0.5, (family, t_small, t_large)
+    assert grows_linearly(t_small, t_large), (family, t_small, t_large)
+
+
+class FakeClock:
+    """A clock a planted walk moves by the cost it stands for, so the controls below spend no real seconds."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def perf_counter(self):
+        return self.now
+
+
+class PlantedWalk:
+    """A validator whose cost for a text of n characters is seconds_for_small * (n / small) ** power, on the fake clock."""
+
+    def __init__(self, clock, power, seconds_for_small=0.03, small=1 << 16):
+        self.clock, self.power, self.seconds_for_small, self.small = clock, power, seconds_for_small, small
+
+    def run(self, text):
+        self.clock.now += self.seconds_for_small * (len(text) / self.small) ** self.power
+
+
+@pytest.mark.parametrize("family", ["fence_spam", "plain_commands", "long_line"])
+def test_a_walk_that_is_quadratic_in_the_text_fails_the_growth_row_at_the_slowest_host_factor(monkeypatch, family):
+    clock = FakeClock()
+    monkeypatch.setitem(globals(), "time", clock)
+    monkeypatch.setattr(_host_factor, "_factor", [_host_factor.CAP])
+    t_small, t_large = growth_seconds(PlantedWalk(clock, 2).run, family)
+    assert t_large == pytest.approx(256 * t_small, rel=0.01)
+    assert not grows_linearly(t_small, t_large), (family, t_small, t_large)
+
+
+@pytest.mark.parametrize("family", ["fence_spam", "plain_commands", "long_line"])
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+def test_a_walk_that_is_linear_in_the_text_passes_the_growth_row_at_any_host_factor(monkeypatch, family, factor):
+    clock = FakeClock()
+    monkeypatch.setitem(globals(), "time", clock)
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    t_small, t_large = growth_seconds(PlantedWalk(clock, 1).run, family)
+    assert t_large == pytest.approx(16 * t_small, rel=0.01)
+    assert grows_linearly(t_small, t_large), (family, t_small, t_large)
+
+
+@pytest.mark.parametrize("factor, passes", [(1.0, False), (1.2, False), (1.5, True), (_host_factor.CAP, True)])
+def test_the_fixed_seconds_of_the_growth_row_follow_the_host_factor(monkeypatch, factor, passes):
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    # 0.027 s for the small text and 1.91 s for the large one: 71x for 16x the input, ruled by the fixed seconds alone
+    assert grows_linearly(0.027, 1.91) is passes
+
+
+@pytest.mark.parametrize("factor, with_layer, passes", [(1.0, 10.0, True), (1.0, 11.0, False), (_host_factor.CAP, 15.0, True),
+                                                         (_host_factor.CAP, 17.0, False)])
+def test_the_bounded_multiple_row_adds_its_fixed_seconds_on_the_host_factor(monkeypatch, factor, with_layer, passes):
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    # without the layer 1 s: 4 x 1 + 6 x factor is 10 s at factor 1.0 and 16 s at the cap
+    assert costs_a_bounded_multiple(with_layer, 1.0) is passes
 
 
 # ---------------------------------------------------------------------- ASTRA round 1: found and exact

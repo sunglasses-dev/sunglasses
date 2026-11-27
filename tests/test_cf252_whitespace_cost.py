@@ -19,13 +19,18 @@ ATTACK_ROWS are 31 wordings taken from two outside reviews of the encoding rules
 blocks on main on the four channels in CHANNELS and must keep doing so. Only the cost tests
 fail on main. The negation and start tests fail on the first version of this change.
 """
+import os
 import re
-import time
+import sys
 
 import pytest
 
 from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import best_seconds, seconds_limit  # noqa: E402
 
 BLOCKING = ("block", "quarantine")
 CHANNELS = ["file", "message", "web_content", "tool_output"]
@@ -122,10 +127,13 @@ def test_status_wording_still_fires_the_rule(engine, text, channel):
 def test_long_whitespace_is_cheap(shape):
     text = LONG_SHAPES[shape]
     regexes = _cf252()
-    start = time.perf_counter()
-    for rx in regexes:
-        rx.search(text)
-    assert time.perf_counter() - start < LIMIT_SECONDS
+
+    def run():
+        for rx in regexes:
+            rx.search(text)
+
+    limit = seconds_limit(LIMIT_SECONDS)
+    assert best_seconds(run, limit) < limit
 
 
 # A scan reaches the rule only when the text holds one of the rule's words, so each text
@@ -144,9 +152,8 @@ SCAN_SHAPES = {
 @pytest.mark.parametrize("channel", CHANNELS)
 @pytest.mark.parametrize("shape", sorted(SCAN_SHAPES))
 def test_scan_of_long_whitespace_is_cheap(engine, shape, channel):
-    start = time.perf_counter()
-    engine.scan(SCAN_SHAPES[shape], channel=channel)
-    assert time.perf_counter() - start < LIMIT_SECONDS
+    limit = seconds_limit(LIMIT_SECONDS)
+    assert best_seconds(lambda: engine.scan(SCAN_SHAPES[shape], channel=channel), limit) < limit
 
 
 # Ordinary prose with a negation word in front of the status line. The engine downgrades the

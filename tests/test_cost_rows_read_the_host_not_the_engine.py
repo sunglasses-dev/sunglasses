@@ -121,3 +121,268 @@ def test_a_latency_at_the_engine_entry_turns_a_bridge_row_red_at_factor_one(engi
     slow = SlowEntry(engine, module.SCAN_LIMIT_SECONDS + 0.2)
     with pytest.raises(AssertionError):
         module.test_the_engine_scans_a_reader_lead_with_many_line_breaks_in_a_small_time(slow, 100)
+
+
+class ShotClock:
+    """A clock that moves by the next number of a list each time the row runs, so the shots below spend no real seconds."""
+
+    def __init__(self, shots):
+        self.shots = list(shots)
+        self.now = 0.0
+        self.taken = 0
+
+    def perf_counter(self):
+        return self.now
+
+    def run(self):
+        self.now += self.shots[self.taken]
+        self.taken += 1
+
+
+def measure(monkeypatch, shots, factor, limit=1.0):
+    clock = ShotClock(shots)
+    monkeypatch.setattr(_host_factor, "time", clock)
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    monkeypatch.setattr(_host_factor, "_first_over", [])
+    monkeypatch.setattr(_host_factor, "ROW", ["tests/test_a_row.py::test_a_row"])
+    best = _host_factor.best_seconds(clock.run, _host_factor.seconds_limit(limit))
+    return best, clock.taken, _host_factor.seconds_limit(limit)
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+def test_a_scan_that_costs_four_seconds_in_every_shot_is_over_the_limit_at_the_floor_and_at_the_cap(monkeypatch, factor):
+    best, taken, limit = measure(monkeypatch, [4.0, 4.0, 4.0], factor)
+    assert best >= limit and taken == 3
+
+
+def test_a_scan_that_costs_one_point_four_seconds_in_every_shot_is_over_the_limit_at_the_floor(monkeypatch):
+    best, taken, limit = measure(monkeypatch, [1.4, 1.4, 1.4], 1.0)
+    assert best >= limit and taken == 3
+
+
+def test_a_scan_that_costs_one_point_four_seconds_in_every_shot_is_under_the_limit_at_a_factor_of_one_point_eight(monkeypatch):
+    best, taken, limit = measure(monkeypatch, [1.4, 1.4, 1.4], 1.8)
+    assert best < limit and taken == 1
+
+
+def test_one_slow_shot_followed_by_a_fast_one_is_under_the_limit_after_two_shots(monkeypatch):
+    best, taken, limit = measure(monkeypatch, [1.4, 0.3, 9.9], 1.0)
+    assert best == pytest.approx(0.3) and best < limit and taken == 2
+
+
+def test_a_first_shot_under_the_limit_is_the_only_shot(monkeypatch):
+    best, taken, limit = measure(monkeypatch, [0.3, 9.9, 9.9], 1.0)
+    assert best == pytest.approx(0.3) and best < limit and taken == 1
+    assert _host_factor.first_over_lines() == []
+
+
+def test_a_first_shot_over_the_limit_is_printed_with_its_row_and_reading_when_a_later_shot_passes(monkeypatch):
+    measure(monkeypatch, [1.4, 0.3, 9.9], 1.0)
+    assert _host_factor.first_over_lines() == [
+        "cost rows: first shot over its limit: tests/test_a_row.py::test_a_row read 1.400 s against 1.000 s"]
+
+
+def test_a_first_shot_over_the_limit_is_printed_when_every_shot_is_over_it(monkeypatch):
+    measure(monkeypatch, [1.4, 1.4, 1.4], 1.0)
+    assert len(_host_factor.first_over_lines()) == 1
+
+
+def test_the_whitespace_files_keep_their_limit_constant_at_one_second():
+    for name in ("test_cf252_whitespace_cost", "test_cmp009_whitespace_cost"):
+        assert importlib.import_module(name).LIMIT_SECONDS == 1.0
+
+
+def slow_host(monkeypatch, factor):
+    """A fake clock in the helper and the factor of a host, for a row that clocks its scan with best_seconds."""
+    clock = ShotClock([])
+    monkeypatch.setattr(_host_factor, "time", clock)
+    monkeypatch.setattr(_host_factor, "_factor", [factor])
+    monkeypatch.setattr(_host_factor, "_first_over", [])
+    return clock
+
+
+class SlowScan:
+    """An engine whose scan costs a fixed number of seconds on the fake clock and reads nothing."""
+
+    def __init__(self, clock, seconds):
+        self.clock, self.seconds = clock, seconds
+
+    def scan(self, *args, **kwargs):
+        self.clock.now += self.seconds
+
+    def search(self, *args, **kwargs):
+        self.clock.now += self.seconds
+
+
+def rows_of(name):
+    return importlib.import_module(name)
+
+
+WHITESPACE_FILES = [("test_cf252_whitespace_cost", "_cf252", "applied then spaces", "file"),
+                    ("test_cmp009_whitespace_cost", "_new", "copy then spaces", "file")]
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("name, regexes, shape, channel", WHITESPACE_FILES)
+def test_a_slowed_engine_turns_the_whitespace_scan_row_red_at_the_floor_and_at_the_cap(monkeypatch, name, regexes, shape, channel, factor):
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of(name)
+    with pytest.raises(AssertionError):
+        module.test_scan_of_long_whitespace_is_cheap(SlowScan(clock, module.LIMIT_SECONDS * factor + 0.2), shape, channel)
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("name, regexes, shape, channel", WHITESPACE_FILES)
+def test_an_engine_under_the_limit_keeps_the_whitespace_scan_row_green_at_the_floor_and_at_the_cap(monkeypatch, name, regexes, shape, channel, factor):
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of(name)
+    module.test_scan_of_long_whitespace_is_cheap(SlowScan(clock, module.LIMIT_SECONDS * factor - 0.2), shape, channel)
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("name, regexes, shape, channel", WHITESPACE_FILES)
+def test_a_slowed_search_turns_the_whitespace_regex_row_red_and_a_fast_one_keeps_it_green(monkeypatch, name, regexes, shape, channel, factor):
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of(name)
+    shape = sorted(module.LONG_SHAPES)[0]
+    monkeypatch.setattr(module, regexes, lambda: [SlowScan(clock, module.LIMIT_SECONDS * factor + 0.2)])
+    with pytest.raises(AssertionError):
+        module.test_long_whitespace_is_cheap(shape)
+    monkeypatch.setattr(module, regexes, lambda: [SlowScan(clock, module.LIMIT_SECONDS * factor - 0.2)])
+    module.test_long_whitespace_is_cheap(shape)
+
+
+class SizedScan:
+    """An engine whose scan costs one number of seconds for a short text and another for a long one, on the fake clock."""
+
+    def __init__(self, clock, short, long, result=None):
+        self.clock, self.short, self.long, self.result = clock, short, long, result
+
+    def scan(self, text, *args, **kwargs):
+        self.clock.now += self.long if len(text) > 50_000 else self.short
+        return self.result
+
+
+def a_scan_result(*ids):
+    import types
+    return types.SimpleNamespace(findings=[{"id": one} for one in ids])
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+def test_a_slowed_engine_turns_the_five_kilobyte_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of("test_stacked_lookaheads")
+    slow = SizedScan(clock, 2.0 * factor + extra, 0, a_scan_result("GLS-SMP-023"))
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_five_kilobytes_with_the_third_signal_only_at_the_end_scan_quickly(slow)
+    else:
+        module.test_five_kilobytes_with_the_third_signal_only_at_the_end_scan_quickly(slow)
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+def test_a_slowed_engine_turns_the_fetch_verb_probe_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of("test_whitespace_run_after_a_fetch_verb")
+    monkeypatch.setattr(module, "SunglassesEngine", lambda: SlowScan(clock, module.CAP_S * 4 * factor + extra))
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_the_engine_scans_the_probe_under_the_cap()
+    else:
+        module.test_the_engine_scans_the_probe_under_the_cap()
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.1, False)])
+def test_a_slowed_search_turns_the_blank_space_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    import types
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of("test_ai_addressed_directive_rules")
+    searches = len(module.by_id(module.A)["regex"])
+    slow = SlowScan(clock, (0.25 * factor + extra) / searches)
+    monkeypatch.setattr(module, "re", types.SimpleNamespace(compile=lambda *args: slow, IGNORECASE=2))
+    shape = sorted(module.LONG_RUNS)[0]
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_long_runs_of_blank_space_are_cheap_for_every_rule_here(module.A, shape)
+    else:
+        module.test_long_runs_of_blank_space_are_cheap_for_every_rule_here(module.A, shape)
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+def test_a_slowed_run_turns_the_dripping_server_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    import types
+    clock = slow_host(monkeypatch, factor)
+    module = rows_of("test_report_to")
+    done = types.SimpleNamespace(stderr="EXIT=1\nsunglasses: --report-to: 127.0.0.1 did not finish within 1 s;", stdout="{}")
+
+    def probe(*args, **kwargs):
+        clock.now += 8 * factor + extra if args[0][-2:-1] == ["--report-to"] else 0
+        return done
+
+    monkeypatch.setattr(module, "_files", lambda tmp_path: ("threat", "other"))
+    monkeypatch.setattr(module, "_probe", probe)
+    monkeypatch.setattr(module, "_stable", lambda document: document)
+    monkeypatch.setattr(module, "_report_lines", lambda run: ["one"])
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_the_scan_exit_and_output_do_not_wait_for_a_dripping_server("dir", lambda drip: types.SimpleNamespace(url="u"))
+    else:
+        module.test_the_scan_exit_and_output_do_not_wait_for_a_dripping_server("dir", lambda drip: types.SimpleNamespace(url="u"))
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+def test_a_slowed_engine_turns_the_long_document_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    clock = slow_host(monkeypatch, factor)
+    monkeypatch.setattr(time, "perf_counter", clock.perf_counter)
+    module = rows_of("test_evasion_hardening")
+    monkeypatch.setattr(module, "engine", SizedScan(clock, 0.001, 0.04 + factor + extra))
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_long_document_scan_stays_fast()
+    else:
+        module.test_long_document_scan_stays_fast()
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+def test_a_slowed_engine_turns_the_input_cap_row_red_and_a_fast_one_keeps_it_green(monkeypatch, factor, extra, red):
+    import types
+    clock = slow_host(monkeypatch, factor)
+    monkeypatch.setattr(time, "perf_counter", clock.perf_counter)
+    module = rows_of("test_input_cap")
+    answer = types.SimpleNamespace(truncated=True, bytes_scanned=50_000)
+    monkeypatch.setattr(module, "SunglassesEngine", lambda **kwargs: SizedScan(clock, 0.001, 0.004 + factor + extra, answer))
+    if red:
+        with pytest.raises(AssertionError):
+            module.test_truncation_bounds_the_cost()
+    else:
+        module.test_truncation_bounds_the_cost()
+
+
+LONG_TEXT_ROWS = [
+    ("test_support_lines_need_a_secret", "CHANNELS", 30, "test_a_long_run_of_the_opening_words_is_read_in_bounded_time"),
+    ("test_order_rules_anchor_and_line_break", "READ", 40, "test_a_long_text_without_a_full_stop_is_read_in_bounded_time"),
+    ("test_passive_order_to_move_data_to_an_outside_mail", "PAGE_CHANNELS", 30, "test_a_long_run_of_the_rule_words_is_read_in_bounded_time"),
+    ("test_authority_order_to_an_outside_mail", "BLOCKING_CHANNELS", 30, "test_a_long_run_of_the_opening_words_is_read_in_bounded_time"),
+]
+
+
+@pytest.mark.parametrize("factor", [1.0, _host_factor.CAP])
+@pytest.mark.parametrize("extra, red", [(0.2, True), (-0.2, False)])
+@pytest.mark.parametrize("name, channels, limit, row", LONG_TEXT_ROWS)
+def test_a_slowed_scan_turns_each_long_text_row_red_and_a_fast_one_keeps_it_green(monkeypatch, name, channels, limit, row, factor, extra, red):
+    clock = slow_host(monkeypatch, factor)
+    monkeypatch.setattr(time, "perf_counter", clock.perf_counter)
+    module = rows_of(name)
+    each = (limit * factor + extra) / len(getattr(module, channels))
+    monkeypatch.setattr(module, "_ids", lambda text, channel: clock.__setattr__("now", clock.now + each))
+    if red:
+        with pytest.raises(AssertionError):
+            getattr(module, row)("a")
+    else:
+        getattr(module, row)("a")

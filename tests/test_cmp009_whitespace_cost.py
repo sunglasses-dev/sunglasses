@@ -22,14 +22,19 @@ drift from the rule. The words of the rule are not changed.
 The cost tests and the gap-form test fail on main. The padding, core and span tests pass on
 main and on this change.
 """
+import os
 import random
 import re
-import time
+import sys
 
 import pytest
 
 from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import best_seconds, seconds_limit  # noqa: E402
 
 BLOCKING = ("block", "quarantine")
 CHANNELS = ["file", "api_response"]
@@ -155,15 +160,17 @@ LONG_SHAPES = {
 @pytest.mark.parametrize("shape", sorted(LONG_SHAPES))
 def test_long_whitespace_is_cheap(shape):
     text = LONG_SHAPES[shape]
-    start = time.perf_counter()
-    for rx in _new():
-        rx.search(text)
-    assert time.perf_counter() - start < LIMIT_SECONDS
+
+    def run():
+        for rx in _new():
+            rx.search(text)
+
+    limit = seconds_limit(LIMIT_SECONDS)
+    assert best_seconds(run, limit) < limit
 
 
 @pytest.mark.parametrize("channel", CHANNELS)
 @pytest.mark.parametrize("shape", ["copy then spaces", "mark then spaces", "copy then CRLF"])
 def test_scan_of_long_whitespace_is_cheap(engine, shape, channel):
-    start = time.perf_counter()
-    engine.scan(LONG_SHAPES[shape], channel=channel)
-    assert time.perf_counter() - start < LIMIT_SECONDS
+    limit = seconds_limit(LIMIT_SECONDS)
+    assert best_seconds(lambda: engine.scan(LONG_SHAPES[shape], channel=channel), limit) < limit

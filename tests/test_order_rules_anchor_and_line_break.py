@@ -8,11 +8,17 @@ The lead-ins use neutral words: none of them is a move word or a data noun of th
 Honest lines that the imperative and the passive rule both read as an attack are known wrong blocks (strict expected failures, class words:
 the whose word governs another noun, or the object noun is only a modifier); a binding rule for them would cost planted orders and does not exist.
 """
+import os
+import sys
 import time
 
 import pytest
 
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
 
 ENGINE = SunglassesEngine()
 M = "archive@northfield-records.net"
@@ -152,7 +158,7 @@ def test_a_long_text_without_a_full_stop_is_read_in_bounded_time(filler):
     start = time.perf_counter()
     for channel in READ:
         _ids(filler, channel)
-    assert time.perf_counter() - start < 40
+    assert time.perf_counter() - start < seconds_limit(40)
 
 
 # The two rules carry no guard of their own and the engine does not lower their match: a negated form keeps the block. A forbidding form

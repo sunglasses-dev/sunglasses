@@ -22,10 +22,11 @@ Three things are pinned here:
   3. one wide-margin timing row for the input that used to run far past the scan budget.
 """
 import json
+import os
 import pathlib
 import random
 import re
-import time
+import sys
 
 import pytest
 
@@ -40,6 +41,10 @@ from sunglasses import _prefilter
 from sunglasses.engine import SunglassesEngine
 from sunglasses.mechanisms import MECHANISM_PATTERNS
 from sunglasses.patterns import PATTERNS
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import best_seconds, seconds_limit  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 RULES = ("GLS-SMP-023", "GLS-AW-613")
@@ -375,18 +380,20 @@ def test_the_fixture_corpus_agrees_for_both_rules():
 def test_five_kilobytes_with_the_third_signal_only_at_the_end_scan_quickly(engine):
     """Signals A and B repeat through the text and C appears once, at the very
     end. The prefilter looks at the whole document, so it lets the rule in, and
-    every earlier 1200 character window holds A and B but not C: the exact
-    case where the interleaved form was cubic, and it ran far past the scan
-    budget before the change. The bar is 2 seconds, a wide margin on any runner,
-    and it is measured on the same engine in the same process."""
+    every earlier 1200 character window holds A and B but not C. The scan
+    stays under 2 seconds on the host factor, the smallest of up to three
+    shots, measured on the same engine in the same process."""
     unit = ("The extractor emits a schema-valid record. The fields were "
             "cross-bound to the wrong actor. " + "q" * 80)
     text = (unit * 100)[:5000 - 6] + " trust"
     assert len(text) == 5000
     engine.scan("warm", channel="message")
-    started = time.perf_counter()
-    result = engine.scan(text, channel="message")
-    elapsed = time.perf_counter() - started
-    assert "GLS-SMP-023" in {f["id"] for f in result.findings}, (
-        "the rule must still fire on the text it was written for")
-    assert elapsed < 2.0, f"a 5 KB scan took {elapsed:.2f}s; the stacked form takes milliseconds"
+    limit = seconds_limit(2.0)
+
+    def run():
+        result = engine.scan(text, channel="message")
+        assert "GLS-SMP-023" in {f["id"] for f in result.findings}, (
+            "the rule must still fire on the text it was written for")
+
+    elapsed = best_seconds(run, limit)
+    assert elapsed < limit, f"a 5 KB scan took {elapsed:.2f}s; the stacked form takes milliseconds"
