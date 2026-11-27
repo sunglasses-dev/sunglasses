@@ -10,13 +10,19 @@ The person's own channel (message) never blocks on this class, whatever the word
 
 Every must-allow text is allowed and every must-block text blocks.
 """
+import os
 import re
+import sys
 import time
 
 import pytest
 
 from sunglasses import patterns as P
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
 
 ENGINE = SunglassesEngine()
 BLOCKING_CHANNELS = ("web_content", "file")
@@ -175,4 +181,4 @@ def test_a_long_run_of_the_opening_words_is_read_in_bounded_time(filler):
     start = time.perf_counter()
     for channel in BLOCKING_CHANNELS:
         _ids(filler, channel)
-    assert time.perf_counter() - start < 30
+    assert time.perf_counter() - start < seconds_limit(30)

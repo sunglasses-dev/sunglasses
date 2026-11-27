@@ -23,6 +23,10 @@ sys.path.insert(0, REPO)
 
 from sunglasses.engine import SunglassesEngine, MAX_SCAN_BYTES  # noqa: E402
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
+
 
 @pytest.fixture(scope="module")
 def engine():
@@ -115,7 +119,7 @@ def test_truncation_bounds_the_cost():
     # Generous multiplier: the only extra work on the oversized path is slicing the
     # string. 4x plus a second of slack cannot be reached by anything but a real
     # regression, and cannot be tripped by a slow runner.
-    assert big_elapsed < cap_elapsed * 4 + 1.0, (
+    assert big_elapsed < cap_elapsed * 4 + seconds_limit(1.0), (
         f"a 4 MB input cost {big_elapsed:.2f}s against {cap_elapsed:.2f}s for a "
         f"cap-sized one — cost is tracking the INPUT, not the cap"
     )

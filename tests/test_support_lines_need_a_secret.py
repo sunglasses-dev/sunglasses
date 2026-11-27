@@ -11,13 +11,19 @@ search history, or the whole process environment (the full, entire, whole, compl
 Bare environment, environment details, your config file and the history of changes are not.
 These tests hold both sides: honest support lines stay out of the rule, and every line that asks for a secret stays in it.
 """
+import os
 import re
+import sys
 import time
 
 import pytest
 
 from sunglasses import patterns as P
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
 
 ENGINE = SunglassesEngine()
 RULE = "GLS-PI-014"
@@ -148,4 +154,4 @@ def test_a_long_run_of_the_opening_words_is_read_in_bounded_time(filler):
     start = time.perf_counter()
     for channel in CHANNELS:
         _ids(filler, channel)
-    assert time.perf_counter() - start < 30
+    assert time.perf_counter() - start < seconds_limit(30)

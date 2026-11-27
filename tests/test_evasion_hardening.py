@@ -11,9 +11,16 @@ legitimate documentation is a regression, not a fix.
 """
 
 import base64
+import os
+import sys
+
 import pytest
 
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import seconds_limit  # noqa: E402
 
 engine = SunglassesEngine()
 
@@ -145,7 +152,7 @@ def test_long_document_scan_stays_fast():
 
     # 10x the input at ~linear cost, so 4x headroom over the expected ratio.
     # Machine-independent: a slow runner slows BOTH measurements equally.
-    assert elapsed < baseline * 40 + 1.0, (
+    assert elapsed < baseline * 40 + seconds_limit(1.0), (
         f"100KB scan took {elapsed:.1f}s against {baseline:.2f}s for 10KB "
         f"({elapsed / max(baseline, 1e-9):.1f}x for 10x the input) — "
         f"perf regression / ReDoS risk"

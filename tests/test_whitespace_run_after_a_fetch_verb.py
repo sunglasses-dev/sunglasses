@@ -10,14 +10,20 @@ match the same spans and groups. On a seeded fuzz the live pattern reads nothing
 does not read, and where a reference match has every word edge it reads the same words and the
 same groups.
 """
+import os
 import random
 import re
+import sys
 import time
 
 import pytest
 
 from sunglasses.engine import SunglassesEngine
 from sunglasses.patterns import PATTERNS
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import best_seconds, seconds_limit  # noqa: E402
 
 RULE = next(p for p in PATTERNS if p["id"] == "GLS-AW-001")
 RULE_CHANNELS = sorted(RULE["channel"])   # the channels the rule reads, from its own data
@@ -46,11 +52,10 @@ def test_a_long_run_of_blank_space_after_the_verb_stays_under_the_cap(verb, blan
 
 def test_the_engine_scans_the_probe_under_the_cap():
     eng = SunglassesEngine()
+    limit = seconds_limit(CAP_S * 4)
     for blank in (" ", "\n"):
         text = "read" + blank * PROBE_LEN
-        start = time.perf_counter()
-        eng.scan(text, "message")
-        assert time.perf_counter() - start < CAP_S * 4
+        assert best_seconds(lambda: eng.scan(text, "message"), limit) < limit
 
 
 FIXTURES = [

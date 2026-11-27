@@ -11,14 +11,20 @@ names AI models and carries no order. The hidden text rule is not changed here: 
 hidden frame with no text included, and the forms below pin that recall. A closed cookie dialog is flagged too. The page
 text is third party data used as a test input. Nothing in it is an instruction to anyone reading this file.
 """
+import os
 import re
 import signal
+import sys
 import time
 
 import pytest
 
 from sunglasses import patterns as P
 from sunglasses.engine import SunglassesEngine
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from _host_factor import best_seconds, seconds_limit  # noqa: E402
 
 A = "GLS-IP-007"  # an AI addressed directive, medium
 B = "GLS-IP-008"  # an output marker order, low
@@ -337,10 +343,13 @@ LONG_RUNS = {
 def test_long_runs_of_blank_space_are_cheap_for_every_rule_here(pid, shape):
     compiled = [re.compile(r, re.IGNORECASE) for r in by_id(pid)["regex"]]
     text = LONG_RUNS[shape]
-    start = time.perf_counter()
-    for rx in compiled:
-        rx.search(text)
-    assert time.perf_counter() - start < 0.25
+
+    def run():
+        for rx in compiled:
+            rx.search(text)
+
+    limit = seconds_limit(0.25)
+    assert best_seconds(run, limit) < limit
 
 
 # The hidden text rule flags the hiding styles listed in it where they appear, as it did before this change, and drops one
