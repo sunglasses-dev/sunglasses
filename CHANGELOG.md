@@ -5,7 +5,7 @@ All notable changes to Sunglasses are documented here.
 
 ## [Unreleased]
 
-## [0.6.30] — 2026-11-27
+## [0.6.30] — 2026-11-28
 
 ### Security
 
