@@ -3688,7 +3688,7 @@ class SunglassesEngine:
     def _check_negation(self, text: str, match_start: int, align=None, match_end: Optional[int] = None,
                         refusal_ok: bool = False, raw_frame: bool = False, view_copy: bool = False,
                         only_list: bool = False, rule_id: Optional[str] = None,
-                        tail_id: Optional[str] = None) -> bool:
+                        tail_id: Optional[str] = None, at_place: bool = False) -> bool:
         """
         Check if negation/framing context before a matched keyword should
         downgrade it from a live attack to a warning/example.
@@ -3768,10 +3768,12 @@ class SunglassesEngine:
                     continue
                 else:
                     road = "quoted"
-            # On the plain road only a true negation lowers a hit. A plain negation lowers on the list
-            # road (above) and nowhere else; a copy of the text read at its place with a rule id
-            # (_negated_here) reaches this check too.
+            # On the plain road only a true negation lowers a hit; a plain negation lowers on the list
+            # road (above). A copy of the text read at its place (_negated_here) reaches this check too
+            # and is not lowered on the quoted road.
             if road == "plain" and plain:
+                continue
+            if road == "quoted" and at_place:
                 continue
             if align is None or align.holds(
                     text, max(0, window_start + m.start() - 1), gap_end,
@@ -4347,7 +4349,7 @@ class SunglassesEngine:
         # The copy is the plain text: when the plain text at its place is negated, so is the copy.
         return place is not None and self._check_negation(
             view, place, align, place + end - pos, refusal_ok, only_list=rule_id is None, rule_id=rule_id,
-            tail_id=tail_id)
+            tail_id=tail_id, at_place=True)
 
     @staticmethod
     def _shape_copy_start(view: str, align):
